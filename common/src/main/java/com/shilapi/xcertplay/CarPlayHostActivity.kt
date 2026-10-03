@@ -3067,7 +3067,7 @@ class CarPlayHostActivity : ComponentActivity() {
         videoHeight: Int,
         controllerGeneration: Int,
     ): AndroidMediaSink {
-        // Capture this session's log: late decoder shutdown must not write into a new session.
+        // 固定当前会话文件，解码器的迟到回调不能写入新会话。
         val diagnosticLog = sessionLog
         return AndroidMediaSink(
             surface = null,
@@ -3090,7 +3090,7 @@ class CarPlayHostActivity : ComponentActivity() {
             onAudioDiagnostic = { message ->
                 val line = formattedLogLine("g=$controllerGeneration $message", System.currentTimeMillis())
                 if (l7DebugLogs) L7DebugLog.buffer.append(line)
-                diagnosticLog?.append(line)
+                AsyncDiagnosticLog.append(diagnosticLog, "g=$controllerGeneration $message")
             },
             onVideoSizeChanged = { width, height -> updateVideoCanvas(controllerGeneration, width, height) },
         )
@@ -3137,8 +3137,9 @@ class CarPlayHostActivity : ComponentActivity() {
             audioCaptureDirectory = audioCaptureDirectory(),
         )
 
-    private fun createSessionListener(controllerGeneration: Int): AirPlaySessionListener =
-        object : AirPlaySessionListener {
+    private fun createSessionListener(controllerGeneration: Int): AirPlaySessionListener {
+        val diagnosticLog = sessionLog
+        return object : AirPlaySessionListener {
             override fun onSessionActive(session: AirPlaySession) {
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
@@ -3185,7 +3186,10 @@ class CarPlayHostActivity : ComponentActivity() {
             }
 
             override fun onDebugLog(message: String) {
-                if (DiagnosticRedactor.redact(message) == null) return
+                val safe = DiagnosticRedactor.redact(message) ?: return
+                // 文件目标随监听器固定，旧控制器的关闭诊断仍落在所属会话；写盘不占用主线程。
+                AsyncDiagnosticLog.append(diagnosticLog, safe)
+                if (l7DebugLogs) L7DebugLog.record(safe)
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
                         return@runOnUiThread
@@ -3195,15 +3199,11 @@ class CarPlayHostActivity : ComponentActivity() {
                         videoFailureDialog?.dismiss()
                     }
                     DisplayDiagnosticSnapshot.record(this@CarPlayHostActivity, displayDiagnosticAttempt, message)
-                    // 设置页覆盖会话时仍保存日志，尤其保留断联和重连原因。
-                    if (message.startsWith(PROTOCOL_TRACE_PREFIX)) {
-                        appendFileLog(message)
-                    } else {
-                        appendLog(message)
-                    }
+
                 }
             }
         }
+    }
 
     private fun createStatusReporter(
         controllerGeneration: Int,
@@ -3839,13 +3839,13 @@ class CarPlayHostActivity : ComponentActivity() {
         val safe = DiagnosticRedactor.redact(message) ?: return
         val line = formattedLogLine(safe, System.currentTimeMillis())
         if (l7DebugLogs) L7DebugLog.buffer.append(line)
-        sessionLog?.append(line)
+        AsyncDiagnosticLog.append(sessionLog, message)
     }
 
     private fun appendFileLog(message: String) {
         val line = formattedLogLine(message, System.currentTimeMillis())
         if (l7DebugLogs) L7DebugLog.buffer.append(line)
-        sessionLog?.append(line)
+        AsyncDiagnosticLog.append(sessionLog, message)
     }
 
     private fun formattedLogLine(message: String, nowMillis: Long): String =

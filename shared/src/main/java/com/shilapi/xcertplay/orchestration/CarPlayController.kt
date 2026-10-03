@@ -1,5 +1,7 @@
 package com.shilapi.xcertplay.orchestration
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothA2dp
 import android.bluetooth.BluetoothDevice
@@ -40,6 +42,9 @@ import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
 import com.shilapi.xcertplay.network.ManualHotspotManager
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
+import com.shilapi.xcertplay.network.WirelessInterfaceDiagnostics
+import com.shilapi.xcertplay.network.WirelessReceiveDiagnostics
+import com.shilapi.xcertplay.network.WirelessStartupDiagnostics
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessHotspotManager
@@ -159,6 +164,8 @@ class CarPlayController(
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
 
     private val appContext = context.applicationContext
+    private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
+    private val diagnosticRun = AtomicInteger()
     private val usbManager = context.getSystemService(UsbManager::class.java)
     private val bluetoothAdapter =
         appContext.getSystemService(BluetoothManager::class.java)?.adapter
@@ -217,6 +224,7 @@ class CarPlayController(
         activeSession?.sendRemoteControlMessage(streamId, message) ?: false
 
     @Volatile private var hotspot: WirelessHotspotManager? = null
+    @Volatile private var wirelessDiagnostics: WirelessStartupDiagnostics? = null
     @Volatile private var bonjour: CarPlayBonjour? = null
     @Volatile private var bluetoothSocket: BluetoothSocket? = null
     @Volatile private var bluetoothStream: BluetoothRfcommDuplexStream? = null
@@ -845,6 +853,7 @@ class CarPlayController(
     }
 
     private fun startWireless() {
+        diagnosticRun.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.WIRELESS
         wirelessHandoffRequested.set(false)
@@ -919,6 +928,17 @@ class CarPlayController(
                     "band=${hotspotInfo.bandLabel} channel=${hotspotInfo.channel} " +
                     "frequency=${hotspotInfo.frequencyMHz?.toString() ?: "unknown"}MHz",
             )
+            var startedBonjour: CarPlayBonjour? = null
+            val receiveDiagnostics = WirelessReceiveDiagnostics(hotspotInfo.interfaceName)
+            val diagnostics = WirelessStartupDiagnostics(
+                sample = {
+                    "${WirelessInterfaceDiagnostics.snapshot(hotspotInfo.interfaceName)} " +
+                        (startedBonjour?.diagnosticSnapshot() ?: "bonjour=not_started") + "\n" +
+                        receiveDiagnostics.snapshot()
+                },
+                log = { message -> if (!isStaleWirelessRun(generation)) debugLog(message) },
+            )
+            wirelessDiagnostics = diagnostics
             onStatus(
                 CarPlayStatus.HotspotReady(
                     ssid = hotspotInfo.ssid,
@@ -988,6 +1008,8 @@ class CarPlayController(
             )
             bonjour = bonjourClient
             bonjourClient.start()
+            startedBonjour = bonjourClient
+            diagnostics.start()
             debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
             if (isStaleWirelessRun(generation)) {
                 closeWirelessStack()
@@ -1002,7 +1024,19 @@ class CarPlayController(
             val socket = device
                     .createRfcommSocketToServiceRecord(UUID.fromString(IAP2_IPHONE_UUID))
                     .also { bluetoothSocket = it }
-            connectBluetoothSocket(socket, device.address)
+            logBluetoothConnectionSnapshot(device, "before-connect")
+            val bluetoothStarted = System.nanoTime()
+            try {
+                connectBluetoothSocket(socket, device.address)
+                connectionDiagnostic("Bluetooth connect completed elapsedMs=${elapsedMillis(bluetoothStarted)}")
+            } catch (error: Throwable) {
+                connectionDiagnostic(
+                    "Bluetooth connect failed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
+                        "failureClass=${diagnosticFailureClass(error)}",
+                )
+                logBluetoothConnectionSnapshot(device, "after-failure")
+                throw error
+            }
             debugLog("wireless RFCOMM connected address=${device.address}")
             if (isStaleWirelessRun(generation)) {
                 closeWirelessStack()
@@ -1051,7 +1085,7 @@ class CarPlayController(
                 endpoint = endpoint,
                 timeoutMillis = controlLoopTimeoutMillis(),
                 onIncoming = ::onRouteFrame,
-                onProgress = ::debugLog,
+                onProgress = { message -> diagnostics.controlProgress(message); debugLog(message) },
             )
             if (isStaleWirelessRun(generation)) {
                 closeWirelessStack()
@@ -1177,6 +1211,7 @@ class CarPlayController(
         object : AirPlaySessionListener by sessionListener {
             override fun onSessionActive(session: AirPlaySession) {
                 if (isStaleWirelessRun(generation)) return
+                wirelessDiagnostics?.let { it.sessionActive(); it.close() }
                 wirelessConnectionProof.activate(generation, session)
                 sessionListener.onSessionActive(session)
             }
@@ -1191,6 +1226,12 @@ class CarPlayController(
                 if (isStaleWirelessRun(generation) || activeSession !== session) return
                 wirelessConnectionProof.rendered(generation, session)
                 connectionTimeline.mark("SurfacePresented", generation)?.let(::debugLog)
+            }
+
+            override fun onDebugLog(message: String) {
+                if (isStaleWirelessRun(generation)) return
+                if (message.startsWith("airplay TCP accepted family=")) wirelessDiagnostics?.connectionAccepted()
+                sessionListener.onDebugLog(message)
             }
 
             // Passed on explicitly: without these the car's video player never opened over Wi-Fi.
@@ -1307,6 +1348,7 @@ class CarPlayController(
     }
 
     private fun startIphone() {
+        diagnosticRun.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.IPHONE
         reenumerationAttempts = 0
@@ -1496,7 +1538,7 @@ class CarPlayController(
         var ncmOwnedLocally = true
         try {
             if (closed) return
-            val mux = Iap2UsbMuxHost.open(usbSession)
+            val mux = Iap2UsbMuxHost.open(usbSession, onDiagnostic = ::connectionDiagnostic)
             this.mux = mux
             debugLog("wired USBMUX host opened")
             onStatus(CarPlayStatus.Pairing)
@@ -1564,19 +1606,41 @@ class CarPlayController(
                     "flags=${value(4)} seq=${value(5)} ack=${value(6)} session=${value(7)}"
             }
             val tracedCarkit = object : com.shilapi.xcertplay.transport.BlockingDuplexByteStream {
+                private val io = ConnectionIoDiagnostics(::connectionDiagnostic)
                 override fun send(data: ByteArray) {
-                    debugLog("wired link TX begin ${wireSummary(data)}")
-                    // Bound each TLS write while diagnosing the stalled certificate transfer.
-                    for (offset in data.indices step 256) {
-                        carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
+                    val started = System.nanoTime()
+                    var result = ConnectionIoDiagnostics.Result.FAILED
+                    try {
+                        debugLog("wired link TX begin ${wireSummary(data)}")
+                        // 限制单次 TLS 写入长度，避免认证传输长时间阻塞。
+                        for (offset in data.indices step 256) {
+                            carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
+                        }
+                        debugLog("wired link TX completed bytes=${data.size}")
+                        result = ConnectionIoDiagnostics.Result.COMPLETED
+                    } finally {
+                        io.record(ConnectionIoDiagnostics.Operation.WRITE, result, elapsedMillis(started))
                     }
-                    debugLog("wired link TX completed bytes=${data.size}")
                 }
-                override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? =
-                    carkit.recv(maxBytes, timeoutMillis)?.also {
-                        debugLog("wired link RX ${wireSummary(it)}")
+                override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? {
+                    val started = System.nanoTime()
+                    var result = ConnectionIoDiagnostics.Result.FAILED
+                    try {
+                        return carkit.recv(maxBytes, timeoutMillis).also { bytes ->
+                            result = when {
+                                bytes == null -> ConnectionIoDiagnostics.Result.TIMED_OUT
+                                bytes.isEmpty() -> ConnectionIoDiagnostics.Result.ENDED
+                                else -> ConnectionIoDiagnostics.Result.COMPLETED
+                            }
+                            if (bytes != null) debugLog("wired link RX ${wireSummary(bytes)}")
+                        }
+                    } finally {
+                        io.record(ConnectionIoDiagnostics.Operation.READ, result, elapsedMillis(started))
                     }
-                override fun close() = carkit.close()
+                }
+                override fun close() {
+                    try { carkit.close() } finally { io.finish() }
+                }
             }
             val csm = Iap2Session.open(
                 tracedCarkit,
@@ -1794,7 +1858,30 @@ class CarPlayController(
         }
     }
 
+    private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                appContext.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+            ) {
+                connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
+                return
+            }
+            val uuids = device.uuids
+            val service = UUID.fromString(IAP2_IPHONE_UUID)
+            connectionDiagnostic(
+                "Bluetooth snapshot point=$point enabled=${bluetoothAdapter?.isEnabled} " +
+                    "bondState=${device.bondState} cachedServiceCount=${uuids?.size ?: "unknown"} " +
+                    "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
+            )
+        } catch (error: RuntimeException) {
+            connectionDiagnostic("Bluetooth snapshot point=$point unavailable failureClass=${diagnosticFailureClass(error)}")
+        }
+    }
+
     private fun closeWirelessStack(service: CarPlayVpnService? = vpnService) {
+        val diagnostics = wirelessDiagnostics
+        wirelessDiagnostics = null
+        diagnostics?.close()
         audioConnectionListener?.invoke(false)
         activeBluetoothDeviceAddress = null
         wirelessConnectionProof.clear()
@@ -1898,10 +1985,15 @@ class CarPlayController(
     }
 
     private fun closeBestEffort(name: String, close: () -> Unit) {
+        val started = System.nanoTime()
+        var completed = false
         try {
             close()
+            completed = true
         } catch (error: Throwable) {
             debugLog("$name teardown failed", error)
+        } finally {
+            connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
         }
     }
 
@@ -2037,6 +2129,22 @@ class CarPlayController(
         }
     }
 
+    private fun connectionDiagnostic(message: String) {
+        try {
+            // 脱敏器将 PHONE 前缀保留给私有手机端日志，因此使用 USB_DISCOVERY。
+            val diagnosticPhase = if (phase == Phase.IPHONE) "USB_DISCOVERY" else phase.name
+            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=${diagnosticRun.get()} phase=$diagnosticPhase $message")
+        } catch (_: Exception) {
+            // 可选诊断不能影响传输或关闭。
+        }
+    }
+
+    private fun diagnosticFailureClass(error: Throwable): String =
+        error.javaClass.simpleName.take(80).replace(Regex("[^A-Za-z0-9_$]"), "?")
+
+    private fun elapsedMillis(startedNanos: Long): Long =
+        ((System.nanoTime() - startedNanos) / 1_000_000L).coerceAtLeast(0)
+
     private fun debugLog(message: String, error: Throwable) {
         Log.w(IphoneCarPlayConfiguration.TAG, message, error)
         try {
@@ -2053,6 +2161,7 @@ class CarPlayController(
         mainHandler.post {
             if (!closed && status != lastReportedStatus) {
                 lastReportedStatus = status
+                connectionDiagnostic("stage=${status.javaClass.simpleName}")
                 connectionTimeline.mark(status.javaClass.simpleName, wirelessGeneration.get())?.let(::debugLog)
                 uiListener?.onDebugLog(status.debugLogMessage())
                 uiStatusReporter?.invoke(status)
@@ -2109,6 +2218,8 @@ class CarPlayController(
     }
 
     companion object {
+        const val CONNECTION_DIAGNOSTIC_PREFIX = "CONNECTION_DIAGNOSTIC"
+        private val diagnosticAttempts = AtomicInteger()
         private const val IAP2_IPHONE_UUID = "00000000-deca-fade-deca-deafdecacafe"
         private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L
         private const val WIFI_P2P_START_TIMEOUT_MILLIS = 20_000L

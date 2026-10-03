@@ -948,7 +948,7 @@ private class AudioRenderer(
         } catch (error: Exception) {
             if (running) {
                 Log.e(TAG, "audio renderer worker failed", error)
-                report("Audio: renderer failed audioType=${format.audioType} error=${error.javaClass.simpleName}")
+                runCatching { report("Audio: renderer failed audioType=${format.audioType} " + MediaFailureSummary.describe(error)) }
             }
         } finally {
             runCatching { logStatsIfDue(force = true) }
@@ -978,21 +978,23 @@ private class AudioRenderer(
                     "csd0=${aacAudioSpecificConfig().toHexString()}",
             )
         }
-        var candidate: MediaCodec? = null
         codec = try {
-            MediaCodec.createDecoderByType(mime).also {
-                candidate = it
-                it.configure(mediaFormat, null, null, 0)
-                it.start()
-                Log.i(TAG, "audio decoder configured mime=$mime name=${it.name}")
-                report("Audio: decoder configured audioType=${format.audioType} mime=$mime codec=${it.name}")
+            MediaCodecStartup.create(
+                create = { MediaCodec.createDecoderByType(mime) },
+                configure = { it.configure(mediaFormat, null, null, 0) },
+                start = { it.start() },
+                release = { it.release() },
+            ).also {
+                // 驱动名称查询或诊断回调失败不能丢弃已启动的解码器。
+                runCatching {
+                    val name = it.name
+                    report("Audio: decoder configured audioType=${format.audioType} mime=$mime codec=$name")
+                }
             }
         } catch (error: Exception) {
-            // 初始化失败时 codec 尚未交给 renderer，必须释放本次创建的实例。
-            runCatching { candidate?.release() }
             Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
-            report("Audio: decoder configuration failed audioType=${format.audioType} mime=$mime " +
-                "diagnostic=${(error as? MediaCodec.CodecException)?.diagnosticInfo ?: error.javaClass.simpleName}")
+            runCatching { report("Audio: decoder configuration failed audioType=${format.audioType} mime=$mime " +
+                MediaFailureSummary.describe(error)) }
             null
         }
     }
