@@ -1,6 +1,6 @@
 <resources>
     <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">调整 CarPlay 图标和文字的大小，保存后在下次连接时应用。</string>
-    <string name="app_name">L7CarPlay</string>
+    <string name="app_name">L7 CarPlay</string>
     <string name="diplay">L7CarPlay</string>
     <string name="about_diplay">关于 L7CarPlay</string>
     <string name="carplay_at_home_in_your_car">银河 L7 专用 CarPlay</string>

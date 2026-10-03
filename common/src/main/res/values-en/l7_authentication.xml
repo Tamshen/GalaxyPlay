@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_auth_title">CarPlay authentication</string>
+    <string name="l7_auth_builtin">Built-in (default)</string>
+    <string name="l7_auth_text">Import from text</string>
+    <string name="l7_auth_usb">USB authentication (CH341)</string>
+    <string name="l7_auth_remote">Remote MFi</string>
+    <string name="l7_auth_local">Local authentication (built-in or imported)</string>
+    <string name="l7_auth_remote_hint">Enter the upstream Remote MFi service URL using HTTP or HTTPS. Enter a token only if required by the service. Availability is checked when connecting.</string>
+    <string name="l7_auth_remote_server">Service URL</string>
+    <string name="l7_auth_remote_server_hint">For example, https://mfi.example.com</string>
+    <string name="l7_auth_remote_token">Access token (optional)</string>
+    <string name="l7_auth_remote_token_hint">Paste the token provided by the service</string>
+    <string name="l7_auth_remote_use">Save and enable Remote MFi</string>
+    <string name="l7_auth_remote_failed">Could not save remote settings. Enter a valid HTTP or HTTPS URL. Tokens cannot contain null characters. Credentials, query parameters and fragments in the URL are not supported.</string>
+    <string name="l7_auth_choose_source">Authentication source</string>
+    <string name="l7_auth_quick_import">Quick text import</string>
+    <string name="l7_auth_not_ready">Authentication is unavailable. Import valid credentials.</string>
+    <string name="l7_auth_switch_hint">Changing authentication ends the current CarPlay session. Reconnect from the connection page after saving.</string>
+    <string name="l7_auth_paste_hint">Paste a matching certificate and private key in PEM or Base64 format. They will be saved and enabled after validation.</string>
+    <string name="l7_auth_certificate">Certificate text</string>
+    <string name="l7_auth_private_key">Private key text</string>
+    <string name="l7_auth_certificate_hint">Paste PKCS7 or CERTIFICATE text</string>
+    <string name="l7_auth_key_hint">Paste PKCS#8 PRIVATE KEY text</string>
+    <string name="l7_auth_import_use">Import and enable</string>
+    <string name="l7_auth_validating">Validating credentials…</string>
+    <string name="l7_auth_builtin_missing">This build does not include built-in credentials. Use quick text import.</string>
+    <string name="l7_auth_import_failed">Could not enable authentication. Check the text format, that the P-256 private key matches a single certificate, and that device storage is writable.</string>
+    <string name="l7_auth_saved">Authentication enabled</string>
+</resources>

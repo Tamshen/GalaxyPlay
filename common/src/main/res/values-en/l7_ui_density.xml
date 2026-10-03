@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_ui_size">Interface size</string>
+    <string name="l7_ui_small">Small</string>
+    <string name="l7_ui_medium">Medium (default)</string>
+    <string name="l7_ui_large">Large</string>
+    <string name="l7_ui_custom">Custom DPI</string>
+    <string name="l7_ui_custom_value">Custom · %1$d DPI</string>
+    <string name="l7_ui_density_hint">Changes only this app interface. A higher DPI makes text and buttons larger. Applies after saving.</string>
+    <string name="l7_ui_density_range">Enter a whole-number DPI from 160 to 480</string>
+</resources>

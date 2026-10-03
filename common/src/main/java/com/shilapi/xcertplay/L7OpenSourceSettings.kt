@@ -1,0 +1,48 @@
+package com.shilapi.xcertplay
+
+import android.content.Context
+import android.widget.LinearLayout
+import com.shilapi.xcertplay.host.R
+
+/** 关于页仅列直接上游，其余声明和许可原文通过同套文本模态框离线查看。 */
+internal object L7OpenSourceSettings {
+    fun add(parent: LinearLayout) {
+        val context = parent.context
+        L7SettingsSection.add(parent, context.getString(R.string.l7_sources_receiver)) { card ->
+            card.addView(L7SettingRow(context, context.getString(R.string.l7_source_diplay_name),
+                context.getString(R.string.l7_source_diplay_description)).apply {
+                setValue(context.getString(R.string.l7_source_version_diplay))
+            })
+            card.addView(L7Components.actionRow(context, context.getString(R.string.l7_licenses_title),
+                context.getString(R.string.l7_licenses_hint)) { showLicenses(context) })
+        }
+    }
+
+    private fun showLicenses(context: Context) {
+        val document = runCatching {
+            fun read(path: String) = context.assets.open(path).bufferedReader().use { it.readText() }
+            val noticePath = if (context.resources.configuration.locales[0].language == "en")
+                "l7-third-party-notices.en.txt" else "third-party/NOTICE.md"
+            val notice = read(noticePath)
+                .replace(Regex("(?m)^<a id=\"[^\"]+\"></a>\\s*$"), "")
+                .replace(Regex("(?m)^#+\\s+"), "")
+                .replace(Regex("\\[([^]]+)]\\(([^)]+)\\)"), "$1（$2）")
+                .replace("`", "")
+            val licenses = context.assets.list("third-party/licenses").orEmpty()
+                .filter { it.endsWith(".txt") }.sorted()
+            buildString {
+                append(notice)
+                licenses.forEach { name ->
+                    // 原文不翻译、不删节，正文与仓库中的许可文件同步打包。
+                    append("\n\n────────\n").append(name).append("\n\n")
+                    append(read("third-party/licenses/$name"))
+                }
+            }
+        }.getOrElse { context.getString(R.string.l7_licenses_load_failed) }
+        val text = L7Typography.text(context, document, L7Typography.Role.DESCRIPTION).apply {
+            setTextIsSelectable(true)
+        }
+        L7Dialogs.builder(context).setTitle(R.string.l7_licenses_title).setView(text)
+            .setPositiveButton(R.string.close, null).show()
+    }
+}

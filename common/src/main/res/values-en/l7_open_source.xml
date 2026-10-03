@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_sources_receiver">Open source</string>
+    <string name="l7_source_diplay_description">CarPlay receiver core · GPL-3.0</string>
+    <string name="l7_licenses_title">Third-party licenses</string>
+    <string name="l7_licenses_hint">View dependency notices and license texts</string>
+    <string name="l7_licenses_load_failed">License files could not be read. Please reopen this dialog.</string>
+</resources>

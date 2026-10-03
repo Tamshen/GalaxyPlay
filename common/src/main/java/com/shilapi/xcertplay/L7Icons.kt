@@ -78,6 +78,7 @@ internal object L7Icons {
             ?: action(context, title) ?: R.drawable.ic_l7_settings
 
     private val dialogs = mapOf(
+        R.string.l7_licenses_title to R.drawable.ic_l7_agreement,
         R.string.l7_exit_title to R.drawable.ic_l7_exit,
         R.string.l7_agreement_revoke to R.drawable.ic_l7_revoke,
         R.string.l7_floating_transparency to R.drawable.ic_dp_display,

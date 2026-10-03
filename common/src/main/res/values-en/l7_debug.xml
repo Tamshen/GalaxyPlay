@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_diagnostics_title">Diagnostics and logs</string>
+    <string name="l7_diagnostics_row_hint">Session logs, diagnostic reports and floating logs</string>
+    <string name="l7_logs_and_reports">Logs and reports</string>
+    <string name="l7_debug_title">Floating logs</string>
+    <string name="l7_debug_desc">Enable this to view connection, reconnection, video and audio logs over other screens. Drag the title to move the window or collapse it to reduce obstruction. Recent logs remain after a disconnect and are included in diagnostic reports.</string>
+    <string name="l7_debug_permission">Manage overlay permission</string>
+    <string name="l7_debug_permission_help">Find L7CarPlay in system settings and allow it to display over other apps. The log window will open when you return.</string>
+    <string name="l7_debug_permission_denied">Overlay permission is off. Enable it for L7CarPlay in system settings.</string>
+    <string name="l7_debug_start">Show floating logs</string>
+    <string name="l7_debug_stop">Close floating logs</string>
+    <string name="l7_debug_view">View current logs</string>
+    <string name="l7_debug_empty">No connection logs yet. Records will appear here after you start connecting.</string>
+    <string name="l7_debug_no_error">No matching errors or reconnection records.</string>
+    <string name="l7_debug_status">Permission: %1$s · Overlay: %2$s</string>
+    <string name="l7_debug_granted">Allowed</string>
+    <string name="l7_debug_denied">Not allowed</string>
+    <string name="l7_debug_running">Visible</string>
+    <string name="l7_debug_stopped">Closed</string>
+    <string name="l7_debug_failed">Could not open floating logs. Check overlay permission and background app settings.</string>
+    <string name="l7_debug_notification">Debug logs are visible. Tap to return to Diagnostics and logs.</string>
+    <string name="l7_debug_collapse">Collapse</string>
+    <string name="l7_debug_expand">Expand</string>
+    <string name="l7_debug_pause">Pause</string>
+    <string name="l7_debug_resume">Resume</string>
+    <string name="l7_debug_errors">Errors only</string>
+    <string name="l7_debug_all">All</string>
+    <string name="l7_debug_copy">Copy</string>
+    <string name="l7_debug_copied">Logs copied</string>
+    <string name="l7_debug_clear">Clear</string>
+    <string name="l7_debug_refresh">Refresh</string>
+    <string name="l7_debug_drag">L7 logs · Drag to move</string>
+    <string name="l7_debug_connected">Connected</string>
+    <string name="l7_debug_connecting">Connecting</string>
+    <string name="l7_debug_disconnected">Disconnected</string>
+    <string name="l7_debug_summary">%1$s · %2$s · %3$d older entries removed</string>
+    <string name="l7_debug_live">Live</string>
+    <string name="l7_debug_paused">Display paused; recording continues</string>
+</resources>

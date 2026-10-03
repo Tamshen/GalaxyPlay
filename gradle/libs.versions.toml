@@ -10,6 +10,7 @@ appProjected = "1.4.0"
 appAutomotive = "1.7.0"
 app = "1.4.0"
 junit = "4.13.2"
+robolectric = "4.17"
 bouncycastle = "1.79"
 jmdns = "3.6.3"
 
@@ -28,6 +29,7 @@ androidx-app-projected = { group = "androidx.car.app", name = "app-projected", v
 androidx-app-automotive = { group = "androidx.car.app", name = "app-automotive", version.ref = "appAutomotive" }
 androidx-app = { group = "androidx.car.app", name = "app", version.ref = "app" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
 

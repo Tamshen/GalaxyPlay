@@ -37,7 +37,7 @@ class L7AgreementActivity : ComponentActivity() {
     }
 
     private fun render() {
-        val document = runCatching { L7Agreement.document(this) }.getOrNull()
+        val document = runCatching { L7Agreement.displayDocument(this) }.getOrNull()
         if (document == null) {
             setContentView(L7Components.actionButton(this, getString(R.string.l7_agreement_load_failed)) { leave() })
             return

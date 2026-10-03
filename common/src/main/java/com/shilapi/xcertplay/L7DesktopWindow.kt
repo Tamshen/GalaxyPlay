@@ -45,7 +45,7 @@ internal class L7DesktopWindow(private val owner: Context, private val navigate:
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH, PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.TOP or Gravity.LEFT
-            title = "L7CarPlay 桌面菜单"
+            title = ui.getString(R.string.l7_desktop_title)
         }
         val current = if (expanded) menu() else handle()
         view = current

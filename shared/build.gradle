@@ -45,5 +45,5 @@ dependencies {
     implementation libs.bouncycastle
     implementation libs.jmdns
     testImplementation libs.junit
-    testImplementation 'org.robolectric:robolectric:4.17'
+    testImplementation libs.robolectric
 }

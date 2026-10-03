@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_agreement_title">First-use Notice and Risk Acknowledgment</string>
+    <string name="l7_agreement_entry">User agreement</string>
+    <string name="l7_agreement_entry_hint">Read the full terms or withdraw consent and stop using the app</string>
+    <string name="l7_agreement_safe_hint">Read and operate only when the vehicle is safely parked.</string>
+    <string name="l7_agreement_read_end">Read to the end and wait 5 seconds before selecting the checkbox.</string>
+    <string name="l7_agreement_countdown">You have reached the end. Wait %1$d more seconds before confirming.</string>
+    <string name="l7_agreement_confirm_hint">After reading, decide whether you agree to the terms.</string>
+    <string name="l7_agreement_check">I have read and understood the entire agreement, accept its safety requirements, and choose to use the app voluntarily.</string>
+    <string name="l7_agreement_accept">Agree and continue</string>
+    <string name="l7_agreement_decline">Decline and exit</string>
+    <string name="l7_agreement_back">Back to About</string>
+    <string name="l7_agreement_accepted">You have accepted the current agreement. You may withdraw consent at any time.</string>
+    <string name="l7_agreement_stopping">Stopping the connection and background services…</string>
+    <string name="l7_agreement_revoke">Withdraw consent</string>
+    <string name="l7_agreement_revoke_message">This will immediately stop CarPlay and floating logs, then return to the agreement screen. Your settings will be kept. Read and accept the agreement again before using the app.</string>
+    <string name="l7_agreement_revoke_confirm">Withdraw and stop using</string>
+    <string name="l7_agreement_save_failed">Could not save the agreement status. Please try again.</string>
+    <string name="l7_agreement_load_failed">Could not load the agreement. Exit and try again.</string>
+</resources>

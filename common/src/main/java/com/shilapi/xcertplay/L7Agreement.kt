@@ -18,6 +18,11 @@ internal object L7Agreement {
         .open("l7-first-use-agreement.md").bufferedReader().use { it.readText() }
         .also { cachedDocument = it }
 
+    /** 英文仅切换展示译文，同意状态继续绑定同一份中文协议原文。 */
+    fun displayDocument(context: Context): String = if (context.resources.configuration.locales[0].language == "en") {
+        context.assets.open("l7-first-use-agreement.en.md").bufferedReader().use { it.readText() }
+    } else document(context)
+
     @Synchronized fun digest(context: Context): String = cachedDigest ?: MessageDigest.getInstance("SHA-256")
         .digest(document(context).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
         .also { cachedDigest = it }
