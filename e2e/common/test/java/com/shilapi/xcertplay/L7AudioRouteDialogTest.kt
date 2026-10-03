@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AudioOutputRole
 import android.app.Activity
 import android.app.AlertDialog
@@ -41,7 +42,7 @@ class L7AudioRouteDialogTest {
         val dialog = L7AudioRouteDialog.show(context, "媒体音频流", 0, AudioOutputRole.MEDIA) { commits.add(it) }
         shadowOf(Looper.getMainLooper()).idle()
         assertFalse(dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
-        find(dialog.window!!.decorView, "高级输出策略")!!.performClick()
+        find(dialog.window!!.decorView, context.getString(R.string.l7_audio_route_select))!!.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         val selector = ShadowAlertDialog.getLatestAlertDialog()
         selector.listView.performItemClick(selector.listView.adapter.getView(3, null, selector.listView), 3, 3)
@@ -54,7 +55,7 @@ class L7AudioRouteDialogTest {
         assertTrue(commits.isEmpty())
         val reopened = L7AudioRouteDialog.show(context, "媒体音频流", 0, AudioOutputRole.MEDIA) { commits.add(it) }
         shadowOf(Looper.getMainLooper()).idle()
-        assertNotNull(find(reopened.window!!.decorView, "0 · 内置推荐（按当前用途）"))
+        assertNotNull(find(reopened.window!!.decorView, context.resources.getStringArray(R.array.l7_audio_stream_names)[0]))
         reopened.dismiss()
         shadowOf(Looper.getMainLooper()).idle()
     }
@@ -66,7 +67,7 @@ class L7AudioRouteDialogTest {
         val commits = mutableListOf<Int>()
         val dialog = L7AudioRouteDialog.show(context, "导航音频流", 0, AudioOutputRole.ASSISTANT) { commits.add(it) }
         shadowOf(Looper.getMainLooper()).idle()
-        find(dialog.window!!.decorView, "高级输出策略")!!.performClick()
+        find(dialog.window!!.decorView, context.getString(R.string.l7_audio_route_select))!!.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         val selector = ShadowAlertDialog.getLatestAlertDialog()
         selector.listView.performItemClick(selector.listView.adapter.getView(3, null, selector.listView), 3, 3)
