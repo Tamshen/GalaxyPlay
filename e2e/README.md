@@ -48,6 +48,12 @@ e2e/
 
 ## Docker 运行
 
+[AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。
+
+`python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查十个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
+
+追加 `--dialogs-only` 可单独检查上述弹窗、协议及 USB 取消，不重复页面扫描；同样保留英文首页。
+
 蓝牙媒体与焦点回归：[AudioFocusCoordinatorTest](shared/test/java/com/shilapi/xcertplay/media/AudioFocusCoordinatorTest.kt) 检查永久失焦后的明确恢复、电话优先、旧监听隔离和焦点关闭；[CarPlayMediaSessionTest](common/test/java/com/shilapi/xcertplay/CarPlayMediaSessionTest.kt) 检查媒体键不另建焦点、手机暂停状态优先与关闭队列；[L7BluetoothMediaGuardTest](common/test/java/com/shilapi/xcertplay/L7BluetoothMediaGuardTest.kt) 用模拟端口覆盖目标确认、权限/请求拒绝、断开确认、超时、次数上限及迟到事件。该端口不代表已验证 L7 隐藏 API 或真实蓝牙断开；媒体服务测试核对框架保存的 PlaybackState，Robolectric 不提供完整车机媒体服务。
 
 [CarPlayPlaybackStatusTest](shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt) 还检查手机首次暂停必须发布、增量状态去重以及新会话重置，避免音乐流已经建立时错误发布播放状态。
@@ -131,7 +137,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 仅修改弹窗主题时，可在上述命令追加 `--theme-only`，只检查切换主题后的待选值、确认按钮状态以及取消恢复；此模式不执行其余设置与连接流程。
 
-仅检查分类层级时追加 `--navigation-only`，覆盖八个分类的「进入」提示、Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
+仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、八类导航、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
 
 仅检查声道交互时追加 `--audio-only`：媒体/语音助手/导航两秒试听、立即停止、选流与保存分离、主题切换保留状态和取消恢复。不保存音频设置，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。
 
