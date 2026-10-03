@@ -63,6 +63,11 @@ https://github.com/junit-team/junit4
 Robolectric — MIT, with Apache-2.0 notices for some files. Android component tests; not an application runtime component.
 https://github.com/robolectric/robolectric
 
+Mockito 5.20.0
+Source: https://github.com/mockito/mockito/tree/v5.20.0
+Purpose: Construction isolation for host window and reconnect unit tests; test-only, excluded from APK runtime dependencies.
+License: MIT; see licenses/Mockito-LICENSE.txt.
+
 Gradle — Apache-2.0. Build tasks and dependency resolution.
 https://github.com/gradle/gradle
 
@@ -96,8 +101,3 @@ L7CarPlay is not affiliated with or endorsed by Apple or Geely. Experimental bui
 Authentication materials
 
 Authentication materials are separate from the source-code license and are not distributed with the source repository. Android application signing and CarPlay authentication are managed separately. Supplying build-time materials does not establish verified vehicle operation or continued compatibility.
-
-Mockito 5.20.0
-Source: https://github.com/mockito/mockito/tree/v5.20.0
-Purpose: Construction isolation for host window and reconnect unit tests; test-only, excluded from APK runtime dependencies.
-License: MIT; see licenses/Mockito-LICENSE.txt.

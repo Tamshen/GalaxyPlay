@@ -28,6 +28,8 @@
         <!-- 核心来源单独写入 APK，产品版本仍由 L7 自己维护。 -->
         <meta-data android:name="com.ecarx.carplay.DIPLAY_CORE_VERSION" android:value="${diplayCoreVersion}" />
         <meta-data android:name="com.ecarx.carplay.DIPLAY_CORE_COMMIT" android:value="${diplayCoreCommit}" />
+        <meta-data android:name="com.ecarx.carplay.DIPLAY_PATCH_VERSION" android:value="${diplayPatchVersion}" />
+        <meta-data android:name="com.ecarx.carplay.DIPLAY_PATCH_COMMIT" android:value="${diplayPatchCommit}" />
         <service android:name="com.shilapi.xcertplay.L7DebugOverlayService"
             android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

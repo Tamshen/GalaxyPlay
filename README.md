@@ -45,7 +45,7 @@ bash scripts/build-l7-host.sh --check
 
 | 项目 | 版本 | 用途 | 许可 |
 | --- | --- | --- | --- |
-| [DiPlay](https://github.com/shihabal3amri/DiPlay) | 0.2.8 | CarPlay 接收核心 | [GPL-3.0](docs/第三方许可.md#diplay) |
+| [DiPlay](https://github.com/shihabal3amri/DiPlay) | 0.2.8+patch.0.2.10 | 接收核心及精选上游补丁 | [GPL-3.0](docs/第三方许可.md#diplay) |
 
 其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，应用中可在「关于 → 第三方许可」打开文本说明。
 

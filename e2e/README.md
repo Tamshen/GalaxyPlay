@@ -46,6 +46,16 @@ e2e/
 
 部分用例使用本机回环 HTTP/TCP/UDP、临时目录与运行时生成的身份，覆盖传输及释放行为，不依赖真实认证文件。阅读时关注触发条件、观察结果和资源清理；L7 功能先看上述前两行，再按实际修改追踪相关核心回归。
 
+## 上游补丁回归
+
+| 范围 | 主要用例与检阅点 |
+| --- | --- |
+| USB / 网络 | `UsbMuxFrameBufferTest`、`UsbMuxIssue100RegressionTest` 覆盖分片及连续帧；`CarPlayVpnScopeTest` 检查限定应用失败时清理；`AirPlayPortSelectorTest` 检查冲突回退与套接字释放；`ManualHotspotConfigTest` 检查有线无需热点 |
+| 窗口 / 定位 | `CarPlayHostDisplaySizeTest` 使用 Mockito 隔离真实控制器，检查缩窗、旋转、拆除期间的最新尺寸及权限；`Iap2WirelessLinkRoleTest`、定位上报用例检查链路订阅隔离及缺失方向 |
+| 诊断 / 释放 | `BoundedDiagnosticWriterTest`、`AsyncDiagnosticLogTest` 检查有界队列与所属日志；`ProcessExitDiagnosticsTest` 检查本应用退出信息边界；无线、I/O、慢读取与 codec 启动用例检查采样及异常释放 |
+| 歌曲 / 封面 | `CarPlayPlaybackStatusTest`、`Iap2FileTransferReceiverTest`、`Iap2LinkEngineFileTransferTest` 检查增量信息和有界传输；`NowPlayingArtworkQueueTest` 检查过期解码；媒体会话测试捕获真实发布参数，检查进度不重发封面、首次暂停与无重复焦点 |
+| 通话 | `TelephonyMicrophoneTest` 检查 AEC/NS、不可用降级、设置关闭、重叠录音、失败释放及不覆盖原车模式；与 L7 路由、焦点、蓝牙互斥测试一起执行。模拟音效不证明实车降噪效果 |
+
 ## Docker 运行
 
 [AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。
