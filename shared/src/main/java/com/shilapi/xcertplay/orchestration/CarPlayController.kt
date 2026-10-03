@@ -209,6 +209,10 @@ class CarPlayController(
 
     /** Told when the iPhone starts or stops playing media; may run on any thread. */
     @Volatile var playbackListener: ((Boolean) -> Unit)? = null
+
+    /** 增量歌曲信息和封面只通知当前会话，不参与音频焦点申请。 */
+    @Volatile var nowPlayingListener: ((com.shilapi.xcertplay.media.CarPlayNowPlaying) -> Unit)? = null
+    @Volatile var artworkListener: ((Int, ByteArray) -> Unit)? = null
     /** 音频互斥就绪独立于窗口监听，后台会话结束也必须撤销。 */
     @Volatile var audioConnectionListener: ((Boolean) -> Unit)? = null
     /** 当前无线引导实际选择的手机，仅供会话内音频互斥使用，不写入诊断。 */
@@ -279,7 +283,11 @@ class CarPlayController(
                 audioConnectionListener?.invoke(false)
                 BydNavigationOutputs.endNow()
                 videoListener?.onVideoSessionEnded()
-                synchronized(playbackStatus) { playbackStatus.clear() }?.let { playing -> playbackListener?.invoke(playing) }
+                val wasPlaying = synchronized(playbackStatus) {
+                    playbackStatus.playing.also { playbackStatus.clearAll() }
+                }
+                nowPlayingListener?.invoke(com.shilapi.xcertplay.media.CarPlayNowPlaying())
+                if (wasPlaying) playbackListener?.invoke(false)
             }
             debugLog("AirPlay session ended peer=${session.host}")
             uiListener?.onSessionEnded(session)
@@ -520,7 +528,28 @@ class CarPlayController(
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
         BydNavigationOutputs.onFrame(frame)
-        synchronized(playbackStatus) { playbackStatus.accept(frame) }?.let { playing -> playbackListener?.invoke(playing) }
+        synchronized(playbackStatus) {
+            val previous = playbackStatus.nowPlaying
+            playbackStatus.acceptUpdate(frame)?.let { next ->
+                next to (next.playbackKnown && (!previous.playbackKnown || next.playing != previous.playing))
+            }
+        }?.let { (next, playbackChanged) ->
+            nowPlayingListener?.invoke(next)
+            if (playbackChanged) playbackListener?.invoke(next.playing)
+        }
+    }
+
+    /** 固定本轮连接代次，重试后拒绝旧链路迟到的歌曲和封面。 */
+    private fun routeFrameHandler(): (com.shilapi.xcertplay.iap2.wire.Iap2Frame) -> Unit {
+        val run = diagnosticRun.get()
+        return { frame -> if (!closed && run == diagnosticRun.get()) onRouteFrame(frame) }
+    }
+
+    private fun artworkTransferHandler(): (com.shilapi.xcertplay.transport.Iap2ArtworkTransfer) -> Unit {
+        val run = diagnosticRun.get()
+        return { transfer ->
+            if (!closed && run == diagnosticRun.get()) artworkListener?.invoke(transfer.id, transfer.bytes)
+        }
     }
 
     private fun startMfi() {
@@ -1047,6 +1076,7 @@ class CarPlayController(
                 stream,
                 traceContext = "wireless-rfcomm",
                 onTrace = ::debugLog,
+                onArtwork = artworkTransferHandler(),
             ).also { csm = it }
             debugLog("wireless iAP2 CSM channel opened over RFCOMM")
             if (isStaleWirelessRun(generation)) {
@@ -1084,7 +1114,7 @@ class CarPlayController(
                 identification = bootstrapIdentification,
                 endpoint = endpoint,
                 timeoutMillis = controlLoopTimeoutMillis(),
-                onIncoming = ::onRouteFrame,
+                onIncoming = routeFrameHandler(),
                 onProgress = { message -> diagnostics.controlProgress(message); debugLog(message) },
             )
             if (isStaleWirelessRun(generation)) {
@@ -1151,6 +1181,7 @@ class CarPlayController(
                 stream,
                 traceContext = "wireless-tunnel",
                 onTrace = ::debugLog,
+                onArtwork = artworkTransferHandler(),
             )
         } catch (error: Throwable) {
             debugLog("Could not open the tunneled iAP2 link", error)
@@ -1175,7 +1206,7 @@ class CarPlayController(
                         onReady = {
                             onWirelessTunnelReady(generation)
                         },
-                        onIncoming = ::onRouteFrame,
+                        onIncoming = routeFrameHandler(),
                         onProgress = { message -> debugLog("iAP tunnel $message") },
                     )
                     if (closed || generation != wirelessGeneration.get()) return@execute
@@ -1646,6 +1677,7 @@ class CarPlayController(
                 tracedCarkit,
                 traceContext = "wired",
                 onTrace = ::debugLog,
+                onArtwork = artworkTransferHandler(),
             )
             this.csm = csm
             debugLog("wired iAP2 CSM channel opened")
@@ -1680,7 +1712,7 @@ class CarPlayController(
                 timeoutMillis = controlLoopTimeoutMillis(),
                 locationProvider = locationProvider,
                 vehicleStatusProvider = vehicleStatusProvider,
-                onIncoming = ::onRouteFrame,
+                onIncoming = routeFrameHandler(),
                 onProgress = { message -> debugLog("wired $message") },
             )
             onStatus(

@@ -17,6 +17,8 @@ internal object CarPlayMediaKeys {
                              assistantActive: () -> Boolean = { false }) {
         if (controller === next) return
         controller?.playbackListener = null
+        controller?.nowPlayingListener = null
+        controller?.artworkListener = null
         bridge?.close()
         steeringWheel?.close()
         controller = next
@@ -34,6 +36,12 @@ internal object CarPlayMediaKeys {
         next.playbackListener = { playing ->
             synchronized(this) { if (controller === next) bridge?.onIphonePlaying(playing) }
         }
+        next.nowPlayingListener = { update ->
+            synchronized(this) { if (controller === next) bridge?.onNowPlayingChanged(update) }
+        }
+        next.artworkListener = { id, bytes ->
+            synchronized(this) { if (controller === next) bridge?.onArtworkChanged(id, bytes) }
+        }
         if (context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
             steeringWheel = L7SteeringWheel(context.applicationContext, next::hasActiveSession, assistantActive) {
                 synchronized(this) { controller === next && next.requestSiri() }
@@ -44,6 +52,8 @@ internal object CarPlayMediaKeys {
     @Synchronized fun detach(expected: CarPlayController?) {
         if (expected == null || controller !== expected) return
         expected.playbackListener = null
+        expected.nowPlayingListener = null
+        expected.artworkListener = null
         bridge?.close()
         steeringWheel?.close()
         steeringWheel = null
