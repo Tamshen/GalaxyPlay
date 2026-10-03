@@ -966,10 +966,10 @@ class CarPlayController(
                 is CarPlayVpnService.AttachResult.Failed ->
                     throw IOException(result.message)
             }
-            debugLog(
-                "wireless AirPlay listener attached bind=$hostAddressText " +
-                    "port=${airPlayConfig.port}",
-            )
+            // 发现广播和 iAP2 都必须发布实际监听端口，不能继续使用被占用的首选端口。
+            val listenerPort = service.boundPort() ?: throw IOException("AirPlay listener is not attached")
+            val advertisedAirPlayConfig = wirelessAirPlayConfig.copy(port = listenerPort)
+            debugLog("wireless AirPlay listener attached bind=$hostAddressText port=$listenerPort")
             if (isStaleWirelessRun(generation)) {
                 closeWirelessStack()
                 return
@@ -977,7 +977,7 @@ class CarPlayController(
 
             val bonjourClient = CarPlayBonjour(
                 context = appContext,
-                config = wirelessAirPlayConfig,
+                config = advertisedAirPlayConfig,
                 identity = identity,
                 advertisedHost = hostAddress.hostAddress,
                 // Bind discovery and its connect probe to the same AP/address family as AirPlay.
@@ -1028,7 +1028,7 @@ class CarPlayController(
                 channel = hotspotInfo.channel,
                 security = hotspotInfo.security,
                 ipAddresses = listOf(hostAddressText),
-                airPlayPort = airPlayConfig.port,
+                airPlayPort = listenerPort,
                 deviceIdentifier = deviceIdentifier,
                 publicKey = identity.publicKeyHex,
                 sourceVersion = airPlayConfig.sourceVersion,
@@ -1604,7 +1604,7 @@ class CarPlayController(
                 ?: throw IphoneUsbException.DeviceUnavailable("MFi coprocessor client is unavailable")
             val endpoint = Iap2WiredCarPlayEndpoint(
                 ipv6Addresses = listOf(config.linkLocal),
-                airPlayPort = airPlayConfig.port,
+                airPlayPort = vpnService?.boundPort() ?: throw IOException("AirPlay listener is not attached"),
                 publicKey = identity.publicKeyHex,
                 sourceVersion = airPlayConfig.sourceVersion,
                 deviceIdentifier = ncmHostMac.macString(),

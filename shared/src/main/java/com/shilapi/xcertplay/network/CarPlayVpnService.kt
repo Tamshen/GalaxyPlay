@@ -18,7 +18,6 @@ import com.shilapi.xcertplay.transport.NcmUsbBridge
 import java.io.IOException
 import java.net.Inet6Address
 import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
@@ -93,6 +92,8 @@ class CarPlayVpnService : VpnService() {
                 .setSession(SESSION_NAME)
                 .setMtu(TUN_MTU)
                 .setBlocking(true)
+                // 空白名单会影响其他应用，建立隧道前限定本包；拒绝授权时清理，不退回全局 VPN。
+                .addAllowedApplication(packageName)
                 .establish()
                 ?: throw IOException("VpnService.establish returned null")
             tun = tunFd
@@ -154,6 +155,9 @@ class CarPlayVpnService : VpnService() {
 
     fun isAttached(): Boolean = active.get() && attachment != null
 
+    /** 返回实际监听端口，首选端口冲突时该值可能与配置不同。 */
+    fun boundPort(): Int? = attachment?.config?.port
+
     override fun onDestroy() {
         detach()
         super.onDestroy()
@@ -163,9 +167,10 @@ class CarPlayVpnService : VpnService() {
         generation: Int,
         replacement: AirPlayAttachment,
     ) {
-        val server = ServerSocket()
-        server.bind(InetSocketAddress(replacement.address, replacement.config.port))
-        attachment = replacement
+        val server = AirPlayPortSelector.bind(replacement.address, replacement.config.port) { busy, bound ->
+            Log.w(TAG, "AirPlay port $busy is in use; listening on $bound instead")
+        }
+        attachment = replacement.copy(config = replacement.config.copy(port = server.localPort))
         serverSocket = server
         Thread(
             { acceptLoop(generation, server) },
@@ -197,6 +202,9 @@ class CarPlayVpnService : VpnService() {
                         socket.close()
                         return
                     }
+                    runCatching { current.listener.onDebugLog(
+                        "airplay TCP accepted family=${if (socket.inetAddress is Inet6Address) "IPv6" else "IPv4"}",
+                    ) }
                     AirPlaySession(
                         socket = socket,
                         config = current.config,
