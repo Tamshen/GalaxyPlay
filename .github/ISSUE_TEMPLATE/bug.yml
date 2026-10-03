@@ -1,0 +1,36 @@
+name: L7 连接、显示或音频问题
+description: 记录银河 L7 车机问题及复现步骤。
+title: '[问题] '
+body:
+  - type: markdown
+    attributes:
+      value: '请在停车状态下测试。问题报告公开可见，上传前检查诊断文件并移除个人信息，不要提交认证材料。'
+  - type: input
+    id: version
+    attributes: {label: L7CarPlay 版本, placeholder: '0.2.8'}
+    validations: {required: true}
+  - type: input
+    id: car
+    attributes: {label: 银河 L7 年款及车机版本, placeholder: 'L7 年款、Flyme OS 版本、Android 版本'}
+    validations: {required: true}
+  - type: input
+    id: phone
+    attributes: {label: iPhone 型号及完整 iOS 版本}
+    validations: {required: true}
+  - type: dropdown
+    id: transport
+    attributes:
+      label: 连接方式
+      options: [原生热点无线连接, USB 有线连接, 两种方式均有问题]
+    validations: {required: true}
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 问题表现及复现步骤
+      description: '请提供预期行为、操作步骤、显示设置及车机是否同时连接其他 Wi-Fi；无线问题可补充诊断中的频段和信道。'
+    validations: {required: true}
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断报告或复现记录
+      description: '设置 → 保存诊断报告，默认保存到 Downloads/DiPlay。请上传检查后的文件；导出失败时说明发生步骤。'

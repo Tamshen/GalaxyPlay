@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp" android:height="64dp"
+    android:viewportWidth="64" android:viewportHeight="64">
+    <!-- L7 字母标记，与界面强调色一致。 -->
+    <path android:fillColor="#1A1A1A"
+        android:pathData="M16,0H48Q64,0 64,16V48Q64,64 48,64H16Q0,64 0,48V16Q0,0 16,0Z" />
+    <path android:fillColor="#0A84FF"
+        android:pathData="M13,16H20V41H31V48H13ZM30,16H52V23L39,48H31L44,23H30Z" />
+</vector>

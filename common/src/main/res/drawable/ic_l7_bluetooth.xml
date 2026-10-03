@@ -1,0 +1,7 @@
+<!-- 蓝牙通用符号，按 L7 功能图标的线宽与留白绘制。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text"
+        android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M25,26L54,52L39,65V15L54,28L25,54" />
+</vector>

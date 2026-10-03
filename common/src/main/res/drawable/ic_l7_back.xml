@@ -1,0 +1,7 @@
+<!-- 导航返回使用单个左箭头，与功能图标的线宽统一。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text"
+        android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M51,20L29,40L51,60" />
+</vector>

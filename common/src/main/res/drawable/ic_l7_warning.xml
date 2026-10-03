@@ -1,0 +1,7 @@
+<!-- Flyme Auto 功能图标，颜色使用 L7 主题角色。 -->
+<vector android:height="32dp" android:width="32dp" android:viewportWidth="80.0" android:viewportHeight="80.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="@color/product_ui_text" android:pathData="M38 46V26H42V46H38Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M38 50V55H42V50H38Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M13 40C13 25.0883 25.0883 13 40 13C54.9117 13 67 25.0883 67 40C67 54.9117 54.9117 67 40 67C25.0883 67 13 54.9117 13 40ZM40 17C27.2975 17 17 27.2975 17 40C17 52.7025 27.2975 63 40 63C52.7025 63 63 52.7025 63 40C63 27.2975 52.7025 17 40 17Z" />
+</vector>

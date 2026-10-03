@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!Dockerfile.arm64
+!.dockerignore

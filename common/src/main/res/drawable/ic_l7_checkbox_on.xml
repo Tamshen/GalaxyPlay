@@ -1,0 +1,16 @@
+<!-- Flyme Auto 参考矢量，保留几何，尺寸及颜色接入 L7 主题。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:height="32dp"
+    android:width="32dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="@color/product_ui_accent"
+        android:pathData="M10,8L54,8A2,2 0,0 1,56 10L56,54A2,2 0,0 1,54 56L10,56A2,2 0,0 1,8 54L8,10A2,2 0,0 1,10 8z"/>
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M20,33L28,41L46,23"
+        android:strokeColor="#ffffff"
+        android:strokeWidth="4"
+        android:strokeAlpha="0.9"/>
+</vector>

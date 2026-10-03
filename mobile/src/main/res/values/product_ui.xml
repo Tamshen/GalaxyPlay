@@ -1,0 +1,17 @@
+<resources>
+    <item name="ic_dp_permissions" type="drawable">@drawable/ic_l7_permissions</item>
+    <!-- Flyme Auto 的文字透明度与蓝色层级，背景采用 CarPlayE5 的灰蓝色层级。 -->
+    <color name="product_ui_background">#D3DBE5</color>
+    <color name="product_ui_surface">#FFFFFF</color>
+    <color name="product_ui_control">#E5EBF2</color>
+    <color name="product_ui_border">#33000000</color>
+    <color name="product_ui_accent">#1368FB</color>
+    <color name="product_ui_selected">#141368FB</color>
+    <color name="product_ui_text">#E5000000</color>
+    <color name="product_ui_muted">#99000000</color>
+    <color name="product_ui_disabled">#66000000</color>
+    <color name="product_ui_ripple">#201368FB</color>
+    <color name="product_ui_warning">#A65C00</color>
+    <color name="product_ui_danger">#C83D43</color>
+    <color name="product_ui_primary_text">#FFFFFF</color>
+</resources>

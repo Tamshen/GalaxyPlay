@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flyme Auto 图标；保留原几何，颜色由 L7 主题与控件状态控制。 -->
+<vector android:height="80.0dp" android:width="80.0dp" android:viewportWidth="80.0" android:viewportHeight="80.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="@color/product_ui_text" android:pathData="M40 30C34.4772 30 30 34.4772 30 40C30 45.5229 34.4772 50 40 50C45.5228 50 50 45.5229 50 40C50 34.4772 45.5228 30 40 30ZM34 40C34 36.6863 36.6863 34 40 34C43.3137 34 46 36.6863 46 40C46 43.3137 43.3137 46 40 46C36.6863 46 34 43.3137 34 40Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M40 12.6865L16.5 26.3493V53.6506L40 67.3134L63.5 53.6506V26.3493L40 12.6865ZM20.5 51.3493V28.6506L40 17.3134L59.5 28.6506V51.3493L40 62.6865L20.5 51.3493Z" />
+</vector>

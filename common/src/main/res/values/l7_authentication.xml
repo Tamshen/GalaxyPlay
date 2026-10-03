@@ -1,0 +1,29 @@
+<resources>
+    <string name="l7_auth_title">CarPlay 认证</string>
+    <string name="l7_auth_builtin">应用内置（默认）</string>
+    <string name="l7_auth_text">文字导入</string>
+    <string name="l7_auth_usb">USB 认证（CH341）</string>
+    <string name="l7_auth_remote">远程 MFi</string>
+    <string name="l7_auth_local">本地认证（内置或文字导入）</string>
+    <string name="l7_auth_remote_hint">填写上游 Remote MFi 服务地址，支持 HTTP 或 HTTPS。服务需要令牌时再填写令牌；连接时检查服务是否可用。</string>
+    <string name="l7_auth_remote_server">服务地址</string>
+    <string name="l7_auth_remote_server_hint">例如 https://mfi.example.com</string>
+    <string name="l7_auth_remote_token">访问令牌（可选）</string>
+    <string name="l7_auth_remote_token_hint">粘贴服务提供的令牌</string>
+    <string name="l7_auth_remote_use">保存并启用远程 MFi</string>
+    <string name="l7_auth_remote_failed">未能保存远程设置。请填写有效的 HTTP 或 HTTPS 服务地址，令牌不可包含空字符。地址中的凭据、查询参数和片段不受支持。</string>
+    <string name="l7_auth_choose_source">选择认证来源</string>
+    <string name="l7_auth_quick_import">文字快捷导入</string>
+    <string name="l7_auth_not_ready">当前认证不可用，请导入有效材料。</string>
+    <string name="l7_auth_switch_hint">切换认证会结束当前 CarPlay 会话。保存后可从连接页重新连接。</string>
+    <string name="l7_auth_paste_hint">分别粘贴匹配的证书和私钥，支持 PEM 或 Base64 文本。校验通过后保存并启用。</string>
+    <string name="l7_auth_certificate">证书文本</string>
+    <string name="l7_auth_private_key">私钥文本</string>
+    <string name="l7_auth_certificate_hint">粘贴 PKCS7 或 CERTIFICATE 文本</string>
+    <string name="l7_auth_key_hint">粘贴 PKCS#8 PRIVATE KEY 文本</string>
+    <string name="l7_auth_import_use">导入并启用</string>
+    <string name="l7_auth_validating">正在校验认证材料…</string>
+    <string name="l7_auth_builtin_missing">此构建未提供内置认证材料，请使用文字快捷导入。</string>
+    <string name="l7_auth_import_failed">未能启用认证。请检查文字格式、P-256 私钥与单张证书是否匹配，以及设备存储是否可写。</string>
+    <string name="l7_auth_saved">认证已启用</string>
+</resources>

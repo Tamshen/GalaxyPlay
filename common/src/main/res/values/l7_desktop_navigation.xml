@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_desktop_title">桌面悬浮菜单</string>
+    <string name="l7_desktop_hint">离开应用后保留浮动入口，点击菜单的「画面」快速返回。</string>
+    <string name="l7_desktop_expand">展开桌面菜单</string>
+    <string name="l7_desktop_permission">开启桌面悬浮权限</string>
+    <string name="l7_desktop_permission_hint">授权后可从车机桌面快速返回；未授权仍可正常连接。</string>
+    <string name="l7_desktop_home_permission">点击开启悬浮权限，即可从桌面快速返回</string>
+    <string name="l7_desktop_notification">桌面悬浮菜单已开启，可快速返回 L7CarPlay</string>
+</resources>

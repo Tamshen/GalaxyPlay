@@ -1,0 +1,5 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="32dp" android:height="32dp" android:viewportWidth="32" android:viewportHeight="32">
+    <!-- USB 通用连接符号，线宽与功能图标保持一致。 -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M16,24V6M16,19L9,14V10M16,15L23,11V8" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M12,7L16,2L20,7ZM21,4H25V8H21ZM9,7a3,3 0,1 0,0 6a3,3 0,1 0,0 -6M16,23a4,4 0,1 0,0 8a4,4 0,1 0,0 -8" />
+</vector>

@@ -1,0 +1,10 @@
+<resources>
+    <!-- 导航、正文、卡片依次提亮，沿用现有蓝色主操作与文字层级。 -->
+    <color name="l7_settings_navigation_top">#EBF1F8</color>
+    <color name="l7_settings_navigation_bottom">#DDE6F1</color>
+    <color name="l7_settings_content_top">#F6F8FC</color>
+    <color name="l7_settings_content_bottom">#EAF0F6</color>
+    <color name="l7_settings_card">#FFFFFF</color>
+    <color name="l7_settings_card_border">#E0E7F0</color>
+    <color name="l7_settings_divider">#D5DFEB</color>
+</resources>

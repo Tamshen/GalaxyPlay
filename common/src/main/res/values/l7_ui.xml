@@ -1,0 +1,42 @@
+<resources>
+    <string name="l7_header_back_home">返回画面</string>
+    <string name="l7_entry_title">Apple CarPlay</string>
+    <string name="l7_entry_connect">立即连接</string>
+    <string name="l7_home_usb">有线连接</string>
+    <string name="l7_home_first_use">首次使用，请选择无线或有线连接。</string>
+    <string name="l7_auth_row_hint">内置、文字导入、USB 与远程 MFi</string>
+    <string name="l7_save_next_connection">保存，下次连接生效</string>
+    <string name="l7_auth_reconnect_hint">认证已保存。请从设置中的连接设置重新连接 iPhone。</string>
+    <!-- 图标包含自身留白，画布与实际可见轮廓分别考虑。 -->
+    <dimen name="l7_nav_width">125dp</dimen>
+    <dimen name="l7_nav_item_height">90dp</dimen>
+    <dimen name="l7_nav_icon_size">48dp</dimen>
+    <string name="l7_nav_connection">连接</string>
+    <string name="l7_vehicle_name">银河 L7</string>
+    <string name="l7_projection_placeholder">连接 iPhone 后，在这里使用导航、音乐与通话。</string>
+    <color name="product_ui_primary_text">#0C111B</color>
+    <string name="l7_back_settings">返回设置</string>
+    <string name="l7_enter_settings">进入</string>
+    <string name="l7_settings_navigation_hint">点击分类进入详细设置；子页可点「返回设置」或左侧「设置」返回此页。</string>
+    <string name="l7_general_settings">通用设置</string>
+    <string name="l7_settings_groups">功能设置</string>
+    <string name="l7_auth_import_row_hint">粘贴认证文本，校验后应用</string>
+    <string name="l7_connection_row_hint">车机热点、USB 与已配对 iPhone</string>
+    <string name="l7_display_row_hint">画面尺寸、分辨率与帧率</string>
+    <string name="l7_audio_row_hint">音频焦点、媒体与导航声道</string>
+    <string name="l7_general_row_hint">自动连接、位置与语言</string>
+    <string name="l7_permissions_row_hint">应用权限、蓝牙与连接帮助</string>
+    <string name="l7_setting_apply_hint">选择项确认后保存，开关立即保存。显示与音频参数在下次连接时应用，保存不会跳出设置或中断当前投屏。</string>
+    <string name="l7_preparing">正在准备…</string>
+    <string name="l7_resume_projection">返回 CarPlay</string>
+    <string name="l7_view_connection">查看连接进度</string>
+    <string name="l7_start_wireless">无线连接</string>
+    <string name="l7_session_connected_hint">会话已建立，返回 CarPlay 继续使用。返回设置不会断开连接。</string>
+    <string name="l7_session_waiting_hint">连接尚未完成，可查看进度或取消本次连接。</string>
+    <string name="l7_summary_connected">iPhone 会话已连接 · 当前为应用状态页</string>
+    <string name="l7_summary_waiting">正在等待 iPhone · 画面尚未显示</string>
+    <string name="l7_summary_idle">iPhone 未连接</string>
+    <string name="l7_cancel_connection">取消连接</string>
+    <string name="l7_connection_return_hint">返回 L7CarPlay 后继续等待；取消连接会结束本次连接。</string>
+    <string name="l7_disconnect_confirm">结束当前 CarPlay 会话？下次使用需要重新连接。</string>
+</resources>

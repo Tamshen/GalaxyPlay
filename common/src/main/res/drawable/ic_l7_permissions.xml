@@ -1,0 +1,7 @@
+<!-- 权限使用盾牌与确认符号，避免与认证锁混淆。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text"
+        android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M40,14L62,23V39C62,52 52,62 40,68C28,62 18,52 18,39V23Z M29,39L37,47L52,32" />
+</vector>

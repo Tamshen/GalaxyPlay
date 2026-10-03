@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.Xcertplay" parent="android:Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/product_ui_accent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/product_ui_background</item>
+        <item name="android:statusBarColor">@color/product_ui_background</item>
+        <item name="android:windowBackground">@color/product_ui_background</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
