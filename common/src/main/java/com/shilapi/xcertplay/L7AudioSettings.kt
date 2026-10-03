@@ -22,6 +22,10 @@ internal object L7AudioSettings {
                 text(R.string.contrib_audio_home_toggle_audio_focus_desc), AirPlayPersistence.loadAudioFocusEnabled(context)) {
                 AirPlayPersistence.saveAudioFocusEnabled(context, it)
             })
+            card.addView(L7Components.switchRow(context, text(R.string.l7_call_processing),
+                text(R.string.l7_call_processing_note), AirPlayPersistence.loadCallProcessingEnabled(context)) {
+                AirPlayPersistence.saveCallProcessingEnabled(context, it)
+            })
             if (context.resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)) {
                 card.addView(L7Components.switchRow(context, text(R.string.advanced_audio_channel_mapping),
                     text(R.string.use_usage_content_type_routing_instead_of_stream_type),

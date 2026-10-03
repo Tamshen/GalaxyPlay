@@ -25,6 +25,8 @@ internal class MicrophoneUplink(
     private val config: MicrophoneConfig,
     private val audioRouting: L7AudioRouting? = null,
     private val report: (String) -> Unit = {},
+    private val callProcessingEnabled: Boolean = true,
+    private val onEnded: () -> Unit = {},
 ) : Closeable {
     @Volatile private var routeBinding: L7AudioRouting.Binding? = null
     private var packetsSent = 0L
@@ -34,9 +36,13 @@ internal class MicrophoneUplink(
     @Volatile private var socket: DatagramSocket? = null
     @Volatile private var opusEncoder: OpusEncoder? = null
     private var thread: Thread? = null
+    private var effects: TelephonyAudioEffects? = null
+    private val ended = AtomicBoolean(false)
+    private val stats = MicrophoneCaptureStats(config, report)
 
     fun start(): Boolean {
         if (!running.compareAndSet(false, true)) return true
+        ended.set(false)
 
         val channelMask = if (config.channels >= 2) {
             AndroidAudioFormat.CHANNEL_IN_STEREO
@@ -50,7 +56,7 @@ internal class MicrophoneUplink(
         )
         if (minBuffer <= 0) {
             Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
-            running.set(false)
+            release()
             return false
         }
 
@@ -66,7 +72,7 @@ internal class MicrophoneUplink(
         }
         if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
             Log.w(TAG, "microphone Opus encoder is unavailable")
-            running.set(false)
+            release()
             return false
         }
         val bufferSize = maxOf(minBuffer * 2, config.frameBytes * 4)
@@ -84,15 +90,16 @@ internal class MicrophoneUplink(
                 .build()
         } catch (error: Exception) {
             Log.e(TAG, "microphone recorder creation failed", error)
+            stats.failure(MicrophoneFailureStage.RECORDER_CREATION, error)
             nextEncoder?.close()
-            running.set(false)
+            release()
             return false
         }
         if (nextRecorder.state != AudioRecord.STATE_INITIALIZED) {
             Log.w(TAG, "microphone recorder failed to initialize")
             nextRecorder.release()
             nextEncoder?.close()
-            running.set(false)
+            release()
             return false
         }
 
@@ -103,9 +110,10 @@ internal class MicrophoneUplink(
             }
         } catch (error: Exception) {
             Log.e(TAG, "microphone socket creation failed", error)
+            stats.failure(MicrophoneFailureStage.SOCKET_CREATION, error)
             nextRecorder.release()
             nextEncoder?.close()
-            running.set(false)
+            release()
             return false
         }
 
@@ -119,7 +127,11 @@ internal class MicrophoneUplink(
                 else -> AudioChannel.NAVIGATION
             }
             routeBinding = audioRouting?.bind(nextRecorder, channel, true, config.sampleRate, config.channels)
+            if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) {
+                effects = TelephonyAudioEffects(nextRecorder.audioSessionId, report)
+            }
             nextRecorder.startRecording()
+            stats.started(runCatching { nextRecorder.routedDevice?.type }.getOrNull())
             routeBinding?.reportActual()
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
                 isDaemon = true
@@ -134,6 +146,7 @@ internal class MicrophoneUplink(
             true
         } catch (error: Exception) {
             Log.e(TAG, "microphone recording failed", error)
+            stats.failure(MicrophoneFailureStage.RECORDING, error)
             release()
             false
         }
@@ -161,9 +174,15 @@ internal class MicrophoneUplink(
         }
         try {
             while (running.get()) {
+                stats.reading()
                 val count = recorder.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+                stats.read(count)
+                stats.flush { recorder.routedDevice?.type }
                 if (count < 0) {
-                    if (running.get()) Log.e(TAG, "microphone read failed code=$count")
+                    if (running.get()) {
+                        Log.e(TAG, "microphone read failed code=$count")
+                        stats.failure(MicrophoneFailureStage.READ, code = count)
+                    }
                     return
                 }
                 if (count == 0) {
@@ -186,9 +205,13 @@ internal class MicrophoneUplink(
                 }
             }
         } catch (error: Exception) {
-            if (running.get()) Log.e(TAG, "microphone capture failed", error)
+            if (running.get()) {
+                Log.e(TAG, "microphone capture failed", error)
+                stats.failure(MicrophoneFailureStage.CAPTURE, error)
+            }
         } finally {
             runCatching { logStats(ended = true) }
+            stats.flush(ended = true) { recorder.routedDevice?.type }
             running.set(false)
             release()
         }
@@ -200,6 +223,7 @@ internal class MicrophoneUplink(
         } else {
             listOf(MicrophonePacketizer.toWirePcm(frame))
         }
+        stats.encoded(bodies.size, bodies.count { it.isEmpty() })
         bodies.forEach { body ->
             sendPacket(
                 socket = socket,
@@ -226,6 +250,7 @@ internal class MicrophoneUplink(
         try {
             socket.send(DatagramPacket(packet, packet.size, config.host, config.port))
             packetsSent++
+            stats.sent()
             if (firstPacketLogged.compareAndSet(false, true)) {
                 Log.i(
                     TAG,
@@ -234,7 +259,7 @@ internal class MicrophoneUplink(
                 )
             }
         } catch (error: Exception) {
-            if (running.get()) throw error
+            if (running.get()) { stats.sendFailed(); throw error }
         }
     }
 
@@ -267,7 +292,9 @@ internal class MicrophoneUplink(
     @Synchronized
     private fun release() {
         running.set(false)
-        routeBinding?.close()
+        effects?.close()
+        effects = null
+        runCatching { routeBinding?.close() }
         routeBinding = null
         val currentRecorder = recorder
         recorder = null
@@ -285,7 +312,8 @@ internal class MicrophoneUplink(
         }
         val currentEncoder = opusEncoder
         opusEncoder = null
-        currentEncoder?.close()
+        runCatching { currentEncoder?.close() }
+        if (ended.compareAndSet(false, true)) runCatching { onEnded() }
     }
 
     private companion object {

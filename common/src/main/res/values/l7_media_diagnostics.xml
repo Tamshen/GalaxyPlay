@@ -40,4 +40,6 @@
     <string name="l7_hevc_failed_title">HEVC 画面未正常输出</string>
     <string name="l7_hevc_failed_message">解码初始化失败，或收到视频后未能确认画面输出。诊断日志已记录配置、解码与渲染阶段。可关闭 HEVC，切换到 H.264 并重新连接；热点设置不变。</string>
     <string name="l7_hevc_use_avc">切换 H.264 并重连</string>
+    <string name="l7_call_processing">通话回声消除与降噪</string>
+    <string name="l7_call_processing_note">通话时使用系统支持的音效；若出现回声、音量或路由异常可关闭。修改下次连接生效。</string>
 </resources>

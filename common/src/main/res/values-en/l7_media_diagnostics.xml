@@ -41,4 +41,6 @@
     <string name="l7_hevc_failed_title">HEVC video did not display</string>
     <string name="l7_hevc_failed_message">Decoder initialization failed, or no video output was confirmed after receiving data. Diagnostic logs include configuration, decoding and rendering details. Turn off HEVC, switch to H.264 and reconnect. Hotspot settings will remain unchanged.</string>
     <string name="l7_hevc_use_avc">Use H.264 and reconnect</string>
+    <string name="l7_call_processing">Call echo cancellation and noise suppression</string>
+    <string name="l7_call_processing_note">Use supported system effects during calls. Turn off if echo, volume or routing becomes worse. Applies on the next connection.</string>
 </resources>
