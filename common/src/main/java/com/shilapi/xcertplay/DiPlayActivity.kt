@@ -1495,6 +1495,8 @@ class DiPlayActivity : ComponentActivity() {
         val deviceSnapshot = L7DeviceDiagnostic.capture(this)
         Thread({
             val result = runCatching {
+                // 在导出工作线程限时排空日志，不能阻塞 UI 或连接线程。
+                AsyncDiagnosticLog.awaitIdle(500)
                 val report = buildString {
                     appendLine("${getString(R.string.app_name)} ${version()} · diagnostic report")
                     appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
@@ -1519,6 +1521,9 @@ class DiPlayActivity : ComponentActivity() {
                         L7DebugLog.buffer.snapshot().lines.forEach { appendLine(it) }
                         appendLine()
                     }
+                    appendLine("--- Process exit history ---")
+                    appendLine(ProcessExitDiagnostics.report(appContext))
+                    appendLine()
                     for (name in SessionLogFile.REPORT_NAMES) {
                         val file = File(appContext.filesDir, "logs/$name")
                         if (file.isFile) {

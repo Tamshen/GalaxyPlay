@@ -48,6 +48,11 @@ sealed interface CarPlayBonjourEvent {
         val statusLine: String?,
         val error: IOException?,
     ) : CarPlayBonjourEvent
+
+    data class ProbeProgress(val stage: Stage, val attempt: Int, val ipv6: Boolean) : CarPlayBonjourEvent {
+        enum class Stage { CONNECTING, TCP_CONNECTED, REQUEST_SENT }
+    }
+    data class ProbeFailed(val stage: ProbeProgress.Stage, val attempt: Int, val error: IOException) : CarPlayBonjourEvent
 }
 
 /** Saved reports need discovery outcomes without phone names, addresses, or pairing identifiers. */
@@ -59,6 +64,10 @@ fun CarPlayBonjourEvent.diagnosticSummary(): String = when (this) {
         val status = statusLine?.let { Regex("^HTTP/\\d(?:\\.\\d)? (\\d{3})(?: |$)").find(it)?.groupValues?.get(1) }
         "control probe attempts=$attempts status=${status ?: "none"} error=${error?.javaClass?.simpleName ?: "none"}"
     }
+    is CarPlayBonjourEvent.ProbeProgress ->
+        "control probe stage=$stage attempt=$attempt family=${if (ipv6) "IPv6" else "IPv4"}"
+    is CarPlayBonjourEvent.ProbeFailed ->
+        "control probe failed after=$stage attempt=$attempt failureClass=${error.javaClass.simpleName}"
 }
 
 /** Pure protocol values shared by the Android runtime and JVM tests. */
@@ -134,6 +143,18 @@ class CarPlayBonjour(
     private val seenServices = ConcurrentHashMap.newKeySet<String>()
     private val lifecycleLock = Any()
     private val localAdvertisedAddress = advertisedHostAddress()
+    private val addedCount = AtomicInteger()
+    private val resolvedCount = AtomicInteger()
+    private val addressMismatchCount = AtomicInteger()
+    private val probeCount = AtomicInteger()
+    private val successfulProbeCount = AtomicInteger()
+    private val lastProbe = AtomicReference("not_started")
+
+    /** 保留零计数，便于识别服务发现期间没有回调的情况。 */
+    fun diagnosticSnapshot(): String =
+        "bonjourAdded=${addedCount.get()} bonjourResolved=${resolvedCount.get()} " +
+            "bonjourAddressMismatch=${addressMismatchCount.get()} connectProbes=${probeCount.get()} " +
+            "connectProbe2xx=${successfulProbeCount.get()} lastProbe=${lastProbe.get()}"
     private val multicastLock = (context.applicationContext ?: context)
         .getSystemService(WifiManager::class.java)
         .createMulticastLock("carplay-bonjour").apply { setReferenceCounted(false) }
@@ -484,7 +505,7 @@ class CarPlayBonjour(
         repeat(MAX_PROBE_ATTEMPTS) { attempt ->
             if (closed) return null
             try {
-                val statusLine = probeOnce(address, endpoint.port)
+                val statusLine = probeOnce(address, endpoint.port, attempt + 1)
                 return CarPlayBonjourEvent.Probed(
                     endpoint = endpoint,
                     attempts = attempt + 1,
@@ -509,15 +530,19 @@ class CarPlayBonjour(
         )
     }
 
-    private fun probeOnce(address: InetAddress, port: Int): String {
+    private fun probeOnce(address: InetAddress, port: Int, attempt: Int): String {
         val socket = Socket()
+        var stage = CarPlayBonjourEvent.ProbeProgress.Stage.CONNECTING
         synchronized(lifecycleLock) {
             check(!closed) { "CarPlayBonjour is closed" }
             activeSocket = socket
         }
         try {
+            emit(CarPlayBonjourEvent.ProbeProgress(CarPlayBonjourEvent.ProbeProgress.Stage.CONNECTING, attempt, address is Inet6Address))
             localAdvertisedAddress?.let { socket.bind(InetSocketAddress(it, 0)) }
             socket.connect(InetSocketAddress(address, port), CONNECT_TIMEOUT_MILLIS)
+            stage = CarPlayBonjourEvent.ProbeProgress.Stage.TCP_CONNECTED
+            emit(CarPlayBonjourEvent.ProbeProgress(CarPlayBonjourEvent.ProbeProgress.Stage.TCP_CONNECTED, attempt, address is Inet6Address))
             socket.soTimeout = READ_TIMEOUT_MILLIS
             val host = address.hostAddress
                 ?: throw IOException("AirPlay control service has no host address")
@@ -530,11 +555,16 @@ class CarPlayBonjour(
             val output = socket.getOutputStream()
             output.write(request.toByteArray(StandardCharsets.US_ASCII))
             output.flush()
+            stage = CarPlayBonjourEvent.ProbeProgress.Stage.REQUEST_SENT
+            emit(CarPlayBonjourEvent.ProbeProgress(CarPlayBonjourEvent.ProbeProgress.Stage.REQUEST_SENT, attempt, address is Inet6Address))
             val reader = BufferedReader(
                 InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII),
             )
             return reader.readLine()
                 ?: throw IOException("AirPlay control probe returned no status line")
+        } catch (error: IOException) {
+            if (!closed) emit(CarPlayBonjourEvent.ProbeFailed(stage, attempt, error))
+            throw error
         } finally {
             synchronized(lifecycleLock) {
                 if (activeSocket === socket) activeSocket = null
@@ -545,6 +575,24 @@ class CarPlayBonjour(
 
     private fun emit(event: CarPlayBonjourEvent) {
         if (closed) return
+        when (event) {
+            is CarPlayBonjourEvent.Discovery -> when (event.stage) {
+                CarPlayBonjourEvent.Discovery.Stage.ADDED -> addedCount.incrementAndGet()
+                CarPlayBonjourEvent.Discovery.Stage.NO_MATCHING_ADDRESS -> addressMismatchCount.incrementAndGet()
+                else -> Unit
+            }
+            is CarPlayBonjourEvent.Resolved -> resolvedCount.incrementAndGet()
+            is CarPlayBonjourEvent.ProbeProgress -> {
+                if (event.stage == CarPlayBonjourEvent.ProbeProgress.Stage.CONNECTING) probeCount.incrementAndGet()
+                lastProbe.set(event.stage.name)
+            }
+            is CarPlayBonjourEvent.ProbeFailed -> lastProbe.set("failed_after_${event.stage}_${event.error.javaClass.simpleName}")
+            is CarPlayBonjourEvent.Probed -> {
+                val status = event.statusLine?.let { Regex("^HTTP/\\d(?:\\.\\d)? (\\d{3})(?: |$)").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                if (status != null && status in 200..299) successfulProbeCount.incrementAndGet()
+                if (event.error == null) lastProbe.set("status_${status ?: "unknown"}")
+            }
+        }
         try {
             onEvent(event)
         } catch (error: RuntimeException) {
