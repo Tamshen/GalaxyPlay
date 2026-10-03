@@ -59,4 +59,5 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.mockito)
 }

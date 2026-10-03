@@ -105,6 +105,34 @@ data class Iap2IdentificationConfig(
     }
 }
 
+/** 无线 CarPlay 的蓝牙引导链路与 Wi-Fi 运行链路分别承担不同职责。 */
+internal enum class Iap2WirelessLinkRole {
+    /** 短期 RFCOMM 链路，仅用于认证并向手机交付 Wi-Fi 端点。 */
+    BLUETOOTH_BOOTSTRAP,
+
+    /** 长期 iAP2 DataStream，位于已建立的 Wi-Fi AirPlay 会话中。 */
+    RUNTIME_TUNNEL,
+}
+
+/**
+ * 为指定无线链路生成能力声明。长期数据只由运行链路提供，避免 iOS 将定位订阅绑定
+ * 到短期蓝牙端点，导致 RFCOMM 关闭后拒收 Wi-Fi 链路的数据。
+ */
+internal fun Iap2IdentificationConfig.forWirelessLink(
+    role: Iap2WirelessLinkRole,
+    wirelessIdentification: Iap2WirelessIdentification,
+): Iap2IdentificationConfig {
+    val wirelessConfig = copy(wireless = wirelessIdentification)
+    return when (role) {
+        Iap2WirelessLinkRole.BLUETOOTH_BOOTSTRAP -> wirelessConfig.copy(
+            locationInformationEnabled = false,
+            vehicleStatusEnabled = false,
+            vehicleSpeedEnabled = false,
+        )
+        Iap2WirelessLinkRole.RUNTIME_TUNNEL -> wirelessConfig
+    }
+}
+
 /** Identification failures distinguished from the underlying iAP2 transport failure. */
 sealed class Iap2IdentificationException(message: String) : IOException(message) {
     class Rejected(parameterIds: Set<Int>) : Iap2IdentificationException(
