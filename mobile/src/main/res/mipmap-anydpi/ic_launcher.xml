@@ -1,0 +1,10 @@
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 最低 Android 10 已支持自适应图标；传统圆角资源仍由 ic_carplay 独立提供。 -->
+    <background android:drawable="@drawable/ic_carplay_background_adaptive" />
+    <foreground>
+        <!-- 为 108dp 图层保留四边各 18dp；标志保持参考比例并位于安全区内。 -->
+        <inset android:drawable="@drawable/ic_carplay_mark"
+            android:insetLeft="16.666667%" android:insetTop="16.666667%"
+            android:insetRight="16.666667%" android:insetBottom="16.666667%" />
+    </foreground>
+</adaptive-icon>
