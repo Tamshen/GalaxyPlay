@@ -39,6 +39,7 @@ object AirPlayPersistence {
     private const val KEY_HEVC_ENABLED = "hevc_enabled"
     private const val KEY_HEVC_SOFTWARE_DECODER = "hevc_software_decoder"
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
+    private const val KEY_CALL_PROCESSING_ENABLED = "l7_call_processing_enabled"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
     private const val KEY_BLUETOOTH_MEDIA_EXCLUSIVE = "bluetooth_media_exclusive"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
@@ -156,6 +157,14 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_AUDIO_FOCUS_ENABLED, enabled)
             .apply()
+    }
+
+    fun loadCallProcessingEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CALL_PROCESSING_ENABLED, true)
+
+    fun saveCallProcessingEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_CALL_PROCESSING_ENABLED, enabled).apply()
     }
 
     fun loadBluetoothMediaExclusive(context: Context): Boolean =

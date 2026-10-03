@@ -56,6 +56,7 @@ class AndroidMediaSink(
     enableL7AudioRouting: Boolean = false,
     onVideoFailure: ((VideoCodec, String) -> Unit)? = null,
     private val assistantChannel: Int = 0,
+    private val callProcessingEnabled: Boolean = true,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -73,6 +74,7 @@ class AndroidMediaSink(
         audioFocusEnabled,
         onAudioDiagnostic,
     )
+    private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
     private val audioRouting = if (enableL7AudioRouting) L7AudioRouting(appContext, onAudioDiagnostic) else null
     private val screenStateLock = Any()
     private val videoLifecycleLock = Any()
@@ -231,15 +233,27 @@ class AndroidMediaSink(
     @Synchronized
     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
         if (closed) return
-        if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
-        val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, audioRouting, onAudioDiagnostic) }
-        if (!uplink.start()) microphoneUplinks.remove(id, uplink)
+        try {
+            if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) callMode.acquire(id)
+            if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
+            val uplink = microphoneUplinks.computeIfAbsent(id) {
+                MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled) { callMode.release(id) }
+            }
+            if (!uplink.start()) onMicrophoneStopped(id)
+        } catch (error: Exception) {
+            // 麦克风失败不能打断下行音频，释放本次录音和通信模式后等待下一次流启动。
+            MicrophoneCaptureStats.reportStartFailure(config, error, onAudioDiagnostic)
+            onMicrophoneStopped(id)
+        }
     }
 
     @Synchronized
     override fun onMicrophoneStopped(id: AudioStreamId) {
-        microphoneUplinks.remove(id)?.close()
-        assistantMicrophoneTypes.remove(id)
+        try { microphoneUplinks.remove(id)?.close() }
+        finally {
+            assistantMicrophoneTypes.remove(id)
+            callMode.release(id)
+        }
     }
 
     fun close() {
@@ -265,8 +279,8 @@ class AndroidMediaSink(
             audioRouting?.close()
             audioRenderers.values.forEach(AudioRenderer::close)
             audioRenderers.clear()
-            microphoneUplinks.values.forEach(MicrophoneUplink::close)
-            microphoneUplinks.clear()
+            try { microphoneUplinks.values.forEach { runCatching { it.close() } } }
+            finally { microphoneUplinks.clear(); callMode.close() }
             assistantAudioTypes.clear()
             assistantMicrophoneTypes.clear()
         }
