@@ -77,10 +77,11 @@ object NmeaLocationEncoder {
             ?.takeIf { it.isFinite() && it >= 0 }
             ?.let { format("%.2f", it * KNOTS_PER_METER_PER_SECOND) }
             ?: "0.00"
+        // 停车等缺少 GPS 方向的情况保留空值；0.00 会被解释为朝北。
         val course = fix.bearingDegrees
             ?.takeIf { it.isFinite() }
             ?.let { format("%.2f", it) }
-            ?: "0.00"
+            .orEmpty()
         val rmcBody = "GPRMC,$time,A,${latitude.value},${latitude.hemisphere}," +
             "${longitude.value},${longitude.hemisphere},$speedKnots,$course,$date,,"
 
@@ -135,30 +136,16 @@ object NmeaLocationEncoder {
 }
 
 /**
- * The iPhone's StartLocationInformation in one wireless session. The iPhone asks on the Bluetooth
- * iAP2 link and closes that link about 2 s later. In testing it did not ask again on the Wi-Fi
- * link, even while driving, so the Wi-Fi link carries the request on.
- */
-class Iap2LocationRequest {
-    /** The 0xFFFA parameter ids while a request is running, otherwise null. */
-    @Volatile var components: Set<Int>? = null
-}
-
-/**
- * Accessory side of iAP2 LocationInformation on one link: starts on 0xFFFA, sends the latest fix
- * on every [tick] (about once a second), stops on 0xFFFC. With [continueRequest], a request that
- * [request] recorded on the Bluetooth link starts this link too.
+ * 单条链路上的定位上报：0xFFFA 开启，tick 按约一秒间隔发送，0xFFFC 停止。
+ * 订阅状态属于当前链路，蓝牙请求不能授权 Wi-Fi 隧道发送定位。
  */
 class Iap2LocationReporter(
     private val provider: Iap2LocationProvider?,
     private val onProgress: (String) -> Unit,
-    private val request: Iap2LocationRequest? = null,
-    private val continueRequest: Boolean = false,
     private val nanoTime: () -> Long = System::nanoTime,
 ) {
     private var active = false
     private var sentLogged = false
-    private var continued = false
     private var lastAttemptNanos = 0L
 
     /** Handles 0xFFFA/0xFFFC; returns false for any other message. */
@@ -166,14 +153,12 @@ class Iap2LocationReporter(
         Iap2LocationMessages.START_LOCATION_INFORMATION -> {
             val components = Iap2LocationMessages.requestedComponents(frame)
             onProgress("iap2 rx=0xfffa start-location-information components=$components")
-            request?.components = components
             provider?.onRequested(components)
             start(send)
             true
         }
         Iap2LocationMessages.STOP_LOCATION_INFORMATION -> {
             onProgress("iap2 rx=0xfffc stop-location-information")
-            request?.components = null
             active = false
             sentLogged = false
             provider?.stop()
@@ -182,38 +167,15 @@ class Iap2LocationReporter(
         else -> false
     }
 
-    /**
-     * Sends the latest fix once a second while active; on the Wi-Fi link first takes over a Bluetooth
-     * request once. The loop calls this after every incoming message too, so it must not send each time:
-     * that sent a dozen fixes in 0.1 s at session start.
-     */
+    /** 当前链路有有效订阅时，每秒发送最新定位。 */
     fun tick(send: (Iap2Frame) -> Unit) {
-        // The Bluetooth reporter receives STOP_LOCATION_INFORMATION and clears the shared request.
-        // Wi-Fi may already have taken over by then, so its active loop must observe that stop too.
-        if (continueRequest && continued && request?.components == null) {
-            active = false
-            sentLogged = false
-            return
-        }
-        if (continueRequest && !active && !continued) {
-            val components = request?.components
-            if (components != null) {
-                continued = true
-                onProgress("iap2 location request continues from the Bluetooth link components=$components")
-                provider?.onRequested(components)
-                start(send)
-                return
-            }
-        }
         if (active && sinceAttemptMillis() >= POLL_INTERVAL_MILLIS) sendLatest(send)
     }
 
-    /** Wakes the loop when the next fix is due, or every second while a Bluetooth request may still arrive. */
-    fun pollTimeout(remainingMillis: Long): Long = when {
-        active -> min(remainingMillis, (POLL_INTERVAL_MILLIS - sinceAttemptMillis()).coerceAtLeast(1))
-        continueRequest && !continued && provider != null -> min(remainingMillis, POLL_INTERVAL_MILLIS)
-        else -> remainingMillis
-    }
+    /** 仅有定位订阅时按发送周期唤醒循环。 */
+    fun pollTimeout(remainingMillis: Long): Long =
+        if (active) min(remainingMillis, (POLL_INTERVAL_MILLIS - sinceAttemptMillis()).coerceAtLeast(1))
+        else remainingMillis
 
     private fun sinceAttemptMillis() = (nanoTime() - lastAttemptNanos) / 1_000_000
 

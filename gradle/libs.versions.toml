@@ -11,6 +11,7 @@ appAutomotive = "1.7.0"
 app = "1.4.0"
 junit = "4.13.2"
 robolectric = "4.17"
+mockito = "5.20.0"
 bouncycastle = "1.79"
 jmdns = "3.6.3"
 
@@ -32,6 +33,8 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
+
+mockito = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

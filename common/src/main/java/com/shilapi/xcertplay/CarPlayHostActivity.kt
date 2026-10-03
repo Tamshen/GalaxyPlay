@@ -293,6 +293,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private val clusterLayers = mutableMapOf<Boolean, ClusterMapPresentation>()
     private var activeDisplaySize: DisplaySize? = null
     private var pendingDisplaySize: DisplaySize? = null
+    private var sessionDisplay: CarPlaySessionDisplay? = null
     private var displayScaleTenths = CarPlayDisplayScale.DEFAULT_TENTHS
     private var uiScalePercent = CarPlayUiScale.DEFAULT
     private var displayDiagnosticAttempt: String? = null
@@ -3232,7 +3233,8 @@ class CarPlayHostActivity : ComponentActivity() {
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.currentAttempt(this)
         controller = snapshot.controller
         sink = snapshot.sink
-        CarPlayBackgroundSession.store(snapshot.controller, snapshot.sink, snapshot.width, snapshot.height, this) { completion ->
+        sessionDisplay = snapshot.display
+        CarPlayBackgroundSession.store(snapshot.controller, snapshot.sink, snapshot.width, snapshot.height, this, snapshot.display) { completion ->
             runOnUiThread {
                 shutdown(false, "DiPlay disconnect", completion)
                 finish()
@@ -3348,7 +3350,12 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayMediaKeys.attach(this, next, renderer::resumeMediaAudioFocus, renderer::isAssistantAudioActive)
         renderer.setMediaAudioChangedListener { active -> CarPlayMediaKeys.onMediaAudioChanged(next, active) }
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
-        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this) { completion ->
+        val display = CarPlaySessionDisplay(airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
+            displayRotation(), hideTopBar, hideBottomBar, size.width, size.height)
+        sessionDisplay = display
+        videoCanvasSize = null
+        videoView?.let { updateVideoViewport(it.width, it.height) }
+        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display) { completion ->
             runOnUiThread {
                 shutdown(terminateProcess = false, reason = "DiPlay disconnect", completion = completion)
                 finish()
@@ -3390,14 +3397,27 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun scheduleDisplaySize(width: Int, height: Int) {
         if (width <= 0 || height <= 0 || shuttingDown.get()) return
         val size = DisplaySize(width, height)
-        if (size == activeDisplaySize || size == pendingDisplaySize) return
-        pendingDisplaySize = size
+        if (size == pendingDisplaySize) return
         mainHandler.removeCallbacks(applyDisplaySize)
+        if (size == activeDisplaySize && !displayLayoutChanged()) {
+            pendingDisplaySize = null
+            // 窗口回到原尺寸可能取消待处理变化，资源拆除完成后仍需恢复正常启动。
+            maybeStartCarPlay()
+            return
+        }
+        pendingDisplaySize = size
         mainHandler.postDelayed(applyDisplaySize, DISPLAY_CHANGE_DEBOUNCE_MILLIS)
     }
 
     private fun applyDisplaySize(size: DisplaySize) {
-        if (shuttingDown.get() || size == activeDisplaySize) return
+        val display = sessionDisplay
+        val layoutChanged = displayLayoutChanged()
+        if (shuttingDown.get()) return
+        if (size == activeDisplaySize && !layoutChanged) {
+            // 等待期间旧会话可能已经拆除，即使尺寸未变也要重新检查启动条件。
+            maybeStartCarPlay()
+            return
+        }
         val previous = activeDisplaySize
         activeDisplaySize = size
         recordDetectedMaximum(size)
@@ -3410,11 +3430,35 @@ class CarPlayHostActivity : ComponentActivity() {
                 "Display updated while handshake is reset: " +
                     "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
             )
+        } else if (controller == null && display == null) {
+            appendLog(
+                "Display updated before CarPlay startup: " +
+                    "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
+            )
+            maybeStartCarPlay()
+        } else if (display != null && !layoutChanged &&
+            size.width <= display.windowWidth && size.height <= display.windowHeight) {
+            // 原窗口范围内的缩小与恢复只调整显示；超过启动窗口时才重新协商画布。
+            val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
+                "keeping CarPlay session canvas=${display.width}x${display.height}"
+            appendLog(message)
+            Log.i(TAG, message)
+            videoView?.let { updateVideoViewport(it.width, it.height) }
         } else {
             restartCarPlay(
                 "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}",
             )
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun displayRotation(): Int = videoView?.display?.rotation ?: windowManager.defaultDisplay.rotation
+
+    private fun displayLayoutChanged(): Boolean {
+        val display = sessionDisplay ?: return false
+        // 环视可能把窗口变窄，不能用窗口宽高比例判断屏幕发生了旋转。
+        return display.rotation != displayRotation() ||
+            display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar
     }
 
     private fun recordDetectedMaximum(size: DisplaySize) {
@@ -3443,6 +3487,7 @@ class CarPlayHostActivity : ComponentActivity() {
             shuttingDown.get() ||
             menuOpen ||
             handshakeResetInProgress ||
+            pendingDisplaySize != null ||
             controller != null
         ) {
             return
@@ -3499,6 +3544,8 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayBackgroundSession.clear(oldController, keepOwner = true)
         controller = null
         sink = null
+        sessionDisplay = null
+        videoCanvasSize = null
         teardownExecutor.execute {
             oldController?.close()
             oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS)
@@ -3506,7 +3553,8 @@ class CarPlayHostActivity : ComponentActivity() {
             runOnUiThread {
                 if (!shuttingDown.get() && generation == restartGeneration) {
                     handshakeResetInProgress = false
-                    startCarPlay(size)
+                    // 关闭旧会话期间窗口或权限可能变化，使用稳定后的当前尺寸重新检查。
+                    maybeStartCarPlay()
                 }
             }
         }
@@ -3575,6 +3623,8 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayBackgroundSession.clear(oldController)
         controller = null
         sink = null
+        sessionDisplay = null
+        videoCanvasSize = null
         Log.i(TAG, "shutdown reason=$reason terminateProcess=$terminateProcess")
         teardownExecutor.execute {
             oldController?.close()
@@ -3611,7 +3661,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun updateVideoViewport(width: Int, height: Int) {
         val video = videoView ?: return
         if (width <= 0 || height <= 0) return
-        val canvas = videoCanvasSize ?: DisplaySize(width, height)
+        val canvas = videoCanvasSize ?: sessionDisplay?.let { DisplaySize(it.width, it.height) }
+            ?: DisplaySize(width, height)
         val viewport = VideoViewport.fit(width, height, canvas.width, canvas.height)
         videoViewport = viewport
         video.isOpaque = viewport.left == 0.0 && viewport.top == 0.0
@@ -3952,6 +4003,7 @@ internal object CarPlayBackgroundSession {
         val sink: AndroidMediaSink,
         val width: Int,
         val height: Int,
+        val display: CarPlaySessionDisplay?,
     )
 
     private var controller: CarPlayController? = null
@@ -3959,16 +4011,18 @@ internal object CarPlayBackgroundSession {
     private var bluetoothMediaGuard: L7BluetoothMediaGuard? = null
     private var width = 0
     private var height = 0
+    private var display: CarPlaySessionDisplay? = null
 
     @Synchronized
     fun snapshot(): Snapshot? {
         val currentController = controller ?: return null
         val currentSink = sink ?: return null
-        return Snapshot(currentController, currentSink, width, height)
+        return Snapshot(currentController, currentSink, width, height, display)
     }
 
     @Synchronized
-    fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int, owner: Any, stop: (() -> Unit) -> Unit) {
+    fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int, owner: Any,
+              display: CarPlaySessionDisplay? = null, stop: (() -> Unit) -> Unit) {
         if (this.controller !== controller) {
             bluetoothMediaGuard?.close()
             bluetoothMediaGuard = null
@@ -3980,6 +4034,7 @@ internal object CarPlayBackgroundSession {
         this.sink = sink
         this.width = width
         this.height = height
+        this.display = display
     }
 
     @Synchronized
@@ -3993,6 +4048,7 @@ internal object CarPlayBackgroundSession {
         active = false
         width = 0
         height = 0
+        display = null
     }
 
     /** 与后台控制器共存，切换设置或重建窗口不重复断开；结束会话才释放监听。 */
