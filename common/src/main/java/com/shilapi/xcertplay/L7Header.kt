@@ -6,12 +6,12 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** 左右操作区固定等宽；未配置右侧动作时也保留位置，标题始终居中。 */
+/** 左右操作区固定等宽；未配置动作时保留空位，一级页面不创建返回按钮。 */
 internal class L7Header(
     context: Context,
     title: String,
     backLabel: String = context.getString(R.string.l7_back_settings),
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
 ) : LinearLayout(context) {
     private val right = FrameLayout(context)
 
@@ -20,7 +20,10 @@ internal class L7Header(
         gravity = Gravity.CENTER_VERTICAL
         val size = L7Components.dp(context, 64)
         minimumHeight = size
-        addView(L7Components.iconButton(context, R.drawable.ic_l7_back, backLabel, onBack), LayoutParams(size, size))
+        addView(FrameLayout(context).apply {
+            if (onBack != null) addView(L7Components.iconButton(context, R.drawable.ic_l7_back, backLabel, onBack),
+                FrameLayout.LayoutParams(-1, -1))
+        }, LayoutParams(size, size))
         addView(L7Typography.text(context, title, L7Typography.Role.PAGE_TITLE).apply {
             gravity = Gravity.CENTER
             includeFontPadding = false

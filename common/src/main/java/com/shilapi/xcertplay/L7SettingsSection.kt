@@ -22,13 +22,13 @@ internal object L7SettingsSection {
         return card
     }
 
-    /** 独立动作区自己承担内边距，避免改变同卡中条目的文字起点。 */
-    fun actions(card: LinearLayout, build: (LinearLayout) -> Unit) {
-        card.addView(LinearLayout(card.context).apply {
+    /** 动作按钮独立成组，与卡片外缘对齐；不再用白卡包裹并叠加内边距。 */
+    fun actions(parent: LinearLayout, footer: String = "", build: (LinearLayout) -> Unit) {
+        parent.addView(LinearLayout(parent.context).apply {
             orientation = LinearLayout.VERTICAL
-            val inset = L7Components.dp(context, 20)
-            setPadding(inset, L7Components.dp(context, 16), inset, L7Components.dp(context, 16))
             build(this)
-        }, LinearLayout.LayoutParams(-1, -2))
+            if (footer.isNotEmpty()) addView(L7Typography.text(context, footer, L7Typography.Role.FEEDBACK),
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = L7Components.dp(context, 12) })
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = L7Components.dp(parent.context, 24) })
     }
 }

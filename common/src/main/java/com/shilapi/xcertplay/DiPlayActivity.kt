@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// 界面文案与视觉语言改编自 DiAuto，许可见 docs/第三方许可.md。
+// 基于 DiPlay 宿主代码适配，保留其上游 DiAuto 来源声明；许可见 docs/第三方许可.md。
 package com.shilapi.xcertplay
 
 import android.Manifest
@@ -45,7 +45,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** DiAuto's visual language, with a connection flow for an independent CarPlay receiver. */
+/** 接入接收端会话与页面生命周期，L7 页面由本项目原生组件组合。 */
 class DiPlayActivity : ComponentActivity() {
     private val l7Ui by lazy { resources.getBoolean(R.bool.config_l7_product_ui) }
     private val BG get() = getColor(R.color.product_ui_background)
@@ -297,9 +297,8 @@ class DiPlayActivity : ComponentActivity() {
         if (settingsPage) body.addView(column().apply {
             setPaddingRelative(dp(inset), dp(24), dp(inset), dp(8))
             addView(L7Header(this@DiPlayActivity, pageTitle(),
-                getString(if (page == "settings") R.string.l7_header_back_home else R.string.l7_back_settings)) {
-                if (page == "settings") selectL7Destination("home") else { page = "settings"; render() }
-            }, LinearLayout.LayoutParams(-1, -2))
+                onBack = if (page == "settings") null else ({ page = "settings"; render() })
+            ), LinearLayout.LayoutParams(-1, -2))
         })
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
         contentScroll = scroll
@@ -409,23 +408,16 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun connectionActionsL7(content: LinearLayout) {
-        section(content, getString(R.string.wireless_carplay), R.drawable.ic_dp_connection) { card ->
-            card.addView(L7SettingRow(this, getString(R.string.l7_current_phone)).apply {
-                setValue(DiPlayPreferences.phoneName(this@DiPlayActivity))
-            })
+        L7SettingsSection.actions(content,
+            footer = getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo)) { actions ->
             connectButton = button(getString(R.string.l7_start_wireless), true) {
                 if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(true)
             }
+            usbButton = button(getString(R.string.l7_home_usb), false) { connect(false) }
             disconnectButton = button(getString(R.string.disconnect), false) { stopFromHome() }.apply { visibility = View.GONE }
-            L7SettingsSection.actions(card) { actions ->
-                actions.addView(connectButton, matchButton())
-                actions.addView(disconnectButton, matchButton(12))
-            }
-        }
-        L7SettingsSection.add(content, getString(R.string.connect_with_usb),
-            footer = getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo)) { card ->
-            usbButton = button(getString(R.string.connect_with_usb), false) { connect(false) }
-            L7SettingsSection.actions(card) { it.addView(usbButton, matchButton()) }
+            actions.addView(connectButton, matchButton())
+            actions.addView(usbButton, matchButton(12))
+            actions.addView(disconnectButton, matchButton(12))
         }
     }
 
