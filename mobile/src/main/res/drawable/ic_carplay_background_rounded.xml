@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="80dp" android:height="80dp"
+    android:viewportWidth="80" android:viewportHeight="80">
+    <!-- 传统图标保留 16dp 圆角与透明四角；这是本项目的外观适配值。 -->
+    <path android:pathData="M16,0H64A16,16 0,0 1,80 16V64A16,16 0,0 1,64 80H16A16,16 0,0 1,0 64V16A16,16 0,0 1,16 0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="40" android:startY="0"
+                android:endX="40" android:endY="80">
+                <item android:offset="0" android:color="@color/l7_launcher_green_top" />
+                <item android:offset="1" android:color="@color/l7_launcher_green_bottom" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
