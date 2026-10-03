@@ -136,10 +136,14 @@ def assert_stacked_long_value(label):
 
 
 def navigation_smoke():
-    assert any(n.attrib.get('text') == '进入' for n in nodes()), '分类没有下一层提示'
+    current = nodes()
+    assert not any(n.attrib.get('text') == '进入' for n in current), '分类尾部仍显示多余的进入文字'
+    assert not any(n.get(key) in ('返回设置', '返回画面') for n in current
+                   for key in ('text', 'content-desc')), '设置首页不应显示返回按钮'
+    screenshot('hierarchy-categories-day')
     tap('显示与性能')
     settings_selected()
-    assert not any(n.attrib.get('text') == 'L7CarPlay' for n in nodes()), '子页重复显示应用标题栏'
+    assert not any(n.attrib.get('text') in ('L7CarPlay', 'L7 CarPlay') for n in nodes()), '子页重复显示应用标题栏'
     require_labels(['返回设置', 'CarPlay 尺寸', '分辨率', '帧率', '高效视频', '全屏显示'])
     screenshot('hierarchy-display-day')
     # 重新点击当前侧栏分类应返回首页，不能困在同一个子页。
@@ -162,7 +166,7 @@ def navigation_smoke():
     tap('取消')
     tap('返回设置')
     for category, labels, name in (
-        ('连接设置', ['无线连接', 'USB 有线连接', '打开车机热点设置', '车机热点详情', '选择 iPhone', '蓝牙设置'], 'connection'),
+        ('连接设置', ['无线连接', '有线连接', '打开车机热点设置', '车机热点详情', '选择 iPhone', '蓝牙设置'], 'connection'),
         ('诊断与日志', ['查看当前日志', '保存诊断报告', '选择保存位置', '悬浮日志状态', '管理悬浮窗权限', '显示悬浮日志', '关闭悬浮日志'], 'diagnostics'),
         ('关于', ['应用版本', '使用协议'], 'about'),
     ):

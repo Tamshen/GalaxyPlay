@@ -48,7 +48,8 @@ internal class L7SettingRow(context: Context, title: String, description: String
 
     fun setAccessory(view: View, width: Int = -2, height: Int = -2) {
         accessory.removeAllViews()
-        accessory.addView(view, FrameLayout.LayoutParams(width, height, Gravity.CENTER))
+        // 操作槽保留文字间隔，图标与开关统一靠末端，避免窄箭头被居中后显得偏左。
+        accessory.addView(view, FrameLayout.LayoutParams(width, height, Gravity.END or Gravity.CENTER_VERTICAL))
         accessory.visibility = VISIBLE
         view.isEnabled = isEnabled
     }

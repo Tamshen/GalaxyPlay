@@ -91,12 +91,9 @@ internal object L7Components {
         parent.addView(row)
     }
 
-    /** 分类导航与参数选择使用不同的尾部提示，避免将子页入口看成普通内容。 */
+    /** 分类入口仅用右侧箭头提示下一层，名称与说明保持原有布局。 */
     fun categoryRow(context: Context, title: String, detail: String, icon: Int, click: () -> Unit): L7SettingRow =
-        actionRow(context, title, detail, icon, click).apply {
-            setValue(context.getString(R.string.l7_enter_settings))
-            L7Ui.text(valueView, R.color.product_ui_accent)
-        }
+        actionRow(context, title, detail, icon, click)
 
     fun switchRow(context: Context, title: String, detail: String, checked: Boolean, save: (Boolean) -> Unit): L7SettingRow =
         L7SettingRow(context, title, detail).apply {

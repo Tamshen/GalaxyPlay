@@ -16,7 +16,6 @@
     <string name="l7_projection_placeholder">连接 iPhone 后，在这里使用导航、音乐与通话。</string>
     <color name="product_ui_primary_text">#0C111B</color>
     <string name="l7_back_settings">返回设置</string>
-    <string name="l7_enter_settings">进入</string>
     <string name="l7_settings_navigation_hint">点击分类进入详细设置；子页可点「返回设置」或左侧「设置」返回此页。</string>
     <string name="l7_general_settings">通用设置</string>
     <string name="l7_settings_groups">功能设置</string>
