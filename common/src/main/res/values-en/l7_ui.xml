@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_header_back_home">Back to display</string>
+    <string name="l7_entry_connect">Connect now</string>
+    <string name="l7_home_usb">Wired connection</string>
+    <string name="l7_home_first_use">First use: choose wireless or wired connection.</string>
+    <string name="l7_auth_row_hint">Built-in, text import, USB and Remote MFi</string>
+    <string name="l7_save_next_connection">Save for next connection</string>
+    <string name="l7_auth_reconnect_hint">Authentication saved. Reconnect your iPhone from Connection settings.</string>
+    <string name="l7_nav_connection">Connection</string>
+    <string name="l7_vehicle_name">Galaxy L7</string>
+    <string name="l7_projection_placeholder">Connect your iPhone to use navigation, music and calls here.</string>
+    <string name="l7_back_settings">Back to settings</string>
+    <string name="l7_settings_navigation_hint">Select a category to view its settings. Use Back to settings or Settings on the left to return here.</string>
+    <string name="l7_general_settings">General settings</string>
+    <string name="l7_settings_groups">Settings categories</string>
+    <string name="l7_auth_import_row_hint">Paste authentication text to validate and apply</string>
+    <string name="l7_connection_row_hint">Vehicle hotspot, USB and paired iPhones</string>
+    <string name="l7_display_row_hint">Display size, resolution and frame rate</string>
+    <string name="l7_audio_row_hint">Audio focus, media and navigation routing</string>
+    <string name="l7_general_row_hint">Automatic connection, location and language</string>
+    <string name="l7_permissions_row_hint">App permissions, Bluetooth and connection help</string>
+    <string name="l7_setting_apply_hint">Selections are saved on confirmation; switches are saved immediately. Display and audio changes apply on the next connection. Saving keeps you in settings and does not interrupt the current display.</string>
+    <string name="l7_preparing">Preparing…</string>
+    <string name="l7_resume_projection">Return to CarPlay</string>
+    <string name="l7_view_connection">View connection progress</string>
+    <string name="l7_start_wireless">Wireless connection</string>
+    <string name="l7_session_connected_hint">Session connected. Return to CarPlay to continue. Opening settings does not disconnect it.</string>
+    <string name="l7_session_waiting_hint">Connection is not complete. View progress or cancel this attempt.</string>
+    <string name="l7_summary_connected">iPhone session connected · App status screen</string>
+    <string name="l7_summary_waiting">Waiting for iPhone · No video yet</string>
+    <string name="l7_summary_idle">iPhone not connected</string>
+    <string name="l7_cancel_connection">Cancel connection</string>
+    <string name="l7_connection_return_hint">Returning to L7CarPlay keeps waiting. Cancel connection ends this attempt.</string>
+    <string name="l7_disconnect_confirm">End the current CarPlay session? You will need to reconnect next time.</string>
+</resources>

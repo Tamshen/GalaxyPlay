@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">L7 CarPlay</string>
+    <string name="diplay">L7CarPlay</string>
+    <string name="home_public_preview">L7CarPlay ·\u0020</string>
+    <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">Adjust CarPlay icon and text size. Saved changes apply on the next connection.</string>
+    <string name="about_diplay">About L7CarPlay</string>
+    <string name="carplay_at_home_in_your_car">CarPlay for Galaxy L7</string>
+    <string name="an_independent_carplay_receiver_for_android_head_units_wir">A CarPlay receiver for Galaxy L7 Android head units, with wireless and USB connections.</string>
+    <string name="make_diplay_feel_right_for_your_car">Adjust L7CarPlay settings to suit your needs.</string>
+    <string name="back_to_diplay">Back to L7CarPlay</string>
+    <string name="connect_when_diplay_opens">Connect when L7CarPlay opens</string>
+    <string name="your_phone_your_drive">Galaxy L7 · Connected for you</string>
+    <string name="a_familiar_drive">Bring your iPhone to your L7.</string>
+    <string name="your_maps_music_and_conversations_carplay_right_here_on_yo">Navigation, music and calls,\nright on your center display.</string>
+    <string name="connect_phone">Connect iPhone</string>
+    <string name="connect_with_usb">USB wired connection</string>
+    <string name="your_drive_your_way">L7CarPlay settings</string>
+    <string name="about_public_preview_prefix">App version ·\u0020</string>
+    <string name="msg_car_hotspot_connect">L7CarPlay connects through the vehicle hotspot “%1$s”. Turn it on in vehicle settings before connecting.</string>
+    <string name="allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per">Allow Nearby devices for L7CarPlay in the vehicle app permissions.</string>
+    <string name="allow_nearby_devices_so_diplay_can_connect_to_your_paired">Allow L7CarPlay to access nearby devices so it can connect to your paired iPhone.</string>
+    <string name="allow_precise_location_for_diplay_in_the_head_unit_s_app_p">Allow precise location for L7CarPlay in the vehicle app permissions.</string>
+    <string name="could_not_start_carplay_return_to_diplay_and_check_app_per">Could not start CarPlay. Return to L7CarPlay and check app permissions.</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">In CarPlay, swipe down with three fingers to open L7CarPlay settings.</string>
+    <string name="language_hint">Choose the language for L7CarPlay. System default follows the device language.</string>
+    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">On your iPhone, open Settings → Bluetooth and pair with the vehicle. Return to L7CarPlay and select Connect iPhone.</string>
+    <string name="return_from_car_settings_to_diplay_then_connect_accept_the">Return from vehicle settings to L7CarPlay and connect. Accept the CarPlay prompt on your iPhone. A vehicle data plan is not required; mobile data availability depends on your phone network settings.</string>
+    <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. Open vehicle hotspot settings, turn the hotspot on and select 5 GHz if available.\n2. Copy the hotspot name and password exactly below.\n3. Keep the vehicle hotspot on while connecting. L7CarPlay sends the details over Bluetooth and your iPhone joins automatically.</string>
+    <string name="ready_when_you_are">Waiting to connect</string>
+    <string name="msg_car_hotspot_off">Vehicle hotspot %1$s is off. Turn it on in system settings first.</string>
+</resources>

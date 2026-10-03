@@ -17,6 +17,10 @@ val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSET
 
 android {
     namespace = "com.shilapi.xcertplay"
+    androidResources {
+        // 同时过滤依赖自带的其他语言，APK 仅保留中英文资源。
+        localeFilters += listOf("en", "zh-rCN")
+    }
     compileSdk {
         version = release(37)
     }
@@ -32,6 +36,8 @@ android {
         manifestPlaceholders["diplayCoreCommit"] = l7Version.getProperty("diplayCoreCommit")
         resValue("string", "l7_core_source_info",
             "核心依赖：DiPlay ${l7Version.getProperty("diplayCoreVersion")} · ${l7Version.getProperty("diplayCoreCommit").take(7)}")
+        // 关于页只展示直接上游，版本与接收核心基线共用同一配置。
+        resValue("string", "l7_source_version_diplay", l7Version.getProperty("diplayCoreVersion"))
 
     }
 

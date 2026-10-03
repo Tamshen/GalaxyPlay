@@ -2,7 +2,6 @@
 package com.shilapi.xcertplay
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.LocaleManager
 import android.os.Build
 import android.os.LocaleList
@@ -11,16 +10,12 @@ import android.content.res.Configuration
 import com.shilapi.xcertplay.host.R
 import java.util.Locale
 
-/** Platform app locales on Android 13+, with a persisted context override on older Android. */
+/** 仅提供中英文；Android 13 起使用系统应用语言，旧系统使用持久化配置。 */
 object AppLocale {
     const val SYSTEM = "system"
     const val ENGLISH = "en"
     const val SIMPLIFIED_CHINESE = "zh"
-    const val ARABIC = "ar"
-    const val RUSSIAN = "ru"
-    const val SPANISH = "es"
-
-    val ALL = listOf(SYSTEM, ENGLISH, SIMPLIFIED_CHINESE, ARABIC, RUSSIAN, SPANISH)
+    val ALL = listOf(SYSTEM, ENGLISH, SIMPLIFIED_CHINESE)
 
     private const val PREFS = "diplay"
     private const val KEY_LANGUAGE = "app_language"
@@ -30,7 +25,7 @@ object AppLocale {
     fun preference(context: Context): String {
         if (Build.VERSION.SDK_INT >= 33) {
             val locales = context.getSystemService(LocaleManager::class.java).applicationLocales
-            return if (locales.isEmpty) SYSTEM else locales[0].language
+            return if (locales.isEmpty) SYSTEM else locales[0].language.takeIf { it in ALL } ?: SYSTEM
         }
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_LANGUAGE, SYSTEM)?.takeIf { it in ALL } ?: SYSTEM
@@ -49,15 +44,18 @@ object AppLocale {
         }
     }
 
-    /** On Android 13+, the OS is the single source of truth for the app language. */
+    /** Android 13 起以系统应用语言为准，已移除的旧语言回到跟随系统。 */
     fun wrap(context: Context): Context {
         if (Build.VERSION.SDK_INT >= 33) {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val manager = context.getSystemService(LocaleManager::class.java)
+            val current = manager.applicationLocales
+            val removedLanguage = !current.isEmpty && current[0].language !in ALL
+            if (removedLanguage) manager.applicationLocales = LocaleList.getEmptyLocaleList()
             if (!prefs.getBoolean(KEY_MIGRATED, false)) {
-                val manager = context.getSystemService(LocaleManager::class.java)
                 val previous = locale(prefs.getString(KEY_LANGUAGE, SYSTEM) ?: SYSTEM)
-                // Never overwrite a language already chosen through Android Settings.
-                if (manager.applicationLocales.isEmpty && previous != null) {
+                // 已有系统选择优先，清理旧语言时也不恢复更早的应用偏好。
+                if (!removedLanguage && manager.applicationLocales.isEmpty && previous != null) {
                     manager.applicationLocales = LocaleList(previous)
                 }
                 prefs.edit().putBoolean(KEY_MIGRATED, true).remove(KEY_LANGUAGE).apply()
@@ -92,7 +90,7 @@ object AppLocale {
                 val next = ALL[selected]
                 if (next != preference(activity)) {
                     save(activity, next)
-                    // LocaleManager recreates activities itself on Android 13+.
+                    // Android 13 起由 LocaleManager 自动重建页面。
                     if (Build.VERSION.SDK_INT < 33) activity.recreate()
                 }
             }
@@ -100,23 +98,17 @@ object AppLocale {
             .show()
     }
 
-    /** Names stay in their native form for every language; only "system default" is localized. */
+    /** 语言名称使用各自原文，只有“跟随系统”随当前语言翻译。 */
     fun displayName(context: Context, language: String): String = when (language) {
         SYSTEM -> context.getString(R.string.language_system_default)
         ENGLISH -> "English"
         SIMPLIFIED_CHINESE -> "简体中文"
-        ARABIC -> "العربية"
-        RUSSIAN -> "Русский"
-        SPANISH -> "Español"
         else -> language
     }
 
     private fun locale(language: String): Locale? = when (language) {
         ENGLISH -> Locale.ENGLISH
         SIMPLIFIED_CHINESE -> Locale.SIMPLIFIED_CHINESE
-        ARABIC -> Locale("ar")
-        RUSSIAN -> Locale("ru")
-        SPANISH -> Locale("es")
         else -> null
     }
 }

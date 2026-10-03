@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_error_auth">CarPlay authentication is not ready. Import credentials in settings, or configure USB or Remote MFi authentication.</string>
+</resources>

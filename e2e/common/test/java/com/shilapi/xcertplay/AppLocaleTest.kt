@@ -20,10 +20,10 @@ class AppLocaleTest {
     private val manager get() = context.getSystemService(LocaleManager::class.java)
 
     @Test fun pickerAndSystemSettingsShareTheSamePreference() {
-        AppLocale.save(context, AppLocale.ARABIC)
-        assertEquals("ar", manager.applicationLocales.toLanguageTags())
-        manager.applicationLocales = LocaleList.forLanguageTags("es")
-        assertEquals(AppLocale.SPANISH, AppLocale.preference(context))
+        AppLocale.save(context, AppLocale.ENGLISH)
+        assertEquals("en", manager.applicationLocales.toLanguageTags())
+        manager.applicationLocales = LocaleList.forLanguageTags("zh-CN")
+        assertEquals(AppLocale.SIMPLIFIED_CHINESE, AppLocale.preference(context))
         assertSame(context, AppLocale.wrap(context))
         AppLocale.save(context, AppLocale.SYSTEM)
         assertTrue(manager.applicationLocales.isEmpty)
@@ -32,9 +32,9 @@ class AppLocaleTest {
 
     @Test fun oldPreferenceMigratesOnceAndCannotOverrideLaterSystemChanges() {
         context.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit()
-            .putString("app_language", "ar").commit()
+            .putString("app_language", "en").commit()
         AppLocale.wrap(context)
-        assertEquals("ar", manager.applicationLocales.toLanguageTags())
+        assertEquals("en", manager.applicationLocales.toLanguageTags())
         manager.applicationLocales = LocaleList.getEmptyLocaleList()
         AppLocale.wrap(context)
         assertEquals(AppLocale.SYSTEM, AppLocale.preference(context))
@@ -42,23 +42,46 @@ class AppLocaleTest {
 
     @Test fun existingSystemChoiceWinsOverLegacyPreference() {
         context.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit()
-            .putString("app_language", "ar").commit()
+            .putString("app_language", "en").commit()
         manager.applicationLocales = LocaleList.forLanguageTags("zh-CN")
         AppLocale.wrap(context)
         assertEquals(AppLocale.SIMPLIFIED_CHINESE, AppLocale.preference(context))
         assertEquals("zh-CN", manager.applicationLocales.toLanguageTags())
     }
 
-    @Test @Config(sdk = [28, 32])
-    fun olderAndroidWrapsArabicAndReturnsToSystemWithoutChangingGlobalResources() {
+    @Test @Config(sdk = [29, 32])
+    fun olderAndroidWrapsEnglishAndReturnsToSystemWithoutChangingGlobalResources() {
         val original = context.resources.configuration.locales.toLanguageTags()
-        AppLocale.save(context, AppLocale.ARABIC)
+        AppLocale.save(context, AppLocale.ENGLISH)
         val wrapped = AppLocale.wrap(context)
-        assertEquals(Locale("ar"), wrapped.resources.configuration.locales[0])
-        assertEquals(View.LAYOUT_DIRECTION_RTL, wrapped.resources.configuration.layoutDirection)
+        assertEquals(Locale.ENGLISH, wrapped.resources.configuration.locales[0])
+        assertEquals(View.LAYOUT_DIRECTION_LTR, wrapped.resources.configuration.layoutDirection)
         assertEquals(original, context.resources.configuration.locales.toLanguageTags())
         AppLocale.save(context, AppLocale.SYSTEM)
         assertSame(context, AppLocale.wrap(context))
+    }
+
+    @Test @Config(sdk = [29])
+    fun removedLegacyLanguagesFallBackToSystem() {
+        for (language in listOf("ar", "ru", "es")) {
+            context.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit()
+                .putString("app_language", language).commit()
+            assertEquals(AppLocale.SYSTEM, AppLocale.preference(context))
+            assertSame(context, AppLocale.wrap(context))
+        }
+    }
+
+    @Test fun removedPlatformLanguagesDoNotRestoreOlderPreferences() {
+        for (language in listOf("ar", "ru", "es")) {
+            context.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit()
+                .putString("app_language", "en")
+                .putBoolean("app_language_platform_migrated", false).commit()
+            manager.applicationLocales = LocaleList.forLanguageTags(language)
+            assertEquals(AppLocale.SYSTEM, AppLocale.preference(context))
+            AppLocale.wrap(context)
+            assertTrue(manager.applicationLocales.isEmpty)
+            assertEquals(AppLocale.SYSTEM, AppLocale.preference(context))
+        }
     }
 
     @Test @Config(sdk = [29])

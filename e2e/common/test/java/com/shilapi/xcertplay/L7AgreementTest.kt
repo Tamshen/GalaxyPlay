@@ -2,9 +2,11 @@ package com.shilapi.xcertplay
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.os.Looper
 import android.view.View
 import java.time.Duration
+import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +56,21 @@ class L7AgreementTest {
         assertTrue(content.contains("协议版本：${L7Agreement.VERSION}"))
         assertFalse(content.contains("[软件名称]"))
         assertFalse(content.contains("[姓名或网名]"))
+    }
+
+    @Test fun englishDisplayKeepsAllSectionsAndTheSameConsent() {
+        val context = activity()
+        assertTrue(L7Agreement.accept(context))
+        val english = context.createConfigurationContext(Configuration(context.resources.configuration).apply {
+            setLocale(Locale.ENGLISH)
+        })
+        val document = L7Agreement.displayDocument(english)
+        assertEquals(11, Regex("(?m)^## ").findAll(document).count())
+        assertTrue(document.contains("First-use Notice and Risk Acknowledgment"))
+        assertFalse(Regex("[\\u3400-\\u9fff]").containsMatchIn(document))
+        assertEquals(L7Agreement.digest(context), L7Agreement.digest(english))
+        assertTrue(L7Agreement.accepted(english))
+        assertTrue(L7Agreement.displayDocument(context).contains("首次使用须知与风险确认协议"))
     }
 
     private fun layout(panel: L7AgreementPanel) {

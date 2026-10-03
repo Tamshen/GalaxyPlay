@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_debug_state_title">Floating log status</string>
+    <string name="l7_app_version">App version</string>
+    <string name="l7_current_phone">Current iPhone</string>
+    <string name="l7_debug_view_hint">View, refresh or copy logs from this run</string>
+    <string name="l7_debug_permission_hint">Allow floating logs to display over other apps</string>
+    <string name="l7_report_location_hint">Choose a report location with the system file picker</string>
+    <string name="l7_section_app_ui">App interface</string>
+    <string name="l7_section_floating">Floating menu</string>
+    <string name="l7_section_projection">CarPlay display</string>
+    <string name="l7_section_audio_playback">Playback and audio focus</string>
+    <string name="l7_section_audio_routes">Audio routing and previews</string>
+    <string name="l7_section_bluetooth_audio">Bluetooth media coordination</string>
+    <string name="l7_section_product">App information</string>
+    <string name="l7_section_agreement">User agreement</string>
+    <string name="l7_section_sources">Open source</string>
+    <string name="l7_physical_size_description">Calculated from the 13.2-inch specification; matches the display area automatically</string>
+    <string name="l7_physical_size_value">Approx. %1$d×%2$d mm</string>
+    <string name="l7_debug_already_running">Floating logs are enabled</string>
+    <string name="l7_debug_not_running">Floating logs are not enabled</string>
+    <string name="l7_report_retry">Export failed. Tap to retry or choose a save location.</string>
+</resources>

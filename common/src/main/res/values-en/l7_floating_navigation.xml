@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_rail_expand">Expand menu</string>
+    <string name="l7_nav_picture">Display</string>
+    <string name="l7_nav_car_home">Vehicle</string>
+    <string name="l7_nav_exit">Exit</string>
+    <string name="l7_about_row_hint">App version, project information and licenses</string>
+    <string name="l7_floating_transparency">Floating icon transparency</string>
+    <string name="l7_floating_hint">The menu collapses after connecting. Drag the icon to move it. Tap the icon or press Back to open the four-item menu at the top left. Transparency changes apply when returning to the display.</string>
+    <string name="l7_exit_app">Exit app</string>
+    <string name="l7_exit_title">Exit L7CarPlay?</string>
+    <string name="l7_exit_message">This will disconnect CarPlay, close floating logs and background services, and end the app process.</string>
+</resources>

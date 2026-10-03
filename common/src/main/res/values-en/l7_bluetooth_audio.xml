@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_bt_media_auto">Bluetooth media coordination</string>
+    <string name="l7_bt_media_auto_desc">After CarPlay connects, try to disconnect Bluetooth media from the same phone while keeping calls and pairing. Applies on the next connection.</string>
+    <string name="l7_bt_media_help">Bluetooth music troubleshooting</string>
+    <string name="l7_bt_media_help_desc">If playback pauses automatically, check the result and how to turn off Bluetooth media manually.</string>
+    <string name="l7_bt_media_help_body">Latest check: %1$s\n\nReceiving music from the same phone over both Bluetooth and CarPlay may cause competing media sources. Automatic handling targets only the phone identified for this wireless connection. Calls and pairing are preserved.\n\nIf the firmware prevents automatic handling, open the phone details in the vehicle Bluetooth settings. Turn off Media audio / Bluetooth music while keeping Call audio enabled, then return to CarPlay and play again. If there is no separate switch, record the logs and firmware version.\n\nIf the target phone cannot be identified over USB, handle this manually. Hearing a test tone does not confirm that phone playback and Bluetooth audio focus are coordinated.</string>
+    <string name="l7_bt_media_open_settings">Open Bluetooth settings</string>
+    <string name="l7_bt_media_settings_unavailable">Could not open Bluetooth settings. Open them from the vehicle system settings.</string>
+    <string name="l7_bt_media_idle">Not checked yet. Connect CarPlay first.</string>
+    <string name="l7_bt_media_checking">Checking the target phone for a Bluetooth music connection.</string>
+    <string name="l7_bt_media_no_target">Target phone not identified. Turn off its Bluetooth media audio manually.</string>
+    <string name="l7_bt_media_clear">Bluetooth music is disconnected for the target phone. Verify actual playback.</string>
+    <string name="l7_bt_media_conflict">The target phone is still connected for Bluetooth music. Automatic handling is off.</string>
+    <string name="l7_bt_media_disconnecting">Disconnect requested. Waiting for system confirmation.</string>
+    <string name="l7_bt_media_blocked">Automatic handling is unavailable or disconnection is unconfirmed. Turn off Bluetooth media audio manually.</string>
+    <string name="l7_bt_media_limit">Bluetooth music keeps reconnecting. Automatic attempts have reached the limit for this session. Turn it off manually.</string>
+    <string name="l7_bt_media_closed">Session ended. This will be checked again on the next connection.</string>
+</resources>

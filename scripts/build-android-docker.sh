@@ -139,7 +139,8 @@ fi
 
 mkdir -p "$project_dir/build"
 # 两个容器不能同时写同一份 Gradle 输出；锁由容器进程持有，退出自动释放。
-gradle_command=(flock --nonblock --conflict-exit-code 75 /workspace/build/android-build.lock
+# 中文文档会作为离线许可输入，JVM 的文件名编码必须由 UTF-8 locale 初始化。
+gradle_command=(env LANG=C.UTF-8 LC_ALL=C.UTF-8 flock --nonblock --conflict-exit-code 75 /workspace/build/android-build.lock
     ./gradlew "${gradle_tasks[@]}" --console=plain)
 set +e
 if [[ "$warm" == true ]]; then

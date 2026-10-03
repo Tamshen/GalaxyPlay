@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_sources_receiver">开源说明</string>
+    <string name="l7_source_diplay_name" translatable="false">DiPlay</string>
+    <string name="l7_source_diplay_description">CarPlay 接收核心 · GPL-3.0</string>
+    <string name="l7_licenses_title">第三方许可</string>
+    <string name="l7_licenses_hint">查看依赖声明与许可原文</string>
+    <string name="l7_licenses_load_failed">许可文件暂时无法读取，请重新打开。</string>
+    <string name="l7_source_version_diplay" translatable="false">—</string>
+</resources>

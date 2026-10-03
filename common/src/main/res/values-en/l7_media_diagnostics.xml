@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_physical_size_automatic">Automatically matches the L7 display area. The panel is approximately %1$d×%2$d mm, calculated from the 13.2-inch specification. The floating sidebar does not change the projection size.</string>
+    <string-array name="l7_audio_stream_names">
+        <item>0 · Recommended (for current use)</item>
+        <item>Media output policy (MEDIA)</item>
+        <item>Voice assistant policy (ASSISTANT)</item>
+        <item>Navigation policy (NAVIGATION)</item>
+        <item>1 · System sounds</item>
+        <item>2 · Ringtone</item>
+        <item>3 · Music</item>
+        <item>4 · Alarm</item>
+        <item>5 · Notifications</item>
+        <item>6 · Bluetooth calls</item>
+        <item>7 · Enforced system sounds</item>
+        <item>8 · Dial pad tones</item>
+        <item>9 · Text-to-speech (system reserved)</item>
+        <item>10 · Accessibility (system restricted)</item>
+    </string-array>
+    <string name="l7_audio_media">Media music</string>
+    <string name="l7_audio_assistant">Voice assistant (Siri)</string>
+    <string name="l7_audio_navigation">Navigation prompts</string>
+    <string name="l7_audio_roles_note">Built-in policies handle media music, Siri responses and navigation prompts separately. Change, preview or restore the recommended policy for each. Calls retain separate handling. Changes apply on the next connection.</string>
+    <string name="l7_audio_route_select">Advanced output policy</string>
+    <string name="l7_audio_route_choose">Select</string>
+    <string name="l7_audio_route_help">The recommended policy uses a separate system policy for media music, Siri or navigation. You can choose another usage policy below. Legacy audio streams 1–10 are for advanced troubleshooting; the numbers do not identify speaker positions. Selecting or previewing does not save changes. Saved changes apply on the next connection.</string>
+    <string name="l7_audio_test_play">Play test tone (2 seconds)</string>
+    <string name="l7_audio_test_stop">Stop test tone</string>
+    <string name="l7_audio_test_ready">Previewing does not save settings. Make sure vehicle audio is audible and operate only while parked.</string>
+    <string name="l7_audio_test_playing">Previewing %1$s…</string>
+    <string name="l7_audio_test_stopped">Preview stopped. Settings have not been saved.</string>
+    <string name="l7_audio_test_sent">Test tone sent. Check whether you heard it. Actual output: %1$s. Verify the result in the vehicle.</string>
+    <string name="l7_audio_output_speaker">System speaker</string>
+    <string name="l7_audio_output_earpiece">Earpiece</string>
+    <string name="l7_audio_output_bus">Vehicle BUS</string>
+    <string name="l7_audio_output_wired">Wired headphones</string>
+    <string name="l7_audio_output_bluetooth">Bluetooth audio</string>
+    <string name="l7_audio_output_usb">USB audio</string>
+    <string name="l7_audio_output_unknown">Not reported by the system</string>
+    <string name="l7_audio_output_system">Other system output</string>
+    <string name="l7_hevc_failed_title">HEVC video did not display</string>
+    <string name="l7_hevc_failed_message">Decoder initialization failed, or no video output was confirmed after receiving data. Diagnostic logs include configuration, decoding and rendering details. Turn off HEVC, switch to H.264 and reconnect. Hotspot settings will remain unchanged.</string>
+    <string name="l7_hevc_use_avc">Use H.264 and reconnect</string>
+</resources>
