@@ -1,0 +1,22 @@
+<resources>
+    <string name="l7_debug_state_title">悬浮日志状态</string>
+    <string name="l7_app_version">应用版本</string>
+    <string name="l7_current_phone">当前 iPhone</string>
+    <string name="l7_debug_view_hint">查看、刷新或复制本次运行的日志</string>
+    <string name="l7_debug_permission_hint">允许日志悬浮窗显示在其他应用上层</string>
+    <string name="l7_report_location_hint">通过系统文件选择器指定报告位置</string>
+    <string name="l7_section_app_ui">应用界面</string>
+    <string name="l7_section_floating">悬浮菜单</string>
+    <string name="l7_section_projection">投屏画面</string>
+    <string name="l7_section_audio_playback">播放与焦点</string>
+    <string name="l7_section_audio_routes">声道路由与试听</string>
+    <string name="l7_section_bluetooth_audio">蓝牙媒体协调</string>
+    <string name="l7_section_product">应用信息</string>
+    <string name="l7_section_agreement">使用协议</string>
+    <string name="l7_section_sources">开源说明</string>
+    <string name="l7_physical_size_description">按 13.2 英寸规格换算，自动匹配显示区域</string>
+    <string name="l7_physical_size_value">约 %1$d×%2$d mm</string>
+    <string name="l7_debug_already_running">悬浮日志已开启</string>
+    <string name="l7_debug_not_running">悬浮日志尚未开启</string>
+    <string name="l7_report_retry">导出失败，点击本项重试或选择保存位置</string>
+</resources>

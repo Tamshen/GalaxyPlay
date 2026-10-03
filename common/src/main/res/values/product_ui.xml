@@ -1,0 +1,11 @@
+<resources>
+    <!-- 默认保留核心宿主外观，L7 由入口模块覆盖。 -->
+    <color name="product_ui_background">#0C111B</color>
+    <color name="product_ui_surface">#151E2C</color>
+    <color name="product_ui_border">#2A384B</color>
+    <color name="product_ui_accent">#A6C8FF</color>
+    <color name="product_ui_text">#F1F5FC</color>
+    <color name="product_ui_muted">#A8B6CA</color>
+    <color name="product_ui_warning">#FFC480</color>
+    <string name="l7_core_source_info" translatable="false"></string>
+</resources>

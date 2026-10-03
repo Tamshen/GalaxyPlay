@@ -1,0 +1,10 @@
+<resources>
+    <!-- 夜间保持相同层级关系，避免白色卡片造成强烈明暗跳变。 -->
+    <color name="l7_settings_navigation_top">#1E2732</color>
+    <color name="l7_settings_navigation_bottom">#161F29</color>
+    <color name="l7_settings_content_top">#28313C</color>
+    <color name="l7_settings_content_bottom">#222A34</color>
+    <color name="l7_settings_card">#303A47</color>
+    <color name="l7_settings_card_border">#3B4756</color>
+    <color name="l7_settings_divider">#344151</color>
+</resources>

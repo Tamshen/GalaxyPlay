@@ -1,0 +1,10 @@
+<resources>
+    <item name="l7_palette_binding" type="id" />
+    <item name="l7_notice" type="id" />
+    <!-- 公共入口回退；L7 昼夜值由 mobile 覆盖。 -->
+    <color name="product_ui_control">@color/product_ui_surface</color>
+    <color name="product_ui_selected">#203B6480</color>
+    <color name="product_ui_disabled">#668C98A8</color>
+    <color name="product_ui_ripple">#337DA8DF</color>
+    <color name="product_ui_danger">#FF6B6B</color>
+</resources>

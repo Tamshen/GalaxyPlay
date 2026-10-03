@@ -1,0 +1,32 @@
+<resources>
+    <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">调整 CarPlay 图标和文字的大小，保存后在下次连接时应用。</string>
+    <string name="app_name">L7CarPlay</string>
+    <string name="diplay">L7CarPlay</string>
+    <string name="about_diplay">关于 L7CarPlay</string>
+    <string name="carplay_at_home_in_your_car">银河 L7 专用 CarPlay</string>
+    <string name="an_independent_carplay_receiver_for_android_head_units_wir">面向银河 L7 安卓车机的 CarPlay 接收端，支持无线与 USB 有线连接。</string>
+    <string name="make_diplay_feel_right_for_your_car">按需调整 L7CarPlay 设置。</string>
+    <string name="back_to_diplay">返回 L7CarPlay</string>
+    <string name="connect_when_diplay_opens">打开 L7CarPlay 时连接</string>
+    <string name="your_phone_your_drive">银河 L7 · 专属连接</string>
+    <string name="a_familiar_drive">让 iPhone，融入 L7。</string>
+    <string name="your_maps_music_and_conversations_carplay_right_here_on_yo">导航、音乐与通话，
+在中控屏上自然呈现。</string>
+    <string name="connect_phone">连接 iPhone</string>
+    <string name="connect_with_usb">USB 有线连接</string>
+    <string name="your_drive_your_way">L7CarPlay 设置</string>
+    <string name="home_public_preview">L7CarPlay ·\u0020</string>
+    <string name="about_public_preview_prefix">应用版本 ·\u0020</string>
+    <string name="msg_car_hotspot_connect">L7CarPlay 通过车机热点“%1$s”连接。请在车机设置中开启热点后连接。</string>
+    <string name="allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per">请在车机应用权限中允许 L7CarPlay 访问附近的设备。</string>
+    <string name="allow_nearby_devices_so_diplay_can_connect_to_your_paired">请允许 L7CarPlay 访问附近的设备，以连接已配对的 iPhone。</string>
+    <string name="allow_precise_location_for_diplay_in_the_head_unit_s_app_p">请在车机应用权限中允许 L7CarPlay 使用精确位置信息。</string>
+    <string name="could_not_start_carplay_return_to_diplay_and_check_app_per">无法启动 CarPlay。请返回 L7CarPlay 检查应用权限。</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">在 CarPlay 界面用三指向下滑动，可打开 L7CarPlay 设置。</string>
+    <string name="language_hint">选择 L7CarPlay 的语言。“跟随系统”将使用设备语言。</string>
+    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">在 iPhone 上打开“设置 → 蓝牙”并与车机配对。然后返回 L7CarPlay，点击“连接手机”。</string>
+    <string name="return_from_car_settings_to_diplay_then_connect_accept_the">从车机设置返回 L7CarPlay，然后连接。在 iPhone 上接受 CarPlay 提示。无需车机流量套餐；移动数据可用性取决于手机的网络设置。</string>
+    <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. 打开车机热点设置，开启热点，如有 5 GHz 请选择。\n2. 在下方准确复制热点名称和密码。\n3. 连接时保持车机热点开启。L7CarPlay 通过蓝牙发送热点信息，iPhone 会自动加入。</string>
+    <string name="ready_when_you_are">等待连接</string>
+    <string name="msg_car_hotspot_off">车机热点 %1$s 尚未开启，请先到系统设置中开启。</string>
+</resources>

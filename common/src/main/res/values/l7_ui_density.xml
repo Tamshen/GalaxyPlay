@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_ui_size">界面大小</string>
+    <string name="l7_ui_small">小</string>
+    <string name="l7_ui_medium">中（默认）</string>
+    <string name="l7_ui_large">大</string>
+    <string name="l7_ui_custom">自定义 DPI</string>
+    <string name="l7_ui_custom_value">自定义 · %1$d DPI</string>
+    <string name="l7_ui_density_hint">只调整本应用界面，DPI 越大，文字和按钮越大；保存后生效。</string>
+    <string name="l7_ui_density_range">请输入 160～480 的整数 DPI</string>
+</resources>

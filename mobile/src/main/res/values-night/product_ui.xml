@@ -1,0 +1,16 @@
+<resources>
+    <!-- 夜间保留文字层级，降低大面积背景亮度。 -->
+    <color name="product_ui_background">#20272E</color>
+    <color name="product_ui_surface">#252A30</color>
+    <color name="product_ui_control">#15191F</color>
+    <color name="product_ui_border">#33FFFFFF</color>
+    <color name="product_ui_accent">#0088FF</color>
+    <color name="product_ui_selected">#240088FF</color>
+    <color name="product_ui_text">#E5FFFFFF</color>
+    <color name="product_ui_muted">#99FFFFFF</color>
+    <color name="product_ui_disabled">#66FFFFFF</color>
+    <color name="product_ui_ripple">#330088FF</color>
+    <color name="product_ui_warning">#FFB34D</color>
+    <color name="product_ui_danger">#FF747A</color>
+    <color name="product_ui_primary_text">#FFFFFF</color>
+</resources>

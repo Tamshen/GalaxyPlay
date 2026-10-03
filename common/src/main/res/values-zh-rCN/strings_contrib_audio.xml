@@ -1,0 +1,9 @@
+<resources>
+    <string name="contrib_audio_home_channel_preview_unavailable">此设备无法试听 Android 音频流 %1$d。</string>
+    <string name="contrib_audio_home_choice_summary">%1$s · %2$s</string>
+    <string name="contrib_audio_home_media_channel_label">媒体音频流</string>
+    <string name="contrib_audio_home_nav_channel_label">导航音频流</string>
+    <string name="contrib_audio_home_nav_channel_note">0 表示自动路由，音乐优先匹配可用媒体 BUS，导航使用系统提示策略；失败回退系统。点击音频流入口可选择并独立试听；数字不是扬声器位置。更改在下次连接后生效。</string>
+    <string name="contrib_audio_home_toggle_audio_focus">音频焦点</string>
+    <string name="contrib_audio_home_toggle_audio_focus_desc">协调音乐、导航、Siri 和电话的音频焦点；失去焦点时静音，导航或 Siri 播放时压低本应用音乐。若此车机开启后无声，可关闭后重新连接。</string>
+</resources>

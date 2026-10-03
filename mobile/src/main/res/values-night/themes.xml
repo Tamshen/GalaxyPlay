@@ -1,0 +1,33 @@
+<resources>
+    <style name="Theme.Xcertplay" parent="android:Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">@color/product_ui_accent</item>
+        <item name="android:textColorPrimary">@color/product_ui_text</item>
+        <item name="android:textColorSecondary">@color/product_ui_muted</item>
+        <item name="android:colorControlNormal">@color/product_ui_muted</item>
+        <item name="android:colorControlActivated">@color/product_ui_accent</item>
+        <item name="android:colorButtonNormal">@color/product_ui_control</item>
+        <item name="android:colorBackground">@color/product_ui_background</item>
+        <item name="android:colorBackgroundFloating">@color/product_ui_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">@color/product_ui_background</item>
+        <item name="android:statusBarColor">@color/product_ui_background</item>
+        <item name="android:windowBackground">@color/product_ui_background</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:alertDialogTheme">@style/Theme.L7.Dialog</item>
+    </style>
+    <style name="Theme.L7.Dialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">@color/product_ui_accent</item>
+        <item name="android:textColorPrimary">@color/product_ui_text</item>
+        <item name="android:textColorSecondary">@color/product_ui_muted</item>
+        <item name="android:colorControlNormal">@color/product_ui_muted</item>
+        <item name="android:colorControlActivated">@color/product_ui_accent</item>
+        <item name="android:colorBackground">@color/product_ui_surface</item>
+        <item name="android:colorBackgroundFloating">@color/product_ui_surface</item>
+        <item name="android:windowBackground">@drawable/l7_dialog_background</item>
+        <item name="android:windowMinWidthMajor">85%</item>
+        <item name="android:windowMinWidthMinor">85%</item>
+    </style>
+</resources>

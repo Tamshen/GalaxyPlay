@@ -1,0 +1,10 @@
+<!-- Flyme Auto 参考矢量，保留几何，尺寸及颜色接入 L7 主题。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:height="32dp"
+    android:width="32dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <path
+        android:fillColor="@color/product_ui_text"
+        android:pathData="M20 13H42.8284L60 30.1716V67H20V13ZM24 17V63H56V33H40V17H24ZM44 19.8284L53.1716 29H44V19.8284Z"/>
+</vector>

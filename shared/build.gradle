@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.library'
+}
+android {
+    namespace = 'com.shilapi.xcertplay.shared'
+    compileSdk = 37
+
+    defaultConfig {
+        minSdk = 28
+        targetSdk = 37
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+
+        externalNativeBuild {
+            ndkBuild {
+                arguments 'APP_PLATFORM=android-28'
+            }
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    ndkVersion = '28.2.13676358'
+    externalNativeBuild {
+        ndkBuild {
+            path = file('src/main/jni/Android.mk')
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    // 测试统一集中在根目录 e2e，保留各模块与测试类型的独立编译范围。
+    sourceSets {
+        test.setRoot(rootProject.file('e2e/shared/test').path)
+        androidTest.setRoot(rootProject.file('e2e/shared/androidTest').path)
+        // 加密验证工具只随调试包提供，应用内音频自检样本保留运行时打包。
+        debug.setRoot(rootProject.file('e2e/shared/debug').path)
+        main.assets.srcDir(rootProject.file('e2e/shared/runtime/assets'))
+    }
+}
+dependencies {
+    implementation libs.androidx.app
+    implementation libs.bouncycastle
+    implementation libs.jmdns
+    testImplementation libs.junit
+    testImplementation 'org.robolectric:robolectric:4.17'
+}

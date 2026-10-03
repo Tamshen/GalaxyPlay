@@ -1,0 +1,4 @@
+<resources>
+    <bool name="config_advanced_audio_channel_mapping">true</bool>
+    <bool name="config_l7_product_ui">true</bool>
+</resources>

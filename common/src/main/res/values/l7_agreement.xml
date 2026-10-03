@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_agreement_title">首次使用须知与风险确认协议</string>
+    <string name="l7_agreement_entry">使用协议</string>
+    <string name="l7_agreement_entry_hint">查看完整条款，或撤回同意并停止使用</string>
+    <string name="l7_agreement_safe_hint">请在车辆安全停稳后阅读和操作。</string>
+    <string name="l7_agreement_read_end">请阅读至文末并等待 5 秒，再主动勾选确认。</string>
+    <string name="l7_agreement_countdown">已到文末，请再等待 %1$d 秒后勾选确认。</string>
+    <string name="l7_agreement_confirm_hint">阅读完毕后，请自行决定是否同意。</string>
+    <string name="l7_agreement_check">我已完整阅读并理解协议，同意其中的安全要求，并自主决定使用。</string>
+    <string name="l7_agreement_accept">同意并进入</string>
+    <string name="l7_agreement_decline">不同意并退出</string>
+    <string name="l7_agreement_back">返回关于</string>
+    <string name="l7_agreement_accepted">你已同意当前协议，可随时撤回。</string>
+    <string name="l7_agreement_stopping">正在停止连接和后台服务…</string>
+    <string name="l7_agreement_revoke">撤回同意</string>
+    <string name="l7_agreement_revoke_message">撤回后立即停止 CarPlay 连接和悬浮日志，并返回协议确认页。已有配置保留；再次使用前须重新阅读并主动同意。</string>
+    <string name="l7_agreement_revoke_confirm">确认撤回并停止使用</string>
+    <string name="l7_agreement_save_failed">协议状态保存失败，请重试。</string>
+    <string name="l7_agreement_load_failed">协议加载失败，点击退出后重试</string>
+</resources>
