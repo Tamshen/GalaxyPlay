@@ -33,7 +33,7 @@ L7 仅指吉利银河 L7 汽车型号。项目名称为 L7CarPlay，应用显示
 - origin 为 Tamshen/L7CarPlay，upstream 为 shihabal3amri/DiPlay；功能分支从 main 创建。
 - 当前主线采用源码快照。上游在独立临时检出中审查，按核心基线提取所需补丁，不将完整上游提交图重新并入产品分支。
 - 上游同步与产品功能分开提交；冲突逐项处理，不整文件盲选；同步检查默认值、资源释放、包名、签名、认证和测试。
-- 产品版本与核心基线唯一维护于 gradle/l7-version.properties；产品 versionCode 递增，核心基线仅在实际同步后更新。
+- 产品版本、核心基线与精选补丁游标唯一维护于 gradle/l7-version.properties；产品 versionCode 递增，精选同步更新补丁游标，不冒充完整核心升级。
 - 不恢复 site、GitHub Pages 或其他车型入口；工作区参考项目不是构建依赖，按用户授权范围修改。
 - 提交说明使用中文，只写最终改动及必要验证；推送和发布遵循用户授权。
 
