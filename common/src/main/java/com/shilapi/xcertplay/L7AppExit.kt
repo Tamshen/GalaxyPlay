@@ -34,6 +34,7 @@ internal object L7AppExit {
     fun exit(context: Context) {
         if (exiting) return
         exiting = true
+        L7StartupGuard.stopped()
         RemoteLogUpload.cancel()
         L7ProbeRunner.stop()
         L7DesktopNavigation.stop(context)

@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
+        android:name="com.shilapi.xcertplay.L7Application"
         android:hardwareAccelerated="true"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"

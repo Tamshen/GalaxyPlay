@@ -415,6 +415,7 @@ class CarPlayHostActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (L7AppExit.exiting) { finish(); return }
         if (!L7Agreement.require(this)) return
+        if (!L7StartupGuard.enterHost(this)) return
         L7DesktopNavigation.attach(this)
         languagePreferenceAtCreate = AppLocale.preference(this)
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
@@ -589,6 +590,7 @@ class CarPlayHostActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (!L7Agreement.require(this)) return
+        if (!L7StartupGuard.enterHost(this)) return
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED" && wirelessEnabled) {
             shutdown(false, "switching to USB") {
                 AirPlayPersistence.saveWirelessEnabled(this, false)
@@ -600,7 +602,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (L7AppExit.exiting) return
+        if (L7AppExit.exiting || isFinishing) return
         if (!L7Agreement.require(this)) return
         refreshL7ChromeDensity()
         L7DesktopNavigation.ensure(this)
@@ -3148,6 +3150,10 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeAirPlaySession = session
                     CarPlayBackgroundSession.active = true
+                    L7StartupGuard.connected(this@CarPlayHostActivity) {
+                        activeAirPlaySession === session && controllerGeneration == restartGeneration &&
+                            CarPlayBackgroundSession.active
+                    }
                     projectionNavigation?.setConnected(true)
                     reconnectAttempts = 0
                     syncAirPlayDarkMode()
@@ -3613,6 +3619,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
+        if (terminateProcess) L7StartupGuard.stopped()
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
         restartGeneration += 1
         mainHandler.removeCallbacks(applyDisplaySize)
@@ -3983,6 +3990,7 @@ internal object CarPlayBackgroundSession {
     private val stopWaiters = mutableListOf<() -> Unit>()
 
     fun stop(completion: () -> Unit = {}) {
+        L7StartupGuard.stopped()
         val action: (((() -> Unit)) -> Unit)?
         synchronized(this) {
             if (stopping) { stopWaiters.add(completion); return }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_startup_recovery_title">已暂停自动连接</string>
+    <string name="l7_startup_recovery_hint">检测到连续 3 次启动或连接异常退出，已关闭自动连接，避免反复闪退。原有配置和认证材料均已保留，可手动连接或查看日志；排查后可在通用设置重新开启自动连接。</string>
+    <string name="l7_startup_recovery_storage">无法保存启动保护状态，本次已暂停自动连接。请检查可用存储空间；仍可手动操作并查看日志。</string>
+</resources>
