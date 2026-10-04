@@ -6,11 +6,10 @@ project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_image="l7carplay-android:local"
 build_platform=linux/amd64
 cache_volume=l7carplay-gradle-amd64
-warm=false
 while [[ "${1:-}" == --arm64 || "${1:-}" == --warm ]]; do
     case "$1" in
         --arm64) build_platform=linux/arm64; cache_volume=l7carplay-gradle-arm64 ;;
-        --warm) warm=true ;;
+        --warm) printf '兼容 --warm：构建容器现已统一用后自动删除。\n' ;;
     esac
     shift
 done
@@ -28,7 +27,7 @@ usage() {
   --image-only    仅准备 Docker 构建镜像
   -- TASK...      在容器中执行指定 Gradle 任务及参数
   --arm64         放在模式之前：原生 ARM64 JVM，官方 x86_64 SDK 工具通过模拟执行
-  --warm          放在模式之前：复用当前项目开发容器及 Gradle Daemon（不用于 release）
+  --warm          旧参数兼容；不再保留运行容器，统一在结束后自动删除
   --help          显示帮助
 基础镜像：mobiledevops/android-sdk-image:latest；默认 linux/amd64，--arm64 为混合构建。
 默认认证目录：仓库内 .private/auth-assets/，不得提交到 Git。
@@ -111,7 +110,7 @@ if [[ "$needs_auth" == true ]]; then
     docker_args+=(--env DIPLAY_AUTH_ASSETS_DIR=/run/l7-auth)
 fi
 
-# 镜像配方未变时直接复用，避免每次导出新镜像而丢失常驻容器。
+# 镜像配方未变时复用工具链；容器生命周期与磁盘缓存分开。
 prepare_image() {
     local tag="$1" platform="$2" dockerfile="$3" recipe="$4"
     local existing
@@ -132,19 +131,12 @@ if [[ "$build_platform" == linux/arm64 ]]; then
 fi
 docker image inspect "$build_image" --format '构建镜像：{{.Id}}，平台：{{.Os}}/{{.Architecture}}'
 if [[ "$build_mode" == image ]]; then exit 0; fi
-if [[ "$warm" == true && "$needs_signing" == true ]]; then
-    printf '错误：release 使用一次性容器，不保留签名环境；请去掉 --warm。\n' >&2
-    exit 2
-fi
-
 mkdir -p "$project_dir/build"
 # 日志默认值也可从根目录 .env 读取；显式环境变量按变量名传递，不打印令牌。
-log_exec_args=(exec)
 log_run_args=(run --rm --platform "$build_platform")
 for variable in L7_LOG_SERVER_URL L7_LOG_AUTHORIZATION; do
     if [[ ${!variable+x} ]]; then
         export "$variable"
-        log_exec_args+=(--env "$variable")
         log_run_args+=(--env "$variable")
     fi
 done
@@ -152,29 +144,23 @@ done
 # 中文文档会作为离线许可输入，JVM 的文件名编码必须由 UTF-8 locale 初始化。
 gradle_command=(env LANG=C.UTF-8 LC_ALL=C.UTF-8 flock --nonblock --conflict-exit-code 75 /workspace/build/android-build.lock
     ./gradlew "${gradle_tasks[@]}" --console=plain)
+# --rm 处理正常退出；退出钩子覆盖失败和终端中断，仅删除本次 CID 对应的容器。
+run_dir=$(mktemp -d "$project_dir/build/docker-run.XXXXXX")
+cid_file="$run_dir/container.cid"
+cleanup_container() {
+    if [[ -s "$cid_file" ]]; then
+        docker rm -f "$(cat "$cid_file")" >/dev/null 2>&1 || true
+    fi
+    rm -f "$cid_file"
+    rmdir "$run_dir" 2>/dev/null || true
+}
+trap cleanup_container EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+printf '使用一次性构建容器，结束后自动停止并删除。\n'
 set +e
-if [[ "$warm" == true ]]; then
-    project_key=$(printf '%s' "$project_dir" | cksum | awk '{print $1}')
-    container_name="l7carplay-dev-${build_platform#linux/}-$project_key"
-    image_id=$(docker image inspect "$build_image" --format '{{.Id}}')
-    fingerprint=$(printf '%s\n' "$project_dir" "$image_id" "${auth_dir:-none}" | cksum)
-    existing=$(docker container inspect "$container_name" --format '{{index .Config.Labels "com.l7carplay.runtime"}}' 2>/dev/null || true)
-    if [[ -n "$existing" && "$existing" != "$fingerprint" ]]; then
-        printf '镜像或挂载已变化，请先 docker rm -f %s，再重试；未关闭可能仍在运行的构建。\n' "$container_name" >&2
-        exit 2
-    fi
-    if [[ -z "$existing" ]]; then
-        docker run --detach --platform "$build_platform" --name "$container_name" \
-            --label "com.l7carplay.runtime=$fingerprint" "${docker_args[@]}" \
-            "$build_image" sleep infinity >/dev/null || exit $?
-    else
-        docker start "$container_name" >/dev/null || exit $?
-    fi
-    printf '复用开发容器：%s（保留 Gradle Daemon）\n' "$container_name"
-    docker "${log_exec_args[@]}" "$container_name" "${gradle_command[@]}"
-else
-    docker "${log_run_args[@]}" "${docker_args[@]}" "$build_image" "${gradle_command[@]}"
-fi
+docker "${log_run_args[@]}" --cidfile "$cid_file" --label com.l7carplay.build=true \
+    "${docker_args[@]}" "$build_image" "${gradle_command[@]}"
 build_status=$?
 set -e
 if [[ "$build_status" -eq 75 ]]; then

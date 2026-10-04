@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""用合成配置验证 .env、环境变量优先级及常驻容器清除旧值；不发送网络日志。"""
+"""用合成配置验证 .env、环境变量优先级及下一次构建清除旧值；不发送网络日志。"""
 import base64
 import os
 from pathlib import Path
@@ -17,7 +17,7 @@ auth = 'Basic ' + base64.b64encode(('test:' + str(uuid.uuid4())).encode()).decod
 url = 'https://logs.example/api/test/{HeadUnit}-{DeviceID}/_json'
 
 def generate(environment):
-    result = subprocess.run(['bash', 'scripts/build-android-docker.sh', '--arm64', '--warm', '--',
+    result = subprocess.run(['bash', 'scripts/build-android-docker.sh', '--arm64', '--',
         ':mobile:generateDebugResValues'], cwd=root, env=environment, capture_output=True)
     if result.returncode:
         # 原始构建输出仅放忽略目录，凭据不打印。
@@ -36,8 +36,8 @@ try:
     assert values['l7_log_default_url'] == override
     assert values['l7_log_default_authorization'] == auth
     values = generate(env)
-    assert values['l7_log_default_url'] == url, '常驻容器残留了上次环境变量'
-    print('打包默认值检查通过：.env 字面量、认证值、环境变量优先级与常驻容器恢复。')
+    assert values['l7_log_default_url'] == url, '后续构建残留了上次环境变量'
+    print('打包默认值检查通过：.env 字面量、认证值、环境变量优先级与后续构建恢复。')
 finally:
     if backup is None: path.unlink(missing_ok=True)
     else: path.write_bytes(backup)
