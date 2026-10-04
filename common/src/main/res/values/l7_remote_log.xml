@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_log_default_url" translatable="false"></string>
+    <string name="l7_log_default_authorization" translatable="false"></string>
+    <string name="l7_log_remote">远程日志</string>
+    <string name="l7_log_server">OpenObserve 日志服务器</string>
+    <string name="l7_log_server_hint">应用内配置优先；未设置时使用打包默认值</string>
+    <string name="l7_log_manual_hint">仅点击上传时发送最近最多 1000 条脱敏日志，不自动上传。超时或部分写入后重试可能产生重复记录，可按 event_id 识别。</string>
+    <string name="l7_log_upload">上传日志</string>
+    <string name="l7_log_retry">重试上次上传</string>
+    <string name="l7_log_cancel">取消上传</string>
+    <string name="l7_log_state">上传状态</string>
+    <string name="l7_log_unconfigured">未配置</string>
+    <string name="l7_log_config_first">请先填写 OpenObserve 写入地址和认证信息</string>
+    <string name="l7_log_idle">尚未上传</string>
+    <string name="l7_log_uploading">正在整理并上传…</string>
+    <string name="l7_log_success">上传成功 · 报告 %1$s</string>
+    <string name="l7_log_cancelled">已停止上传；已到达服务器的报告仍会保留</string>
+    <string name="l7_log_network_failed">上传结果未确认：网络或响应异常。手动重试可能产生重复记录</string>
+    <string name="l7_log_http_failed">上传失败：HTTP %1$d，请检查写入地址、认证信息和权限</string>
+    <string name="l7_log_url_label">OpenObserve 写入 URL</string>
+    <string name="l7_log_token_label">Authorization（含 Basic 前缀）</string>
+    <string name="l7_log_config_hint">从 OpenObserve 的日志接入示例复制 /api/组织/流/_json 完整地址和 Authorization 值。建议使用 HTTPS 与写入专用凭据；局域网 HTTP 不加密。</string>
+    <string name="l7_log_reset">恢复打包默认值</string>
+    <string name="l7_log_save_failed">配置保存失败，请重试</string>
+    <string name="l7_log_url_error">请输入以 /api/组织/流/_json 结尾的 HTTP 或 HTTPS 地址，不含账号密码、查询参数或片段</string>
+    <string name="l7_log_token_error">请填写 Basic 空格加 Base64 编码的用户名:写入凭据</string>
+    <string name="l7_log_partial">OpenObserve 未全部写入，重试可能产生重复记录</string>
+</resources>

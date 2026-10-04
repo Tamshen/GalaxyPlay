@@ -20,6 +20,7 @@ internal class L7DiagnosticSettings(
     private val state = L7SettingRow(context, context.getString(R.string.l7_debug_state_title), "")
     private val start = L7Components.actionRow(context, context.getString(R.string.l7_debug_start)) { onPermission(true) }
     private val stop = L7Components.actionRow(context, context.getString(R.string.l7_debug_stop)) { L7DebugOverlayService.stop(context) }
+    private val remote: L7RemoteLogSettings
 
     init {
         L7SettingsSection.add(parent, context.getString(R.string.l7_logs_and_reports),
@@ -38,9 +39,11 @@ internal class L7DiagnosticSettings(
             card.addView(start)
             card.addView(stop)
         }
+        remote = L7RemoteLogSettings(context, parent)
     }
 
     fun update(exporting: Boolean) {
+        remote.update()
         if (exporting) exportFailed = false
         export.setFeedback(when {
             exporting -> context.getString(R.string.saving_report)
