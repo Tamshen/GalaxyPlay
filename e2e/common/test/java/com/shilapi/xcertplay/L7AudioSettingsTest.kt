@@ -36,8 +36,8 @@ class L7AudioSettingsTest {
         restore()
         ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertEquals(L7AudioSettings.label(context, 0),
+        assertEquals(101, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(L7AudioSettings.label(context, 101),
             row(parent, context.getString(R.string.l7_audio_media))!!.valueView.text.toString())
         assertNotNull(row(parent, context.getString(R.string.l7_audio_restore)))
     }

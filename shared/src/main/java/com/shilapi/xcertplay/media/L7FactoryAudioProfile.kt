@@ -33,7 +33,9 @@ class L7FactoryAudioProfile internal constructor(
 
     internal fun attributes(channel: AudioChannel, contentType: Int, choice: Int): AudioAttributes {
         val fallback = AudioOutputPolicy.usage(channel, choice)
-        val usage = if (choice == AudioOutputPolicy.BUILTIN || AudioOutputPolicy.isLegacy(choice)) usage(channel) else fallback
+        // 电话固定使用标准通信用途；不将厂商编号误当设备或扬声器编号。
+        val usage = if (channel != AudioChannel.PHONE &&
+            (choice == AudioOutputPolicy.BUILTIN || AudioOutputPolicy.isLegacy(choice))) usage(channel) else fallback
         val result = runCatching {
             AudioAttributes.Builder().setUsage(usage).setContentType(contentType).build()
         }.getOrNull()

@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AudioOutputRole
+import com.shilapi.xcertplay.media.AudioOutputPolicy
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Looper
@@ -45,7 +46,8 @@ class L7AudioRouteDialogTest {
         find(dialog.window!!.decorView, context.getString(R.string.l7_audio_route_select))!!.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         val selector = ShadowAlertDialog.getLatestAlertDialog()
-        selector.listView.performItemClick(selector.listView.adapter.getView(3, null, selector.listView), 3, 3)
+        val navigation = AudioOutputPolicy.choices.indexOf(AudioOutputPolicy.NAVIGATION)
+        selector.listView.performItemClick(selector.listView.adapter.getView(navigation, null, selector.listView), navigation, navigation.toLong())
         selector.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(commits.isEmpty())
@@ -55,7 +57,7 @@ class L7AudioRouteDialogTest {
         assertTrue(commits.isEmpty())
         val reopened = L7AudioRouteDialog.show(context, "媒体音频流", 0, AudioOutputRole.MEDIA) { commits.add(it) }
         shadowOf(Looper.getMainLooper()).idle()
-        assertNotNull(find(reopened.window!!.decorView, context.resources.getStringArray(R.array.l7_audio_stream_names)[0]))
+        assertNotNull(find(reopened.window!!.decorView, L7AudioSettings.label(context, 0)))
         reopened.dismiss()
         shadowOf(Looper.getMainLooper()).idle()
     }
@@ -70,7 +72,8 @@ class L7AudioRouteDialogTest {
         find(dialog.window!!.decorView, context.getString(R.string.l7_audio_route_select))!!.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         val selector = ShadowAlertDialog.getLatestAlertDialog()
-        selector.listView.performItemClick(selector.listView.adapter.getView(3, null, selector.listView), 3, 3)
+        val navigation = AudioOutputPolicy.choices.indexOf(AudioOutputPolicy.NAVIGATION)
+        selector.listView.performItemClick(selector.listView.adapter.getView(navigation, null, selector.listView), navigation, navigation.toLong())
         selector.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)

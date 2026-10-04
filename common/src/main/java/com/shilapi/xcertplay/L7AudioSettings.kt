@@ -11,6 +11,24 @@ internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
              open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
         fun text(id: Int) = context.getString(id)
+        L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
+            description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
+            add(context, card, open)
+            card.addView(L7SettingRow(context, text(R.string.l7_audio_phone), text(R.string.l7_audio_phone_note)).apply {
+                setValue(text(R.string.l7_audio_phone_usage))
+            })
+            card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
+                text(R.string.l7_audio_restore_hint)) {
+                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
+                    .setMessage(R.string.l7_audio_restore_confirm)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
+                        AirPlayPersistence.restoreUsageAudioDefaults(context)
+                        parent.removeAllViews()
+                        page(context, parent, open)
+                    }.show()
+            })
+        }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = text(R.string.l7_setting_apply_hint)) { card ->
             val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
             L7Components.choice(card, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
@@ -38,26 +56,12 @@ internal object L7AudioSettings {
                 })
             }
         }
-        L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes), footer = text(R.string.l7_audio_roles_note)) {
-            add(context, it, open)
-            it.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
-                text(R.string.l7_audio_restore_hint)) {
-                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
-                    .setMessage(R.string.l7_audio_restore_confirm)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
-                        AirPlayPersistence.restoreBoyueAudioDefaults(context)
-                        parent.removeAllViews()
-                        page(context, parent, open)
-                    }.show()
-            })
-        }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it) }
     }
 
     fun add(context: Context, parent: LinearLayout,
             open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
-        AudioOutputRole.entries.forEach { role ->
+        listOf(AudioOutputRole.MEDIA, AudioOutputRole.NAVIGATION, AudioOutputRole.ASSISTANT).forEach { role ->
             val title = context.getString(when (role) {
                 AudioOutputRole.MEDIA -> R.string.l7_audio_media
                 AudioOutputRole.ASSISTANT -> R.string.l7_audio_assistant
