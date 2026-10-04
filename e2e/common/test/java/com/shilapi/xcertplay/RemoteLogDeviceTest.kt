@@ -24,7 +24,7 @@ class RemoteLogDeviceTest {
             androidId = { "synthetic-android-id" })
         assertFalse(serialRead)
         assertEquals(RemoteLogDevice.derive("android_id", "synthetic-android-id"), id)
-        assertTrue(id.matches(Regex("l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}")))
+        assertTrue(RemoteLogDevice.validName(id))
         assertEquals(mapOf("id" to id), prefs.all)
     }
 
@@ -62,8 +62,27 @@ class RemoteLogDeviceTest {
 
     @Test fun legacyDeviceNamesKeepTheirHashWhenConvertedToStreamNames() {
         prefs.edit().putString("id", "L7-ABCDE-12345-ABCDE-67890").commit()
-        val id = RemoteLogDevice.id(context, serial = { error("不应重建编号") }, androidId = { error("不应重建编号") })
-        assertEquals("l7_abcde_12345_abcde_67890", id)
+        val id = RemoteLogDevice.id(context, serial = { error("不应重建编号") }, androidId = { error("不应重建编号") },
+            manufacturer = "Example", model = "Unit 42")
+        assertEquals("example_unit_42_abcde_12345_abcde_67890", id)
         assertEquals(id, prefs.getString("id", null))
+    }
+
+    @Test fun modelPrefixIsReadableBoundedAndSafeForStreamUrls() {
+        val id = RemoteLogDevice.derive("android_id", "synthetic-a", "Example", "Unit /42")
+        assertTrue(id.startsWith("example_unit_42_"))
+        assertTrue(RemoteLogDevice.validName(id))
+        assertTrue(RemoteLogDevice.derive("android_id", "synthetic-a", "unknown", "").startsWith("head_unit_"))
+        val long = RemoteLogDevice.derive("android_id", "synthetic-a", "Vendor".repeat(20), "Model".repeat(20))
+        assertTrue(RemoteLogDevice.validName(long))
+        assertTrue(long.length <= 72)
+    }
+
+    @Test fun refreshedHeadUnitNameKeepsExistingRandomDeviceHash() {
+        val first = RemoteLogDevice.id(context, serial = { null }, androidId = { null }, manufacturer = "Example", model = "Old")
+        val next = RemoteLogDevice.id(context, serial = { error("不应重复读取") }, androidId = { error("不应重复读取") },
+            manufacturer = "Example", model = "Current")
+        assertTrue(next.startsWith("example_current_"))
+        assertEquals(first.takeLast(23), next.takeLast(23))
     }
 }

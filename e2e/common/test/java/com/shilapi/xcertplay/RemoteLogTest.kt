@@ -167,6 +167,20 @@ class RemoteLogTest {
         assertTrue(runCatching { saved.forDevice("../other") }.isFailure)
     }
 
+    @Test fun endpointTemplatesExpandOnlyWithinTheStreamAndMatchNormalizedAcknowledgements() {
+        val name = RemoteLogDevice.derive("android_id", "synthetic", "Example", "Unit 42")
+        val template = RemoteLogConfig("https://logs.example/proxy/api/test/{HeadUnit}-{DeviceID}/_json", token)
+        assertTrue(template.valid())
+        val target = template.forDevice(name)
+        assertEquals("https://logs.example/proxy/api/test/example_unit_42-${name.takeLast(23)}/_json", target.endpoint)
+        assertEquals(name, target.stream)
+        val idOnly = RemoteLogConfig("https://logs.example/api/test/{DeviceID}/_json", token)
+        assertTrue(idOnly.valid())
+        assertEquals(name.takeLast(23), idOnly.forDevice(name).stream)
+        assertFalse(RemoteLogConfig.validEndpoint("https://{HeadUnit}.example/api/test/{DeviceID}/_json"))
+        assertFalse(RemoteLogConfig.validEndpoint("https://logs.example/api/test/{Unknown}/_json"))
+    }
+
     private fun acknowledgement(stream: String, successful: Int, failed: Int): ByteArray = JSONObject()
         .put("code", 200).put("status", JSONArray().put(JSONObject().put("name", stream)
             .put("successful", successful).put("failed", failed))).toString().toByteArray()

@@ -14,10 +14,11 @@ import com.shilapi.xcertplay.host.R
 /** 远程日志仍属于诊断页，配置确认保存，上传只由明确按钮触发。 */
 internal class L7RemoteLogSettings(private val context: Context, parent: LinearLayout) {
     private val deviceId = RemoteLogDevice.id(context)
+    private var logName = deviceId
     private val device = L7Components.actionRow(context, context.getString(R.string.l7_log_device),
         context.getString(R.string.l7_log_device_hint)) {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
-            ClipData.newPlainText(context.getString(R.string.l7_log_device), deviceId))
+            ClipData.newPlainText(context.getString(R.string.l7_log_device), logName))
         Toast.makeText(context, R.string.l7_log_device_copied, Toast.LENGTH_SHORT).show()
     }.apply { setValue(deviceId) }
     private val server = L7Components.actionRow(context, context.getString(R.string.l7_log_server),
@@ -53,8 +54,10 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         val config = RemoteLogConfig.load(context)
         val status = RemoteLogUpload.status
         val busy = status.phase == RemoteLogUpload.Phase.UPLOADING
-        server.setValue(if (RemoteLogConfig.validEndpoint(config.endpoint)) config.forDevice(deviceId).endpoint
-            else config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) })
+        val target = if (RemoteLogConfig.validEndpoint(config.endpoint)) config.forDevice(deviceId) else null
+        logName = target?.stream ?: deviceId
+        device.setValue(logName)
+        server.setValue(target?.endpoint ?: config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) })
         upload.isEnabled = config.valid() && !busy
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
         retry.isEnabled = config.valid() && status.phase == RemoteLogUpload.Phase.FAILED
@@ -62,7 +65,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         state.setValue(when (status.phase) {
             RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
             RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
-            RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, deviceId, status.id.take(8))
+            RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
             RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
             RemoteLogUpload.Phase.FAILED -> when (status.code) {
                 0 -> context.getString(R.string.l7_log_network_failed)

@@ -21,10 +21,10 @@
     <string name="l7_log_http_failed">Upload failed: HTTP %1$d. Check the ingestion URL, authorization and permissions.</string>
     <string name="l7_log_url_label">OpenObserve ingestion URL</string>
     <string name="l7_log_token_label">Authorization (including Basic prefix)</string>
-    <string name="l7_log_config_hint">Copy the full /api/organization/stream/_json URL and Authorization value from OpenObserve. Uploads replace the example stream with this device’s log name. Use HTTPS and dedicated ingestion credentials. HTTP is unencrypted.</string>
+    <string name="l7_log_config_hint">Enter the full ingestion URL and Authorization. Use {HeadUnit}-{DeviceID} for the stream to insert the head unit model and device hash. Plain example URLs also work. Use HTTPS and dedicated ingestion credentials. HTTP is unencrypted.</string>
     <string name="l7_log_reset">Restore build defaults</string>
     <string name="l7_log_save_failed">Could not save settings. Please retry.</string>
-    <string name="l7_log_url_error">Enter an HTTP or HTTPS URL ending in /api/organization/stream/_json, without credentials, query or fragment</string>
+    <string name="l7_log_url_error">Enter /api/organization/stream/_json; the stream can use {HeadUnit}-{DeviceID} or {DeviceID}. Omit credentials, query and fragment.</string>
     <string name="l7_log_token_error">Enter Basic followed by a space and Base64-encoded username:ingestion-credential</string>
     <string name="l7_log_partial">OpenObserve did not accept every record. Retrying may create duplicates.</string>
 </resources>

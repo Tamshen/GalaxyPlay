@@ -14,7 +14,7 @@ env = dict(os.environ)
 for key in ('L7_LOG_SERVER_URL', 'L7_LOG_AUTHORIZATION'): env.pop(key, None)
 env['DIPLAY_AUTH_ASSETS_DIR'] = env.get('DIPLAY_AUTH_ASSETS_DIR', str(root / '.private/auth-assets'))
 auth = 'Basic ' + base64.b64encode(('test:' + str(uuid.uuid4())).encode()).decode()
-url = 'https://logs.example/api/test/l7carplay/_json'
+url = 'https://logs.example/api/test/{HeadUnit}-{DeviceID}/_json'
 
 def generate(environment):
     result = subprocess.run(['bash', 'scripts/build-android-docker.sh', '--arm64', '--warm', '--',
