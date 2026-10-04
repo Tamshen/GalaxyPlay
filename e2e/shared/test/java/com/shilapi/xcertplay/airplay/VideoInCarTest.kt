@@ -40,6 +40,59 @@ class VideoInCarTest {
     }
 
     @Test
+    fun videoAvailabilityWaitsForFeatureAndEventChannel() {
+        val sent = mutableListOf<Boolean>()
+        val availability = VideoPlaybackAvailability { sent += it; true }
+
+        assertEquals(VideoPlaybackDelivery.QUEUED, availability.setDesired(true))
+        assertEquals(VideoPlaybackDelivery.QUEUED, availability.setFeatureEnabled(true))
+        assertTrue(sent.isEmpty())
+        assertEquals(VideoPlaybackDelivery.SENT, availability.setEventReady(true))
+        assertEquals(listOf(true), sent)
+        assertEquals(VideoPlaybackDelivery.UNCHANGED, availability.setDesired(true))
+    }
+
+    @Test
+    fun videoAvailabilityCoalescesChangesBeforeAirPlayIsReady() {
+        val sent = mutableListOf<Boolean>()
+        val availability = VideoPlaybackAvailability { sent += it; true }
+
+        availability.setDesired(true)
+        availability.setDesired(false)
+        availability.setEventReady(true)
+        assertTrue(sent.isEmpty())
+        assertEquals(VideoPlaybackDelivery.SENT, availability.setFeatureEnabled(true))
+        assertEquals(listOf(false), sent)
+    }
+
+    @Test
+    fun videoAvailabilityIsResentAfterAnEventChannelReconnect() {
+        val sent = mutableListOf<Boolean>()
+        val availability = VideoPlaybackAvailability { sent += it; true }
+
+        availability.setDesired(true)
+        availability.setFeatureEnabled(true)
+        availability.setEventReady(true)
+        availability.setEventReady(false)
+        assertEquals(VideoPlaybackDelivery.SENT, availability.setEventReady(true))
+        assertEquals(listOf(true, true), sent)
+    }
+
+    @Test
+    fun aFailedAvailabilityWriteRemainsPendingForRetry() {
+        val attempts = mutableListOf<Boolean>()
+        var writable = false
+        val availability = VideoPlaybackAvailability { allowed -> attempts += allowed; writable }
+
+        availability.setDesired(true)
+        availability.setFeatureEnabled(true)
+        assertEquals(VideoPlaybackDelivery.QUEUED, availability.setEventReady(true))
+        writable = true
+        assertEquals(VideoPlaybackDelivery.SENT, availability.setEventReady(true))
+        assertEquals(listOf(true, true), attempts)
+    }
+
+    @Test
     fun teardownOfAVideoDataStreamKeepsTheIapTunnel() {
         fun body(vararg streams: Map<String, Any?>) = mapOf("streams" to streams.toList())
 
@@ -71,6 +124,19 @@ class VideoInCarTest {
 
         assertNull(VideoInCar.parseItem(mapOf("item" to mapOf("Content-Location" to "file:///sdcard/v.mp4"))))
         assertNull(VideoInCar.parseItem(mapOf("item" to mapOf("uuid" to "x"))))
+    }
+
+    @Test
+    fun appSchemesOnlyWhenTheIphoneLoadsThem() {
+        val app = mapOf("item" to mapOf("uuid" to "A1", "Content-Location" to "mainm3u8://example/index.m3u8"))
+        assertNull(VideoInCar.parseItem(app))
+        assertEquals(VideoInCar.Item("A1", "mainm3u8://example/index.m3u8", 0), VideoInCar.parseItem(app, iphoneLoadsAppSchemes = true))
+
+        for (url in listOf("file:///sdcard/v.mp4", "content://media/1", "asset:///v.mp4",
+            "rawresource:///123", "android.resource://app/raw/video", "skd://key", "not a url",
+            "/sdcard/v.mp4", "https", "FILE:///sdcard/v.mp4")) {
+            assertNull(url, VideoInCar.parseItem(mapOf("item" to mapOf("Content-Location" to url)), iphoneLoadsAppSchemes = true))
+        }
     }
 
     @Test

@@ -2,6 +2,8 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import com.shilapi.xcertplay.hud.BydOutputSettings
+import com.shilapi.xcertplay.network.CarHotspotSettings
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -12,6 +14,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class L7VehicleIsolationTest {
+    @Test fun legacyAutomaticHotspotPreferenceCannotChangeL7Hotspot() {
+        val context = RuntimeEnvironment.getApplication()
+        CarHotspotSettings.setEnabled(context, true)
+
+        assertFalse(CarHotspotSettings.enabled(context))
+        assertFalse(CarHotspotSettings.shouldEnable(context, true, WirelessHotspotMode.MANUAL))
+    }
+
     @Test fun legacyBydSettingsCannotEnableVehicleCapabilitiesOnL7() {
         val context = RuntimeEnvironment.getApplication()
         // 覆盖安装可能保留上游开关，不能因此声明轮速或驻车视频能力。
@@ -21,6 +31,8 @@ class L7VehicleIsolationTest {
             .putBoolean("battery_to_iphone", true)
             .putBoolean("wheel_speed_to_iphone", true)
             .putBoolean("video_while_parked", true)
+            .putBoolean("cluster_song", true)
+            .putBoolean("legacy_vehicle_probe", true)
             .commit()
         AirPlayPersistence.saveClusterMapEnabled(context, true)
 
@@ -30,6 +42,10 @@ class L7VehicleIsolationTest {
         assertFalse(BydOutputSettings.batteryToIphone(context))
         assertFalse(BydOutputSettings.wheelSpeedToIphone(context))
         assertFalse(BydOutputSettings.videoWhileParked(context))
+        assertFalse(BydOutputSettings.clusterSong(context))
+        assertFalse(BydOutputSettings.batteryToIphoneActive(context))
+        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
+        assertFalse(BydOutputSettings.videoWhileParkedActive(context))
         assertFalse(AirPlayPersistence.loadClusterMapEnabled(context))
     }
 }

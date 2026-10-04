@@ -13,14 +13,22 @@ object CarPlayClusterDisplay {
 
     /**
      * What the dashboard shows: one of the cluster contents the iPhone lists in `altScreenURLs`.
-     * On the tested car the turn card needed 0–5 kbit/s against 0.3–4 Mbit/s for the map, and
-     * "instrumentcluster" drew the map with the turn card on it.
+     * On the tested car the iPhone glass turn card needed 0–5 kbit/s against 0.3–4 Mbit/s for the map.
+     * MAP_WITH_CUSTOM_CARD asks for the map stream so DiPlay can draw a movable card on top.
      */
     enum class Content(val url: String) {
         MAP(MAP_URL),
         TURN_CARD("maps:/car/instrumentcluster/instructioncard"),
         INSTRUMENTS("maps:/car/instrumentcluster"),
+        MAP_WITH_CUSTOM_CARD(MAP_URL),
     }
+
+    enum class OverlaySize { SMALL, MEDIUM, LARGE }
+
+    fun usesCustomTurnCard(content: Content): Boolean = content == Content.MAP_WITH_CUSTOM_CARD
+
+    fun usesOfficialTurnCard(content: Content): Boolean =
+        content == Content.TURN_CARD || content == Content.INSTRUMENTS
 
     /**
      * Where the car marker goes, as percent of the panel (left, top, right, bottom). Measured on a
