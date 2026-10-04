@@ -15,7 +15,7 @@ class DebugLogBufferTest {
         buffer.append("reconnecting")
         val result = buffer.snapshot()
         assertEquals(3, result.lines.size)
-        assertEquals(1L, result.evicted)
+        assertEquals(3L, result.evicted)
         assertEquals(listOf("transport error: timeout", "reconnecting"), buffer.snapshot(onlyErrors = true).lines)
         assertFalse(result.lines.joinToString().contains("secret"))
     }

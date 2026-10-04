@@ -20,15 +20,52 @@ class DiagnosticRedactorTest {
             assertTrue(report.contains(video))
         } finally { folder.deleteRecursively() }
     }
-    @Test fun payloadAndCredentialLinesNeverReachReports() {
-        for (line in listOf("TRACE IAP2 tx key", "hotspot passphrase=secret", "token=secret", "certificate bytes=607", "rx body={phone: 'Jane'}", "ok\nsecret", "wifi ssid=Home", "wireless name=Jane Smith’s iPhone")) {
-            assertNull(line, DiagnosticRedactor.redact(line))
+    @Test fun payloadValuesAreHiddenWithoutDroppingTechnicalContext() {
+        for (line in listOf("hotspot passphrase=secret", "token=secret", "rx body={phone: 'secret'}",
+            "wifi ssid=secret", "wireless name=secret with spaces", "serial=secret")) {
+            val safe = DiagnosticRedactor.redact(line)!!
+            assertFalse(safe.contains("secret"))
+            assertTrue(safe.contains("[redacted]"))
+            assertEquals(safe, DiagnosticRedactor.redact(safe))
         }
+        for (line in listOf("TRACE IAP2 tx key", "PHONE packet", "ok\nsecret", "-----BEGIN PRIVATE KEY-----"))
+            assertNull(line, DiagnosticRedactor.redact(line))
+        assertEquals("certificate bytes=607", DiagnosticRedactor.redact("certificate bytes=607"))
     }
+
+    @Test fun technicalNamesAndParametersSurviveSensitiveFieldMasking() {
+        val technical = listOf(
+            "name=c2.qti.hevc.decoder profile=2 level=153 width=1440 height=1920 error=0xfffffff4",
+            "audio device=BUS00_MEDIA deviceId=5 usage=12 focus=44 sampleRate=48000 channels=2 underruns=3",
+            "entry=PERM:android.permission.ACCESS_TOKEN granted=false appOp=ignored",
+            "entry=PERM:android.permission.CALL_PHONE result=DENIED",
+            "decoderName=OMX.qcom.video.decoder.hevc bypass=false serialExecutor=1 payloadBytes=420 maxGapMs=150",
+            "firmware=1.2.3.4 api=30 physical=201x268mm",
+        )
+        technical.forEach { assertEquals(it, DiagnosticRedactor.redact(it)) }
+        val safe = DiagnosticRedactor.redact("stage=mfi token=secret status=failed code=403 elapsedMs=200")!!
+        assertEquals("stage=mfi token=[redacted] status=failed code=403 elapsedMs=200", safe)
+        val json = DiagnosticRedactor.redact("rx payload={\"nested\":{\"password\":\"secret\"}} codec=HEVC error=-12")!!
+        assertEquals("rx payload=[redacted] codec=HEVC error=-12", json)
+        assertEquals("peerName=[redacted] stage=connected", DiagnosticRedactor.redact("peerName=\"private phone\" stage=connected"))
+        assertFalse(DiagnosticRedactor.redact("server=https://private.example/api path=/data/user/0/private code=401")!!.contains("private"))
+    }
+
+    @Test fun longTechnicalLinesHaveAnExplicitMarkerInsteadOfSilentTruncation() {
+        val original = "codec config " + "width=1440 ".repeat(600)
+        val safe = DiagnosticRedactor.redact(original)!!
+        assertEquals(DiagnosticRedactor.MAX_LINE, safe.length)
+        assertTrue(safe.endsWith(" [truncated]"))
+    }
+
     @Test fun stateTransitionsSurviveWithoutAddressesOrIdentifiers() {
         val line = DiagnosticRedactor.redact("connected peer=C0:A6:00:29:58:0A ip=192.168.31.71 id=0123456789abcdef0123456789abcdef ipv6=fe80::1234:5678:abcd:9%p2p0")!!
         assertTrue(line.contains("connected"))
         assertFalse(line.contains("C0:A6")); assertFalse(line.contains("192.168")); assertFalse(line.contains("012345")); assertFalse(line.contains("fe80"))
+        assertEquals(line, DiagnosticRedactor.redact(line))
+        val peer = DiagnosticRedactor.redact("Microphone: start type=telephony codec=OPUS peer=192.168.49.1")!!
+        assertEquals("Microphone: start type=telephony codec=OPUS peer=[ip]", peer)
+        assertEquals(peer, DiagnosticRedactor.redact(peer))
     }
     @Test fun logRotationIsBoundedAndRedactionHappensBeforeDisk() {
         val folder = Files.createTempDirectory("diplay-log-test").toFile()

@@ -63,16 +63,17 @@ class RemoteLogTest {
         val report = RemoteLogReport.create(listOf("token=do-not-send", "peerName=private-phone",
             "serial=private-car", "payload=private-voice", "file=/data/user/0/private", "Audio source=192.168.1.4") +
             (1..2000).map { "$it " + "解码\"".repeat(200) }, "0.test", "DiPlay test")
-        assertTrue(report.body.size <= RemoteLogReport.MAX_BODY)
-        assertTrue(report.lineCount in 1..1000)
-        val text = report.body.toString(Charsets.UTF_8)
+        assertTrue(report.batches.all { it.body.size <= RemoteLogReport.MAX_BODY })
+        assertTrue(report.batches.sumOf { it.body.size } <= RemoteLogReport.MAX_REPORT_BODY)
+        assertTrue(report.lineCount > 1)
+        val text = records(report).toString()
         assertFalse(text.contains("private"))
         assertFalse(text.contains("192.168.1.4"))
         assertTrue(text.contains("2000"))
         assertEquals(report.id, JSONArray(text).getJSONObject(0).getString("report_id"))
         val records = JSONArray(text)
         for (index in 0 until records.length()) assertFalse(records.getJSONObject(index).has("device_id"))
-        assertNull(RemoteLogReport.redact("serial=private-car"))
+        assertEquals("serial=[redacted]", RemoteLogReport.redact("serial=private-car"))
         assertEquals("Audio source=[ip]", RemoteLogReport.redact("Audio source=192.168.1.4"))
     }
 
@@ -84,7 +85,7 @@ class RemoteLogTest {
             exchange.sendResponseHeaders(302, -1); exchange.close()
         }
         val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
-        RemoteLogTransport().use { assertEquals(302, it.send(RemoteLogConfig(endpoint, token), report)) }
+        RemoteLogTransport().use { assertEquals(302, it.send(RemoteLogConfig(endpoint, token), report.batches.first())) }
         assertEquals(1, requests.get())
     }
 
@@ -96,7 +97,7 @@ class RemoteLogTest {
         }
         val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use {
-            assertTrue(runCatching { it.send(RemoteLogConfig(endpoint, token), report) }.isFailure)
+            assertTrue(runCatching { it.send(RemoteLogConfig(endpoint, token), report.batches.first()) }.isFailure)
         }
     }
 
@@ -176,7 +177,7 @@ class RemoteLogTest {
         }
         val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use {
-            assertEquals(-1, it.send(RemoteLogConfig(endpoint, token), report))
+            assertEquals(-1, it.send(RemoteLogConfig(endpoint, token), report.batches.first()))
         }
     }
 
@@ -205,6 +206,11 @@ class RemoteLogTest {
         assertFalse(RemoteLogConfig.validEndpoint("https://{HeadUnit}.example/api/test/{DeviceID}/_json"))
         assertFalse(RemoteLogConfig.validEndpoint("https://logs.example/api/test/{Unknown}/_json"))
     }
+
+    private fun records(report: RemoteLogReport): JSONArray = JSONArray(report.batches.flatMap { batch ->
+        val data = JSONArray(batch.body.toString(Charsets.UTF_8))
+        (0 until data.length()).map { data.getJSONObject(it) }
+    })
 
     private fun acknowledgement(stream: String, successful: Int, failed: Int): ByteArray = JSONObject()
         .put("code", 200).put("status", JSONArray().put(JSONObject().put("name", stream)
