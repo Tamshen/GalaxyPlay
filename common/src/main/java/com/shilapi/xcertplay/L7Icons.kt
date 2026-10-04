@@ -71,6 +71,8 @@ internal object L7Icons {
         R.string.l7_cancel_connection to R.drawable.ic_l7_close,
         R.string.l7_debug_stop to R.drawable.ic_l7_close,
         R.string.l7_exit_app to R.drawable.ic_l7_exit,
+        R.string.l7_reset_confirm to R.drawable.ic_l7_delete,
+        R.string.l7_reset_open_settings to R.drawable.ic_l7_settings,
         R.string.l7_agreement_entry to R.drawable.ic_l7_agreement,
         R.string.l7_agreement_accept to R.drawable.ic_l7_check,
         R.string.l7_agreement_decline to R.drawable.ic_l7_exit,
