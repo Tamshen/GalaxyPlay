@@ -63,7 +63,7 @@ internal class L7HomePanel(
             quick.isEnabled = enabled
             L7Ui.refresh(quick)
         }
-        usb.isEnabled = !running && !pending && error == null
+        usb.isEnabled = !running && !pending
         val message = error ?: context.getString(when {
             connected -> R.string.l7_session_connected_hint
             running -> R.string.l7_session_waiting_hint

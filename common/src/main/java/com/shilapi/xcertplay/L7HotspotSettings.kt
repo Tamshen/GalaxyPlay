@@ -5,58 +5,56 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import android.text.method.PasswordTransformationMethod
-import android.view.View
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.network.CarHotspotTethering
-import com.shilapi.xcertplay.network.NativeHotspotCredentials
 
 /** 原生热点引导与系统能力反馈；页面只自动读取，写入和开启必须点击。 */
 internal class L7HotspotSettings(
     private val activity: Activity,
     parent: LinearLayout,
     private val task: L7HotspotTask,
+    private val actions: L7HotspotActions,
     private val onEdit: () -> Unit,
 ) {
     private lateinit var details: L7SettingRow
     private lateinit var read: L7SettingRow
     private lateinit var start: android.widget.Button
     private lateinit var create: android.widget.Button
-    private lateinit var cancel: android.widget.Button
-    private lateinit var permission: android.widget.Button
+    private lateinit var stateRow: L7SettingRow
     private var dialog: AlertDialog? = null
     private var displayedStatus: L7HotspotTask.Status? = null
 
     init {
-        L7SettingsSection.add(parent, text(R.string.built_in_car_hotspot),
+        L7SettingsSection.add(parent, text(R.string.l7_wireless_step1),
             description = text(R.string.hotspot_mode_manual_desc)) { card ->
+            stateRow = L7SettingRow(activity, text(R.string.l7_hotspot_state)).also(card::addView)
             card.addView(L7Components.actionRow(activity, text(R.string.open_car_hotspot_settings),
                 text(R.string.l7_hotspot_settings_hint)) { openSettings(activity) })
-            details = L7Components.valueRow(activity, text(R.string.car_hotspot_details), "", onEdit)
-            card.addView(details)
-            read = L7Components.actionRow(activity, text(R.string.l7_hotspot_read)) { task.read(); update() }
-            card.addView(read)
+        }
+        L7SettingsSection.actions(parent) { group ->
+            start = L7Components.actionButton(activity, text(R.string.l7_hotspot_start), primary = true) {
+                actions.start(); update()
+            }.also { group.addView(it, LinearLayout.LayoutParams(-1, -2)) }
+        }
+        L7SettingsSection.add(parent, text(R.string.l7_wireless_step2),
+            description = text(R.string.l7_wireless_details_hint)) { card ->
+            details = L7Components.valueRow(activity, text(R.string.car_hotspot_details), "", onEdit).also(card::addView)
+            read = L7Components.actionRow(activity, text(R.string.l7_hotspot_read)) { actions.read(); update() }.also(card::addView)
         }
         L7SettingsSection.actions(parent, text(R.string.l7_hotspot_actions_hint)) { group ->
-            start = L7Components.actionButton(activity, text(R.string.l7_hotspot_start), primary = true) {
-                if (ensurePermission()) { task.start(); update() }
-            }
             create = L7Components.actionButton(activity, text(R.string.l7_hotspot_create)) { generatedDialog() }
-            cancel = L7Components.actionButton(activity, text(R.string.l7_hotspot_cancel)) { task.cancel(); update() }
-            permission = L7Components.actionButton(activity, text(R.string.l7_hotspot_grant)) { openPermission() }
-            listOf(start, create, cancel, permission).forEachIndexed { index, view ->
-                group.addView(view, LinearLayout.LayoutParams(-1, -2).apply {
-                    if (index > 0) topMargin = L7Components.dp(activity, 12)
-                })
-            }
+                .also { group.addView(it, LinearLayout.LayoutParams(-1, -2)) }
         }
-        task.read()
+        refresh()
+    }
+
+    fun refresh() {
+        if (!actions.showing && !task.status.busy) task.read()
         update()
     }
 
@@ -64,28 +62,25 @@ internal class L7HotspotSettings(
         val state = task.status
         if (state != displayedStatus) {
             displayedStatus = state
-            read.setFeedback(text(state.message))
+            val reading = state.message in setOf(R.string.l7_hotspot_reading, R.string.l7_hotspot_read_ok,
+                R.string.l7_hotspot_read_permission, R.string.l7_hotspot_read_invalid, R.string.l7_hotspot_read_unavailable)
+            read.setFeedback(if (reading) text(state.message) else "", error = reading && !state.busy && state.message != R.string.l7_hotspot_read_ok)
+            stateRow.setValue(text(when {
+                state.busy -> R.string.l7_hotspot_checking
+                state.hotspotEnabled == true -> R.string.l7_hotspot_observed_on
+                state.hotspotEnabled == false -> R.string.l7_hotspot_observed_off
+                else -> R.string.l7_hotspot_observed_unknown
+            }))
+            stateRow.setFeedback(if (reading) text(R.string.l7_hotspot_observation_hint) else text(state.message),
+                error = !reading && !state.busy && state.message !in setOf(R.string.l7_hotspot_ready,
+                    R.string.l7_hotspot_ready_no_details, R.string.l7_hotspot_cancelled))
         }
+        val valid = com.shilapi.xcertplay.orchestration.ManualHotspotValidation.error(
+            AirPlayPersistence.loadManualHotspotSsid(activity), AirPlayPersistence.loadManualHotspotPassphrase(activity)) == null
         details.setValue(AirPlayPersistence.loadManualHotspotSsid(activity).ifBlank { text(R.string.l7_hotspot_not_saved) })
+        details.setFeedback(text(if (valid) R.string.l7_wireless_details_saved else R.string.l7_wireless_details_missing), error = !valid)
         val enabled = !state.busy && !CarPlayBackgroundSession.hasSession()
         listOf(start, create, details, read).forEach { it.isEnabled = enabled }
-        cancel.visibility = if (state.busy) View.VISIBLE else View.GONE
-        permission.visibility = if (state.message == R.string.l7_hotspot_start_permission) View.VISIBLE else View.GONE
-    }
-
-    private fun ensurePermission(): Boolean {
-        if (CarHotspotTethering.permitted(activity) ||
-            com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(activity) == true) return true
-        L7Dialogs.builder(activity).setTitle(R.string.l7_hotspot_grant)
-            .setMessage(R.string.l7_hotspot_start_permission)
-            .setPositiveButton(R.string.l7_hotspot_grant) { _, _ -> openPermission() }
-            .setNegativeButton(R.string.cancel, null).show()
-        return false
-    }
-
-    private fun openPermission() {
-        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${activity.packageName}"))
-        if (runCatching { activity.startActivity(intent) }.isFailure) openSettings(activity)
     }
 
     private fun generatedDialog() {
@@ -119,7 +114,7 @@ internal class L7HotspotSettings(
         dialog = L7Dialogs.builder(activity).setTitle(R.string.l7_hotspot_create)
             .setView(ScrollView(activity).apply { addView(fields) })
             .setPositiveButton(R.string.l7_hotspot_apply_start) { _, _ ->
-                if (ensurePermission()) { task.start(value); update() }
+                actions.start(value); update()
             }
             .setNeutralButton(R.string.open_car_hotspot_settings) { _, _ -> openSettings(activity) }
             .setNegativeButton(R.string.cancel, null).show()

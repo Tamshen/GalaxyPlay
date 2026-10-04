@@ -115,8 +115,11 @@ class DiPlayActivity : ComponentActivity() {
         }
     }
     private val hotspotTask by lazy { L7HotspotTask(applicationContext) }
+    private val hotspotActions by lazy { L7HotspotActions(this, hotspotTask) }
+    private var wiredSettings: L7WiredSettings? = null
     private val wirelessHotspotGate by lazy { L7WirelessHotspotGate(this, hotspotTask) }
     private var hotspotSettings: L7HotspotSettings? = null
+    private var wirelessPrerequisites: L7WirelessPrerequisiteView? = null
     private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) choosePhone() else permissionHelp(getString(R.string.nearby_devices), getString(R.string.allow_nearby_devices_so_diplay_can_connect_to_your_paired))
     }
@@ -227,7 +230,7 @@ class DiPlayActivity : ComponentActivity() {
         handler.removeCallbacks(tick); handler.post(tick)
         if (l7Ui && L7Routes.isDebug(page)) L7ProbeRunner.refreshEnvironment(this)
         L7DesktopNavigation.ensure(this)
-        if (l7Ui) debugTasks.resume()
+        if (l7Ui) { debugTasks.resume(); hotspotActions.resume(); hotspotSettings?.refresh(); wiredSettings?.check(); wirelessPrerequisites?.update() }
         // Back from the car settings: refresh the car hotspot reminder on the home page.
         if (!initialLaunch && (page == "home" || page == "connection" || page in L7Routes.settings)) {
             setupError = runCatching { DiPlayBootstrap.ensure(this) }.exceptionOrNull()?.let { getString(R.string.setup_error_auth) }
@@ -253,6 +256,7 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onStop() {
         wirelessHotspotGate.cancel()
+        hotspotActions.background(); wiredSettings?.background()
         if (!isChangingConfigurations) { L7ProbeRunner.stop(); debugTasks.background() }
         super.onStop()
     }
@@ -261,14 +265,16 @@ class DiPlayActivity : ComponentActivity() {
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
         hotspotSettings?.dispose()
+        hotspotActions.close(); wiredSettings?.dispose()
         hotspotTask.close()
         super.onDestroy()
     }
 
     private fun render() {
         if (!L7Agreement.require(this)) return
-        hotspotSettings?.dispose(); hotspotSettings = null
-        if (page != "settings-connection") hotspotTask.cancel()
+        hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null
+        wiredSettings?.dispose(); wiredSettings = null
+        if (page != "settings-connection-wireless") { hotspotActions.close(); hotspotTask.cancel() }
         if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
         contentScroll = null; desktopPermissionHint = null; homePanel = null; usbButton = null
@@ -327,7 +333,10 @@ class DiPlayActivity : ComponentActivity() {
         }
         when (page) {
             "settings" -> settingsL7(content)
-            "settings-connection" -> connectionSettingsL7(content)
+            "settings-connection" -> connectionChoicesL7(content)
+            "settings-connection-wireless" -> connectionSettingsL7(content)
+            "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
+                { if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(false) }, ::stopFromHome)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
             "settings-debug-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
@@ -344,6 +353,7 @@ class DiPlayActivity : ComponentActivity() {
             setPaddingRelative(dp(inset), dp(24), dp(inset), dp(8))
             addView(L7Header(this@DiPlayActivity, pageTitle(),
                 backLabel = getString(when {
+                    page.startsWith("settings-connection-") -> R.string.l7_connection_back
                     page == "settings-debug" -> R.string.l7_back_settings
                     L7Routes.isDebug(page) -> R.string.l7_probe_back_debug
                     else -> R.string.l7_back_settings
@@ -399,6 +409,8 @@ class DiPlayActivity : ComponentActivity() {
         "connection" -> R.string.connection_setup
         "settings-auth" -> R.string.l7_auth_title
         "settings-connection" -> R.string.connection_setup
+        "settings-connection-wireless" -> R.string.l7_start_wireless
+        "settings-connection-usb" -> R.string.l7_home_usb
         "settings-display" -> R.string.display_and_performance
         "settings-audio" -> R.string.audio_routing
         "settings-general" -> R.string.l7_general_settings
@@ -438,31 +450,41 @@ class DiPlayActivity : ComponentActivity() {
         }
     }
 
+    private fun connectionChoicesL7(content: LinearLayout) {
+        L7SettingsSection.add(content, getString(R.string.l7_connection_choose), getString(R.string.l7_connection_choose_hint)) { card ->
+            card.addView(L7Components.categoryRow(this, getString(R.string.l7_start_wireless),
+                getString(R.string.l7_connection_wireless_hint), R.drawable.ic_l7_hotspot) {
+                page = "settings-connection-wireless"; render()
+            })
+            card.addView(L7Components.categoryRow(this, getString(R.string.l7_home_usb),
+                getString(R.string.l7_connection_usb_hint), R.drawable.ic_l7_usb) {
+                page = "settings-connection-usb"; render()
+            })
+        }
+    }
+
     private fun connectionSettingsL7(content: LinearLayout) {
-        connectionActionsL7(content)
-        hotspotSettings = L7HotspotSettings(this, content, hotspotTask) {
+        content.addView(L7Components.sectionTitle(this, getString(R.string.l7_wireless_steps)))
+        content.addView(L7Typography.text(this, getString(R.string.l7_connection_wireless_hint), L7Typography.Role.DESCRIPTION).apply {
+            setPadding(0, 0, 0, dp(20))
+        })
+        wirelessPrerequisites = L7WirelessPrerequisiteView(this, content, ::choosePhone)
+        hotspotSettings = L7HotspotSettings(this, content, hotspotTask, hotspotActions) {
             askHotspotCredentials { ssid, password ->
                 saveHotspotCredentials(ssid, password)
                 pendingCarHotspotSetup = false
                 applyWirelessLink(WirelessHotspotMode.MANUAL)
             }
         }
-        section(content, getString(R.string.choose_iphone), R.drawable.ic_l7_phone) { card ->
-            card.addView(L7Components.valueRow(this, getString(R.string.choose_iphone), DiPlayPreferences.phoneName(this)) { choosePhone() })
-            card.addView(L7Components.actionRow(this, getString(R.string.bluetooth_settings)) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) })
+        L7SettingsSection.add(content, getString(R.string.l7_wireless_step3)) { card ->
+            card.addView(L7SettingRow(this, getString(R.string.l7_wireless_join_iphone), getString(R.string.l7_wireless_phone_hint)))
         }
-    }
-
-    private fun connectionActionsL7(content: LinearLayout) {
-        L7SettingsSection.actions(content,
-            footer = getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo)) { actions ->
+        L7SettingsSection.actions(content) { actions ->
             connectButton = button(getString(R.string.l7_start_wireless), true) {
                 if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(true)
             }
-            usbButton = button(getString(R.string.l7_home_usb), false) { connect(false) }
             disconnectButton = button(getString(R.string.disconnect), false) { stopFromHome() }.apply { visibility = View.GONE }
             actions.addView(connectButton, matchButton())
-            actions.addView(usbButton, matchButton(12))
             actions.addView(disconnectButton, matchButton(12))
         }
     }
@@ -476,8 +498,8 @@ class DiPlayActivity : ComponentActivity() {
                 if (CarPlayBackgroundSession.hasSession()) openProjection()
                 else connect(AirPlayPersistence.loadWirelessEnabled(this))
             },
-            onWireless = { page = "settings-connection"; render() },
-            onUsb = { connect(false) },
+            onWireless = { page = "settings-connection-wireless"; render() },
+            onUsb = { page = "settings-connection-usb"; render() },
             onSettings = { page = "settings"; render() },
         ).also { content.addView(it, LinearLayout.LayoutParams(width, -2)) }
         // 悬浮权限提示留在首页内容中；连接状态统一由菜单「画面」显示。
@@ -1326,25 +1348,32 @@ class DiPlayActivity : ComponentActivity() {
         if (!l7Ui && reconnect && setupError == null) connect(AirPlayPersistence.loadWirelessEnabled(this))
     }
 
+    private fun connectionProblem(message: String) {
+        L7Dialogs.builder(this).setTitle(R.string.setup_needs_attention).setMessage(message)
+            .setPositiveButton(R.string.close, null).show()
+    }
+
     private fun connect(wireless: Boolean, nativeHotspotPrepared: Boolean = false) {
         if (!L7Agreement.require(this)) return
-        if (wireless && hotspotTask.status.busy) { toast(getString(R.string.l7_hotspot_busy)); return }
+        if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
+            !L7WirelessPrerequisites.ensure(this, ::choosePhone)) return
+        if (wireless && hotspotTask.status.busy) { connectionProblem(getString(R.string.l7_hotspot_busy)); return }
         if (l7Ui && wireless && !nativeHotspotPrepared && setupError == null && !CarPlayBackgroundSession.hasSession()) {
             wirelessHotspotGate.start(onReady = {
                 if (hotspotError(storedSsid(), storedPassword()) == null) pendingCarHotspotSetup = false
                 connect(true, nativeHotspotPrepared = true)
-            }, onSetup = { page = "settings-connection"; render() })
+            }, onSetup = { page = "settings-connection-wireless"; render() })
             return
         }
         if (l7Ui) L7DebugLog.record(if (wireless) "请求无线连接" else "请求 USB 有线连接")
-        if (wireless && pendingCarHotspotSetup) { toast(getString(R.string.save_your_hotspot_details_in_connection_setup_first)); page = if (l7Ui) "settings-connection" else "connection"; render(); return }
-        if (setupError != null) { toast(setupError!!); return }
+        if (wireless && pendingCarHotspotSetup) { page = if (l7Ui) "settings-connection-wireless" else "connection"; render(); connectionProblem(getString(R.string.save_your_hotspot_details_in_connection_setup_first)); return }
+        if (setupError != null) { connectionProblem(setupError!!); return }
         if (wireless && AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
             hotspotError(storedSsid(), storedPassword()) != null) {
             pendingCarHotspotSetup = true
-            page = if (l7Ui) "settings-connection" else "connection"
+            page = if (l7Ui) "settings-connection-wireless" else "connection"
             render()
-            toast(getString(R.string.save_the_name_and_password_from_the_car_s_hotspot_settings))
+            connectionProblem(getString(R.string.save_the_name_and_password_from_the_car_s_hotspot_settings))
             return
         }
         if (wireless && carHotspotOff()) { carHotspotOffDialog(); return }
@@ -1467,6 +1496,7 @@ class DiPlayActivity : ComponentActivity() {
     private fun refreshStatus() {
         diagnosticSettings?.update(exportInProgress)
         debugPage?.update()
+        wiredSettings?.update(connectionRequestPending)
         val running = CarPlayBackgroundSession.hasSession()
         homePanel?.update(L7HomePanel.configured(this), running, CarPlayBackgroundSession.active,
             connectionRequestPending, setupError)
@@ -1495,7 +1525,7 @@ class DiPlayActivity : ComponentActivity() {
             disconnectButton?.updateText(getString(if (CarPlayBackgroundSession.active) R.string.disconnect else R.string.l7_cancel_connection))
             usbButton?.isEnabled = !running && !connectionRequestPending && setupError == null
         }
-        connectButton?.isEnabled = setupError == null && !connectionRequestPending
+        connectButton?.isEnabled = (l7Ui || setupError == null) && !connectionRequestPending
     }
     // 相同状态不重复发送文本事件，避免持续播报与无谓的布局刷新。
     private fun TextView.updateText(value: String) {

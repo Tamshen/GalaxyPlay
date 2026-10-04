@@ -4,7 +4,8 @@ package com.shilapi.xcertplay
 internal object L7Routes {
     val settings = setOf("settings", "settings-auth", "settings-connection", "settings-display",
         "settings-audio", "settings-general", "settings-permissions",
-        "settings-about", "settings-debug", "settings-debug-results", "settings-debug-history", "settings-debug-logs")
+        "settings-about", "settings-debug", "settings-debug-results", "settings-debug-history", "settings-debug-logs",
+        "settings-connection-wireless", "settings-connection-usb")
     private val aliases = mapOf("connection" to "settings-connection", "diagnostics" to "settings-debug",
         "settings-diagnostics" to "settings-debug", "about" to "settings-about")
     private val roots = setOf("home", "wireless-recovery")
@@ -13,6 +14,7 @@ internal object L7Routes {
     fun isDebug(page: String) = normalize(page).startsWith("settings-debug")
     fun back(page: String) = normalize(page).let {
         when {
+            it.startsWith("settings-connection-") -> "settings-connection"
             it == "settings-debug" -> "settings"
             isDebug(it) -> "settings-debug"
             it in settings && it != "settings" -> "settings"

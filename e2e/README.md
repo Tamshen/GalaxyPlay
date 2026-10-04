@@ -65,6 +65,12 @@ e2e/
 
 在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试与日志」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
+## 连接分步引导与失败提示
+
+`L7WirelessPrerequisitesTest` 验证蓝牙关闭与失效配对不能通过、确认前不继续连接或申请权限；`L7HotspotActionsTest` 在 API 29/30 验证自动读取不弹窗、显式操作错误保留、权限拒绝不写入/开启、配置保存但超时不报成功、真实开启确认；配合 `L7HotspotTaskTest`、`L7WirelessHotspotGateTest` 和通用任务弹窗回归。`L7WiredSettingsTest` 检查进入仅检测、缺设备明确确认、已有设备沿用核心授权、能力不足阻止连接、后台丢弃迟到结果；`L7RoutesTest` 验证两个子页返回连接方式。
+
+中文、已同意协议的 AVD 运行 `python3 e2e/device/connection_guide_smoke.py`，检查首页/设置独立入口、三步引导、Header/系统返回、热点权限拒绝和读取失败强提示、USB 未就绪提示及中英文昼夜截图。脚本临时拒绝修改设置权限，结束恢复权限、语言与昼夜，不开启热点、不上传、不建立手机连接。`--english-only` 可只复核英文引导与失败弹窗。当前 AVD 未声明 USB Host，只验收能力不足分支；USB 等待/取消和浮动菜单等待页脚本需要支持 USB Host 的设备，不把未执行的等待场景记为通过。
+
 ## 任务弹窗与悬浮日志开关
 
 `L7TaskProgressDialogTest` 检查返回/右上角关闭确认、继续等待、终止释放轮询、停止后的部分结果、失败明确重试及完成与关闭确认的竞态；`L7DebugTasksTest` 用本机模拟接口检查失败重开不自动发送、同一报告重试和后台停止。`L7DiagnosticSettingsTest` 检查悬浮日志只有一个开关、权限不足时回到关闭、外部状态回填不重复操作，以及移除页面重试/取消入口。
@@ -95,7 +101,7 @@ e2e/
 
 [AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。
 
-`python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查 13 个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；取消前收起悬浮菜单，并等待未连接首页出现。不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
+`python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查 15 个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；USB Host 不可用时检查未就绪提示并明确跳过等待场景，支持时取消前收起悬浮菜单，并等待未连接首页出现。不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
 
 追加 `--dialogs-only` 可单独检查上述弹窗、协议及 USB 取消，不重复页面扫描；同样保留英文首页。
 
@@ -229,6 +235,6 @@ python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 
 原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
 
-AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英文热点引导、生成窗口、原生设置跳转和日志首屏入口，不上传、不写入热点。无线预检会临时将模拟器 WRITE_SETTINGS 设为拒绝，验证提示后恢复原 AppOps；中文 AVD 可用 `--gate-only` 单独检查。脚本仅接受 emulator 序列号，截图保存在忽略目录。
+AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英文热点引导、生成窗口、原生设置跳转和日志首屏入口，不上传、不写入热点。原生热点开启权限检查会临时将模拟器 WRITE_SETTINGS 设为拒绝，验证提示后恢复原 AppOps；中文 AVD 可用 `--gate-only` 单独检查。脚本仅接受 emulator 序列号，截图保存在忽略目录。
 
 日志地址遮蔽：`RemoteLogEditorTest` 覆盖内置地址遮蔽、空字段保留、手动覆盖和更换地址不复用认证；中文 AVD 使用内置默认值时执行 `python3 e2e/device/log_server_mask_smoke.py`，检查列表/弹窗及保存/取消不覆盖配置，不上传或打印真实地址。

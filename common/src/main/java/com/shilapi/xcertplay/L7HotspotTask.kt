@@ -33,7 +33,8 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
         override fun permitted() = CarHotspotTethering.permitted(app)
         override fun start(cancelled: () -> Boolean) = CarHotspotTethering.enable(app, cancelled) { L7DebugLog.record(it) }
     }
-    data class Status(val message: Int = R.string.l7_hotspot_reading, val busy: Boolean = false)
+    data class Status(val message: Int = R.string.l7_hotspot_reading, val busy: Boolean = false,
+        val hotspotEnabled: Boolean? = null, val configurationApplied: Boolean = false)
     private val app = context.applicationContext
     private val executor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(1),
         { Thread(it, "l7-native-hotspot") })
@@ -52,7 +53,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
             NativeHotspotProblem.PERMISSION -> R.string.l7_hotspot_read_permission
             NativeHotspotProblem.INVALID -> R.string.l7_hotspot_read_invalid
             else -> R.string.l7_hotspot_read_unavailable
-        })
+        }, runCatching { access.enabled() }.getOrNull())
     }
 
     fun start(proposed: NativeHotspotCredentials? = null) = begin(R.string.l7_hotspot_starting) { token ->
@@ -60,7 +61,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
         if (proposed == null) access.read().credentials?.let { save(token, it) }
         if (cancelled(token)) return@begin
         if (proposed != null && access.enabled() == true) {
-            finish(token, null, R.string.l7_hotspot_already_on); return@begin
+            finish(token, null, R.string.l7_hotspot_already_on, true); return@begin
         }
         // 已运行的热点只能复用；系统权限页面返回后仍需用户再次点击，不隐式重配。
         if (access.enabled() != true && !access.permitted()) {
@@ -79,6 +80,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
             }
             // 系统已接受才保存；开启失败仍可在原生设置中手动开启同一配置。
             save(token, proposed)
+            synchronized(this) { if (!cancelled(token)) status = status.copy(configurationApplied = true) }
         }
         if (cancelled(token)) return@begin
         val result = access.start { cancelled(token) }
@@ -90,7 +92,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
             CarHotspotTethering.Result.TIMED_OUT -> R.string.l7_hotspot_timeout
             CarHotspotTethering.Result.CANCELLED -> R.string.l7_hotspot_cancelled
             else -> R.string.l7_hotspot_failed
-        })
+        }, if (result == CarHotspotTethering.Result.READY) true else runCatching { access.enabled() }.getOrNull())
     }
 
     @Synchronized private fun begin(message: Int, action: (Int) -> Unit): Boolean {
@@ -120,10 +122,10 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
         if (!cancelled(token) && credentials.valid()) AirPlayPersistence.saveNativeHotspotCredentials(app, credentials)
     }
 
-    @Synchronized private fun finish(token: Int, credentials: NativeHotspotCredentials?, message: Int) {
+    @Synchronized private fun finish(token: Int, credentials: NativeHotspotCredentials?, message: Int, enabled: Boolean? = null) {
         if (cancelled(token)) return
         credentials?.let { save(token, it) }
-        status = Status(message)
+        status = status.copy(message = message, busy = false, hotspotEnabled = enabled)
         // 仅记结果码；不记录名称、密码或接口异常正文。
         L7DebugLog.record("原生热点操作结果=${app.resources.getResourceEntryName(message)}")
     }
@@ -131,7 +133,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
     @Synchronized fun cancel() {
         generation++
         work?.cancel(true)
-        if (status.busy) status = Status(R.string.l7_hotspot_cancelled)
+        if (status.busy) status = status.copy(message = R.string.l7_hotspot_cancelled, busy = false, hotspotEnabled = null)
     }
     override fun close() { cancel(); executor.shutdownNow() }
 }
