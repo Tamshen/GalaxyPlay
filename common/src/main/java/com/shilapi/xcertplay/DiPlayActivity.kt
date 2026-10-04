@@ -409,7 +409,7 @@ class DiPlayActivity : ComponentActivity() {
             Triple("settings-audio", R.string.audio_routing, R.drawable.ic_l7_audio),
             Triple("settings-general", R.string.l7_general_settings, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
-            Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_dp_diagnostics),
+            Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
         val hints = listOf(R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
