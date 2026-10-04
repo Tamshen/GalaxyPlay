@@ -85,6 +85,7 @@ private class SettingText(context: Context) : ViewGroup(context) {
     val feedback = L7Typography.text(context, "", L7Typography.Role.FEEDBACK)
     private var inline = false
     private var firstHeight = 0
+    private var textHeight = 0
     private val gap = L7Components.dp(context, 4)
     private val valueGap = L7Components.dp(context, 16)
 
@@ -103,21 +104,22 @@ private class SettingText(context: Context) : ViewGroup(context) {
             view.measure(MeasureSpec.makeMeasureSpec(available.coerceAtLeast(0), if (exact) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST),
                 MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
         }
-        if (inline) {
+        val textWidth = if (inline) {
             measureText(value, width, false)
-            measureText(label, width - value.measuredWidth - valueGap)
+            width - value.measuredWidth - valueGap
         } else {
-            measureText(label, width)
-            if (value.visibility == VISIBLE) measureText(value, width)
+            width
         }
-        firstHeight = maxOf(label.measuredHeight, if (inline) value.measuredHeight else 0)
-        var height = firstHeight
+        measureText(label, textWidth)
+        firstHeight = label.measuredHeight
+        textHeight = firstHeight
         listOf(value, description, feedback).forEach { view ->
             if (view.visibility != GONE && !(view === value && inline)) {
-                measureText(view, width)
-                height += gap + view.measuredHeight
+                measureText(view, textWidth)
+                textHeight += gap + view.measuredHeight
             }
         }
+        val height = maxOf(textHeight, if (inline) value.measuredHeight else 0)
         setMeasuredDimension(width, resolveSize(height, heightMeasureSpec))
     }
 
@@ -127,9 +129,11 @@ private class SettingText(context: Context) : ViewGroup(context) {
             val start = if (rtl) width - x - view.measuredWidth else x
             view.layout(start, y, start + view.measuredWidth, y + view.measuredHeight)
         }
-        place(label, 0, (firstHeight - label.measuredHeight) / 2)
-        if (inline) place(value, width - value.measuredWidth, (firstHeight - value.measuredHeight) / 2)
-        var y = firstHeight
+        // 短值独立于标题与说明，按整条文字区居中，与右侧操作槽保持同一中心线。
+        val textTop = (height - textHeight) / 2
+        place(label, 0, textTop)
+        if (inline) place(value, width - value.measuredWidth, (height - value.measuredHeight) / 2)
+        var y = textTop + firstHeight
         listOf(value, description, feedback).forEach { view ->
             if (view.visibility != GONE && !(view === value && inline)) {
                 y += gap
