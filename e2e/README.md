@@ -59,6 +59,14 @@ e2e/
 | 歌曲 / 封面 | `CarPlayPlaybackStatusTest`、`Iap2FileTransferReceiverTest`、`Iap2LinkEngineFileTransferTest` 检查增量信息和有界传输；`NowPlayingArtworkQueueTest` 检查过期解码；媒体会话测试捕获真实发布参数，检查进度不重发封面、首次暂停与无重复焦点 |
 | 通话 | `TelephonyMicrophoneTest` 检查 AEC/NS、不可用降级、设置关闭、重叠录音、失败释放及不覆盖原车模式；与 L7 路由、焦点、蓝牙互斥测试一起执行。模拟音效不证明实车降噪效果 |
 
+## 远程日志回归
+
+`RemoteLogTest` 使用本机回环 HTTP 模拟 OpenObserve `_json` 接口，验证认证与地址限制、脱敏和真实 JSON 字节预算、重定向拒绝、目标流及写入数量检查、部分拒收、无协议不发送、显式重试和撤回后的迟到结果隔离。不连接真实账号，也不读取实车日志。
+
+没有其他构建正在运行时，可执行 `python3 e2e/checks/check_openobserve_build_defaults.py`，检查 `.env` 与环境变量优先级、常驻容器不会残留上次默认值。脚本临时写入合成配置并最终恢复原 `.env`，仅生成资源，不上传日志；需要已准备 ARM64 Docker 工具链和本地认证挂载。
+
+使用默认日志配置为空的调试 APK，运行 `python3 e2e/device/openobserve_log_smoke.py` 检查 AVD 诊断页配置弹窗、认证输入隐藏、取消不保存、保存不上传和恢复默认值。脚本只使用合成配置，最终恢复原配置，不点击上传；截图位于忽略目录 `build/previews/openobserve/`。真实 OpenObserve 联调需使用用户提供的写入地址和凭据，不能将模拟响应测试称为云端写入通过。
+
 ## Docker 运行
 
 [AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。

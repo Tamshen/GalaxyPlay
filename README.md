@@ -37,6 +37,8 @@ bash scripts/build-l7-host.sh --preview
 bash scripts/build-l7-host.sh --check
 ```
 
+远程日志仅手动上传至 OpenObserve，打包默认值可在根目录 `.env` 设置；配置方法见[开发说明](docs/开发与验证.md#openobserve-打包默认值)。
+
 输出为 `mobile/build/outputs/apk/debug/mobile-debug.apk`。无认证输入可显式使用 `bash scripts/build-android-docker.sh --source-only`，安装后配置认证。
 
 保留 [GPL-3.0](LICENSE)、[既有源码许可声明](docs/第三方许可.md#保留源码的许可声明)和第三方资源许可。本项目与 Apple 或吉利无隶属或背书关系。
