@@ -40,7 +40,10 @@ class L7ProbeLogTest {
         assertTrue(retained.contains(L7ProbeLog.batch(first))); assertTrue(retained.contains(L7ProbeLog.batch(second)))
         repeat(1000) { L7DebugLog.buffer.append("Busy session event index=$it " + "detail ".repeat(60)) }
         val upload = RemoteLogReport.collect(app)
-        val events = JSONArray(upload.body.toString(Charsets.UTF_8))
+        val events = JSONArray(upload.batches.flatMap { batch ->
+            val data = JSONArray(batch.body.toString(Charsets.UTF_8))
+            (0 until data.length()).map { data.getJSONObject(it) }
+        })
         assertTrue(events.toString().contains("phase=CANCELLED"))
         assertTrue(events.toString().contains(L7ProbeLog.batch(first)))
         assertTrue(events.toString().contains(L7ProbeLog.batch(second)))
@@ -58,7 +61,7 @@ class L7ProbeLogTest {
         })
         val lines = L7ProbeLog.lines(report)
         report.items.indices.forEach { index ->
-            assertTrue(lines.any { "item=$index entry=ENTRY_$index status=NO_PERMISSION" in it })
+            assertTrue(lines.any { "item=$index entry=${report.items[index].id} status=NO_PERMISSION" in it })
         }
         assertTrue(lines.all { RemoteLogReport.redact(it) == it })
     }

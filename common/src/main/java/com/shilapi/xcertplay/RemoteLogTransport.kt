@@ -11,7 +11,7 @@ internal class RemoteLogTransport : Closeable {
     @Volatile private var connection: HttpURLConnection? = null
     @Volatile private var closed = false
 
-    fun send(config: RemoteLogConfig, report: RemoteLogReport): Int {
+    fun send(config: RemoteLogConfig, batch: RemoteLogBatch): Int {
         require(config.valid())
         val request = URL(config.endpoint).openConnection() as HttpURLConnection
         synchronized(this) {
@@ -26,8 +26,9 @@ internal class RemoteLogTransport : Closeable {
             request.doOutput = true
             request.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             request.setRequestProperty("Authorization", config.authorization)
-            request.setFixedLengthStreamingMode(report.body.size)
-            request.outputStream.use { it.write(report.body) }
+            val body = batch.body
+            request.setFixedLengthStreamingMode(body.size)
+            request.outputStream.use { it.write(body) }
             val status = request.responseCode
             if (status !in 200..299) return status
             val bytes = request.inputStream.use { input ->
@@ -49,7 +50,7 @@ internal class RemoteLogTransport : Closeable {
                 throw IOException("invalid acknowledgement")
             }
             // HTTP 200 也可能部分拒收；只有该流全部写入才显示成功。
-            if (result.getInt("successful") != report.lineCount || result.getInt("failed") != 0) return -1
+            if (result.getInt("successful") != batch.lineCount || result.getInt("failed") != 0) return -1
             return status
         } finally {
             request.disconnect()

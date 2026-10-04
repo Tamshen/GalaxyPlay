@@ -9,66 +9,129 @@ import java.io.RandomAccessFile
 import java.time.Instant
 import java.util.UUID
 
-/** 设备由写入 URL 的日志流区分，正文只包含有界文本及报告信息。 */
-internal data class RemoteLogReport(val id: String, val body: ByteArray, val lineCount: Int) {
+internal data class RemoteLogEntry(val index: Int, val source: String, val message: String)
+
+/** 只在发送当前批次时生成 JSON，避免同时保留全部请求体。 */
+internal class RemoteLogBatch(
+    private val metadata: RemoteLogMetadata,
+    val index: Int,
+    val total: Int,
+    val entries: List<RemoteLogEntry>,
+) {
+    val lineCount get() = entries.size
+    val body: ByteArray get() = JSONArray(entries.map { metadata.event(it, index, total) })
+        .toString().toByteArray(Charsets.UTF_8).also { check(it.size <= RemoteLogReport.MAX_BODY) }
+}
+
+internal data class RemoteLogMetadata(val id: String, val collected: String, val version: String, val core: String) {
+    fun event(entry: RemoteLogEntry, batch: Int, total: Int): JSONObject = JSONObject()
+        .put("report_id", id).put("event_id", "$id:${entry.index}").put("collected_at", collected)
+        .put("app_version", version).put("core_version", core).put("line_index", entry.index)
+        .put("source", entry.source).put("batch_index", batch).put("batch_count", total).put("message", entry.message)
+}
+
+/** 每次点击冻结一份有界快照；设备只由 URL 区分，正文不包含硬件编号。 */
+internal data class RemoteLogReport(
+    val id: String,
+    val batches: List<RemoteLogBatch>,
+    val omittedLines: Int,
+    val shortenedSources: Int,
+) {
+    val lineCount get() = batches.sumOf { it.lineCount }
+
     companion object {
         const val MAX_BODY = 256 * 1024
-        private val privateFields = Regex("(?i)authorization|cookie|bearer |fingerprint|serial|imei|android.?id|\\bvin[=:]|https?://|(?:/Users/|/storage/|/data/)|bluetooth.*name|(?:phone|device|peer)[=:]")
-
-        internal fun redact(line: String): String? =
-            if (privateFields.containsMatchIn(line) || line.any { it.code < 32 && it != '\t' || it.code == 127 }) null
-            else DiagnosticRedactor.redact(line)
+        const val MAX_BATCH_LINES = 1000
+        const val MAX_REPORT_BODY = 1024 * 1024
+        private const val SUMMARY_RESERVE = 4096
+        const val MAX_LINES = 5000
+        internal fun redact(line: String): String? = DiagnosticRedactor.redact(line)
 
         fun collect(context: Context): RemoteLogReport {
-            AsyncDiagnosticLog.awaitIdle(500)
-            val lines = ArrayList<String>()
-            for (name in listOf("previous.log", "diplay.log")) {
-                val file = File(context.filesDir, "logs/$name")
-                if (file.isFile) runCatching {
-                    RandomAccessFile(file, "r").use { input ->
-                        val offset = (input.length() - SessionLogFile.MAX_BYTES).coerceAtLeast(0)
-                        input.seek(offset)
-                        val bytes = ByteArray((input.length() - offset).toInt())
-                        input.readFully(bytes)
-                        val text = bytes.toString(Charsets.UTF_8)
-                        lines += (if (offset > 0) text.substringAfter('\n', "") else text).lineSequence().toList()
+            val drained = AsyncDiagnosticLog.awaitIdle(500)
+            val buffer = L7DebugLog.buffer.snapshot()
+            var shortened = 0
+            val lines = sequence {
+                for (name in SessionLogFile.REPORT_NAMES + "memory" + L7ProbeLog.files) {
+                    if (name == "memory") {
+                        for (line in buffer.lines) yield("memory" to line)
+                        continue
                     }
+                    val limit = if (name in L7ProbeLog.files) L7ProbeLog.MAX_BYTES.toLong() else SessionLogFile.MAX_BYTES
+                    val file = File(context.filesDir, "logs/$name")
+                    if (!file.isFile) continue
+                    val result = runCatching { tail(file, limit) { shortened++ } }
+                    if (result.isFailure) {
+                        yield("collection" to "read_failed source=$name error=${result.exceptionOrNull()!!.javaClass.simpleName}")
+                        continue
+                    }
+                    for (line in result.getOrThrow().lineSequence()) yield(name to line)
                 }
+                yield("collection" to "snapshot writerDrained=$drained memoryEvicted=${buffer.evicted}")
             }
-            lines += L7DebugLog.buffer.snapshot().lines
-            // 环境与权限是本次分析的依据，放在预算优先保留端，避免被大量会话日志挤掉。
-            lines += L7ProbeLog.read(context)
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            return create(lines, version, context.getString(R.string.l7_core_source_info))
+            return build(lines, version, context.getString(R.string.l7_core_source_info)) { shortened }
         }
 
-        internal fun create(lines: List<String>, version: String, core: String): RemoteLogReport {
-            // 每条日志一个 OpenObserve 事件；按实际 JSON 字节预算保留最近记录。
-            val id = UUID.randomUUID().toString()
-            val collected = Instant.now().toString()
-            val selected = ArrayDeque<JSONObject>()
-            val seen = HashSet<String>()
+        private fun tail(file: File, limit: Long, onShortened: () -> Unit): String = RandomAccessFile(file, "r").use {
+            val length = it.length()
+            val offset = (length - limit).coerceAtLeast(0)
+            it.seek(offset)
+            val bytes = ByteArray((length - offset).toInt())
+            it.readFully(bytes)
+            val text = bytes.toString(Charsets.UTF_8)
+            if (offset == 0L) text else { onShortened(); text.substringAfter('\n', "") }
+        }
+
+        internal fun create(lines: List<String>, version: String, core: String): RemoteLogReport =
+            build(lines.asSequence().map { "runtime" to it }, version, core) { 0 }
+
+        private fun build(lines: Sequence<Pair<String, String>>, version: String, core: String, shortened: () -> Int): RemoteLogReport {
+            val metadata = RemoteLogMetadata(UUID.randomUUID().toString(), Instant.now().toString(), version.take(80), core.take(120))
+            val retained = ArrayDeque<Pair<RemoteLogEntry, Int>>()
+            var retainedBytes = 0
+            var omitted = 0; var excluded = 0; var masked = 0; var truncated = 0; var count = 0
+            for ((source, line) in lines) {
+                val index = count++
+                if (line.isBlank()) continue
+                val safe = redact(line)
+                if (safe == null) { excluded++; continue }
+                if (safe != line || "[redacted]" in safe) masked++
+                if (safe.endsWith(" [truncated]")) truncated++
+                val entry = RemoteLogEntry(index, source, safe)
+                val size = metadata.event(entry, MAX_LINES + 1, MAX_LINES + 1).toString().toByteArray(Charsets.UTF_8).size + 1
+                while (retained.isNotEmpty() && (retained.size == MAX_LINES || retainedBytes + size > MAX_REPORT_BODY - SUMMARY_RESERVE)) {
+                    retainedBytes -= retained.removeFirst().second
+                    omitted++
+                }
+                // 不按文本去重：相同报错的重复次数和先后顺序也是诊断证据。
+                retained += entry to size
+                retainedBytes += size
+            }
+            val summary = RemoteLogEntry(count, "collection", "upload_summary retained=${retained.size} " +
+                "omittedLines=$omitted excludedPayloadLines=$excluded redactedLines=$masked truncatedLines=$truncated shortenedSources=${shortened()}")
+            val groups = split(retained.map { it.first } + summary, metadata)
+            return RemoteLogReport(metadata.id, groups.mapIndexed { index, entries ->
+                RemoteLogBatch(metadata, index + 1, groups.size, entries)
+            }, omitted, shortened())
+        }
+
+        private fun split(entries: Iterable<RemoteLogEntry>, metadata: RemoteLogMetadata): List<List<RemoteLogEntry>> {
+            val result = mutableListOf<List<RemoteLogEntry>>()
+            var batch = mutableListOf<RemoteLogEntry>()
             var bytes = 2
-            for ((index, line) in lines.withIndex().reversed()) {
-                val safe = redact(line)?.takeIf { it.isNotBlank() } ?: continue
-                if (!seen.add(safe)) continue
-                // _timestamp 由服务端填接收时间，避免车机时钟异常使日志落到错误的查询时间段。
-                val event = JSONObject().put("report_id", id).put("event_id", "$id:$index")
-                    .put("collected_at", collected).put("app_version", version.take(80))
-                    .put("core_version", core.take(120)).put("line_index", index).put("message", safe)
-                val size = event.toString().toByteArray(Charsets.UTF_8).size + 1
-                if (selected.size == 1000 || bytes + size > MAX_BODY) break
-                selected.addFirst(event)
-                bytes += size
+            for (entry in entries) {
+                // 用批次编号的上界计量 UTF-8 JSON，实际生成时不会超过单批预算。
+                val size = metadata.event(entry, MAX_LINES + 1, MAX_LINES + 1).toString().toByteArray(Charsets.UTF_8).size
+                if (batch.isNotEmpty() && (batch.size == MAX_BATCH_LINES || bytes + size + 1 > MAX_BODY)) {
+                    result += batch; batch = mutableListOf(); bytes = 2
+                }
+                check(size + 2 <= MAX_BODY)
+                bytes += size + if (batch.isEmpty()) 0 else 1
+                batch += entry
             }
-            if (selected.isEmpty()) {
-                selected.add(JSONObject().put("report_id", id).put("event_id", "$id:empty")
-                    .put("collected_at", collected).put("app_version", version.take(80))
-                    .put("core_version", core.take(120)).put("line_index", 0).put("message", "No diagnostic lines available"))
-            }
-            val body = JSONArray(selected.toList()).toString().toByteArray(Charsets.UTF_8)
-            check(body.size <= MAX_BODY)
-            return RemoteLogReport(id, body, selected.size)
+            if (batch.isNotEmpty()) result += batch
+            return result
         }
     }
 }

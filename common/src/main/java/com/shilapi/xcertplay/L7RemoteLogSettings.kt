@@ -68,16 +68,23 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
 
     companion object {
         /** 首页与详细设置共享状态文案，成功时都给出可反馈的日志名称。 */
-        fun statusText(context: Context, status: RemoteLogUpload.Status, logName: String): String = when (status.phase) {
-            RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
-            RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
-            RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
-            RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
-            RemoteLogUpload.Phase.FAILED -> when (status.code) {
-                0 -> context.getString(R.string.l7_log_network_failed)
-                -1 -> context.getString(R.string.l7_log_partial)
-                else -> context.getString(R.string.l7_log_http_failed, status.code)
+        fun statusText(context: Context, status: RemoteLogUpload.Status, logName: String): String {
+            val message = when (status.phase) {
+                RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
+                RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
+                RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
+                RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
+                RemoteLogUpload.Phase.FAILED -> when (status.code) {
+                    0 -> context.getString(R.string.l7_log_network_failed)
+                    -1 -> context.getString(R.string.l7_log_partial)
+                    else -> context.getString(R.string.l7_log_http_failed, status.code)
+                }
             }
+            val progress = if (status.totalBatches > 0) "\n" + context.getString(R.string.l7_log_batch_progress,
+                status.completedBatches, status.totalBatches, status.uploadedLines, status.totalLines) else ""
+            val limit = if (status.omittedLines > 0 || status.shortenedSources > 0) "\n" +
+                context.getString(R.string.l7_log_snapshot_limit, status.omittedLines, status.shortenedSources) else ""
+            return message + progress + limit
         }
     }
 
