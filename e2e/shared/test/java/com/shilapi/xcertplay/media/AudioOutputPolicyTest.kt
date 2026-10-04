@@ -20,10 +20,10 @@ class AudioOutputPolicyTest {
     }
 
     @Test fun oldLegacyChoicesAndNewPresetsCannotCollide() {
-        assertEquals(14, AudioOutputPolicy.choices.distinct().size)
-        (1..10).forEach { assertTrue(AudioOutputPolicy.valid(it)); assertTrue(AudioOutputPolicy.isLegacy(it)) }
+        assertEquals(24, AudioOutputPolicy.choices.distinct().size)
+        (1..20).forEach { assertTrue(AudioOutputPolicy.valid(it)); assertTrue(AudioOutputPolicy.isLegacy(it)) }
         (101..103).forEach { assertTrue(AudioOutputPolicy.valid(it)); assertFalse(AudioOutputPolicy.isLegacy(it)) }
-        assertFalse(AudioOutputPolicy.valid(16))
+        assertFalse(AudioOutputPolicy.valid(21))
         assertFalse(AudioOutputPolicy.valid(-1))
     }
 }

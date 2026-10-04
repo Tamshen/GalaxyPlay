@@ -12,6 +12,7 @@ internal enum class AudioChannel {
     PHONE,
     ASSISTANT,
     NAVIGATION,
+    RINGTONE,
 }
 
 internal enum class AudioContentType {

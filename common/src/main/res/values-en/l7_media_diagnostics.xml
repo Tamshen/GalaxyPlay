@@ -16,20 +16,30 @@
         <item>8 · Dial pad tones</item>
         <item>9 · Text-to-speech (system reserved)</item>
         <item>10 · Accessibility (system restricted)</item>
+        <item>11 · Head-unit stream</item>
+        <item>12 · Head-unit stream</item>
+        <item>13 · Head-unit stream</item>
+        <item>14 · Guidance (Boyue default)</item>
+        <item>15 · Head-unit stream</item>
+        <item>16 · Head-unit stream</item>
+        <item>17 · Head-unit stream</item>
+        <item>18 · Head-unit stream</item>
+        <item>19 · Head-unit stream</item>
+        <item>20 · Head-unit stream</item>
     </string-array>
     <string name="l7_audio_media">Media music</string>
     <string name="l7_audio_assistant">Voice assistant (Siri)</string>
     <string name="l7_audio_navigation">Navigation prompts</string>
-    <string name="l7_audio_roles_note">Defaults match the system usage in DiPlay 0.2.11. Change or preview each output. Existing selections are kept after an upgrade; use Restore upstream audio defaults to clear audio overrides. Applies on the next connection.</string>
+    <string name="l7_audio_roles_note">Defaults follow Boyue DiPlay 0.2.11: automatic media and Siri usage, navigation stream 14, audio focus and advanced mapping on. This upgrade applies the profile once, then keeps manual changes. Preview each output; saved changes apply on the next connection.</string>
     <string name="l7_audio_route_select">Advanced output policy</string>
     <string name="l7_audio_route_choose">Select</string>
-    <string name="l7_audio_route_help">Defaults use system routing for media, Siri or navigation. Other usage policies are available; legacy streams 1–10 are for troubleshooting, not speaker positions. Preview verifies PCM output only; actual voice audio requires a connected phone. Selecting or previewing does not save changes. Saved changes apply on the next connection.</string>
+    <string name="l7_audio_route_help">Media, Siri and navigation have separate outputs. Navigation defaults to Boyue stream 14. Choose automatic usage or legacy streams 1–20; numbers are not speaker positions. Rejected streams fall back to the matching usage and are logged. Preview uses the same routing policy but cannot replace real voice testing. Selection and preview do not save changes.</string>
     <string name="l7_audio_test_play">Play test tone (2 seconds)</string>
     <string name="l7_audio_test_stop">Stop test tone</string>
     <string name="l7_audio_test_ready">Previewing does not save settings. Make sure vehicle audio is audible and operate only while parked.</string>
     <string name="l7_audio_test_playing">Previewing %1$s…</string>
     <string name="l7_audio_test_stopped">Preview stopped. Settings have not been saved.</string>
-    <string name="l7_audio_test_sent">Test tone sent. Check whether you heard it. Actual output: %1$s. Verify the result in the vehicle.</string>
+    <string name="l7_audio_test_sent">Test tone sent. Check whether you heard it.\nActual output: %1$s.\nVerify the result in the vehicle.</string>
     <string name="l7_audio_output_speaker">System speaker</string>
     <string name="l7_audio_output_earpiece">Earpiece</string>
     <string name="l7_audio_output_bus">Vehicle BUS</string>
@@ -45,7 +55,7 @@
     <string name="l7_call_processing_note">Use supported system effects during calls. Turn off if echo, volume or routing becomes worse. Applies on the next connection.</string>
     <string name="l7_audio_bus">Try L7 BUS routing</string>
     <string name="l7_audio_bus_note">Off by default: playback and recording use system routing, matching the upstream audio path. Enable only after confirming vehicle support. Missing or rejected devices fall back to the system. Applies on the next connection.</string>
-    <string name="l7_audio_restore">Restore upstream audio defaults</string>
-    <string name="l7_audio_restore_hint">DiPlay 0.2.11 · Clear audio overrides</string>
-    <string name="l7_audio_restore_confirm">Restore system usage for media, Siri and navigation; turn off audio focus, BUS routing and advanced mapping; restore default buffering and call effects. Only audio settings change. Pairing, authentication and Bluetooth media handoff settings are kept. Applies on the next connection.</string>
+    <string name="l7_audio_restore">Restore Boyue audio defaults</string>
+    <string name="l7_audio_restore_hint">Boyue DiPlay 0.2.11 · Reapply audio profile</string>
+    <string name="l7_audio_restore_confirm">Restore automatic media and Siri usage, navigation stream 14, audio focus and advanced mapping on, additional BUS routing off, and default buffering and call effects. Pairing, authentication and Bluetooth media handoff settings are kept. Applies on the next connection.</string>
 </resources>

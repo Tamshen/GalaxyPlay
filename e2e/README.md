@@ -65,6 +65,12 @@ e2e/
 
 在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试与日志」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
+`L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查升级后的导航流 14、焦点与高级映射默认值、试听及取消不保存；不连接手机、不上传，截图留在忽略目录。
+
+## 启动崩溃保护
+
+`L7StartupRecoveryTest` 在 API 29/30 验证连续三次异常熔断、Java 异常落盘、native 退出分类、正常停止排除、稳定运行复位、手动重新启用与原配置保留。运行 `python3 e2e/device/startup_recovery_smoke.py`，仅允许 AVD，模拟三次进程崩溃并检查设置可访问、USB 直达被拦截；原偏好仅在内存备份，结束恢复，不清空认证、日志或报告，不上传。此测试验证启动保护，不代表已定位实车 USB 闪退原因。
+
 ## 连接分步引导与失败提示
 
 `L7WirelessPrerequisitesTest` 验证蓝牙关闭与失效配对不能通过、确认前不继续连接或申请权限；`L7HotspotActionsTest` 在 API 29/30 验证自动读取不弹窗、显式操作错误保留、权限拒绝不写入/开启、配置保存但超时不报成功、真实开启确认；配合 `L7HotspotTaskTest`、`L7WirelessHotspotGateTest` 和通用任务弹窗回归。`L7WiredSettingsTest` 检查进入仅检测、缺设备明确确认、已有设备沿用核心授权、能力不足阻止连接、后台丢弃迟到结果；`L7RoutesTest` 验证两个子页返回连接方式。
@@ -105,13 +111,13 @@ e2e/
 
 追加 `--dialogs-only` 可单独检查上述弹窗、协议及 USB 取消，不重复页面扫描；同样保留英文首页。
 
-蓝牙媒体与焦点回归：[AudioFocusCoordinatorTest](shared/test/java/com/shilapi/xcertplay/media/AudioFocusCoordinatorTest.kt) 检查原版导航不申请焦点、Siri MAY_DUCK、失焦与拒绝不静音、系统降音恢复、多流选择、明确恢复、旧监听隔离和焦点关闭；[CarPlayMediaSessionTest](common/test/java/com/shilapi/xcertplay/CarPlayMediaSessionTest.kt) 检查媒体键不另建焦点、手机暂停状态优先与关闭队列；[L7BluetoothMediaGuardTest](common/test/java/com/shilapi/xcertplay/L7BluetoothMediaGuardTest.kt) 用模拟端口覆盖目标确认、权限/请求拒绝、断开确认、超时、次数上限及迟到事件。该端口不代表已验证 L7 隐藏 API 或真实蓝牙断开；媒体服务测试核对框架保存的 PlaybackState，Robolectric 不提供完整车机媒体服务。
+蓝牙媒体与焦点回归：[AudioFocusCoordinatorTest](shared/test/java/com/shilapi/xcertplay/media/AudioFocusCoordinatorTest.kt) 检查博越导航降音与恢复、电话 / Siri 优先级、焦点拒绝与明确播放恢复、系统降音叠乘、旧监听隔离和焦点关闭；[CarPlayMediaSessionTest](common/test/java/com/shilapi/xcertplay/CarPlayMediaSessionTest.kt) 检查媒体键不另建焦点、手机暂停状态优先与关闭队列；[L7BluetoothMediaGuardTest](common/test/java/com/shilapi/xcertplay/L7BluetoothMediaGuardTest.kt) 用模拟端口覆盖目标确认、权限/请求拒绝、断开确认、超时、次数上限及迟到事件。该端口不代表已验证 L7 隐藏 API 或真实蓝牙断开；媒体服务测试核对框架保存的 PlaybackState，Robolectric 不提供完整车机媒体服务。
 
 [CarPlayPlaybackStatusTest](shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt) 还检查手机首次暂停必须发布、增量状态去重以及新会话重置，避免音乐流已经建立时错误发布播放状态。
 
-[L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例在 API 29/30 观察实际 AudioTrack 音量，核对原版助手 MAY_DUCK 与导航不申请焦点。
+[L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例在 API 29/30 观察实际 AudioTrack 音量，核对博越助手和导航临时焦点及实际音量。
 
-设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖原版默认值、旧选择保留与恢复范围；`L7AudioSettingsTest` 检查恢复前确认、取消不保存及界面刷新。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
+设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖博越默认值、一次迁移后保留手动选择与恢复范围；`L7AudioSettingsTest` 检查恢复前确认、取消不保存及界面刷新。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
 
 全部 Android 编译和测试在 `mobiledevops/android-sdk-image:latest` 的 Docker 工具链内执行；完整测试默认采用 `linux/amd64`。Apple Silicon 调试的 ARM64 混合构建入口见 [构建说明](../docs/开发与验证.md)，不将调试打包成功写成完整测试通过。在仓库根目录运行：
 

@@ -8,107 +8,148 @@ import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.io.Closeable
 
-/** 对齐 DiPlay 0.2.11：导航不申请焦点，其余音轨共享一个请求。 */
+/** 参考 carlito12345/DiPlay v0.2.11：电话、Siri、导航优先于媒体，保留单一焦点所有者。 */
 internal class AudioFocusCoordinator(
-    context: Context?, private val enabled: Boolean, private val report: (String) -> Unit = {},
-) : Closeable {
+    context: Context?,
+    private val enabled: Boolean,
+    private val report: (String) -> Unit = {},
+    private val factoryRouting: Boolean = false,
+) : java.io.Closeable {
     private data class Entry(val channel: AudioChannel, val attributes: AudioAttributes)
+
     private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val active = LinkedHashMap<AudioTrack, Entry>()
     private var request: AudioFocusRequest? = null
     private var requestedChannel: AudioChannel? = null
-    private var generation = 0
-    private var hasFocus = false
+    private var requestGeneration = 0
+    private var focusHeld = false
+    private var focusVolume = FULL_VOLUME
+    private var mediaAttributes: AudioAttributes? = null
+    private var mediaSuppressed = false
     private var closed = false
 
-    @Synchronized fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
-        if (closed) { runCatching { track.setVolume(0f) }; return }
-        if (!enabled || manager == null || channel == AudioChannel.NAVIGATION) return
+    private fun onFocusChanged(generation: Int, change: Int) {
+        synchronized(this) {
+            if (closed || generation != requestGeneration) return
+            runCatching { report("Audio: focus change=$change activeTracks=${active.size}") }
+            when (change) {
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> focusVolume = DUCKED_VOLUME
+                AudioManager.AUDIOFOCUS_GAIN -> { focusHeld = true; focusVolume = FULL_VOLUME }
+                AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                    focusHeld = false
+                    if (factoryRouting) focusVolume = 0f
+                    if (factoryRouting && change == AudioManager.AUDIOFOCUS_LOSS) mediaSuppressed = true
+                }
+            }
+            applyVolumes()
+        }
+    }
+
+    @Synchronized
+    fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
+        if (closed || !enabled || manager == null || (channel == AudioChannel.NAVIGATION && !factoryRouting)) return
         active[track] = Entry(channel, attributes)
+        if (channel == AudioChannel.MEDIA) mediaAttributes = attributes
         refreshRequest()
     }
 
-    @Synchronized fun release(track: AudioTrack) {
+    @Synchronized
+    fun release(track: AudioTrack) {
         if (active.remove(track) != null) refreshRequest()
     }
 
-    /** 只响应明确的重新播放，失焦回调和重复数据包不能触发持续争抢。 */
-    @Synchronized fun resumeMedia() {
-        if (closed || hasFocus || active.values.none { it.channel == AudioChannel.MEDIA }) return
-        if (active.values.any { it.channel != AudioChannel.MEDIA }) return
-        refreshRequest(force = true)
+    @Synchronized
+    fun onMediaPlaying(playing: Boolean) {
+        if (!playing || closed) return
+        mediaSuppressed = false
+        refreshRequest()
+        if (!focusHeld && requestedChannel == AudioChannel.MEDIA) requestCurrentFocus()
     }
 
-    private fun refreshRequest(force: Boolean = false) {
-        val audioManager = manager ?: return
+    fun resumeMedia() = onMediaPlaying(true)
+
+    @Synchronized
+    override fun close() {
+        closed = true
+        requestGeneration++
+        active.keys.forEach { runCatching { it.setVolume(0f) } }
+        active.clear()
+        mediaAttributes = null
+        request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
+        request = null
+        requestedChannel = null
+        focusHeld = false
+    }
+
+    private fun refreshRequest() {
         val primary = active.values.maxByOrNull { it.channel.focusPriority() }
-        if (primary == null) { abandon(); return }
-        if (!force && request != null && requestedChannel == primary.channel) return
-        abandon()
-        val currentGeneration = generation
+            ?: mediaAttributes?.takeIf { !mediaSuppressed }?.let { Entry(AudioChannel.MEDIA, it) }
+        if (primary == null) {
+            requestGeneration++
+            request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
+            request = null
+            requestedChannel = null
+            focusHeld = false
+            focusVolume = FULL_VOLUME
+            return
+        }
+        if (request != null && requestedChannel == primary.channel) { applyVolumes(); return }
+        val generation = ++requestGeneration
+        request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
         val gain = when (primary.channel) {
             AudioChannel.MEDIA -> AudioManager.AUDIOFOCUS_GAIN
             AudioChannel.PHONE -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
-            AudioChannel.ASSISTANT -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-            AudioChannel.NAVIGATION -> return
+            AudioChannel.ASSISTANT -> if (factoryRouting) AudioManager.AUDIOFOCUS_GAIN_TRANSIENT else AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+            AudioChannel.NAVIGATION -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            AudioChannel.RINGTONE -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
         }
-        val listener = AudioManager.OnAudioFocusChangeListener { change ->
-            synchronized(this) {
-                if (closed || generation != currentGeneration || request == null) return@synchronized
-                when (change) {
-                    AudioManager.AUDIOFOCUS_GAIN -> { hasFocus = true; setVolume(1f) }
-                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> setVolume(0.2f)
-                    AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                        // 与原版一致：部分车机不回送 GAIN，不能因此永久静音语音。
-                        hasFocus = false
-                    }
-                }
-                emit("Audio: focus change=$change channel=$requestedChannel usage=${primary.attributes.usage} policy=diplay-0.2.11 activeTracks=${active.size}")
-            }
-        }
-        val next = AudioFocusRequest.Builder(gain).setAudioAttributes(primary.attributes)
-            .setOnAudioFocusChangeListener(listener, Handler(Looper.getMainLooper())).build()
+        val next = AudioFocusRequest.Builder(gain)
+            .setAudioAttributes(primary.attributes)
+            .setOnAudioFocusChangeListener({ change -> onFocusChanged(generation, change) }, Handler(Looper.getMainLooper()))
+            .build()
         request = next
         requestedChannel = primary.channel
-        val result = runCatching { audioManager.requestAudioFocus(next) }.getOrDefault(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
-        hasFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        emit("Audio: focus requested channel=${primary.channel} usage=${primary.attributes.usage} gain=$gain result=$result policy=diplay-0.2.11")
-    }
-
-    private fun setVolume(volume: Float) {
-        active.keys.forEach { track -> runCatching { track.setVolume(volume) } }
-    }
-
-    // 这是原版的焦点选择顺序；不另叠加 L7 的静音/混音优先级。
-    private fun AudioChannel.focusPriority(): Int = when (this) {
-        AudioChannel.MEDIA -> 3
-        AudioChannel.PHONE -> 2
-        AudioChannel.ASSISTANT -> 1
-        AudioChannel.NAVIGATION -> 0
-    }
-
-    private fun abandon() {
-        // 先失效旧监听器，再放弃请求，避免迟到的 GAIN 恢复新会话音量。
-        generation++
-        val old = request
-        request = null
-        requestedChannel = null
-        hasFocus = false
-        old?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
-    }
-
-    @Synchronized override fun close() {
-        if (closed) return
-        closed = true
-        setVolume(0f)
-        abandon()
-        active.clear()
-    }
-
-    private fun emit(line: String) {
-        Log.i("L7-AudioFocus", line)
+        val result = if (factoryRouting && mediaSuppressed && primary.channel == AudioChannel.MEDIA) {
+            focusHeld = false
+            focusVolume = 0f
+            applyVolumes()
+            null
+        } else requestCurrentFocus()
+        val line = "Audio: focus requested channel=${primary.channel} gain=$gain granted=$result activeTracks=${active.size}"
+        Log.i(TAG, line)
         runCatching { report(line) }
+    }
+
+    private fun requestCurrentFocus(): Int? {
+        val current = request ?: return null
+        val result = runCatching { manager?.requestAudioFocus(current) }.getOrDefault(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        focusHeld = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        focusVolume = if (factoryRouting && !focusHeld) 0f else FULL_VOLUME
+        applyVolumes()
+        return result
+    }
+
+    private fun applyVolumes() {
+        active.forEach { (track, entry) ->
+            val localVolume = if (!factoryRouting || entry.channel == requestedChannel || requestedChannel == AudioChannel.MEDIA) FULL_VOLUME
+                else if (requestedChannel == AudioChannel.NAVIGATION && entry.channel == AudioChannel.MEDIA) DUCKED_VOLUME
+                else 0f
+            val volume = if (factoryRouting && mediaSuppressed && entry.channel == AudioChannel.MEDIA) 0f else focusVolume * localVolume
+            runCatching { track.setVolume(volume) }
+        }
+    }
+
+    private fun AudioChannel.focusPriority(): Int = when (this) {
+        AudioChannel.PHONE -> 4
+        AudioChannel.ASSISTANT, AudioChannel.RINGTONE -> 3
+        AudioChannel.NAVIGATION -> 2
+        AudioChannel.MEDIA -> 1
+    }
+
+    private companion object {
+        const val TAG = "DiPlay-AudioFocus"
+        const val FULL_VOLUME = 1f
+        const val DUCKED_VOLUME = 0.2f
     }
 }

@@ -69,6 +69,15 @@ class TelephonyMicrophoneTest {
         ShadowAudioRecord.clearSource()
     }
 
+    @Test fun rejectedFactoryMicrophoneSourceFallsBackAndReleasesEffects() {
+        val uplink = MicrophoneUplink(config("telephony"), factorySource = Int.MAX_VALUE)
+        try {
+            assertTrue(uplink.start())
+            assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, awaitCapture().audioSource)
+        } finally { uplink.close() }
+        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+    }
+
     @Test fun telephonyEnablesEffectsOnItsRecorderAndRestoresThePreviousMode() {
         manager.mode = AudioManager.MODE_NORMAL
         sink.onMicrophoneStarted(telephony, config("telephony"))

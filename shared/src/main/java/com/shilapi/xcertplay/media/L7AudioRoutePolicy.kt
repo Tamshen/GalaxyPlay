@@ -32,7 +32,7 @@ internal object L7AudioRoutePolicy {
             if (prefix == null) null else "${prefix}_CARPLAY_TELE_${band}_${if (input) "UP" else "DL"}"
         }
         // 原厂集成分支没有给导航/Siri 输出填入通知 BUS，保持标准 usage 路由。
-        AudioChannel.NAVIGATION -> null
+        AudioChannel.NAVIGATION, AudioChannel.RINGTONE -> null
     }
 
     fun select(devices: List<L7AudioDevice>, channel: AudioChannel, input: Boolean,
