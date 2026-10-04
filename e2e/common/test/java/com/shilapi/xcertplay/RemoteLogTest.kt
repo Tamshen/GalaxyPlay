@@ -58,7 +58,7 @@ class RemoteLogTest {
     @Test fun reportRedactsSecretsAndLimitsActualUtf8JsonBytes() {
         val report = RemoteLogReport.create(listOf("token=do-not-send", "peerName=private-phone",
             "serial=private-car", "payload=private-voice", "file=/data/user/0/private", "Audio source=192.168.1.4") +
-            (1..2000).map { "$it " + "解码\"".repeat(200) }, "0.test", "DiPlay test")
+            (1..2000).map { "$it " + "解码\"".repeat(200) }, "0.test", "DiPlay test", "L7-TEST")
         assertTrue(report.body.size <= RemoteLogReport.MAX_BODY)
         assertTrue(report.lineCount in 1..1000)
         val text = report.body.toString(Charsets.UTF_8)
@@ -66,6 +66,8 @@ class RemoteLogTest {
         assertFalse(text.contains("192.168.1.4"))
         assertTrue(text.contains("2000"))
         assertEquals(report.id, JSONArray(text).getJSONObject(0).getString("report_id"))
+        val records = JSONArray(text)
+        for (index in 0 until records.length()) assertEquals("L7-TEST", records.getJSONObject(index).getString("device_id"))
         assertNull(RemoteLogReport.redact("serial=private-car"))
         assertEquals("Audio source=[ip]", RemoteLogReport.redact("Audio source=192.168.1.4"))
     }
@@ -77,7 +79,7 @@ class RemoteLogTest {
             exchange.responseHeaders.add("Location", "/other")
             exchange.sendResponseHeaders(302, -1); exchange.close()
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
         RemoteLogTransport().use { assertEquals(302, it.send(RemoteLogConfig(endpoint, token), report)) }
         assertEquals(1, requests.get())
     }
@@ -88,7 +90,7 @@ class RemoteLogTest {
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
         RemoteLogTransport().use {
             assertTrue(runCatching { it.send(RemoteLogConfig(endpoint, token), report) }.isFailure)
         }
@@ -145,7 +147,7 @@ class RemoteLogTest {
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
         RemoteLogTransport().use {
             assertEquals(-1, it.send(RemoteLogConfig(endpoint, token), report))
         }
