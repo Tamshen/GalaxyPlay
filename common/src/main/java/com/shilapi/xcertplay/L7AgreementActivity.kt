@@ -89,6 +89,7 @@ class L7AgreementActivity : ComponentActivity() {
 
     private fun stopUsage() {
         val context = applicationContext
+        RemoteLogUpload.cancel()
         L7DesktopNavigation.stop(context)
         L7DebugOverlayService.stop(context)
         // 控制器释放有界；若清理卡住则结束应用，不能在旧连接仍运行时重新同意。

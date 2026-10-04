@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.net.URI
+import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,6 +14,33 @@ val l7Version = Properties().apply {
 }
 
 val diplayDisplayVersion = l7Version.getProperty("diplayCoreVersion")
+
+// .env 只按字面量读取，不执行 shell 展开；环境变量可覆盖文件中的打包默认值。
+val logDefaults = providers.fileContents(rootProject.layout.projectDirectory.file(".env"))
+    .asText.orElse("").get().lineSequence().map(String::trim)
+    .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains('=') }
+    .associate { line ->
+        val key = line.substringBefore('=').trim()
+        val raw = line.substringAfter('=').trim()
+        key to if (raw.length >= 2 && raw.first() == raw.last() && raw.first() in "\"'") raw.substring(1, raw.length - 1) else raw
+    }
+val logServerUrl = providers.environmentVariable("L7_LOG_SERVER_URL").getOrElse(logDefaults["L7_LOG_SERVER_URL"].orEmpty())
+val logAuthorization = providers.environmentVariable("L7_LOG_AUTHORIZATION").getOrElse(logDefaults["L7_LOG_AUTHORIZATION"].orEmpty())
+check(logServerUrl.isEmpty() || runCatching {
+    val uri = URI(logServerUrl)
+    logServerUrl.length <= 2048 && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() &&
+        uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
+        (uri.port == -1 || uri.port in 1..65535) &&
+        Regex("(?:/[^/]+)*/api/[^/]+/[^/]+/_json").matches(uri.path)
+}.getOrDefault(false)) { "L7_LOG_SERVER_URL 格式无效" }
+check(logAuthorization.isEmpty() || runCatching {
+    check(logAuthorization.length <= 4096 && logAuthorization.matches(Regex("Basic [A-Za-z0-9+/]+={0,2}")))
+    val decoded = Base64.getDecoder().decode(logAuthorization.removePrefix("Basic ")).toString(Charsets.UTF_8)
+    val colon = decoded.indexOf(':')
+    colon > 0 && colon < decoded.lastIndex && decoded.none { it.code < 32 || it.code == 127 }
+}.getOrDefault(false)) { "L7_LOG_AUTHORIZATION 格式无效" }
+fun logResource(value: String): String = "\"" + value.replace("&", "&amp;").replace("<", "&lt;")
+    .replace(">", "&gt;").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 // 认证材料由 Docker 脚本显式挂载；未提供环境变量的源码构建不包含身份。
 val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
@@ -40,11 +69,13 @@ android {
             "DiPlay $diplayDisplayVersion · ${l7Version.getProperty("diplayCoreCommit").take(7)}")
         // 核心版本只来源于官方发布基线。
         resValue("string", "l7_source_version_diplay", diplayDisplayVersion)
+        resValue("string", "l7_log_default_url", logResource(logServerUrl))
+        resValue("string", "l7_log_default_authorization", logResource(logAuthorization))
 
     }
 
 
-    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }
+    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.directories.add(it.path) }
 
     signingConfigs {
         create("release") {

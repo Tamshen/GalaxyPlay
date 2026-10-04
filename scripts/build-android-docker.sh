@@ -138,6 +138,16 @@ if [[ "$warm" == true && "$needs_signing" == true ]]; then
 fi
 
 mkdir -p "$project_dir/build"
+# 日志默认值也可从根目录 .env 读取；显式环境变量按变量名传递，不打印令牌。
+log_exec_args=(exec)
+log_run_args=(run --rm --platform "$build_platform")
+for variable in L7_LOG_SERVER_URL L7_LOG_AUTHORIZATION; do
+    if [[ ${!variable+x} ]]; then
+        export "$variable"
+        log_exec_args+=(--env "$variable")
+        log_run_args+=(--env "$variable")
+    fi
+done
 # 两个容器不能同时写同一份 Gradle 输出；锁由容器进程持有，退出自动释放。
 # 中文文档会作为离线许可输入，JVM 的文件名编码必须由 UTF-8 locale 初始化。
 gradle_command=(env LANG=C.UTF-8 LC_ALL=C.UTF-8 flock --nonblock --conflict-exit-code 75 /workspace/build/android-build.lock
@@ -161,9 +171,9 @@ if [[ "$warm" == true ]]; then
         docker start "$container_name" >/dev/null || exit $?
     fi
     printf '复用开发容器：%s（保留 Gradle Daemon）\n' "$container_name"
-    docker exec "$container_name" "${gradle_command[@]}"
+    docker "${log_exec_args[@]}" "$container_name" "${gradle_command[@]}"
 else
-    docker run --rm --platform "$build_platform" "${docker_args[@]}" "$build_image" "${gradle_command[@]}"
+    docker "${log_run_args[@]}" "${docker_args[@]}" "$build_image" "${gradle_command[@]}"
 fi
 build_status=$?
 set -e

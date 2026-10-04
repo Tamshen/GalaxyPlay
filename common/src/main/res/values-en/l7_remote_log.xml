@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_log_remote">Remote logs</string>
+    <string name="l7_log_server">OpenObserve log server</string>
+    <string name="l7_log_server_hint">App settings override the build defaults</string>
+    <string name="l7_log_manual_hint">Only tapping Upload sends up to 1,000 recent redacted log lines. No automatic uploads. Retrying after a timeout or partial ingestion may create duplicates; identify them by event_id.</string>
+    <string name="l7_log_upload">Upload logs</string>
+    <string name="l7_log_retry">Retry last upload</string>
+    <string name="l7_log_cancel">Cancel upload</string>
+    <string name="l7_log_state">Upload status</string>
+    <string name="l7_log_unconfigured">Not configured</string>
+    <string name="l7_log_config_first">Enter the OpenObserve ingestion URL and authorization first</string>
+    <string name="l7_log_idle">No uploads yet</string>
+    <string name="l7_log_uploading">Preparing and uploading…</string>
+    <string name="l7_log_success">Uploaded · report %1$s</string>
+    <string name="l7_log_cancelled">Upload stopped; reports already received remain on the server</string>
+    <string name="l7_log_network_failed">Upload result is unconfirmed: network or response error. A manual retry may create duplicates.</string>
+    <string name="l7_log_http_failed">Upload failed: HTTP %1$d. Check the ingestion URL, authorization and permissions.</string>
+    <string name="l7_log_url_label">OpenObserve ingestion URL</string>
+    <string name="l7_log_token_label">Authorization (including Basic prefix)</string>
+    <string name="l7_log_config_hint">Copy the full /api/organization/stream/_json URL and Authorization value from the OpenObserve log ingestion example. Use HTTPS and dedicated ingestion credentials. Local HTTP is unencrypted.</string>
+    <string name="l7_log_reset">Restore build defaults</string>
+    <string name="l7_log_save_failed">Could not save settings. Please retry.</string>
+    <string name="l7_log_url_error">Enter an HTTP or HTTPS URL ending in /api/organization/stream/_json, without credentials, query or fragment</string>
+    <string name="l7_log_token_error">Enter Basic followed by a space and Base64-encoded username:ingestion-credential</string>
+    <string name="l7_log_partial">OpenObserve did not accept every record. Retrying may create duplicates.</string>
+</resources>

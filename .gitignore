@@ -41,3 +41,8 @@ release-signing.properties
 # Python 测试脚本的本地缓存
 __pycache__/
 *.py[cod]
+
+# 本地远程日志配置不入库，示例配置可提交。
+.env
+.env.*
+!.env.example
