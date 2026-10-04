@@ -33,9 +33,8 @@ for line in (root / '.env').read_text().splitlines():
 endpoint = config['L7_LOG_SERVER_URL']
 authorization = config['L7_LOG_AUTHORIZATION']
 url = urllib.parse.urlsplit(endpoint)
-prefix, organization, stream, suffix = url.path.rsplit('/', 3)
+prefix, organization, example_stream, suffix = url.path.rsplit('/', 3)
 assert suffix == '_json' and prefix.endswith('/api')
-assert re.fullmatch(r'[\w-]+', stream), '测试仅支持普通日志流名称'
 search_url = urllib.parse.urlunsplit((url.scheme, url.netloc, f'{prefix}/{organization}/_search', '', ''))
 marker = 'L7_AVD_SMOKE_' + uuid.uuid4().hex
 started = time.time()
@@ -59,9 +58,10 @@ def find(label):
 
 adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-diagnostics')
 find('OpenObserve 日志服务器')
-assert endpoint in [n.get('text') for n in nodes()], '应用地址与本地 .env 不一致，未上传'
-find('日志设备编号')
-device = next(n.get('text') for n in nodes() if re.fullmatch(r'L7-[A-F0-9]{5}(?:-[A-F0-9]{5}){3}', n.get('text', '')))
+find('日志名称')
+stream = next(n.get('text') for n in nodes() if re.fullmatch(r'l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}', n.get('text', '')))
+actual_endpoint = urllib.parse.urlunsplit((url.scheme, url.netloc, f'{prefix}/{organization}/{stream}/_json', '', ''))
+assert actual_endpoint in [n.get('text') for n in nodes()], '应用实际上传地址与 .env 的组织及本机日志名称不一致，未上传'
 lines = '\n'.join(f'{marker} sample={index} level=info AVD synthetic upload verification' for index in range(1, 4)) + '\n'
 command = 'run-as com.ecarx.carplay sh -c ' + shlex.quote('mkdir -p files/logs && cat >> files/logs/diplay.log')
 subprocess.run(base + ['shell', command], input=lines.encode(), check=True, capture_output=True)
@@ -76,9 +76,9 @@ for _ in range(12):
     if success or failure:
         break
     time.sleep(.5)
-assert success and device in success, '应用未确认完整上传成功：' + failure
+assert success and stream in success, '应用未确认完整上传成功：' + failure
 (out / 'uploaded.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
-result = {'device_id': device, 'report_prefix': success.split('报告 ')[-1],
+result = {'stream': stream, 'report_prefix': success.split('报告 ')[-1],
           'marker': marker, 'ingestion_confirmed': True, 'query_status': 'not_requested'}
 (out / 'upload-result.json').write_text(json.dumps(result, indent=2) + '\n')
 print('AVD 上传成功，已收到服务端全部写入确认。')
@@ -91,7 +91,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 opener = urllib.request.build_opener(NoRedirect())
-sql = f'SELECT device_id, report_id, event_id, message FROM "{stream}" WHERE device_id=\'{device}\' AND message LIKE \'%{marker}%\' ORDER BY line_index'
+sql = f'SELECT * FROM "{stream}" WHERE message LIKE \'%{marker}%\' ORDER BY line_index'
 hits = []
 for attempt in range(4):
     query = {'query': {'sql': sql, 'start_time': int((started - 300) * 1e6),
@@ -109,9 +109,9 @@ for attempt in range(4):
     if len(hits) == 3:
         break
     time.sleep(2)
-assert len(hits) == 3 and all(hit['device_id'] == device and marker in hit['message'] for hit in hits)
+assert len(hits) == 3 and all('device_id' not in hit and marker in hit['message'] for hit in hits)
 assert len({hit['report_id'] for hit in hits}) == 1
 result.update(report_id=hits[0]['report_id'], verified_samples=len(hits), query_status=200)
 (out / 'upload-result.json').write_text(json.dumps(result, indent=2) + '\n')
-print('AVD 点击上传与服务端查询通过；设备编号、报告编号一致，确认 3 条合成测试记录。')
+print('AVD 点击上传与服务端查询通过；本机日志流、报告编号一致，确认 3 条不含 device_id 的合成记录。')
 print(json.dumps(result))

@@ -58,7 +58,7 @@ class RemoteLogTest {
     @Test fun reportRedactsSecretsAndLimitsActualUtf8JsonBytes() {
         val report = RemoteLogReport.create(listOf("token=do-not-send", "peerName=private-phone",
             "serial=private-car", "payload=private-voice", "file=/data/user/0/private", "Audio source=192.168.1.4") +
-            (1..2000).map { "$it " + "解码\"".repeat(200) }, "0.test", "DiPlay test", "L7-TEST")
+            (1..2000).map { "$it " + "解码\"".repeat(200) }, "0.test", "DiPlay test")
         assertTrue(report.body.size <= RemoteLogReport.MAX_BODY)
         assertTrue(report.lineCount in 1..1000)
         val text = report.body.toString(Charsets.UTF_8)
@@ -67,7 +67,7 @@ class RemoteLogTest {
         assertTrue(text.contains("2000"))
         assertEquals(report.id, JSONArray(text).getJSONObject(0).getString("report_id"))
         val records = JSONArray(text)
-        for (index in 0 until records.length()) assertEquals("L7-TEST", records.getJSONObject(index).getString("device_id"))
+        for (index in 0 until records.length()) assertFalse(records.getJSONObject(index).has("device_id"))
         assertNull(RemoteLogReport.redact("serial=private-car"))
         assertEquals("Audio source=[ip]", RemoteLogReport.redact("Audio source=192.168.1.4"))
     }
@@ -79,7 +79,7 @@ class RemoteLogTest {
             exchange.responseHeaders.add("Location", "/other")
             exchange.sendResponseHeaders(302, -1); exchange.close()
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use { assertEquals(302, it.send(RemoteLogConfig(endpoint, token), report)) }
         assertEquals(1, requests.get())
     }
@@ -90,7 +90,7 @@ class RemoteLogTest {
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use {
             assertTrue(runCatching { it.send(RemoteLogConfig(endpoint, token), report) }.isFailure)
         }
@@ -102,7 +102,9 @@ class RemoteLogTest {
             assertEquals(token, exchange.requestHeaders.getFirst("Authorization"))
             val payload = JSONArray(exchange.requestBody.bufferedReader().readText())
             ids += payload.getJSONObject(0).getString("report_id")
-            val response = acknowledgement("l7carplay", payload.length(), 0)
+            assertEquals("/api/default/${RemoteLogDevice.id(context)}/_json", exchange.requestURI.path)
+            assertFalse(payload.getJSONObject(0).has("device_id"))
+            val response = acknowledgement(RemoteLogDevice.id(context), payload.length(), 0)
             exchange.sendResponseHeaders(if (ids.size == 1) 503 else 201, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
@@ -147,10 +149,22 @@ class RemoteLogTest {
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
-        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test", "L7-TEST")
+        val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use {
             assertEquals(-1, it.send(RemoteLogConfig(endpoint, token), report))
         }
+    }
+
+    @Test fun configuredExampleStreamIsReplacedWithoutChangingServerOrOrganization() {
+        val saved = RemoteLogConfig("https://logs.example/proxy/api/test_org/123/_json", token)
+        val first = RemoteLogDevice.derive("android_id", "synthetic-a")
+        val second = RemoteLogDevice.derive("android_id", "synthetic-b")
+        assertEquals("https://logs.example/proxy/api/test_org/$first/_json", saved.forDevice(first).endpoint)
+        assertEquals(token, saved.forDevice(first).authorization)
+        assertEquals(first, saved.forDevice(first).stream)
+        assertNotEquals(saved.forDevice(first).endpoint, saved.forDevice(second).endpoint)
+        assertTrue(saved.forDevice(first).valid())
+        assertTrue(runCatching { saved.forDevice("../other") }.isFailure)
     }
 
     private fun acknowledgement(stream: String, successful: Int, failed: Int): ByteArray = JSONObject()

@@ -24,7 +24,7 @@ class RemoteLogDeviceTest {
             androidId = { "synthetic-android-id" })
         assertFalse(serialRead)
         assertEquals(RemoteLogDevice.derive("android_id", "synthetic-android-id"), id)
-        assertTrue(id.matches(Regex("L7-[A-F0-9]{5}(?:-[A-F0-9]{5}){3}")))
+        assertTrue(id.matches(Regex("l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}")))
         assertEquals(mapOf("id" to id), prefs.all)
     }
 
@@ -55,8 +55,15 @@ class RemoteLogDeviceTest {
         assertEquals(id, RemoteLogDevice.id(context))
     }
 
-    @Test fun emptyReportsStillCarryTheDeviceId() {
-        val record = JSONArray(RemoteLogReport.create(emptyList(), "test", "test", "L7-TEST").body.toString(Charsets.UTF_8)).getJSONObject(0)
-        assertEquals("L7-TEST", record.getString("device_id"))
+    @Test fun emptyReportsDoNotRepeatDeviceIdentity() {
+        val record = JSONArray(RemoteLogReport.create(emptyList(), "test", "test").body.toString(Charsets.UTF_8)).getJSONObject(0)
+        assertFalse(record.has("device_id"))
+    }
+
+    @Test fun legacyDeviceNamesKeepTheirHashWhenConvertedToStreamNames() {
+        prefs.edit().putString("id", "L7-ABCDE-12345-ABCDE-67890").commit()
+        val id = RemoteLogDevice.id(context, serial = { error("不应重建编号") }, androidId = { error("不应重建编号") })
+        assertEquals("l7_abcde_12345_abcde_67890", id)
+        assertEquals(id, prefs.getString("id", null))
     }
 }
