@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="contrib_audio_home_nav_channel_note">0 uses upstream usage-based system routing. BUS routing is attempted only when explicitly enabled. Select and preview each output; numbers do not identify speakers. Applies on the next connection.</string>
-    <string name="contrib_audio_home_toggle_audio_focus_desc">Off by default, matching DiPlay 0.2.11. When enabled, navigation takes no focus; Siri uses transient focus that allows ducking. This app does not force mute on focus loss or denial. Applies on the next connection.</string>
+    <string name="contrib_audio_home_toggle_audio_focus_desc">On by default. Calls, Siri and navigation take priority over music; navigation lowers music volume. Turning this off affects all audio, and the head unit may still duck audio. Applies on the next connection.</string>
 </resources>

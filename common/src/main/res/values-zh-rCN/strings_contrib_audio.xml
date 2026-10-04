@@ -5,5 +5,5 @@
     <string name="contrib_audio_home_nav_channel_label">导航音频流</string>
     <string name="contrib_audio_home_nav_channel_note">0 按原版用途交由系统路由；BUS 仅在显式开启后尝试。可选择并独立试听，数字不是扬声器位置。修改下次连接生效。</string>
     <string name="contrib_audio_home_toggle_audio_focus">音频焦点</string>
-    <string name="contrib_audio_home_toggle_audio_focus_desc">默认关闭，与 DiPlay 原版 0.2.11 一致。开启后导航仍不申请焦点；Siri 使用可降音的临时焦点，失焦或请求失败不由本应用强制静音。修改下次连接生效。</string>
+    <string name="contrib_audio_home_toggle_audio_focus_desc">默认开启。电话、Siri 与导航优先于音乐，导航播报时降低音乐音量。关闭会影响全部音频；车机仍可能自行降音。修改下次连接生效。</string>
 </resources>

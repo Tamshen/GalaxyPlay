@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AVD 检查博越默认音频配置、导航 14 号流与试听；不保存新选择、不连接手机。"""
+"""AVD 检查用途路由默认配置、导航 usage 12 与试听；不保存新选择、不连接手机。"""
 import argparse
 from pathlib import Path
 import re
@@ -56,12 +56,14 @@ def preferences():
 adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n',
     package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-audio')
 original = preferences()
-assert original['navigation_audio_channel'] == '14'
+assert original['navigation_audio_channel'] == '103'
 assert original['audio_focus_enabled'] == 'true'
 assert original['advanced_audio_channel_mapping'] == 'true'
 try:
+    assert '通话 · usage 2' in texts()
+    (output/'usage-settings.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     tap('导航播报')
-    assert '14 · 导航（博越默认）' in texts()
+    assert '导航 · usage 12' in texts()
     (output/'navigation-profile.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     tap('试听此声道（2 秒）')
     for _ in range(8):
@@ -72,6 +74,6 @@ try:
     (output/'navigation-preview.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     tap('取消')
     assert preferences() == original, '试听或取消修改了音频配置'
-    print('AVD 通过：博越默认焦点/高级映射、导航流 14、试听完成且取消不保存；不代表实车发声。')
+    print('AVD 通过：用途路由默认焦点/高级映射、导航 usage 12、试听完成且取消不保存；不代表实车发声。')
 finally:
     adb('shell', 'input', 'keyevent', '4')

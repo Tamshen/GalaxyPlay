@@ -2,38 +2,38 @@
 <resources>
     <string name="l7_physical_size_automatic">Automatically matches the L7 display area. The panel is approximately %1$d×%2$d mm, calculated from the 13.2-inch specification. The floating sidebar does not change the projection size.</string>
     <string-array name="l7_audio_stream_names">
-        <item>0 · Recommended (for current use)</item>
-        <item>Media output policy (MEDIA)</item>
-        <item>Voice assistant policy (ASSISTANT)</item>
-        <item>Navigation policy (NAVIGATION)</item>
-        <item>1 · System sounds</item>
-        <item>2 · Ringtone</item>
-        <item>3 · Music</item>
-        <item>4 · Alarm</item>
-        <item>5 · Notifications</item>
-        <item>6 · Bluetooth calls</item>
-        <item>7 · Enforced system sounds</item>
-        <item>8 · Dial pad tones</item>
-        <item>9 · Text-to-speech (system reserved)</item>
-        <item>10 · Accessibility (system restricted)</item>
-        <item>11 · Head-unit stream</item>
-        <item>12 · Head-unit stream</item>
-        <item>13 · Head-unit stream</item>
-        <item>14 · Guidance (Boyue default)</item>
-        <item>15 · Head-unit stream</item>
-        <item>16 · Head-unit stream</item>
-        <item>17 · Head-unit stream</item>
-        <item>18 · Head-unit stream</item>
-        <item>19 · Head-unit stream</item>
-        <item>20 · Head-unit stream</item>
+        <item>Music · usage 1</item>
+        <item>Navigation · usage 12</item>
+        <item>Siri · usage 16</item>
+        <item>Factory usage (advanced)</item>
+        <item>Legacy 1 · System sounds</item>
+        <item>Legacy 2 · Ringtone</item>
+        <item>Legacy 3 · Music</item>
+        <item>Legacy 4 · Alarm</item>
+        <item>Legacy 5 · Notifications</item>
+        <item>Legacy 6 · Bluetooth calls (system)</item>
+        <item>Legacy 7 · Enforced system sounds</item>
+        <item>Legacy 8 · Dial pad tones</item>
+        <item>Legacy 9 · Text-to-speech (system reserved)</item>
+        <item>Legacy 10 · Accessibility (system restricted)</item>
+        <item>Legacy 11 · Head-unit stream</item>
+        <item>Legacy 12 · Head-unit stream</item>
+        <item>Legacy 13 · Head-unit stream</item>
+        <item>Legacy 14 · Guidance (Boyue default)</item>
+        <item>Legacy 15 · Head-unit stream</item>
+        <item>Legacy 16 · Head-unit stream</item>
+        <item>Legacy 17 · Head-unit stream</item>
+        <item>Legacy 18 · Head-unit stream</item>
+        <item>Legacy 19 · Head-unit stream</item>
+        <item>Legacy 20 · Head-unit stream</item>
     </string-array>
     <string name="l7_audio_media">Media music</string>
     <string name="l7_audio_assistant">Voice assistant (Siri)</string>
     <string name="l7_audio_navigation">Navigation prompts</string>
-    <string name="l7_audio_roles_note">Defaults follow Boyue DiPlay 0.2.11: automatic media and Siri usage, navigation stream 14, audio focus and advanced mapping on. This upgrade applies the profile once, then keeps manual changes. Preview each output; saved changes apply on the next connection.</string>
-    <string name="l7_audio_route_select">Advanced output policy</string>
+    <string name="l7_audio_roles_note">The head unit assigns speakers by usage: music 1, navigation 12, calls 2 and Siri 16. These are usage values, not device IDs. Changes apply on the next connection.</string>
+    <string name="l7_audio_route_select">Output routing</string>
     <string name="l7_audio_route_choose">Select</string>
-    <string name="l7_audio_route_help">Media, Siri and navigation have separate outputs. Navigation defaults to Boyue stream 14. Choose automatic usage or legacy streams 1–20; numbers are not speaker positions. Rejected streams fall back to the matching usage and are logged. Preview uses the same routing policy but cannot replace real voice testing. Selection and preview do not save changes.</string>
+    <string name="l7_audio_route_help">Standard usage lets the head unit assign the output. Factory usage and legacy streams are advanced compatibility options. Legacy streams 1–20 are not usage values, device IDs or speaker positions. Preview does not save; saved changes apply on the next connection.</string>
     <string name="l7_audio_test_play">Play test tone (2 seconds)</string>
     <string name="l7_audio_test_stop">Stop test tone</string>
     <string name="l7_audio_test_ready">Previewing does not save settings. Make sure vehicle audio is audible and operate only while parked.</string>
@@ -55,7 +55,11 @@
     <string name="l7_call_processing_note">Use supported system effects during calls. Turn off if echo, volume or routing becomes worse. Applies on the next connection.</string>
     <string name="l7_audio_bus">Try L7 BUS routing</string>
     <string name="l7_audio_bus_note">Off by default: playback and recording use system routing, matching the upstream audio path. Enable only after confirming vehicle support. Missing or rejected devices fall back to the system. Applies on the next connection.</string>
-    <string name="l7_audio_restore">Restore Boyue audio defaults</string>
-    <string name="l7_audio_restore_hint">Boyue DiPlay 0.2.11 · Reapply audio profile</string>
-    <string name="l7_audio_restore_confirm">Restore automatic media and Siri usage, navigation stream 14, audio focus and advanced mapping on, additional BUS routing off, and default buffering and call effects. Pairing, authentication and Bluetooth media handoff settings are kept. Applies on the next connection.</string>
+    <string name="l7_audio_restore">Restore usage routing</string>
+    <string name="l7_audio_restore_hint">Apply recommended usage settings</string>
+    <string name="l7_audio_restore_confirm">Restore music usage 1, navigation usage 12 and Siri usage 16; calls use usage 2. Enable audio focus and advanced mapping, disable extra BUS routing, and restore default buffering and call effects. Pairing, authentication and Bluetooth handoff settings stay unchanged. Applies on the next connection.</string>
+    <string name="l7_audio_headrest_note">L7 headrest check: enable the vehicle’s driver audio mode and check navigation, Siri and calls separately. Music ducking follows Boyue focus behavior. Turning audio focus off affects all audio; the head unit may still apply its own mixing policy.</string>
+    <string name="l7_audio_phone">Phone calls</string>
+    <string name="l7_audio_phone_usage">Calls · usage 2</string>
+    <string name="l7_audio_phone_note">Uses system communication usage. Verify headrest output during a real call.</string>
 </resources>

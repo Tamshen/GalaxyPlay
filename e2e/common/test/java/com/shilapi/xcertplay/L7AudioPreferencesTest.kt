@@ -11,13 +11,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class L7AudioPreferencesTest {
-    @Test fun defaultAudioMatchesBoyueWithoutOverwritingExplicitChoices() {
+    @Test fun defaultAudioUsesStandardUsageWithoutOverwritingExplicitChoices() {
         val context = context()
         assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
         assertFalse(AirPlayPersistence.loadL7AudioBusEnabled(context))
         assertTrue(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(101, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(103, AirPlayPersistence.loadNavigationAudioChannel(context))
         AirPlayPersistence.saveAudioFocusEnabled(context, true)
         AirPlayPersistence.saveMediaAudioChannel(context, 3)
         assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
@@ -41,14 +41,14 @@ class L7AudioPreferencesTest {
         val unrelated = prefs.all.filterKeys { it !in setOf("audio_focus_enabled", "l7_audio_bus_enabled",
             "advanced_audio_channel_mapping", "l7_call_processing_enabled", "media_audio_channel",
             "assistant_audio_channel", "navigation_audio_channel", "media_buffer_ms") }
-        AirPlayPersistence.restoreBoyueAudioDefaults(context)
+        AirPlayPersistence.restoreUsageAudioDefaults(context)
         assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
         assertFalse(AirPlayPersistence.loadL7AudioBusEnabled(context))
         assertTrue(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
         assertTrue(AirPlayPersistence.loadCallProcessingEnabled(context))
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadAssistantAudioChannel(context))
-        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(101, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(102, AirPlayPersistence.loadAssistantAudioChannel(context))
+        assertEquals(103, AirPlayPersistence.loadNavigationAudioChannel(context))
         assertEquals(300, AirPlayPersistence.loadMediaBufferMillis(context))
         unrelated.forEach { (key, value) -> assertEquals(value, prefs.all[key]) }
     }
@@ -66,16 +66,19 @@ class L7AudioPreferencesTest {
     }
     @Test fun upgradeAppliesProfileOnceAndKeepsLaterManualChoices() {
         val context = context()
-        AirPlayPersistence.saveNavigationAudioChannel(context, 5)
+        context.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .putBoolean("l7_boyue_audio_0211", true)
+            .putInt("media_audio_channel", 0).putInt("assistant_audio_channel", 0)
+            .putInt("navigation_audio_channel", 14).commit()
         AirPlayPersistence.saveAudioFocusEnabled(context, false)
         AirPlayPersistence.saveWirelessEnabled(context, false)
-        AirPlayPersistence.migrateBoyueAudioDefaults(context)
-        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
-        assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
+        AirPlayPersistence.migrateUsageAudioDefaults(context)
+        assertEquals(103, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
         assertFalse(AirPlayPersistence.loadWirelessEnabled(context))
         AirPlayPersistence.saveNavigationAudioChannel(context, 0)
         AirPlayPersistence.saveAudioFocusEnabled(context, false)
-        AirPlayPersistence.migrateBoyueAudioDefaults(context)
+        AirPlayPersistence.migrateUsageAudioDefaults(context)
         assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
         assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
     }
@@ -85,13 +88,24 @@ class L7AudioPreferencesTest {
         val context = context()
         AirPlayPersistence.saveMediaAudioChannel(context, 3)
         AirPlayPersistence.saveNavigationAudioChannel(context, 5)
-        assertEquals(0, AirPlayPersistence.loadAssistantAudioChannel(context))
+        assertEquals(102, AirPlayPersistence.loadAssistantAudioChannel(context))
         AirPlayPersistence.saveAssistantAudioChannel(context, 101)
         assertEquals(101, AirPlayPersistence.loadAssistantAudioChannel(context))
         assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
         assertEquals(5, AirPlayPersistence.loadNavigationAudioChannel(context))
         AirPlayPersistence.saveAssistantAudioChannel(context, 0)
         assertEquals(0, AirPlayPersistence.loadAssistantAudioChannel(context))
+    }
+
+    @Test fun upgradeKeepsCustomLegacyRoutingAndOldNavigationKey() {
+        val context = context()
+        AirPlayPersistence.saveMediaAudioChannel(context, 3)
+        AirPlayPersistence.saveNavigationStreamType(context, 6)
+        AirPlayPersistence.saveAudioFocusEnabled(context, false)
+        AirPlayPersistence.migrateUsageAudioDefaults(context)
+        assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(6, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
     }
 
     @Test fun presetsPersistAndInvalidOverridesFallBackToBuiltin() {

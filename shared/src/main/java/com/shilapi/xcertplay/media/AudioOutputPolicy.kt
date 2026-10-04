@@ -15,13 +15,13 @@ enum class AudioOutputRole(val usage: Int, val contentType: Int, val channels: I
     }
 }
 
-/** 0 按原用途内置推荐；1–20 对齐博越车机流设置；101–103 明确选择标准用途策略。 */
+/** 101–103 为标准用途预设键；0 选原厂用途；1–20 为博越传统流，均不是设备 ID。 */
 object AudioOutputPolicy {
     const val BUILTIN = 0
     const val MEDIA = 101
     const val ASSISTANT = 102
     const val NAVIGATION = 103
-    val choices: List<Int> = listOf(BUILTIN, MEDIA, ASSISTANT, NAVIGATION) + (1..20)
+    val choices: List<Int> = listOf(MEDIA, NAVIGATION, ASSISTANT, BUILTIN) + (1..20)
 
     fun valid(choice: Int): Boolean = choice == BUILTIN || isLegacy(choice) || choice in MEDIA..NAVIGATION
     fun isLegacy(choice: Int): Boolean = choice in 1..20

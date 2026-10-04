@@ -1,38 +1,38 @@
 <resources>
     <string name="l7_physical_size_automatic">自动匹配 L7 显示区域。面板约 %1$d×%2$d mm，按 13.2 英寸规格换算；浮动侧栏不改变投屏尺寸。</string>
     <string-array name="l7_audio_stream_names">
-        <item>0 · 内置推荐（按当前用途）</item>
-        <item>媒体输出策略（MEDIA）</item>
-        <item>语音助手策略（ASSISTANT）</item>
-        <item>导航提示策略（NAVIGATION）</item>
-        <item>1 · 系统提示</item>
-        <item>2 · 铃声</item>
-        <item>3 · 音乐</item>
-        <item>4 · 闹钟</item>
-        <item>5 · 通知</item>
-        <item>6 · 蓝牙通话</item>
-        <item>7 · 强制系统提示</item>
-        <item>8 · 拨号按键</item>
-        <item>9 · 语音合成（系统保留）</item>
-        <item>10 · 无障碍（系统限制）</item>
-        <item>11 · 车机扩展流</item>
-        <item>12 · 车机扩展流</item>
-        <item>13 · 车机扩展流</item>
-        <item>14 · 导航（博越默认）</item>
-        <item>15 · 车机扩展流</item>
-        <item>16 · 车机扩展流</item>
-        <item>17 · 车机扩展流</item>
-        <item>18 · 车机扩展流</item>
-        <item>19 · 车机扩展流</item>
-        <item>20 · 车机扩展流</item>
+        <item>音乐 · usage 1</item>
+        <item>导航 · usage 12</item>
+        <item>Siri · usage 16</item>
+        <item>原厂用途（高级）</item>
+        <item>传统流 1 · 系统提示</item>
+        <item>传统流 2 · 铃声</item>
+        <item>传统流 3 · 音乐</item>
+        <item>传统流 4 · 闹钟</item>
+        <item>传统流 5 · 通知</item>
+        <item>传统流 6 · 蓝牙通话（系统定义）</item>
+        <item>传统流 7 · 强制系统提示</item>
+        <item>传统流 8 · 拨号按键</item>
+        <item>传统流 9 · 语音合成（系统保留）</item>
+        <item>传统流 10 · 无障碍（系统限制）</item>
+        <item>传统流 11 · 车机扩展流</item>
+        <item>传统流 12 · 车机扩展流</item>
+        <item>传统流 13 · 车机扩展流</item>
+        <item>传统流 14 · 导航（博越默认）</item>
+        <item>传统流 15 · 车机扩展流</item>
+        <item>传统流 16 · 车机扩展流</item>
+        <item>传统流 17 · 车机扩展流</item>
+        <item>传统流 18 · 车机扩展流</item>
+        <item>传统流 19 · 车机扩展流</item>
+        <item>传统流 20 · 车机扩展流</item>
     </string-array>
     <string name="l7_audio_media">媒体音乐</string>
     <string name="l7_audio_assistant">语音助手（Siri）</string>
     <string name="l7_audio_navigation">导航播报</string>
-    <string name="l7_audio_roles_note">默认采用博越 DiPlay 0.2.11 音频配置：媒体与 Siri 自动用途，导航流 14，开启音频焦点与高级映射。本次升级会应用一次该配置，之后保留手动修改。每项可试听，下次连接生效。</string>
-    <string name="l7_audio_route_select">高级输出策略</string>
+    <string name="l7_audio_roles_note">默认按音频用途交给车机分配扬声器。音乐 1、导航 12、电话 2、Siri 16 均为 usage 编号，不是设备 ID。修改下次连接生效。</string>
+    <string name="l7_audio_route_select">输出路由</string>
     <string name="l7_audio_route_choose">选择</string>
-    <string name="l7_audio_route_help">媒体、Siri 和导航独立输出，默认导航采用博越流 14。可改用自动用途或传统流 1–20；数字不是扬声器位置。固件拒绝传统流时回退对应用途，日志会记录。试听与连接使用同一路由策略，但 PCM 试听不能代替真实语音验证。选择和试听不保存。</string>
+    <string name="l7_audio_route_help">默认使用标准 usage，由车机分配输出。原厂用途与传统流为高级兼容选项；传统流 1–20 不是 usage、设备 ID 或扬声器位置。试听不保存，点击保存后下次连接生效。</string>
     <string name="l7_audio_test_play">试听此声道（2 秒）</string>
     <string name="l7_audio_test_stop">停止试听</string>
     <string name="l7_audio_test_ready">试听不会保存设置。请确认车机音量已开启，并在停车时操作。</string>
@@ -54,7 +54,11 @@
     <string name="l7_call_processing_note">通话时使用系统支持的音效；若出现回声、音量或路由异常可关闭。修改下次连接生效。</string>
     <string name="l7_audio_bus">尝试 L7 BUS 路由</string>
     <string name="l7_audio_bus_note">默认关闭，播放与录音交给系统，保持原版音频路径。仅在确认车机支持后开启；设备缺失或请求失败时回退系统。修改下次连接生效。</string>
-    <string name="l7_audio_restore">恢复博越默认音频</string>
-    <string name="l7_audio_restore_hint">博越 DiPlay 0.2.11 · 重新应用音频配置</string>
-    <string name="l7_audio_restore_confirm">恢复媒体与 Siri 自动用途、导航流 14，开启音频焦点与高级映射，关闭额外 BUS 路由，恢复默认缓冲与通话音效。仅修改音频设置；配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
+    <string name="l7_audio_restore">恢复用途路由</string>
+    <string name="l7_audio_restore_hint">使用推荐的 usage 配置</string>
+    <string name="l7_audio_restore_confirm">恢复音乐 usage 1、导航 usage 12、Siri usage 16；电话固定 usage 2。开启音频焦点与高级映射，关闭额外 BUS 路由，恢复默认缓冲与通话音效。配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
+    <string name="l7_audio_headrest_note">L7 头枕验证：开启原车“驾享”模式，分别确认导航、Siri 和通话是否从头枕发声。音乐避让沿用博越焦点逻辑；关闭音频焦点会影响全部音频，车机仍可能执行自身的混音策略。</string>
+    <string name="l7_audio_phone">电话</string>
+    <string name="l7_audio_phone_usage">通话 · usage 2</string>
+    <string name="l7_audio_phone_note">使用系统通信用途；请通过实际通话验证头枕输出。</string>
 </resources>

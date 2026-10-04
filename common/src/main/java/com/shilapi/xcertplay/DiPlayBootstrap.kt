@@ -13,7 +13,7 @@ internal object DiPlayBootstrap {
     private var readyTarget: MfiTarget? = null
 
     @Synchronized fun ensure(context: Context) {
-        AirPlayPersistence.migrateBoyueAudioDefaults(context)
+        AirPlayPersistence.migrateUsageAudioDefaults(context)
         val selectedTarget = AirPlayPersistence.loadMfiTarget(context)
         if (ready && readyTarget == selectedTarget && selectedTarget != MfiTarget.REMOTE) return
         // USB 与远程认证直接使用上游后端，不以本地身份文件作为启动前提。
