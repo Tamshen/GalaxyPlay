@@ -40,6 +40,9 @@ interface WirelessHotspotManager : Closeable {
 
     /** The authenticated wireless session has rendered CarPlay; AP creation alone is insufficient. */
     fun onCarPlayConfirmed() {}
+
+    /** Counts reported by the framework, when available; never contains station identities. */
+    fun connectionDiagnosticSnapshot(): String = "association=not_exposed"
 }
 
 /**

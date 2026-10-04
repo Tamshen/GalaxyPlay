@@ -6,8 +6,7 @@ import android.net.wifi.WifiManager
 /**
  * Reads whether the head unit's own Wi-Fi hotspot is on, for the "Car hotspot" link.
  *
- * DiPlay does not turn the hotspot on itself: that needs a permission Android only grants over
- * ADB. The user turns it on in the car settings, or automates it with a tool such as BYDMate.
+ * The user can turn it on in car settings or opt into [CarHotspotTethering] after granting permission.
  */
 object CarHotspotStatus {
     private const val WIFI_AP_STATE_ENABLED = 13

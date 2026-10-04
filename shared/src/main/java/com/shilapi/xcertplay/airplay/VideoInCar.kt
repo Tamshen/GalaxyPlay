@@ -3,6 +3,59 @@ package com.shilapi.xcertplay.airplay
 import java.math.BigInteger
 import java.util.Base64
 
+/** Whether the latest video availability update was sent now or retained for a later AirPlay stage. */
+internal enum class VideoPlaybackDelivery { SENT, QUEUED, UNCHANGED }
+
+/**
+ * Keeps the latest parked-state decision until both SETUP has enabled video playback and the
+ * encrypted AirPlay event channel is ready. AirPlay establishes those asynchronously, so dropping
+ * an early update can leave the iPhone in audio-only mode for the rest of the session.
+ */
+internal class VideoPlaybackAvailability(
+    private val send: (Boolean) -> Boolean,
+) {
+    private var desired: Boolean? = null
+    private var featureEnabled = false
+    private var eventReady = false
+    private var lastSent: Boolean? = null
+
+    @Synchronized
+    fun setDesired(allowed: Boolean): VideoPlaybackDelivery {
+        desired = allowed
+        return flush()
+    }
+
+    @Synchronized
+    fun setFeatureEnabled(enabled: Boolean): VideoPlaybackDelivery {
+        if (featureEnabled != enabled) {
+            featureEnabled = enabled
+            if (!enabled) lastSent = null
+        }
+        return flush()
+    }
+
+    @Synchronized
+    fun setEventReady(ready: Boolean): VideoPlaybackDelivery {
+        if (eventReady != ready) {
+            eventReady = ready
+            if (!ready) lastSent = null
+        }
+        return flush()
+    }
+
+    private fun flush(): VideoPlaybackDelivery {
+        val next = desired ?: return VideoPlaybackDelivery.QUEUED
+        if (!featureEnabled || !eventReady) return VideoPlaybackDelivery.QUEUED
+        if (lastSent == next) return VideoPlaybackDelivery.UNCHANGED
+        return if (send(next)) {
+            lastSent = next
+            VideoPlaybackDelivery.SENT
+        } else {
+            VideoPlaybackDelivery.QUEUED
+        }
+    }
+}
+
 /**
  * iOS 27 "video in car": while the car is parked, the iPhone hands the head unit a media URL and
  * drives playback; the head unit plays it in its own player. Observed with an iPhone on iOS 27 and
@@ -39,6 +92,19 @@ object VideoInCar {
     /** Bits the AirPlay web app's manifest adds to the legacy feature bits (featureList.additionalAirPlayFeatures). */
     private val ADDITIONAL_FEATURE_BITS = listOf(0, 64)
 
+    /** A URL scheme an app could serve through its resource loader. */
+    private val APP_SCHEME = Regex("[a-z][a-z0-9+.-]*")
+
+    /** Android local resources and FairPlay keys must never be opened as remote video. */
+    private val NOT_APP_SCHEMES = setOf("file", "content", "asset", "rawresource", "android.resource", "skd")
+
+    /** Shared policy for queue items, playlist children and iPhone loader redirects. */
+    fun isPlayableUrl(url: String, iphoneLoadsAppSchemes: Boolean = false): Boolean {
+        val scheme = url.substringBefore(':', missingDelimiterValue = "").lowercase()
+        return scheme == "http" || scheme == "https" ||
+            (iphoneLoadsAppSchemes && APP_SCHEME.matches(scheme) && scheme !in NOT_APP_SCHEMES)
+    }
+
     /** The legacy AirPlay feature bits plus [ADDITIONAL_FEATURE_BITS], as base64 of the little-endian bit set. */
     fun featuresEx(legacyFeatures: Long): String {
         var bits = BigInteger.valueOf(legacyFeatures)
@@ -68,12 +134,15 @@ object VideoInCar {
     /** A queued media item the car can play. */
     data class Item(val uuid: Any?, val url: String, val startMillis: Int)
 
-    /** The item of an insertPlayQueueItem message, or null when its media cannot play here. */
-    fun parseItem(message: Map<String, Any?>): Item? {
+    /**
+     * The item of an insertPlayQueueItem message, or null when its media cannot play here. With
+     * [iphoneLoadsAppSchemes] an app's own scheme (served by its resource loader) is accepted too, for a
+     * player that asks the iPhone for such URLs (unhandledURL).
+     */
+    fun parseItem(message: Map<String, Any?>, iphoneLoadsAppSchemes: Boolean = false): Item? {
         val item = message["item"] as? Map<*, *> ?: return null
         val url = item["Content-Location"] as? String ?: return null
-        val scheme = url.substringBefore(':').lowercase()
-        if (scheme != "http" && scheme != "https") return null
+        if (!isPlayableUrl(url, iphoneLoadsAppSchemes)) return null
         val startSeconds = (item["Start-Position-Seconds"] as? Number)?.toDouble()
             ?: (item["Start-Position"] as? Map<*, *>)?.let(::seconds)
         val startMillis = startSeconds?.let { (it * 1000).toLong().coerceIn(0, Int.MAX_VALUE.toLong()).toInt() } ?: 0

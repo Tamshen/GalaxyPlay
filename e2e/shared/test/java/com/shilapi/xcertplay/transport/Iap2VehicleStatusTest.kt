@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.ByteBuffer
 
 class Iap2VehicleStatusTest {
     private val reading = VehicleStatusSnapshot(
@@ -45,6 +46,25 @@ class Iap2VehicleStatusTest {
         assertEquals(listOf(1, 4), connectors(EvChargingConnectors.CCS2_TYPE2))
         assertEquals(listOf(5, 6), connectors(EvChargingConnectors.GB_T))
         assertEquals(listOf(0, 2), connectors(EvChargingConnectors.CCS1_J1772))
+    }
+
+    @Test
+    fun unknownEnergyOmitsWattHoursButPreservesSocRangeAndCharging() {
+        val status = reading.copy(batteryPercent = 51.0, rangeKm = 36, currentChargeWh = null, maxChargeWh = null, charging = true)
+        val parameters = Iap2ParameterList.parse(Iap2VehicleStatus.update(status).payload)
+        for (id in 21..23) assertNull(parameters.first(id))
+        assertEquals(51_000, ByteBuffer.wrap(parameters.first(24)!!.payload).int)
+        assertEquals(36, ByteBuffer.wrap(parameters.first(11)!!.payload).short.toInt())
+        assertEquals(1, parameters.first(25)!!.payload.single().toInt())
+    }
+
+    @Test
+    fun knownEnergyStillUsesWattHours() {
+        val parameters = Iap2ParameterList.parse(Iap2VehicleStatus.update(reading).payload)
+        assertEquals(0, ByteBuffer.wrap(parameters.first(21)!!.payload).int)
+        assertEquals(25_100, ByteBuffer.wrap(parameters.first(22)!!.payload).int)
+        assertEquals(100_400, ByteBuffer.wrap(parameters.first(23)!!.payload).int)
+        assertEquals(25_000, ByteBuffer.wrap(parameters.first(24)!!.payload).int)
     }
 
     private fun connectors(choice: EvChargingConnectors): List<Int> {

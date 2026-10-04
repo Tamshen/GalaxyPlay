@@ -11,8 +11,8 @@ data class VehicleStatusSnapshot(
     val rangeKm: Int,
     val rangeWarning: Boolean,
     val batteryPercent: Double,
-    val currentChargeWh: Long,
-    val maxChargeWh: Long,
+    val currentChargeWh: Long?,
+    val maxChargeWh: Long?,
     val maxRangeKm: Int,
     val charging: Boolean = false,
 )
@@ -78,9 +78,10 @@ object Iap2VehicleStatus {
         bool(6, status.rangeWarning) // RangeWarning
         u16(11, status.rangeKm.coerceIn(0, 0xffff)) // RangeElectric, km
         bool(15, status.rangeWarning) // RangeWarningElectric
-        u32(21, 0L) // MinBatteryCharge, Wh
-        u32(22, status.currentChargeWh.coerceAtLeast(0)) // CurrentBatteryCharge, Wh
-        u32(23, status.maxChargeWh.coerceAtLeast(0)) // MaxBatteryCharge, Wh
+        // Unknown energy is omitted, never represented as an empty battery or a zero capacity.
+        if (status.currentChargeWh != null || status.maxChargeWh != null) u32(21, 0L) // MinBatteryCharge, Wh
+        status.currentChargeWh?.let { u32(22, it.coerceAtLeast(0)) } // CurrentBatteryCharge, Wh
+        status.maxChargeWh?.let { u32(23, it.coerceAtLeast(0)) } // MaxBatteryCharge, Wh
         u32(24, (status.batteryPercent.coerceIn(0.0, 100.0) * 1000).roundToLong()) // DisplayedBatteryPercentage, % x 1000
         bool(25, status.charging) // isCharging
         u16(30, status.maxRangeKm.coerceIn(0, 0xffff)) // MaxRangeElectric, km
