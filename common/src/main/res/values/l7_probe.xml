@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_probe_back_about">返回关于</string>
     <string name="l7_probe_back_debug">返回调试</string>
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
     <string name="l7_probe_executor">当前执行身份与辅助连接</string>
