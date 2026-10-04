@@ -63,7 +63,7 @@ e2e/
 
 `RemoteLogTest` 使用本机回环 HTTP 模拟 OpenObserve `_json` 接口，验证认证与地址限制、脱敏和真实 JSON 字节预算、重定向拒绝、目标流及写入数量检查、部分拒收、无协议不发送、显式重试和撤回后的迟到结果隔离。不连接真实账号，也不读取实车日志。
 
-`RemoteLogDeviceTest` 检查 Android ID 优先、序列号权限回退、随机编号持久化、同设备再生成与不同设备区分、恢复服务器配置不改变编号，以及旧编号转换为安全流名。`RemoteLogTest` 同时检查按设备替换目标流、保留服务器与组织、重试沿用目标流，以及普通/空报告均不包含 `device_id`。只使用合成标识。
+`RemoteLogDeviceTest` 检查 Android ID 优先、序列号权限回退、随机编号持久化、同设备再生成与不同设备区分、恢复服务器配置不改变编号、厂商型号规范化与长度边界，以及旧编号更新前缀时保留哈希。`RemoteLogTest` 同时检查 `{HeadUnit}-{DeviceID}` / `{DeviceID}` 模板、占位符位置限制、保留服务器与组织、服务端流名规范化、重试沿用目标流，以及普通/空报告均不包含 `device_id`。只使用合成标识。
 
 没有其他构建正在运行时，可执行 `python3 e2e/checks/check_openobserve_build_defaults.py`，检查 `.env` 与环境变量优先级、常驻容器不会残留上次默认值。脚本临时写入合成配置并最终恢复原 `.env`，仅生成资源，不上传日志；需要已准备 ARM64 Docker 工具链和本地认证挂载。
 
@@ -145,7 +145,23 @@ AVD 可验证界面、授权与生命周期；真实 iPhone、USB 模块、远�
 
 源集配置依据：[Android sourceSets](https://developer.android.com/build/build-variants#sourcesets)；任务强制执行依据：[Gradle --rerun](https://docs.gradle.org/current/userguide/gradle_command_line.html#sec:builtin_task_options)。
 
-组件交互回归位于 [L7ComponentsTest.kt](common/test/java/com/shilapi/xcertplay/L7ComponentsTest.kt)，覆盖整行/开关各提交一次、选择后取消再打开不残留、未修改不提交、重复确认只提交一次，以及禁用操作仍保留确认值和可读反馈。诊断组件检查导出中阻止重复请求、名称稳定、失败提示和再次重试；模态框检查内容刷新后恢复同名入口焦点。布局截图、系统返回栈、连接与服务停止仍通过 AVD 或实车检查，单测不替代这些验证。
+组件交互回归位于 [L7ComponentsTest.kt](common/test/java/com/shilapi/xcertplay/L7ComponentsTest.kt)，覆盖整行/开关各提交一次、选择后取消再打开不残留、未修改不提交、重复确认只提交一次，以及禁用操作仍保留确认值和可读反馈。列表同时检查涟漪有界、悬停/禁用反馈和触屏点击不抢焦点。诊断组件检查导出中阻止重复请求、名称稳定、失败提示和再次重试；模态框检查键盘导航在内容刷新后恢复同名入口焦点。布局截图、系统返回栈、连接与服务停止仍通过 AVD 或实车检查，单测不替代这些验证。
+
+列表原生反馈检查使用 [PointerInput.java](device/PointerInput.java) 向 AVD 注入鼠标悬停和触屏按压，再由 [list_feedback_smoke.py](device/list_feedback_smoke.py) 比较截图。辅助程序只通过 shell 临时运行，不进入 APK；先用 Docker 常驻容器编译（容器名见构建日志），再使用安装了 Pillow 的 Python 运行：
+
+```bash
+L7_DEV_CONTAINER=你的常驻容器名称
+docker exec "$L7_DEV_CONTAINER" sh -c '
+  mkdir -p /workspace/build/e2e/list-feedback/classes
+  javac --release 8 -cp /opt/android-sdk-linux/platforms/android-37.0/android.jar \
+    -d /workspace/build/e2e/list-feedback/classes /workspace/e2e/device/PointerInput.java
+  /opt/android-sdk-linux/build-tools/36.1.0/d8 --min-api 29 \
+    --output /workspace/build/e2e/list-feedback/pointer.jar \
+    /workspace/build/e2e/list-feedback/classes/l7/e2e/PointerInput.class'
+python3 e2e/device/list_feedback_smoke.py --adb ../tools/scripts/adb.sh
+```
+
+仅在中文、已同意协议且无活动会话的 1440×1920 AVD 运行。检查昼夜悬停整行、移出消退、按压不越界，以及取消选择弹窗后无强制焦点；不保存帧率。完成后恢复原昼夜模式并删除设备上的辅助程序。截图位于忽略目录 `build/previews/list-feedback/`，仍需人工检阅颜色和边界。
 
 [L7DiagnosticSettingsTest.kt](common/test/java/com/shilapi/xcertplay/L7DiagnosticSettingsTest.kt) 检查导出进行中禁用条目并拦截重复请求，完成后恢复入口与标题。
 
