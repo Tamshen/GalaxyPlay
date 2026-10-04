@@ -61,9 +61,9 @@ e2e/
 
 ## 基础调试回归
 
-`L7PermissionProbeTest` 检查授权与有效调用分离、声明/授予/AppOps 原因区分，以及异常权限原名保留；`L7ProbeStoreTest` 覆盖未知值、身份/schema 隔离、进程中断恢复、保存上限及定向删除。`L7ProbeRunnerTest` 检查进入页面不扫描、不上传，显式单项检查、协议门禁、取消/超时拒收迟到结果以及单工作线程约束。`L7ProbeExporterTest` 检查 Activity 创建阶段可注册导出组件，JSON 实际写入另由 AVD 检查。测试不证明厂商接口或实车权限可用。
+`L7PermissionProbeTest` 检查授权与有效调用分离、声明/授予/AppOps 原因区分，以及异常权限原名保留；`L7ProbeStoreTest` 覆盖未知值、身份/schema 隔离、进程中断恢复、保存上限及定向删除。`L7ProbeRunnerTest` 检查进入页面不扫描、不上传，显式单项检查、协议门禁、取消/超时拒收迟到结果以及单工作线程约束。`L7ProbeExporterTest` 检查 Activity 创建阶段可注册导出组件，JSON 实际写入另由 AVD 检查。`L7ProbeStatusTest` 检查颜色状态的证据边界与默认全量；`L7ProbeLogTest` 检查逐项脱敏、两批落盘、字节预算，以及缓冲清空或大量会话日志下手动上传仍保留环境和权限结果、不自动发送。测试不证明厂商接口或实车权限可用。
 
-在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查关于入口和旧路由、Header/系统多级返回、显式扫描、结果筛选、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。昼夜模式结束恢复原值；界面排版仍需目视检查。
+在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查关于入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
 ## 远程日志回归
 
