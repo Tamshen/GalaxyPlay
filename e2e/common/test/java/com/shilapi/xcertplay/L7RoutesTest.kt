@@ -21,11 +21,11 @@ class L7RoutesTest {
         assertEquals("home", L7Routes.normalize("settings-missing"))
     }
 
-    @Test fun oldDiagnosticsAndRestoredPageResolveToAboutDebug() {
+    @Test fun oldDiagnosticsAndRestoredPageResolveToSettingsDebug() {
         assertEquals("settings-debug", L7Routes.normalize("settings-diagnostics"))
         assertEquals("settings-debug", L7Routes.normalize("diagnostics"))
         assertEquals("settings", L7Routes.navigation("settings-debug"))
-        assertEquals("settings-about", L7Routes.back("settings-debug"))
+        assertEquals("settings", L7Routes.back("settings-debug"))
         assertEquals("settings-debug", L7Routes.destination("home", "settings", "settings-diagnostics"))
         listOf("settings-debug-results", "settings-debug-history", "settings-debug-logs").forEach {
             assertEquals("settings-debug", L7Routes.back(it))

@@ -321,7 +321,7 @@ class DiPlayActivity : ComponentActivity() {
             setPaddingRelative(dp(inset), dp(24), dp(inset), dp(8))
             addView(L7Header(this@DiPlayActivity, pageTitle(),
                 backLabel = getString(when {
-                    page == "settings-debug" -> R.string.l7_probe_back_about
+                    page == "settings-debug" -> R.string.l7_back_settings
                     L7Routes.isDebug(page) -> R.string.l7_probe_back_debug
                     else -> R.string.l7_back_settings
                 }),
@@ -409,11 +409,12 @@ class DiPlayActivity : ComponentActivity() {
             Triple("settings-audio", R.string.audio_routing, R.drawable.ic_l7_audio),
             Triple("settings-general", R.string.l7_general_settings, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
+            Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_dp_diagnostics),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
         val hints = listOf(R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
             R.string.l7_display_row_hint, R.string.l7_audio_row_hint, R.string.l7_general_row_hint,
-            R.string.l7_permissions_row_hint, R.string.l7_about_row_hint)
+            R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))
         })
@@ -868,7 +869,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun about(content: LinearLayout) {
-        if (l7Ui) { L7AboutSettings.add(this, content, version()) { page = "settings-debug"; render() }; return }
+        if (l7Ui) { L7AboutSettings.add(this, content, version()); return }
         content.addView(label(getString(R.string.diplay), 40, TEXT, true))
         content.addView(label(getString(R.string.carplay_at_home_in_your_car), 20, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
         section(content, "${getString(R.string.about_public_preview_prefix)}${version()}") { card ->

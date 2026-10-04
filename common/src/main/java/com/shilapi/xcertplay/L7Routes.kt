@@ -13,7 +13,7 @@ internal object L7Routes {
     fun isDebug(page: String) = normalize(page).startsWith("settings-debug")
     fun back(page: String) = normalize(page).let {
         when {
-            it == "settings-debug" -> "settings-about"
+            it == "settings-debug" -> "settings"
             isDebug(it) -> "settings-debug"
             it in settings && it != "settings" -> "settings"
             else -> "home"
