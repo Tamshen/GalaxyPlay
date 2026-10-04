@@ -12,11 +12,12 @@ import java.io.IOException
 /** Saves an app-owned report without depending on an OEM's document-picker activity. */
 internal object DiagnosticExportStore {
     @RequiresApi(Build.VERSION_CODES.Q)
-    fun saveToDownloads(resolver: ContentResolver, fileName: String, report: String): Uri {
+    fun saveToDownloads(resolver: ContentResolver, fileName: String, report: String,
+                        mimeType: String = "text/plain", directory: String = "DiPlay"): Uri {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/DiPlay")
+            put(MediaStore.Downloads.MIME_TYPE, mimeType)
+            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$directory")
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)

@@ -56,7 +56,7 @@ def find(label):
             adb('shell', 'input', 'swipe', '1000', start, '1000', end, '250')
     raise AssertionError('找不到入口：' + label)
 
-adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-diagnostics')
+adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-debug-logs')
 find('OpenObserve 日志服务器')
 find('日志名称')
 stream = next(n.get('text') for n in nodes() if re.fullmatch(r'(?:[a-z0-9]+(?:_[a-z0-9]+)*_)?[a-f0-9]{5}(?:_[a-f0-9]{5}){3}', n.get('text', '')))

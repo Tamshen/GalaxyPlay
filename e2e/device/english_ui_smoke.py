@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', required=True)
 parser.add_argument('--serial', default='emulator-5556')
-parser.add_argument('--dialogs-only', action='store_true', help='仅复核弹窗、协议和 USB 取消，跳过已验证的十个页面')
+parser.add_argument('--dialogs-only', action='store_true', help='仅复核弹窗、协议和 USB 取消，跳过页面巡检')
 args = parser.parse_args()
 if not re.fullmatch(r'emulator-\d+', args.serial):
     parser.error('只允许模拟器，不操作实车')
@@ -84,7 +84,7 @@ else:
     tap('应用', 'Apply')
 
 pages = ('home', 'settings', 'settings-auth', 'settings-connection', 'settings-display',
-         'settings-audio', 'settings-general', 'settings-permissions', 'settings-diagnostics', 'settings-about')
+         'settings-audio', 'settings-general', 'settings-permissions', 'settings-debug', 'settings-debug-results', 'settings-debug-history', 'settings-debug-logs', 'settings-about')
 for page in (() if args.dialogs_only else pages):
     launch(page)
     english(page)
@@ -154,5 +154,5 @@ tap('Cancel connection')
 launch('home')
 english('返回首页')
 screenshot('home-final')
-print(('英文弹窗检查通过：' if args.dialogs_only else '英文检查通过：10 个页面、') +
+print(('英文弹窗检查通过：' if args.dialogs_only else f'英文检查通过：{len(pages)} 个页面、') +
       '许可弹窗/滚动/关闭、协议、语言/认证/字号/音频选择器和 USB 取消；未改变认证或音频配置。')

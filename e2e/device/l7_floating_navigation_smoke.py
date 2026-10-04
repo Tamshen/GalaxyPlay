@@ -153,7 +153,7 @@ def check_home():
         adb('shell', 'input', 'swipe', str((x1+x2)//2), str((y1+y2)//2), str((ox1+ox2)//2), str((oy1+oy2)//2), '650')
     tap('展开菜单')
     tap('设置')
-    assert find('诊断与日志') is not None, '首页菜单无法进入设置'
+    assert find('关于') is not None, '首页菜单无法进入设置'
     assert menu_bounds() == fixed_menu, '进入设置后菜单位置变化或重复建立'
     assert find('设置').attrib.get('selected') == 'true', '设置菜单没有选中当前分类'
     screenshot('settings-menu')
@@ -168,14 +168,14 @@ def check_home():
     screenshot('settings-child-menu-night')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
     tap('设置')
-    assert find('诊断与日志') is not None, '重新点击设置没有返回分类首页'
+    assert find('关于') is not None, '重新点击设置没有返回分类首页'
     adb('shell', 'input', 'keyevent', '4')
     assert find('无线连接') is not None and find('展开菜单') is not None, '设置返回没有恢复首页'
     tap('展开菜单')
     tap('画面')
     assert find('展开菜单') is not None and find('画面') is None
     tap('设置')
-    assert find('诊断与日志') is not None, '首页设置按钮没有进入统一分类页'
+    assert find('关于') is not None, '首页设置按钮没有进入统一分类页'
     require_menu(fixed_menu, '首页设置按钮进入后菜单位置变化')
     adb('shell', 'input', 'keyevent', '4')
     tap('无线连接')
@@ -278,16 +278,20 @@ try:
     tap('设置')
     require_menu(expected_menu, '从投屏进入设置时菜单位置变化')
     print('跨页面坐标检查通过：首页、投屏等待页与设置的四个按钮坐标完全一致。', flush=True)
-    for label in ('诊断与日志', '关于', '连接设置'):
+    for label in ('关于', '连接设置'):
         tap(label)
         assert find('返回设置') is not None, '详细功能未归入设置：' + label
-        if label == '诊断与日志':
+        if label == '关于':
+            tap('调试')
+            tap('日志与报告')
             labels = {n.attrib.get('text') for n in nodes()}
             assert {'日志与报告', '悬浮日志', '查看当前日志', '保存诊断报告', '管理悬浮窗权限', '显示悬浮日志', '关闭悬浮日志'} <= labels
             screenshot('diagnostics-night')
             tap('查看当前日志')
             tap('刷新')
             tap('关闭')
+            tap('返回调试')
+            tap('返回关于')
         adb('shell', 'input', 'keyevent', '4')
     labels = {n.attrib.get('text') for n in nodes()}
     assert '悬浮日志' not in labels and '诊断' not in labels, '设置中仍有重复诊断入口'
