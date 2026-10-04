@@ -149,8 +149,22 @@ adb('shell', 'input', 'keyevent', '4')
 launch('home')
 tap('Wired connection')
 english('USB 等待页面')
+# 等待页首次展开悬浮菜单；先点「画面」收起遮罩，再操作下方按钮。
+if any(n.get('text') == 'Display' for n in nodes()):
+    tap('Display')
 screenshot('usb-waiting')
 tap('Cancel connection')
+# 等待异步停止完成，不能仅凭页面文案为英文就认定取消成功。
+deadline = time.monotonic() + 15
+while True:
+    current = english('取消 USB 连接后的首页')
+    labels = {n.get('text') for n in current}
+    if {'Wired connection', 'Settings', 'iPhone not connected'} <= labels and 'Cancel connection' not in labels:
+        break
+    assert time.monotonic() < deadline, 'USB 取消后没有回到未连接首页'
+    time.sleep(.3)
+services = adb('shell', 'dumpsys', 'activity', 'services', 'com.ecarx.carplay').decode()
+assert not re.search(r'ServiceRecord.*(?:DiPlaySessionService|CarPlayVpnService)', services), '取消后连接服务仍在运行'
 launch('home')
 english('返回首页')
 screenshot('home-final')
