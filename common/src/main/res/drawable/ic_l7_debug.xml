@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flyme Auto fa_ic_common_service；保留原几何，尺寸与颜色接入 L7 主题。 -->
+<vector android:height="32dp" android:width="32dp" android:viewportWidth="80.0" android:viewportHeight="80.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="@color/product_ui_text" android:pathData="M16 16H64V40.5H60V20H20V62H40V66H16V16Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M55 32H25V28H55V32Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M25 43H32V39H25V43Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M32 54H25V50H32V54Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M36.9497 41.1923C34.982 44.9622 35.5812 49.7233 38.7474 52.8894C41.9135 56.0556 46.6746 56.6548 50.4445 54.687L62.789 67.0316L67.0317 62.789L54.6871 50.4444C56.6549 46.6746 56.0557 41.9135 52.8895 38.7473C49.7233 35.5811 44.9622 34.9819 41.1924 36.9497L47.2326 42.9899L42.99 47.2326L36.9497 41.1923Z" />
+</vector>
