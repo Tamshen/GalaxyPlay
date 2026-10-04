@@ -233,8 +233,12 @@ python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 
 此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
 
-原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
+原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。`L7HotspotNavigationTest` 在 API 29/30 验证定制 Wi-Fi handler、原生热点入口失败恢复和无线设置回退；`L7HotspotActionsTest` 验证读取失败保留配置且不阻止写入。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
 
 AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英文热点引导、生成窗口、原生设置跳转和日志首屏入口，不上传、不写入热点。原生热点开启权限检查会临时将模拟器 WRITE_SETTINGS 设为拒绝，验证提示后恢复原 AppOps；中文 AVD 可用 `--gate-only` 单独检查。脚本仅接受 emulator 序列号，截图保存在忽略目录。
 
 日志地址遮蔽：`RemoteLogEditorTest` 覆盖内置地址遮蔽、空字段保留、手动覆盖和更换地址不复用认证；中文 AVD 使用内置默认值时执行 `python3 e2e/device/log_server_mask_smoke.py`，检查列表/弹窗及保存/取消不覆盖配置，不上传或打印真实地址。
+
+`python3 e2e/device/task_dialog_smoke.py --clear-only` 在 AVD 使用本机模拟接口验证清空后无内容不发送、删除中 HTTP 400 提示及旧重试丢弃，结束恢复服务器配置与上传历史。会清空 AVD 日志及报告，不在实车运行。`python3 e2e/device/connection_guide_smoke.py --wifi-only` 检查 Wi-Fi 跳转和读取失败恢复，不启停或写入热点。
+
+显式远端联调可用 `python3 e2e/device/openobserve_http_probe.py --send`：读取本地配置，向当前 AVD 日志流发送两条合成记录，对照 Content-Type 并输出脱敏状态；不读取车辆日志，不属于默认回归。

@@ -35,6 +35,8 @@ internal class L7HotspotSettings(
             stateRow = L7SettingRow(activity, text(R.string.l7_hotspot_state)).also(card::addView)
             card.addView(L7Components.actionRow(activity, text(R.string.open_car_hotspot_settings),
                 text(R.string.l7_hotspot_settings_hint)) { openSettings(activity) })
+            card.addView(L7Components.actionRow(activity, text(R.string.l7_hotspot_wifi_settings),
+                text(R.string.l7_hotspot_wifi_hint)) { openWifiSettings(activity) })
         }
         L7SettingsSection.actions(parent) { group ->
             start = L7Components.actionButton(activity, text(R.string.l7_hotspot_start), primary = true) {
@@ -124,17 +126,26 @@ internal class L7HotspotSettings(
     private fun text(id: Int) = activity.getString(id)
 
     companion object {
-        /** 明确限定 Android 设置包，避免相同 action 被车机自带热点页面接管。 */
+        /** 原生直达入口保留；定制固件不提供该组件时，回退到它实际支持的 Wi-Fi 设置。 */
         fun openSettings(activity: Activity) {
             val candidates = listOf(
                 Intent("com.android.settings.WIFI_TETHER_SETTINGS").setPackage("com.android.settings"),
                 Intent().setClassName("com.android.settings", "com.android.settings.Settings\$WifiTetherSettingsActivity"),
                 Intent().setClassName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity"),
-                Intent(Settings.ACTION_WIRELESS_SETTINGS).setPackage("com.android.settings"),
             )
             if (candidates.none { runCatching { activity.startActivity(it) }.isSuccess }) {
                 L7Dialogs.builder(activity).setTitle(R.string.open_car_hotspot_settings)
-                    .setMessage(R.string.l7_hotspot_settings_missing).setPositiveButton(R.string.close, null).show()
+                    .setMessage(R.string.l7_hotspot_settings_missing).setNegativeButton(R.string.close, null)
+                    .setPositiveButton(R.string.l7_hotspot_wifi_settings) { _, _ -> openWifiSettings(activity) }.show()
+            }
+        }
+
+        fun openWifiSettings(activity: Activity) {
+            // 不限制包名，沿用系统 Wi-Fi action，允许 Flyme 固件自己的设置页处理。
+            val candidates = listOf(Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_WIRELESS_SETTINGS))
+            if (candidates.none { runCatching { activity.startActivity(it) }.isSuccess }) {
+                L7Dialogs.builder(activity).setTitle(R.string.l7_hotspot_wifi_settings)
+                    .setMessage(R.string.l7_hotspot_wifi_missing).setPositiveButton(R.string.close, null).show()
             }
         }
     }
