@@ -7,6 +7,8 @@
     <string name="l7_log_server_hint">应用内配置优先；未设置时使用打包默认值</string>
     <string name="l7_log_manual_hint">仅点击上传时发送最近最多 1000 条脱敏日志，不自动上传。超时或部分写入后重试可能产生重复记录，可按 event_id 识别。</string>
     <string name="l7_log_upload">上传日志</string>
+    <string name="l7_log_view_short">查看日志</string>
+    <string name="l7_log_quick_hint">点击上传后发送最近日志及已收集的环境与权限结果。</string>
     <string name="l7_log_retry">重试上次上传</string>
     <string name="l7_log_cancel">取消上传</string>
     <string name="l7_log_state">上传状态</string>

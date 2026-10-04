@@ -63,7 +63,7 @@ e2e/
 
 `L7PermissionProbeTest` 检查授权与有效调用分离、声明/授予/AppOps 原因区分，以及异常权限原名保留；`L7ProbeStoreTest` 覆盖未知值、身份/schema 隔离、进程中断恢复、保存上限及定向删除。`L7ProbeRunnerTest` 检查进入页面不扫描、不上传，显式单项检查、协议门禁、取消/超时拒收迟到结果以及单工作线程约束。`L7ProbeExporterTest` 检查 Activity 创建阶段可注册导出组件，JSON 实际写入另由 AVD 检查。`L7ProbeStatusTest` 检查颜色状态的证据边界与默认全量；`L7ProbeLogTest` 检查逐项脱敏、两批落盘、字节预算，以及缓冲清空或大量会话日志下手动上传仍保留环境和权限结果、不自动发送。测试不证明厂商接口或实车权限可用。
 
-在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页调试入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
+在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试与日志」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
 ## 远程日志回归
 
@@ -71,7 +71,7 @@ e2e/
 
 `RemoteLogDeviceTest` 检查 Android ID 优先、序列号权限回退、随机编号持久化、同设备再生成与不同设备区分、恢复服务器配置不改变编号、厂商型号规范化与长度边界，以及旧编号更新前缀时保留哈希。`RemoteLogTest` 同时检查 `{HeadUnit}-{DeviceID}` / `{DeviceID}` 模板、占位符位置限制、保留服务器与组织、服务端流名规范化、重试沿用目标流，以及普通/空报告均不包含 `device_id`。只使用合成标识。
 
-没有其他构建正在运行时，可执行 `python3 e2e/checks/check_openobserve_build_defaults.py`，检查 `.env` 与环境变量优先级、常驻容器不会残留上次默认值。脚本临时写入合成配置并最终恢复原 `.env`，仅生成资源，不上传日志；需要已准备 ARM64 Docker 工具链和本地认证挂载。
+没有其他构建正在运行时，可执行 `python3 e2e/checks/check_openobserve_build_defaults.py`，检查 `.env` 与环境变量优先级、后续构建不会残留上次默认值。脚本临时写入合成配置并最终恢复原 `.env`，仅生成资源，不上传日志；需要已准备 ARM64 Docker 工具链和本地认证挂载。
 
 使用默认日志配置为空的调试 APK，运行 `python3 e2e/device/openobserve_log_smoke.py` 检查 AVD 诊断页配置弹窗、认证输入隐藏、取消不保存、保存不上传和恢复默认值。脚本只使用合成配置，最终恢复原配置，不点击上传；截图位于忽略目录 `build/previews/openobserve/`。真实 OpenObserve 联调需使用用户提供的写入地址和凭据，不能将模拟响应测试称为云端写入通过。
 
@@ -153,11 +153,11 @@ AVD 可验证界面、授权与生命周期；真实 iPhone、USB 模块、远�
 
 组件交互回归位于 [L7ComponentsTest.kt](common/test/java/com/shilapi/xcertplay/L7ComponentsTest.kt)，覆盖整行/开关各提交一次、选择后取消再打开不残留、未修改不提交、重复确认只提交一次，以及禁用操作仍保留确认值和可读反馈。列表同时检查涟漪有界、悬停/禁用反馈和触屏点击不抢焦点。诊断组件检查导出中阻止重复请求、名称稳定、失败提示和再次重试；模态框检查键盘导航在内容刷新后恢复同名入口焦点。布局截图、系统返回栈、连接与服务停止仍通过 AVD 或实车检查，单测不替代这些验证。
 
-列表原生反馈检查使用 [PointerInput.java](device/PointerInput.java) 向 AVD 注入鼠标悬停和触屏按压，再由 [list_feedback_smoke.py](device/list_feedback_smoke.py) 比较截图。辅助程序只通过 shell 临时运行，不进入 APK；先用 Docker 常驻容器编译（容器名见构建日志），再使用安装了 Pillow 的 Python 运行：
+列表原生反馈检查使用 [PointerInput.java](device/PointerInput.java) 向 AVD 注入鼠标悬停和触屏按压，再由 [list_feedback_smoke.py](device/list_feedback_smoke.py) 比较截图。辅助程序只通过 shell 临时运行，不进入 APK；先用 Docker 一次性容器编译（结束自动删除），再使用安装了 Pillow 的 Python 运行：
 
 ```bash
-L7_DEV_CONTAINER=你的常驻容器名称
-docker exec "$L7_DEV_CONTAINER" sh -c '
+docker run --rm --platform linux/arm64 --mount "type=bind,source=$PWD,target=/workspace" \
+  l7carplay-android:arm64 sh -c '
   mkdir -p /workspace/build/e2e/list-feedback/classes
   javac --release 8 -cp /opt/android-sdk-linux/platforms/android-37.0/android.jar \
     -d /workspace/build/e2e/list-feedback/classes /workspace/e2e/device/PointerInput.java
@@ -184,7 +184,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 仅修改弹窗主题时，可在上述命令追加 `--theme-only`，只检查切换主题后的待选值、确认按钮状态以及取消恢复；此模式不执行其余设置与连接流程。
 
-仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、八类导航及设置首页的调试入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
+仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、八类导航及设置首页的「调试与日志」入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
 
 仅检查声道交互时追加 `--audio-only`：媒体/语音助手/导航两秒试听、立即停止、选流与保存分离、主题切换保留状态和取消恢复。不保存音频设置，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。
 
@@ -212,3 +212,7 @@ python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 [L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开四项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
 
 此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
+
+原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
+
+AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英文热点引导、生成窗口、原生设置跳转和日志首屏入口，不上传、不写入热点。无线预检会临时将模拟器 WRITE_SETTINGS 设为拒绝，验证提示后恢复原 AppOps；中文 AVD 可用 `--gate-only` 单独检查。脚本仅接受 emulator 序列号，截图保存在忽略目录。

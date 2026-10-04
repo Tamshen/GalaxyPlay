@@ -62,7 +62,12 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
         retry.isEnabled = config.valid() && status.phase == RemoteLogUpload.Phase.FAILED
         cancel.isEnabled = busy
-        state.setValue(when (status.phase) {
+        state.setValue(statusText(context, status, logName))
+    }
+
+    companion object {
+        /** 首页与详细设置共享状态文案，成功时都给出可反馈的日志名称。 */
+        fun statusText(context: Context, status: RemoteLogUpload.Status, logName: String): String = when (status.phase) {
             RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
             RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
             RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
@@ -72,7 +77,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 -1 -> context.getString(R.string.l7_log_partial)
                 else -> context.getString(R.string.l7_log_http_failed, status.code)
             }
-        })
+        }
     }
 
     private fun configure() {

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_probe_back_debug">Back to Debug</string>
+    <string name="l7_probe_back_debug">Back to Debug and logs</string>
     <string name="l7_probe_packages">Visibility of reference packages</string>
     <string name="l7_probe_executor">Execution identity and auxiliary connections</string>
-    <string name="l7_probe_title">Debug</string>
+    <string name="l7_probe_title">Debug and logs</string>
     <string name="l7_probe_entry_hint">Check the environment, permissions and interfaces; view logs and reports</string>
     <string name="l7_probe_environment">Environment and permissions</string>
     <string name="l7_probe_modules">Debug modules</string>

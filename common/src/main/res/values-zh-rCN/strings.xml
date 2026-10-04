@@ -1,7 +1,7 @@
 <resources>
-    <string name="built_in_car_hotspot">车载热点</string>
+    <string name="built_in_car_hotspot">Android 原生热点</string>
     <string name="wifi_direct">Wi-Fi Direct</string>
-    <string name="hotspot_hint_manual">车载热点 · 保持车载热点、蓝牙和 iPhone 的 Wi-Fi 开启。</string>
+    <string name="hotspot_hint_manual">请开启 Android 原生设置中的热点，不是车机桌面的热点；保持蓝牙与 iPhone Wi-Fi 开启。</string>
     <string name="hotspot_hint_local">打开“连接设置”以保存车载热点信息。</string>
     <string name="hotspot_hint_p2p">Wi-Fi Direct · 保持车机 Wi-Fi 开关、蓝牙和 iPhone 的 Wi-Fi 开启。</string>
     <string name="cluster_size_standard">标准 · 最清晰</string>
@@ -12,10 +12,10 @@
     <string name="marker_up">上</string>
     <string name="marker_down">下</string>
     <string name="marker_centre_default">居中 · 默认</string>
-    <string name="hotspot_mode_manual_desc">使用车輄自带热点。若车机支持，请在车机设置中选择 5 GHz。</string>
+    <string name="hotspot_mode_manual_desc">无线 CarPlay 使用 Android 原生设置中的热点，与车机桌面自带的热点不是同一个服务。请开启原生热点；支持时建议选择 5 GHz。</string>
     <string name="hotspot_mode_p2p_desc">备选方案。需要打开车机 Wi-Fi 开关；2.4 GHz 连接可能会卡顿。</string>
-    <string name="hotspot_details_off">热点已关闭 · 请在车机设置中开启。</string>
-    <string name="hotspot_details_saved">详情已保存 · 连接前请确认车载热点已开启。</string>
+    <string name="hotspot_details_off">原生热点未开启，请在 Android 原生设置中开启。</string>
+    <string name="hotspot_details_saved">配置已保存，请确认 Android 原生热点已开启且名称和密码一致。</string>
     <string name="permission_enabled_ready">权限已启用 · 可以使用</string>
     <string name="permission_not_enabled">权限尚未启用</string>
     <string name="clipboard_usage_access">DiPlay 使用情况访问权限</string>
@@ -59,12 +59,12 @@
     <string name="status_waiting_reenumeration">等待 iPhone 重新枚举</string>
     <string name="status_attaching_ncm">正在连接 NCM/AirPlay 网络</string>
     <string name="status_failed">失败：%1$s</string>
-    <string name="msg_car_hotspot_off">车机热点“%1$s”未开启。请在车机设置中开启后再连接。</string>
+    <string name="msg_car_hotspot_off">Android 原生热点“%1$s”未开启。请从原生设置开启，不要使用车机桌面的热点。</string>
     <string name="home_public_preview">公开预览  ·\u0020\u0020</string>
     <string name="choose_iphone_prefix">选择 iPhone ·\u0020</string>
     <string name="audio_saved_value">已保存：%1$d</string>
     <string name="about_public_preview_prefix">公开预览 ·\u0020</string>
-    <string name="msg_car_hotspot_connect">DiPlay 通过车机热点“%1$s”连接。请在车机设置中开启热点后连接。</string>
+    <string name="msg_car_hotspot_connect">请开启 Android 原生设置中的热点“%1$s”，与车机桌面热点不同。也可在连接设置中尝试一键开启。</string>
     <string name="edit_saved_hotspot_prefix">编辑已保存的热点 ·\u0020</string>
     <string name="cluster_adb_multi_device">如果 ADB 列出多个设备，请使用 adb -s &lt;car-device-ID&gt; shell appops set %1$s GET_USAGE_STATS allow。用 adb devices 查询 ID。</string>
     <string name="status_ready_for_prefix">已准备连接：</string>
@@ -110,8 +110,8 @@
     <string name="byd_navigation">比亚迪导航</string>
     <string name="cancel">取消</string>
     <string name="car_home">车机主页</string>
-    <string name="car_hotspot_details">车机热点详情</string>
-    <string name="car_hotspot_is_off">车机热点未开启</string>
+    <string name="car_hotspot_details">热点名称与密码</string>
+    <string name="car_hotspot_is_off">Android 原生热点未开启</string>
     <string name="car_marker_horizontal">车辆标记 · 水平</string>
     <string name="car_marker_vertical">车辆标记 · 垂直</string>
     <string name="carplay">CarPlay</string>
@@ -155,7 +155,7 @@
     <string name="connection_setup">连接设置</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">已复制到车机剪贴板。在电脑上运行该命令。</string>
     <string name="copy_command">复制命令</string>
-    <string name="copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av">从车机热点设置中复制以下内容。如有 5 GHz 请选择。在此保存不会更改车机的热点。</string>
+    <string name="copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av">请填写 Android 原生热点的名称与密码，不是车机桌面热点。这里仅保存连接信息，不修改系统热点；支持时建议选 5 GHz。</string>
     <string name="could_not_decode_image">无法读取图片</string>
     <string name="could_not_encode_image">无法编码图片</string>
     <string name="could_not_reset_wi_fi_direct_close_the_other_projection_ap">无法重置 Wi-Fi Direct。请关闭其他投屏应用后重试。</string>
@@ -253,7 +253,7 @@
     <string name="open">开放</string>
     <string name="open_after_the_car_starts">车机启动后打开</string>
     <string name="open_bluetooth">打开蓝牙</string>
-    <string name="open_car_hotspot_settings">打开车机热点设置</string>
+    <string name="open_car_hotspot_settings">打开 Android 原生热点设置</string>
     <string name="open_car_settings">打开车机设置</string>
     <string name="open_car_wi_fi_settings">打开车机 Wi-Fi 设置</string>
     <string name="open_carplay">打开 CarPlay</string>
@@ -324,7 +324,7 @@
     <string name="save_details">保存详情</string>
     <string name="save_diagnostic_report">保存诊断报告</string>
     <string name="save_hotspot_details_and_use_this_mode">保存热点信息并使用此模式</string>
-    <string name="save_the_name_and_password_from_the_car_s_hotspot_settings">请先保存车机热点设置中的名称和密码</string>
+    <string name="save_the_name_and_password_from_the_car_s_hotspot_settings">请读取或填写 Android 原生热点的名称与密码</string>
     <string name="save_your_hotspot_details_in_connection_setup_first">请先在“连接设置”中保存热点信息</string>
     <string name="saved_for_your_next_connection">已保存，将在下次连接时生效</string>
     <string name="saving_report">正在保存报告…</string>

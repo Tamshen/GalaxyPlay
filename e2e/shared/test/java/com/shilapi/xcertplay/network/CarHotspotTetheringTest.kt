@@ -52,6 +52,11 @@ class CarHotspotTetheringTest {
         assertEquals(Result.FAILED, enable(start = { it.send(1, null) }))
     }
 
+    @Test fun android11PermissionFailureCallbackIsNotReportedAsGenericFailure() {
+        assertEquals(Result.PERMISSION_REQUIRED, enable(start = { it.send(14, null) }))
+        assertEquals(Result.PERMISSION_REQUIRED, enable(start = { it.send(15, null) }))
+    }
+
     @Test fun missingBinderMethodIsUnsupported() {
         assertEquals(Result.UNSUPPORTED, enable(start = { throw NoSuchMethodException() }))
     }

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_hotspot_use_saved">使用已保存配置连接</string>
+    <string name="l7_hotspot_read">重新读取热点配置</string>
+    <string name="l7_hotspot_reading">正在读取 Android 原生热点的名称和密码…</string>
+    <string name="l7_hotspot_read_ok">已读取并保存系统热点配置。</string>
+    <string name="l7_hotspot_read_permission">系统未授权读取名称或密码。请到 Android 原生热点设置查看并手动填写，已保存的配置会保留。</string>
+    <string name="l7_hotspot_read_invalid">系统未提供完整、可用的名称和密码，请在原生热点设置核对后手动填写。</string>
+    <string name="l7_hotspot_read_unavailable">此系统未开放热点配置读取，请在 Android 原生热点设置查看并手动填写。</string>
+    <string name="l7_hotspot_start">一键开启原生热点</string>
+    <string name="l7_hotspot_create">生成 CarPlay 热点配置</string>
+    <string name="l7_hotspot_starting">正在尝试开启原生热点，请稍候…</string>
+    <string name="l7_hotspot_start_permission">需要允许本应用修改系统设置。授权后返回并再次点击开启；部分车机仍需在 Android 原生设置中手动开启。</string>
+    <string name="l7_hotspot_write_permission">系统拒绝修改热点配置；修改系统设置权限不等于热点配置权限。请复制生成的名称和密码，在 Android 原生设置中填写。</string>
+    <string name="l7_hotspot_already_on">热点已经开启，未替换名称或密码。可直接复用；如需改名，请先在原生设置关闭热点。</string>
+    <string name="l7_hotspot_unsupported">此固件未开放所需接口，请在 Android 原生设置中配置并开启热点。</string>
+    <string name="l7_hotspot_write_failed">系统未确认接受新配置，应用未保存生成的名称或密码。请在原生设置核对。</string>
+    <string name="l7_hotspot_ready">已确认原生热点开启，可返回无线连接。</string>
+    <string name="l7_hotspot_ready_no_details">原生热点已开启，但无法读取名称或密码。请手动填写后连接。</string>
+    <string name="l7_hotspot_timeout">等待热点开启超时。请到原生设置核对状态，再重试。</string>
+    <string name="l7_hotspot_failed">原生热点操作失败，请在系统设置检查。</string>
+    <string name="l7_hotspot_cancelled">已停止等待；已提交的系统操作可能仍会完成，应用不会关闭热点。</string>
+    <string name="l7_hotspot_session_active">请先断开 CarPlay，再调整热点配置。</string>
+    <string name="l7_hotspot_settings_hint">Android 设置 → 网络和互联网 → 热点与网络共享。</string>
+    <string name="l7_hotspot_actions_hint">优先沿用原生热点已有配置。需要新名称和密码时，可生成后应用；退出应用不会关闭热点。</string>
+    <string name="l7_hotspot_cancel">停止等待</string>
+    <string name="l7_hotspot_grant">允许修改系统设置</string>
+    <string name="l7_hotspot_not_saved">尚未保存</string>
+    <string name="l7_hotspot_create_hint">自动生成专用热点名称和 16 位随机密码（大小写字母与数字，WPA2）。确认后仅在热点关闭时写入；系统拒绝时，可复制到 Android 原生设置手动填写。</string>
+    <string name="l7_hotspot_copy_name">复制热点名称</string>
+    <string name="l7_hotspot_copy_password">复制热点密码</string>
+    <string name="l7_hotspot_copied">已复制</string>
+    <string name="l7_hotspot_apply_start">应用并开启</string>
+    <string name="l7_hotspot_settings_missing">未找到可打开的 Android 原生热点设置。请从系统的 Android 设置入口进入“热点与网络共享”，不要使用车机桌面自带的热点入口。</string>
+    <string name="l7_hotspot_busy">正在处理原生热点，请等待完成或先停止等待。</string>
+</resources>
