@@ -24,16 +24,37 @@ internal class L7QuickLogActions(private val context: Context, parent: LinearLay
 
     init {
         L7SettingsSection.actions(parent, context.getString(R.string.l7_log_quick_hint)) { group ->
-            group.addView(LinearLayout(context).apply {
-                addView(L7Components.actionButton(context, context.getString(R.string.l7_log_view_short), click = onLogs),
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = L7Components.dp(context, 12) })
-                addView(upload, LinearLayout.LayoutParams(0, -2, 1f))
-            })
+            listOf(
+                L7Components.actionButton(context, context.getString(R.string.l7_log_view_short), click = onLogs),
+                upload,
+                L7Components.actionButton(context, context.getString(R.string.l7_log_clear_logs)) { confirmClear(true) },
+                L7Components.actionButton(context, context.getString(R.string.l7_log_clear_reports)) { confirmClear(false) },
+            ).forEachIndexed { index, button ->
+                group.addView(button, LinearLayout.LayoutParams(-1, -2).apply { if (index > 0) topMargin = L7Components.dp(context, 12) })
+            }
             listOf(status, retry, cancel, options).forEach { view ->
                 group.addView(view, LinearLayout.LayoutParams(-1, -2).apply { topMargin = L7Components.dp(context, 12) })
             }
         }
         update()
+    }
+
+    private fun confirmClear(logs: Boolean) {
+        L7Dialogs.builder(context).setTitle(if (logs) R.string.l7_log_clear_logs else R.string.l7_log_clear_reports)
+            .setMessage(if (logs) R.string.l7_log_clear_logs_hint else R.string.l7_log_clear_reports_hint)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.l7_debug_clear) { _, _ ->
+                val started = L7ProbeRunner.clear(context, logs) { success ->
+                    notice(if (success) R.string.l7_log_cleared else R.string.l7_log_clear_failed)
+                }
+                if (!started) notice(R.string.l7_log_clear_busy)
+            }.show()
+    }
+
+    private fun notice(message: Int) {
+        val activity = context as? android.app.Activity
+        if (activity != null && !activity.isDestroyed) L7Notice.show(activity, context.getString(message))
+        else if (activity == null) android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     fun update() {

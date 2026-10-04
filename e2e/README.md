@@ -65,7 +65,13 @@ e2e/
 
 在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试与日志」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
+## 日志查看与清空
+
+`L7LogViewModelTest` 覆盖普通文本搜索、复制范围、刷新保留搜索和 Unicode 分段无丢失；`LogMaintenanceTest` 检查清空拒绝旧写入队列且允许新日志，`L7ProbeStoreTest` 检查报告清空保留日志和无关文件。中文、已同意协议的 AVD 运行 `python3 e2e/device/log_view_smoke.py`，检查四个按钮满宽单列、搜索/刷新/复制及清空确认后取消，保存昼夜截图到忽略目录；不上传、不实际清空已有数据。
+
 ## 远程日志回归
+
+`RemoteLogBatchTest` 检查 Unicode/JSON 的 1 MiB 总预算、256 KiB 分批、八份运行与两份采集来源、显式省略、不去重、取消阻止下一批和手动重试跳过已确认批次。`DiagnosticRedactorTest` 检查敏感值遮盖、权限/codec/BUS 等技术信息保留及重复脱敏不损坏上下文。
 
 `RemoteLogTest` 使用本机回环 HTTP 模拟 OpenObserve `_json` 接口，验证认证与地址限制、脱敏和真实 JSON 字节预算、重定向拒绝、目标流及写入数量检查、部分拒收、无协议不发送、显式重试和撤回后的迟到结果隔离。不连接真实账号，也不读取实车日志。
 

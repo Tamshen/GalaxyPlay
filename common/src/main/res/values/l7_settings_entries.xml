@@ -2,7 +2,7 @@
     <string name="l7_debug_state_title">悬浮日志状态</string>
     <string name="l7_app_version">应用版本</string>
     <string name="l7_current_phone">当前 iPhone</string>
-    <string name="l7_debug_view_hint">查看、刷新或复制本次运行的日志</string>
+    <string name="l7_debug_view_hint">搜索、查看或复制最近保留的日志</string>
     <string name="l7_debug_permission_hint">允许日志悬浮窗显示在其他应用上层</string>
     <string name="l7_report_location_hint">通过系统文件选择器指定报告位置</string>
     <string name="l7_section_app_ui">应用界面</string>
