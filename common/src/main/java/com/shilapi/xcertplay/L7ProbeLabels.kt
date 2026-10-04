@@ -8,9 +8,14 @@ import java.util.Date
 /** 报告只保存稳定标识，界面标题和结果说明随应用语言切换。 */
 internal class L7ProbeLabels(private val context: Context) {
     fun text(id: Int) = context.getString(id)
-    fun time(value: Long) = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(value))
+    fun time(value: Long) = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM,
+        context.resources.configuration.locales[0]).format(Date(value))
     fun name(item: L7ProbeItem): String = environmentNames[item.id]?.let(::text) ?: item.name.substringAfterLast('.')
-    fun reason(item: L7ProbeItem): String = text(when (item.reason) {
+    fun reason(item: L7ProbeItem): String {
+        if (L7ProbeStatus.of(item) == L7ProbeStatus.UNSUPPORTED) return text(R.string.l7_probe_reason_unsupported)
+        if (item.id in setOf("ENV-OVERLAY", "ENV-WRITE-SETTINGS") && item.facts["allowed"] == "false")
+            return text(R.string.l7_probe_reason_access)
+        return text(when (item.reason) {
         "QUERY_ONLY" -> R.string.l7_probe_query_only
         "DEFINITION_NOT_VISIBLE" -> R.string.l7_probe_definition_not_visible
         "NOT_DECLARED" -> R.string.l7_probe_not_declared
@@ -19,6 +24,19 @@ internal class L7ProbeLabels(private val context: Context) {
         "GRANTED_NOT_CALLED" -> R.string.l7_probe_granted_not_called
         "NOT_RUN" -> R.string.l7_probe_not_run
         else -> R.string.l7_probe_query_failed
+        })
+    }
+    fun compactReason(item: L7ProbeItem): String = text(when {
+        L7ProbeStatus.of(item) == L7ProbeStatus.UNSUPPORTED -> R.string.l7_probe_reason_unsupported
+        item.id in setOf("ENV-OVERLAY", "ENV-WRITE-SETTINGS") && item.facts["allowed"] == "false" -> R.string.l7_probe_reason_access
+        item.reason == "QUERY_ONLY" -> R.string.l7_probe_reason_query
+        item.reason == "GRANTED_NOT_CALLED" -> R.string.l7_probe_reason_granted
+        item.reason == "NOT_DECLARED" -> R.string.l7_probe_reason_declared
+        item.reason == "NOT_GRANTED" -> R.string.l7_probe_reason_grant
+        item.reason == "APP_OP_RESTRICTED" -> R.string.l7_probe_reason_appop
+        item.reason == "DEFINITION_NOT_VISIBLE" -> R.string.l7_probe_reason_unknown
+        item.reason == "NOT_RUN" -> R.string.l7_probe_not_run
+        else -> R.string.l7_probe_reason_error
     })
     fun phase(report: L7ProbeReport) = text(when (report.phase) {
         L7ProbePhase.RUNNING -> R.string.l7_probe_running
@@ -28,12 +46,11 @@ internal class L7ProbeLabels(private val context: Context) {
         L7ProbePhase.INTERRUPTED -> R.string.l7_probe_interrupted
     })
     fun summary(report: L7ProbeReport): String {
-        val counts = report.counts()
-        val notRun = report.items.count { it.reason == "NOT_RUN" }
-        val verified = counts.getValue(L7ProbeOutcome.VERIFIED)
-        val restricted = counts.getValue(L7ProbeOutcome.DENIED)
-        return context.getString(R.string.l7_probe_summary, verified, restricted,
-            report.items.size - verified - restricted - notRun, notRun)
+        val statuses = report.items.map(L7ProbeStatus::of)
+        return context.getString(R.string.l7_probe_table_summary, statuses.size,
+            statuses.count { it.matches(1) }, statuses.count { it.matches(2) },
+            statuses.count { it.matches(3) }, statuses.count { it.matches(4) },
+            statuses.count { it.matches(5) || it.matches(6) })
     }
     fun readable(report: L7ProbeReport) = buildString {
         appendLine("L7 CarPlay ${report.version} · ${text(R.string.l7_probe_title)}")
@@ -48,5 +65,6 @@ internal class L7ProbeLabels(private val context: Context) {
         "ENV-LIBRARIES" to R.string.l7_probe_libraries, "ENV-AUDIO" to R.string.l7_probe_audio,
         "ENV-PACKAGES" to R.string.l7_probe_packages, "ENV-EXECUTOR" to R.string.l7_probe_executor,
         "ENV-NETWORK" to R.string.l7_probe_network, "ENV-USB" to R.string.l7_probe_usb,
+        "ENV-RUNTIME" to R.string.l7_probe_runtime,
         "ENV-OVERLAY" to R.string.l7_probe_overlay, "ENV-WRITE-SETTINGS" to R.string.l7_probe_write_settings)
 }

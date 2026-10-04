@@ -20,11 +20,12 @@ base = [args.adb, '-s', args.serial]
 package = 'com.ecarx.carplay'
 
 def adb(*parts, binary=False):
-    result = subprocess.check_output(base + list(parts), stderr=subprocess.DEVNULL)
+    result = subprocess.check_output(base + list(parts))
     return result if binary else result.decode()
 
 def nodes():
-    adb('shell', 'uiautomator', 'dump', '/sdcard/l7-probe-test.xml')
+    dumped = adb('shell', 'uiautomator', 'dump', '/sdcard/l7-probe-test.xml')
+    assert 'UI hierchary dumped to:' in dumped, '界面转储失败，不能使用旧页面继续点击：' + dumped
     root = ET.fromstring(adb('shell', 'cat', '/sdcard/l7-probe-test.xml'))
     assert package in {n.get('package') for n in root.iter('node')}, '应用不在前台，停止操作并检查启动日志'
     return root
@@ -61,6 +62,10 @@ def launch(page):
 def screenshot(name):
     (args.output_dir / (name + '.png')).write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
 
+def collect_label():
+    titles = {'收集环境与调试信息', '重新收集环境与调试信息'}
+    return next(n.get('text') for n in nodes().iter('node') if n.get('text') in titles)
+
 def reports():
     command = 'ls files/probe-reports/*.json 2>/dev/null || true'
     names = adb('shell', 'run-as', package, 'sh', '-c', "'" + command + "'").splitlines()
@@ -75,6 +80,32 @@ def wait_report(previous):
         time.sleep(.3)
     raise AssertionError('没有收到完整检查报告')
 
+def english_table():
+    launch('settings-general')
+    tap('应用语言')
+    tap('English')
+    tap('应用')
+    launch('settings-debug')
+    before = {r['runId'] for r in reports()}
+    tap('Collect environment and debug info again')
+    wait_report(before)
+    tap('View check results')
+    for heading in ('Item', 'Status', 'Reason', 'All'):
+        find(heading)
+    visible = [n.get(key, '') for n in nodes().iter('node') for key in ('text', 'content-desc')]
+    assert not any(re.search(r'[\u3400-\u9fff]', text) for text in visible), '英文结果表存在中文界面文案'
+    screenshot('debug-table-english-day')
+    adb('shell', 'cmd', 'uimode', 'night', 'yes')
+    find('Item')
+    screenshot('debug-table-english-night')
+    adb('shell', 'cmd', 'uimode', 'night', 'no')
+    launch('settings-general')
+    tap('App language')
+    tap('简体中文')
+    tap('Apply')
+    launch('settings-debug-results')
+    find('项目')
+
 original_night = adb('shell', 'cmd', 'uimode', 'night').strip().split()[-1]
 try:
     adb('shell', 'am', 'force-stop', package)
@@ -84,10 +115,10 @@ try:
     before = {r['runId'] for r in reports()}
     tap('调试')
     find('返回关于')
-    find('开始基础检查')
+    find(collect_label())
     assert before == {r['runId'] for r in reports()}, '打开调试页自动开始了扫描'
     screenshot('debug-idle-day')
-    tap('开始基础检查')
+    tap(collect_label())
     report = wait_report(before)
     assert len(report['items']) >= 150
     assert all(i['reason'] != 'NOT_RUN' for i in report['items'])
@@ -99,17 +130,43 @@ try:
     screenshot('debug-completed-day')
     tap('查看检查结果')
     find('返回调试')
+    for heading in ('项目', '状态', '原因', '全部'):
+        find(heading)
+    screenshot('debug-table-all-day')
     tap('结果筛选')
-    tap('受限')
+    tap('无权限')
     screenshot('debug-restricted-day')
+    before = {r['runId'] for r in reports()}
+    tap('重新收集')
+    refreshed = wait_report(before)
+    find('全部')
+    assert refreshed['runId'] != report['runId']
+    batch = refreshed['runId'].replace('-', '')[:12]
+    deadline = time.monotonic() + 10
+    while True:
+        log = adb('shell', 'run-as', package, 'cat', 'files/logs/probe-latest.log')
+        if f'batch={batch}' in log and 'event=end phase=COMPLETED' in log:
+            break
+        assert time.monotonic() < deadline, '重新收集后没有完整写入日志'
+        time.sleep(.3)
+    assert len(set(re.findall(r'item=(\d+) entry=', log))) == len(refreshed['items'])
+    assert 'entry=ENV-RUNTIME' in log and 'entry=ENV-WINDOW' in log
+    assert 'device_id' not in log
+    previous_log = adb('shell', 'run-as', package, 'cat', 'files/logs/probe-previous.log')
+    assert report['runId'].replace('-', '')[:12] in previous_log
+    adb('shell', 'cmd', 'uimode', 'night', 'yes')
+    find('项目')
+    screenshot('debug-table-all-night')
+    adb('shell', 'cmd', 'uimode', 'night', 'no')
     tap('结果筛选')
-    tap('已验证')
+    tap('支持 / 已授权')
     tap('系统与运行环境')
     screenshot('debug-evidence-day')
     before = {r['runId'] for r in reports()}
     tap('重新检查此项')
     single = wait_report(before)
     assert [i['capabilityId'] for i in single['items']] == ['ENV-SYSTEM']
+    tap('报告操作')
     tap('导出检查报告（JSON）')
     time.sleep(.7)
     labels = [n.get('text', '') for n in nodes().iter('node')]
@@ -135,10 +192,12 @@ try:
     find('显示与性能')
     launch('settings-diagnostics')
     find('返回关于')
-    find('开始基础检查')
+    find(collect_label())
     adb('shell', 'cmd', 'uimode', 'night', 'yes')
     screenshot('debug-night')
-    print('调试检查通过：关于入口、旧路由、多级返回、显式扫描、结果筛选、单项复查、历史和 JSON 导出。未上传。')
+    adb('shell', 'cmd', 'uimode', 'night', 'no')
+    english_table()
+    print('调试检查通过：关于入口、多级返回、中英文昼夜全量表格、重新收集重置筛选、逐项落盘日志与批次保留、单项复查、历史和 JSON 导出。未上传。')
 finally:
     if original_night in ('yes', 'no', 'auto'):
         adb('shell', 'cmd', 'uimode', 'night', original_night)

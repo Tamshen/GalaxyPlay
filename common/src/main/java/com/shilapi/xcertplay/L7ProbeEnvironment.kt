@@ -94,6 +94,18 @@ internal object L7ProbeEnvironment {
             mapOf("visibleDeviceCount" to devices.size.toString(), "deviceTypes" to devices.take(32)
                 .joinToString(";") { "type=${it.type},input=${it.isSource},output=${it.isSink}" })
         },
+        "ENV-RUNTIME" to {
+            val audio = context.getSystemService(AudioManager::class.java)
+            mapOf("videoPreference" to if (AirPlayPersistence.loadHevcEnabled(context)) "HEVC" else "H264",
+                "fpsPreference" to AirPlayPersistence.loadFps(context).toString(),
+                "displayScalePreference" to AirPlayPersistence.loadDisplayScaleTenths(context).toString(),
+                "connectionPreference" to if (AirPlayPersistence.loadWirelessEnabled(context)) "WIRELESS" else "USB",
+                "authenticationBackend" to AirPlayPersistence.loadMfiTarget(context).toString(),
+                "bluetoothExclusivePreference" to AirPlayPersistence.loadBluetoothMediaExclusive(context).toString(),
+                "bluetoothGuardState" to L7BluetoothAudioSettings.status.name,
+                "audioMode" to audio.mode.toString(), "musicActive" to audio.isMusicActive.toString(),
+                "sessionPresent" to CarPlayBackgroundSession.hasSession().toString())
+        },
         "ENV-NETWORK" to {
             val manager = context.getSystemService(ConnectivityManager::class.java)
             val caps = manager.activeNetwork?.let { manager.getNetworkCapabilities(it) }

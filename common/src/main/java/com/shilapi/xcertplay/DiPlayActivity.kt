@@ -1554,7 +1554,7 @@ class DiPlayActivity : ComponentActivity() {
                     appendLine("--- Process exit history ---")
                     appendLine(ProcessExitDiagnostics.report(appContext))
                     appendLine()
-                    for (name in SessionLogFile.REPORT_NAMES) {
+                    for (name in SessionLogFile.REPORT_NAMES + L7ProbeLog.files) {
                         val file = File(appContext.filesDir, "logs/$name")
                         if (file.isFile) {
                             appendLine("--- $name ---")
