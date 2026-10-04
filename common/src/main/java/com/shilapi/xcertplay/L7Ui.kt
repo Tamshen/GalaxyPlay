@@ -2,9 +2,12 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.view.Gravity
@@ -32,6 +35,23 @@ internal object L7Ui {
 
     fun surface(view: View, color: Int = R.color.product_ui_surface, radius: Int = 12) {
         bind(view) { view.background = rounded(view.context, view.context.getColor(color), radius) }
+    }
+
+    /** 按压只在当前行内扩散；悬停和键盘焦点使用整行底色，不绘制无边界光圈。 */
+    fun rowFeedback(view: View) = bind(view) {
+        val accent = view.context.getColor(R.color.product_ui_ripple)
+        val highlight = view.context.getColor(R.color.product_ui_selected)
+        val states = StateListDrawable().apply {
+            addState(intArrayOf(-android.R.attr.state_enabled), ColorDrawable(Color.TRANSPARENT))
+            addState(intArrayOf(android.R.attr.state_hovered), ColorDrawable(highlight))
+            addState(intArrayOf(android.R.attr.state_focused), ColorDrawable(highlight))
+            addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
+        }
+        val ripple = ColorStateList(arrayOf(
+            intArrayOf(-android.R.attr.state_enabled), intArrayOf(android.R.attr.state_pressed),
+            intArrayOf(android.R.attr.state_hovered), intArrayOf(android.R.attr.state_focused), intArrayOf(),
+        ), intArrayOf(Color.TRANSPARENT, accent, Color.TRANSPARENT, Color.TRANSPARENT, accent))
+        view.background = RippleDrawable(ripple, states, ColorDrawable(Color.WHITE))
     }
 
     fun button(view: Button, primary: Boolean = false, radius: Int = 8, compact: Boolean = false) {

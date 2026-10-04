@@ -39,10 +39,12 @@ class L7ModalDialogTest {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
     }
 
-    @Test fun closingDialogRestoresEntryAfterPageContentRefresh() {
+    @Test fun keyboardClosingDialogRestoresEntryAfterPageContentRefresh() {
         val context = Robolectric.buildActivity(Activity::class.java).setup().visible().get()
         val original = L7Components.actionRow(context, "认证来源") {}
         context.setContentView(original)
+        // 显式模拟键盘定位入口；触屏点击本身不应强制获得键盘焦点。
+        original.requestFocusFromTouch()
         original.performClick()
         assertTrue("打开弹窗前入口应获得焦点", original.hasFocus())
         val dialog = L7ModalDialog(context, L7Dialogs.Content().apply { title = "选择来源" })
