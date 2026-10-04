@@ -2,7 +2,7 @@
 <resources>
     <string name="l7_log_remote">Remote logs</string>
     <string name="l7_log_server">OpenObserve log server</string>
-    <string name="l7_log_server_hint">App settings override the build defaults</string>
+    <string name="l7_log_server_hint">App settings take priority; the built-in server address is hidden</string>
     <string name="l7_log_manual_hint">Only tapping Upload sends up to 1,000 recent redacted log lines. No automatic uploads. Retrying after a timeout or partial ingestion may create duplicates; identify them by event_id.</string>
     <string name="l7_log_upload">Upload logs</string>
     <string name="l7_log_view_short">View logs</string>
@@ -23,7 +23,7 @@
     <string name="l7_log_http_failed">Upload failed: HTTP %1$d. Check the ingestion URL, authorization and permissions.</string>
     <string name="l7_log_url_label">OpenObserve ingestion URL</string>
     <string name="l7_log_token_label">Authorization (including Basic prefix)</string>
-    <string name="l7_log_config_hint">Enter the full ingestion URL and Authorization. Use {HeadUnit}-{DeviceID} for the stream to insert the head unit model and device hash. Plain example URLs also work. Use HTTPS and dedicated ingestion credentials. HTTP is unencrypted.</string>
+    <string name="l7_log_config_hint">***** indicates a hidden saved value. Leave it blank to keep it. Changing the URL requires entering Authorization again. Use {HeadUnit}-{DeviceID} for the stream to insert the head unit model and device hash. Use HTTPS and dedicated ingestion credentials. HTTP is unencrypted.</string>
     <string name="l7_log_reset">Restore build defaults</string>
     <string name="l7_log_save_failed">Could not save settings. Please retry.</string>
     <string name="l7_log_url_error">Enter /api/organization/stream/_json; the stream can use {HeadUnit}-{DeviceID} or {DeviceID}. Omit credentials, query and fragment.</string>
