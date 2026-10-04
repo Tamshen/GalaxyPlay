@@ -12,12 +12,18 @@ internal object L7OpenSourceSettings {
     fun add(parent: LinearLayout) {
         val context = parent.context
         L7SettingsSection.add(parent, context.getString(R.string.l7_sources_receiver)) { card ->
-            card.addView(L7SettingRow(context, context.getString(R.string.l7_source_diplay_name),
-                context.getString(R.string.l7_source_diplay_description)).apply {
+            card.addView(L7Components.actionRow(context, context.getString(R.string.l7_source_diplay_name),
+                context.getString(R.string.l7_source_diplay_description)) {
+                showProject(context, R.string.l7_source_diplay_name, R.string.l7_source_version_diplay,
+                    R.string.l7_source_diplay_url, R.string.l7_source_diplay_details)
+            }.apply {
                 setValue(context.getString(R.string.l7_source_version_diplay))
             })
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_source_geely_name),
-                context.getString(R.string.l7_source_geely_description)) { showGeelyReference(context) }.apply {
+                context.getString(R.string.l7_source_geely_description)) {
+                showProject(context, R.string.l7_source_geely_name, R.string.l7_source_geely_version,
+                    R.string.l7_source_geely_url, R.string.l7_source_geely_details)
+            }.apply {
                 setValue(context.getString(R.string.l7_source_geely_version))
             })
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_licenses_title),
@@ -25,15 +31,15 @@ internal object L7OpenSourceSettings {
         }
     }
 
-    private fun showGeelyReference(context: Context) {
-        val document = context.getString(R.string.l7_source_geely_details,
-            context.getString(R.string.l7_source_geely_url))
+    private fun showProject(context: Context, name: Int, version: Int, url: Int, details: Int) {
+        val projectUrl = context.getString(url)
+        val document = context.getString(details, projectUrl)
         val text = L7Typography.text(context, document, L7Typography.Role.DESCRIPTION).apply {
             setTextIsSelectable(true)
         }
-        L7Dialogs.builder(context).setTitle(R.string.l7_source_geely_name).setView(text)
+        L7Dialogs.builder(context).setTitle("${context.getString(name)} · ${context.getString(version)}").setView(text)
             .setNeutralButton(R.string.l7_source_open_project) { _, _ ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.l7_source_geely_url)))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(projectUrl))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { context.startActivity(intent) }.onFailure {
                     Toast.makeText(context, R.string.l7_source_browser_unavailable, Toast.LENGTH_LONG).show()
