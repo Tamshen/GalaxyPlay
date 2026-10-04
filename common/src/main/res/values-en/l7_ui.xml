@@ -27,9 +27,6 @@
     <string name="l7_start_wireless">Wireless connection</string>
     <string name="l7_session_connected_hint">Session connected. Return to CarPlay to continue. Opening settings does not disconnect it.</string>
     <string name="l7_session_waiting_hint">Connection is not complete. View progress or cancel this attempt.</string>
-    <string name="l7_summary_connected">iPhone session connected · App status screen</string>
-    <string name="l7_summary_waiting">Waiting for iPhone · No video yet</string>
-    <string name="l7_summary_idle">iPhone not connected</string>
     <string name="l7_cancel_connection">Cancel connection</string>
     <string name="l7_connection_return_hint">Returning to L7CarPlay keeps waiting. Cancel connection ends this attempt.</string>
     <string name="l7_disconnect_confirm">End the current CarPlay session? You will need to reconnect next time.</string>

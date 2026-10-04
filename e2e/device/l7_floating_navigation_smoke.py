@@ -74,7 +74,7 @@ def require_menu(expected, message):
     raise AssertionError(f'{message}；预期={expected}，实际={actual}')
 
 def launch(page='home'):
-    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
     time.sleep(.5)
 
 def host():
@@ -114,9 +114,15 @@ def start_waiting():
         screenshot('waiting-failure')
         raise AssertionError('未进入投屏等待页')
 
+def require_no_connection_footer():
+    labels = {n.attrib.get('text') for n in nodes()}
+    assert not labels.intersection({'iPhone 未连接', '正在等待 iPhone · 画面尚未显示',
+                                    'iPhone 会话已连接 · 当前为应用状态页'}), '仍显示底部连接状态'
+
 def check_home():
     launch()
     assert not host(), '首页检查意外进入投屏页'
+    require_no_connection_footer()
     assert find('展开菜单') is not None and find('画面') is None, '首页没有默认收起菜单'
     title = find('Apple CarPlay')
     connect = find('无线连接')
@@ -156,6 +162,7 @@ def check_home():
     assert find('关于') is not None, '首页菜单无法进入设置'
     assert menu_bounds() == fixed_menu, '进入设置后菜单位置变化或重复建立'
     assert find('设置').attrib.get('selected') == 'true', '设置菜单没有选中当前分类'
+    require_no_connection_footer()
     screenshot('settings-menu')
     tap('显示与性能')
     assert find('返回设置') is not None, '设置菜单遮挡了分类操作'
@@ -165,6 +172,7 @@ def check_home():
     adb('shell', 'cmd', 'uimode', 'night', 'yes')
     assert menu_bounds() == fixed_menu, '切换夜间主题后菜单位置变化'
     assert find('设置').attrib.get('selected') == 'true', '夜间主题丢失设置选中态'
+    require_no_connection_footer()
     screenshot('settings-child-menu-night')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
     tap('设置')
@@ -179,7 +187,7 @@ def check_home():
     require_menu(fixed_menu, '首页设置按钮进入后菜单位置变化')
     adb('shell', 'input', 'keyevent', '4')
     tap('无线连接')
-    assert find('返回设置') is not None and find('车机热点详情') is not None, '无线入口没有进入配置与连接页'
+    assert find('返回设置') is not None and find('热点名称与密码') is not None, '无线入口没有进入配置与连接页'
     tap('设置')
     adb('shell', 'input', 'keyevent', '4')
     screenshot('home-restored')

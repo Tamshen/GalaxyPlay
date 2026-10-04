@@ -6,6 +6,7 @@
     <color name="product_ui_border">#33FFFFFF</color>
     <color name="product_ui_accent">#0088FF</color>
     <color name="product_ui_selected">#240088FF</color>
+    <color name="product_ui_connected">#7BD89B</color>
     <color name="product_ui_text">#E5FFFFFF</color>
     <color name="product_ui_muted">#99FFFFFF</color>
     <color name="product_ui_disabled">#66FFFFFF</color>

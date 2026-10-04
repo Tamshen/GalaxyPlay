@@ -32,9 +32,6 @@
     <string name="l7_start_wireless">无线连接</string>
     <string name="l7_session_connected_hint">会话已建立，返回 CarPlay 继续使用。返回设置不会断开连接。</string>
     <string name="l7_session_waiting_hint">连接尚未完成，可查看进度或取消本次连接。</string>
-    <string name="l7_summary_connected">iPhone 会话已连接 · 当前为应用状态页</string>
-    <string name="l7_summary_waiting">正在等待 iPhone · 画面尚未显示</string>
-    <string name="l7_summary_idle">iPhone 未连接</string>
     <string name="l7_cancel_connection">取消连接</string>
     <string name="l7_connection_return_hint">返回 L7CarPlay 后继续等待；取消连接会结束本次连接。</string>
     <string name="l7_disconnect_confirm">结束当前 CarPlay 会话？下次使用需要重新连接。</string>

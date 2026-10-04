@@ -159,7 +159,7 @@ deadline = time.monotonic() + 15
 while True:
     current = english('取消 USB 连接后的首页')
     labels = {n.get('text') for n in current}
-    if {'Wired connection', 'Settings', 'iPhone not connected'} <= labels and 'Cancel connection' not in labels:
+    if {'Apple CarPlay', 'Wired connection', 'Settings', 'Wireless connection'} <= labels and 'Cancel connection' not in labels:
         break
     assert time.monotonic() < deadline, 'USB 取消后没有回到未连接首页'
     time.sleep(.3)

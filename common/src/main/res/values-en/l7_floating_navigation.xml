@@ -2,6 +2,7 @@
 <resources>
     <string name="l7_rail_expand">Expand menu</string>
     <string name="l7_nav_picture">Display</string>
+    <string name="l7_nav_picture_connected">Display, iPhone connected</string>
     <string name="l7_nav_car_home">Vehicle</string>
     <string name="l7_nav_exit">Exit</string>
     <string name="l7_about_row_hint">App version, project information and licenses</string>

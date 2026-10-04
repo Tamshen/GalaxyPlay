@@ -65,7 +65,7 @@ class DiPlayActivity : ComponentActivity() {
     private var contentScroll: ScrollView? = null
     private var renderedPage: String? = null
     private val scrollPositions = mutableMapOf<String, Int>()
-    private var connectionSummary: TextView? = null
+    private var desktopPermissionHint: TextView? = null
     private var homePanel: L7HomePanel? = null
     private var usbButton: Button? = null
     private var connectionRequestPending = false
@@ -264,7 +264,7 @@ class DiPlayActivity : ComponentActivity() {
         if (page != "settings-connection") hotspotTask.cancel()
         if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
-        contentScroll = null; connectionSummary = null; homePanel = null; usbButton = null
+        contentScroll = null; desktopPermissionHint = null; homePanel = null; usbButton = null
         status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null; debugPage = null
         if (l7Ui) {
             renderL7()
@@ -348,18 +348,6 @@ class DiPlayActivity : ComponentActivity() {
         contentScroll = scroll
         renderedPage = page
         body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        connectionSummary = L7Components.text(this, "", secondary = true).apply {
-            setPadding(dp(inset), dp(12), dp(inset), dp(12))
-            if (page == "home") {
-                gravity = Gravity.CENTER
-                textSize = 20f
-                minHeight = dp(64)
-                setPadding(dp(24), dp(16), dp(24), dp(28))
-                L7Ui.text(this, R.color.product_ui_text)
-            }
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
-        body.addView(connectionSummary)
         root.addView(body, LinearLayout.LayoutParams(0, -1, 1f).apply {
             if (settingsPage) marginStart = L7ProjectionNavigation.settingsColumnWidth(this@DiPlayActivity)
         })
@@ -485,6 +473,12 @@ class DiPlayActivity : ComponentActivity() {
             onUsb = { connect(false) },
             onSettings = { page = "settings"; render() },
         ).also { content.addView(it, LinearLayout.LayoutParams(width, -2)) }
+        // 悬浮权限提示留在首页内容中；连接状态统一由菜单「画面」显示。
+        desktopPermissionHint = L7Components.text(this, getString(R.string.l7_desktop_home_permission), secondary = true).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(20), dp(16), dp(12))
+            setOnClickListener { L7DesktopNavigation.permission(this@DiPlayActivity) }
+        }.also { content.addView(it, LinearLayout.LayoutParams(width, -2)) }
     }
 
     private fun home(content: LinearLayout) {
@@ -1503,14 +1497,8 @@ class DiPlayActivity : ComponentActivity() {
                 running -> R.string.l7_view_connection
                 else -> if (page == "home") R.string.l7_entry_connect else R.string.l7_start_wireless
             }))
-            val summary = getString(when {
-                CarPlayBackgroundSession.active -> R.string.l7_summary_connected
-                running -> R.string.l7_summary_waiting
-                else -> R.string.l7_summary_idle
-            })
-            val permissionHint = page == "home" && L7DesktopNavigation.enabled(this) && !Settings.canDrawOverlays(this)
-            connectionSummary?.updateText(if (permissionHint) "$summary\n${getString(R.string.l7_desktop_home_permission)}" else summary)
-            connectionSummary?.setOnClickListener(if (permissionHint) View.OnClickListener { L7DesktopNavigation.permission(this) } else null)
+            pageNavigation?.setConnected(CarPlayBackgroundSession.active)
+            desktopPermissionHint?.visibility = if (L7DesktopNavigation.enabled(this) && !Settings.canDrawOverlays(this)) View.VISIBLE else View.GONE
             disconnectButton?.updateText(getString(if (CarPlayBackgroundSession.active) R.string.disconnect else R.string.l7_cancel_connection))
             usbButton?.isEnabled = !running && !connectionRequestPending && setupError == null
         }

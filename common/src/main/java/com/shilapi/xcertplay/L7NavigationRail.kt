@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -16,6 +18,18 @@ import com.shilapi.xcertplay.host.R
 /** 一级导航保留画面、设置、车机、退出；详细功能统一归入设置。 */
 internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : LinearLayout(context) {
     private val buttons = mutableMapOf<String, View>()
+    private var connected = false
+    private val connectionDot = View(context).apply {
+        visibility = View.INVISIBLE
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        L7Ui.bind(this) {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(context.getColor(R.color.product_ui_connected))
+                setStroke(L7Components.dp(context, 2), context.getColor(R.color.product_ui_surface))
+            }
+        }
+    }
 
     init {
         val resources = context.resources
@@ -48,18 +62,28 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
                 setOnClickListener { onSelect(key) }
             }
             val iconSize = resources.getDimensionPixelSize(R.dimen.l7_nav_icon_size)
-            item.addView(ImageView(context).apply {
+            fun foreground() = context.getColor(when {
+                key == "home" && connected -> R.color.product_ui_connected
+                item.isSelected -> R.color.product_ui_accent
+                else -> R.color.product_ui_text
+            })
+            val iconFrame = FrameLayout(context)
+            iconFrame.addView(ImageView(context).apply {
                 setImageResource(icon)
                 L7Ui.bind(this) {
-                    imageTintList = ColorStateList.valueOf(context.getColor(if (item.isSelected) R.color.product_ui_accent else R.color.product_ui_text))
+                    imageTintList = ColorStateList.valueOf(foreground())
                 }
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, LinearLayout.LayoutParams(iconSize, iconSize))
+            }, FrameLayout.LayoutParams(-1, -1))
+            // 状态点覆盖在图标角上，不挤动图标或文字，也不改变菜单尺寸。
+            if (key == "home") iconFrame.addView(connectionDot,
+                FrameLayout.LayoutParams(dp(13), dp(13), Gravity.TOP or Gravity.END))
+            item.addView(iconFrame, LinearLayout.LayoutParams(iconSize, iconSize))
             item.addView(TextView(context).apply {
                 setText(title)
                 textSize = 19f
                 gravity = Gravity.CENTER
-                L7Ui.bind(this) { setTextColor(context.getColor(if (item.isSelected) R.color.product_ui_accent else R.color.product_ui_text)) }
+                L7Ui.bind(this) { setTextColor(foreground()) }
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
@@ -71,6 +95,16 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
         // 小窗口和大字体时侧栏可独立滚动，保持所有入口可达。
         addView(ScrollView(context).apply { addView(navigation) }, LinearLayout.LayoutParams(-1, -2))
         L7Ui.refresh(this)
+    }
+
+    fun setConnected(value: Boolean) {
+        if (connected == value) return
+        connected = value
+        connectionDot.visibility = if (value) View.VISIBLE else View.INVISIBLE
+        buttons["home"]?.let {
+            it.contentDescription = context.getString(if (value) R.string.l7_nav_picture_connected else R.string.l7_nav_picture)
+            L7Ui.refresh(it)
+        }
     }
 
     fun select(destination: String) {
