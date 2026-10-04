@@ -81,7 +81,7 @@ e2e/
 
 [AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。
 
-`python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查十个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
+`python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查 13 个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；取消前收起悬浮菜单，并等待未连接首页出现。不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
 
 追加 `--dialogs-only` 可单独检查上述弹窗、协议及 USB 取消，不重复页面扫描；同样保留英文首页。
 
