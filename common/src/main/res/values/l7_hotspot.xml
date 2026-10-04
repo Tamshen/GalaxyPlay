@@ -31,10 +31,9 @@
     <string name="l7_hotspot_copy_password">复制热点密码</string>
     <string name="l7_hotspot_copied">已复制</string>
     <string name="l7_hotspot_apply_start">应用并开启</string>
-    <string name="l7_hotspot_settings_missing">此固件无法直达 Android 原生热点页面，可改用 Wi-Fi 设置查找热点入口。车机桌面自带热点与 Android 原生热点可能是不同服务，请核对用于 CarPlay 的名称和密码。</string>
+    <string name="l7_hotspot_settings_missing">无法打开 Android 原生网络设置，此固件可能限制了入口。可继续尝试一键设置原生热点，或在调试与日志中收集环境信息。</string>
     <string name="l7_hotspot_busy">正在处理原生热点，请等待完成或先停止等待。</string>
-    <string name="l7_hotspot_wifi_settings">Wi-Fi 设置</string>
-    <string name="l7_hotspot_wifi_hint">不同固件的入口不同；原生热点页不可用时，从这里进入系统 Wi-Fi 设置查找热点。</string>
-    <string name="l7_hotspot_wifi_missing">无法打开系统 Wi-Fi 设置，请从车机系统设置手动进入 Wi-Fi 或网络设置。</string>
-    <string name="l7_hotspot_read_independent">读取与设置权限不同，读不到配置不代表热点未开启。可继续一键生成并应用配置，或进入 Wi-Fi 设置核对后手动填写；已保存的名称和密码会保留。</string>
+    <string name="l7_hotspot_wifi_settings">原生 Wi-Fi 设置</string>
+    <string name="l7_hotspot_wifi_hint">打开系统网络设置，在“热点与网络共享”中设置 Android 原生热点。</string>
+    <string name="l7_hotspot_read_independent">读取与设置权限不同，读不到配置不代表热点未开启。可继续一键生成并应用配置，或进入原生 Wi-Fi 设置核对后手动填写；已保存的名称和密码会保留。</string>
 </resources>
