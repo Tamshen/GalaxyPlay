@@ -93,4 +93,21 @@ class L7HotspotActionsTest {
         assertFalse(state.error); assertFalse(state.result)
         assertTrue(ShadowAlertDialog.getLatestAlertDialog().isShowing)
     }
+
+    @Test fun readFailureKeepsSavedDetailsAndOffersWifiWithoutBlockingApply() {
+        L7Agreement.accept(activity)
+        val value = task.proposal("synthetic-device")
+        AirPlayPersistence.saveNativeHotspotCredentials(activity, value)
+        actions.read(); await()
+        val state = L7HotspotFeedback.state(activity, task.status, reading = true)
+        assertEquals(R.string.l7_hotspot_wifi_settings, state.resultLabel)
+        assertTrue(state.detail.contains(activity.getString(R.string.l7_hotspot_read_independent)))
+        assertEquals(value.ssid, AirPlayPersistence.loadManualHotspotSsid(activity))
+        assertEquals(value.password, AirPlayPersistence.loadManualHotspotPassphrase(activity))
+        actions.close()
+        access.result = CarHotspotTethering.Result.READY
+        actions.start(value); await()
+        assertEquals(1, access.writes)
+        assertEquals(true, task.status.hotspotEnabled)
+    }
 }

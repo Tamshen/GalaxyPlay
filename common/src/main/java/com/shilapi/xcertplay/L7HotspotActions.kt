@@ -27,7 +27,9 @@ internal class L7HotspotActions(private val activity: Activity, private val task
             if (reading) R.string.l7_hotspot_read else if (applying) R.string.l7_hotspot_apply_start else R.string.l7_hotspot_start,
             R.string.l7_hotspot_cancel, R.string.l7_hotspot_cancelled,
             snapshot = { L7HotspotFeedback.state(activity, task.status, reading, applying) },
-            onStop = { task.cancel() }, onResult = { L7HotspotFeedback.recover(activity, task.status.message) },
+            onStop = { task.cancel() }, onResult = {
+                if (reading) L7HotspotSettings.openWifiSettings(activity) else L7HotspotFeedback.recover(activity, task.status.message)
+            },
             onDismiss = { window = null }).also { it.show() }
     }
 
@@ -42,6 +44,7 @@ internal object L7HotspotFeedback {
         val code = status.message
         val success = code in setOf(R.string.l7_hotspot_ready, R.string.l7_hotspot_ready_no_details, R.string.l7_hotspot_read_ok)
         val cancelled = code == R.string.l7_hotspot_cancelled
+        val readFailed = reading && !status.busy && !success && !cancelled
         val title = when {
             status.busy -> code
             cancelled -> R.string.l7_hotspot_stopped_title
@@ -54,16 +57,21 @@ internal object L7HotspotFeedback {
         val recover = !status.busy && !success && !cancelled && code != R.string.l7_hotspot_session_active
         val detail = if (status.busy) activity.getString(R.string.l7_hotspot_wait_hint) else buildList {
             add(activity.getString(code))
+            if (readFailed) add(activity.getString(R.string.l7_hotspot_read_independent))
             if (status.configurationApplied && !success && !cancelled) add(activity.getString(R.string.l7_hotspot_saved_hint))
             if (!success && !cancelled) add(activity.getString(R.string.l7_hotspot_settings_hint))
         }.joinToString("\n\n")
         return L7TaskProgress(status.busy, activity.getString(title), detail,
             result = recover, error = !status.busy && !success && !cancelled,
-            resultLabel = if (code == R.string.l7_hotspot_start_permission) R.string.l7_hotspot_grant else R.string.open_car_hotspot_settings,
+            resultLabel = if (code == R.string.l7_hotspot_start_permission) R.string.l7_hotspot_grant
+                else if (readFailed) R.string.l7_hotspot_wifi_settings else R.string.open_car_hotspot_settings,
             showProgress = status.busy)
     }
 
     fun recover(activity: Activity, code: Int) {
+        if (code in setOf(R.string.l7_hotspot_read_permission, R.string.l7_hotspot_read_invalid, R.string.l7_hotspot_read_unavailable)) {
+            L7HotspotSettings.openWifiSettings(activity); return
+        }
         if (code == R.string.l7_hotspot_start_permission) {
             val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${activity.packageName}"))
             if (runCatching { activity.startActivity(intent) }.isSuccess) return

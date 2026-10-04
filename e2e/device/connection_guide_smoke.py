@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
 parser.add_argument('--english-only', action='store_true', help='仅复核英文引导与热点失败弹窗')
+parser.add_argument('--wifi-only', action='store_true', help='仅复核独立 Wi-Fi 入口和读取失败恢复，不启停热点')
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 base = [args.adb, '-s', args.serial]
@@ -82,6 +83,25 @@ original_night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()
 english = False
 try:
     adb('shell', 'cmd', 'appops', 'set', package, 'WRITE_SETTINGS', 'deny')
+    if args.wifi_only:
+        launch('settings-connection-wireless')
+        tap('Wi-Fi 设置')
+        assert 'com.android.settings' in adb('shell', 'dumpsys', 'activity', 'top').decode()
+        screenshot('wifi-settings')
+        adb('shell', 'input', 'keyevent', '4')
+        launch('settings-connection-wireless')
+        tap('重新读取热点配置'); wait('未能读取热点配置')
+        assert any('读取与设置权限不同' in t for t in texts())
+        screenshot('read-failure-wifi')
+        tap('Wi-Fi 设置')
+        assert 'com.android.settings' in adb('shell', 'dumpsys', 'activity', 'top').decode()
+        adb('shell', 'input', 'keyevent', '4')
+        launch('settings-connection-wireless')
+        adb('shell', 'cmd', 'uimode', 'night', 'yes')
+        tap('重新读取热点配置'); wait('未能读取热点配置')
+        screenshot('read-failure-wifi-night'); tap('关闭')
+        print('AVD 通过：独立 Wi-Fi 设置与读取失败恢复入口，昼夜提示；未启停热点、未修改配置。')
+        raise SystemExit(0)
     if not args.english_only:
         assert {'无线连接', '有线连接'} <= set(texts())
         assert '一键开启原生热点' not in texts()

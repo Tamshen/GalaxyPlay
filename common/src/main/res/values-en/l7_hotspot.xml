@@ -31,6 +31,10 @@
     <string name="l7_hotspot_copy_password">Copy hotspot password</string>
     <string name="l7_hotspot_copied">Copied</string>
     <string name="l7_hotspot_apply_start">Apply and start</string>
-    <string name="l7_hotspot_settings_missing">Android native hotspot settings could not be opened. Open Android Settings and find Hotspot &amp; tethering. The hotspot entry on the vehicle launcher is a different service.</string>
+    <string name="l7_hotspot_settings_missing">This firmware does not provide direct access to the Android native hotspot page. Try Wi-Fi settings instead. The vehicle launcher hotspot may be a separate service; check the name and password used for CarPlay.</string>
     <string name="l7_hotspot_busy">A native hotspot operation is in progress. Wait for it to finish or stop waiting first.</string>
+    <string name="l7_hotspot_wifi_settings">Wi-Fi settings</string>
+    <string name="l7_hotspot_wifi_hint">Settings vary by firmware. If the native hotspot page is unavailable, find the hotspot through system Wi-Fi settings.</string>
+    <string name="l7_hotspot_wifi_missing">System Wi-Fi settings could not be opened. Open Wi-Fi or network settings from the head unit’s system settings.</string>
+    <string name="l7_hotspot_read_independent">Reading and changing settings use different permissions. Unreadable credentials do not mean the hotspot is off. You can still generate and apply a configuration, or check Wi-Fi settings and enter it manually. Saved details are kept.</string>
 </resources>

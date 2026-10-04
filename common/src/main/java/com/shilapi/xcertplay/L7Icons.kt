@@ -19,6 +19,7 @@ internal object L7Icons {
         R.string.l7_resume_projection to R.drawable.ic_l7_projection,
         R.string.l7_view_connection to R.drawable.ic_l7_projection,
         R.string.open_car_hotspot_settings to R.drawable.ic_l7_hotspot,
+        R.string.l7_hotspot_wifi_settings to R.drawable.ic_l7_hotspot,
         R.string.l7_hotspot_start to R.drawable.ic_l7_hotspot,
         R.string.l7_hotspot_read to R.drawable.ic_l7_refresh,
         R.string.l7_hotspot_not_started to R.drawable.ic_l7_hotspot,
