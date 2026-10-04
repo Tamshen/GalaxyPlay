@@ -2,7 +2,11 @@
 <resources>
     <string name="l7_sources_receiver">Open source</string>
     <string name="l7_source_diplay_description">CarPlay receiver core · GPL-3.0</string>
+    <string name="l7_source_geely_description">Geely fork · Bluetooth media handoff and head-unit adaptation reference</string>
+    <string name="l7_source_geely_details">Thanks to carlito12345 for sharing the open-source DiPlay fork for Geely head units. L7 CarPlay refers to its Bluetooth media handoff, steering-wheel input and audio compatibility implementations, evaluating each adaptation against actual Galaxy L7 capabilities.\n\nThis is an adaptation reference. Its inclusion here does not mean all features have been integrated or verified on L7.\n\nProject URL:\n%1$s\n\nProject root license: GPL-3.0. Original source attribution and individual file license notices are retained. See Third-party licenses for the complete texts.</string>
     <string name="l7_licenses_title">Third-party licenses</string>
     <string name="l7_licenses_hint">View dependency notices and license texts</string>
     <string name="l7_licenses_load_failed">License files could not be read. Please reopen this dialog.</string>
+    <string name="l7_source_open_project">Open project link</string>
+    <string name="l7_source_browser_unavailable">No browser is available. Select and copy the link in the project details.</string>
 </resources>

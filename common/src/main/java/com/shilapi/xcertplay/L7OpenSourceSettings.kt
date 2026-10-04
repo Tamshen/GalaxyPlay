@@ -1,10 +1,13 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** 关于页仅列直接上游，其余声明和许可原文通过同套文本模态框离线查看。 */
+/** 关于页区分接收核心与车机适配参考，完整声明和许可原文支持离线查看。 */
 internal object L7OpenSourceSettings {
     fun add(parent: LinearLayout) {
         val context = parent.context
@@ -13,9 +16,30 @@ internal object L7OpenSourceSettings {
                 context.getString(R.string.l7_source_diplay_description)).apply {
                 setValue(context.getString(R.string.l7_source_version_diplay))
             })
+            card.addView(L7Components.actionRow(context, context.getString(R.string.l7_source_geely_name),
+                context.getString(R.string.l7_source_geely_description)) { showGeelyReference(context) }.apply {
+                setValue(context.getString(R.string.l7_source_geely_version))
+            })
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_licenses_title),
                 context.getString(R.string.l7_licenses_hint)) { showLicenses(context) })
         }
+    }
+
+    private fun showGeelyReference(context: Context) {
+        val document = context.getString(R.string.l7_source_geely_details,
+            context.getString(R.string.l7_source_geely_url))
+        val text = L7Typography.text(context, document, L7Typography.Role.DESCRIPTION).apply {
+            setTextIsSelectable(true)
+        }
+        L7Dialogs.builder(context).setTitle(R.string.l7_source_geely_name).setView(text)
+            .setNeutralButton(R.string.l7_source_open_project) { _, _ ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.l7_source_geely_url)))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { context.startActivity(intent) }.onFailure {
+                    Toast.makeText(context, R.string.l7_source_browser_unavailable, Toast.LENGTH_LONG).show()
+                }
+            }
+            .setPositiveButton(R.string.close, null).show()
     }
 
     private fun showLicenses(context: Context) {

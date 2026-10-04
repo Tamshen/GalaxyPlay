@@ -8,6 +8,16 @@ DiPlay — GPL-3.0. Receiver protocol, connection and recovery code.
 https://github.com/shihabal3amri/DiPlay
 Original xcertplay source attribution and file licenses remain in the receiver sources.
 
+Head-unit adaptation reference
+
+DiPlay — carlito12345 Geely fork. Thanks to carlito12345 for sharing the open-source head-unit adaptations.
+https://github.com/carlito12345/DiPlay
+Purpose: source comparison and adaptation reference for Bluetooth media handoff, steering-wheel input and audio compatibility.
+Reviewed reference: 0.2.11, commit 0109cf7f6948ae1823099ca29170e83df3cd6cce. This is a reference baseline, not the L7 receiver core version.
+Relationship: migration preparation and attribution; not a separate SDK, module or Gradle dependency. This notice does not mean that all fork features have been integrated or verified on L7. Any subsequent selected patches must record their source and retain individual file notices.
+Root license: GPL-3.0, with the same license text bundled in the application. Individual source copyrights and license notices remain applicable.
+https://github.com/carlito12345/DiPlay/blob/0109cf7f6948ae1823099ca29170e83df3cd6cce/LICENSE
+
 Runtime components
 
 AndroidX — Apache-2.0. Android support components including Core, Activity, Lifecycle and Car App. Copyright notices remain with the respective Android Open Source Project sources.
