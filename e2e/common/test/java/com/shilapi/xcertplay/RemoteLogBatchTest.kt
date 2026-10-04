@@ -49,6 +49,42 @@ class RemoteLogBatchTest {
             assertTrue(name, records.any { it.getString("source") == name && "codec=HEVC" in it.getString("message") })
     }
 
+    @Test fun emptyCollectionDoesNotSendSummariesOrOverwriteSuccessfulHistory() {
+        val received = CopyOnWriteArrayList<String>()
+        configure { text, _ -> received += text; 200 }
+        val history = RemoteLogHistory.Entry(123456, 12)
+        RemoteLogHistory.save(app, history)
+        assertTrue(RemoteLogReport.create(listOf("", " "), "test", "test").batches.isEmpty())
+        assertTrue(RemoteLogReport.collect(app).batches.isEmpty())
+        assertTrue(RemoteLogUpload.start(app))
+        await(RemoteLogUpload.Phase.EMPTY)
+        assertTrue(received.isEmpty())
+        assertEquals(0, RemoteLogUpload.status.totalLines)
+        assertEquals(history, RemoteLogHistory.last(app))
+    }
+
+    @Test fun clearingLogsOrReportsDiscardsFailedRetryAndOnlyUploadsAFreshSnapshot() {
+        val received = CopyOnWriteArrayList<String>()
+        configure { text, _ -> received += text; 400 }
+        for (logs in listOf(false, true)) {
+            L7DebugLog.buffer.append("synthetic before clear")
+            assertTrue(RemoteLogUpload.start(app))
+            await(RemoteLogUpload.Phase.FAILED)
+            val oldId = RemoteLogUpload.status.id
+            assertTrue(L7ProbeRunner.clear(app, logs) {})
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (L7ProbeRunner.busy && System.nanoTime() < deadline) Thread.sleep(10)
+            assertFalse(L7ProbeRunner.busy)
+            assertEquals(RemoteLogUpload.Phase.CANCELLED, RemoteLogUpload.status.phase)
+            L7DebugLog.buffer.append("synthetic after clear")
+            assertTrue(RemoteLogUpload.start(app, retry = true))
+            await(RemoteLogUpload.Phase.FAILED)
+            assertNotEquals(oldId, RemoteLogUpload.status.id)
+            if (logs) assertFalse(received.last().contains("synthetic before clear"))
+            assertTrue(received.last().contains("synthetic after clear"))
+        }
+    }
+
     @Test fun failedBatchStopsAndManualRetrySkipsConfirmedBatchesWithStableEvents() {
         File(folder, "diplay.log").writeText((0..2400).joinToString("\n") { "event=$it HEVC codec=c2.qti.hevc.decoder " + "frame=1920x1440 ".repeat(5) })
         val received = CopyOnWriteArrayList<Pair<Int, String>>()

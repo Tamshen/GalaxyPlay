@@ -35,6 +35,8 @@ class RemoteLogTest {
         RemoteLogUpload.cancel()
         context.getSharedPreferences("l7_remote_log", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("l7_agreement", Context.MODE_PRIVATE).edit().clear().commit()
+        L7DebugLog.buffer.clear()
+        L7DebugLog.buffer.append("synthetic upload test")
     }
 
     @After fun after() { RemoteLogUpload.cancel(); server?.stop(0) }
@@ -87,6 +89,40 @@ class RemoteLogTest {
         val report = RemoteLogReport.create(listOf("Audio ready"), "test", "test")
         RemoteLogTransport().use { assertEquals(302, it.send(RemoteLogConfig(endpoint, token), report.batches.first())) }
         assertEquals(1, requests.get())
+    }
+
+    @Test fun deletingStreamResponseIsRecognizedWithoutExposingItsNameOrRawBody() {
+        val endpoint = serve { exchange ->
+            val response = """{"code":400,"message":"Error# stream [private-stream] is being deleted"}""".toByteArray()
+            exchange.sendResponseHeaders(400, response.size.toLong())
+            exchange.responseBody.use { it.write(response) }
+        }
+        RemoteLogConfig.save(context, RemoteLogConfig(endpoint, token))
+        L7Agreement.accept(context)
+        assertTrue(RemoteLogUpload.start(context))
+        awaitPhase(RemoteLogUpload.Phase.FAILED)
+        assertEquals(400, RemoteLogUpload.status.code)
+        assertTrue(RemoteLogUpload.status.streamDeleting)
+        val text = L7RemoteLogSettings.statusText(context, RemoteLogUpload.status, "test-stream")
+        assertTrue(text.contains(context.getString(R.string.l7_log_stream_deleting)))
+        assertFalse(text.contains("private-stream"))
+    }
+
+    @Test fun generic400AndOversizedBodiesAreNotMisclassifiedAsDeletingStreams() {
+        var response = """{"code":400,"message":"invalid JSON"}"""
+        val endpoint = serve { exchange ->
+            val bytes = response.toByteArray()
+            exchange.sendResponseHeaders(400, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        val batch = RemoteLogReport.create(listOf("synthetic"), "test", "test").batches.first()
+        for (body in listOf(response, " ".repeat(5000)+"stream is being deleted")) {
+            response = body
+            RemoteLogTransport().use {
+                assertEquals(400, it.send(RemoteLogConfig(endpoint, token), batch))
+                assertFalse(it.streamDeleting)
+            }
+        }
     }
 
     @Test fun successfulHttpWithWrongStreamIsNotAnAcknowledgement() {

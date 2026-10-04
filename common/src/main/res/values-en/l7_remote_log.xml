@@ -44,10 +44,13 @@
     <string name="l7_log_clear_logs">Clear logs</string>
     <string name="l7_log_clear_reports">Clear reports</string>
     <string name="l7_log_clear_logs_hint">Clear retained runtime and environment logs on this device and stop the current upload. New logs will still be recorded. Uploaded logs are unaffected.</string>
-    <string name="l7_log_clear_reports_hint">Delete environment and permission report history stored in the app. Exported files and log records are kept.</string>
+    <string name="l7_log_clear_reports_hint">Delete locally saved environment and permission report history, stop the current upload, and discard its retry snapshot. Exported files and log records are kept.</string>
     <string name="l7_log_clear_busy">Reports are being collected or processed. Wait until this finishes before clearing.</string>
     <string name="l7_log_cleared">Cleared</string>
     <string name="l7_log_clear_failed">Some content could not be cleared. Please retry.</string>
     <string name="l7_log_never_uploaded">Not uploaded</string>
     <string name="l7_log_last_upload">Uploaded\nLast successful upload: %1$s\n%2$d log records</string>
+    <string name="l7_log_empty_title">No logs to upload</string>
+    <string name="l7_log_empty_hint">No local logs or environment check records are available. No network request was sent. Collect environment and debug information or reproduce the issue, then upload again.</string>
+    <string name="l7_log_stream_deleting">The server is deleting this device’s log stream (HTTP 400). Wait for OpenObserve to finish, then retry. If this persists, check the deletion task on the server. Clearing local data does not delete the remote stream.</string>
 </resources>
