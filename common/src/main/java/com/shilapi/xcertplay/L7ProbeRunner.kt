@@ -135,6 +135,33 @@ internal object L7ProbeRunner {
         }.onFailure { storageFailed = true }
     }
 
+    /** 复用采集工作线程并互斥，避免清空后旧采集结果重新写回。 */
+    @Synchronized fun clear(context: Context, logs: Boolean, done: (Boolean) -> Unit): Boolean {
+        if (busy) return false
+        busy = true
+        val app = context.applicationContext
+        if (logs) RemoteLogUpload.cancel()
+        worker.execute {
+            val success = runCatching {
+                if (logs) {
+                    AsyncDiagnosticLog.clear(File(app.filesDir, "logs"))
+                    L7ProbeLog.clear(app)
+                    L7DebugLog.buffer.clear()
+                } else {
+                    store(app).clear()
+                    history = emptyList()
+                    current = null
+                    storageFailed = false
+                    initialized = true
+                }
+            }.isSuccess
+            busy = false
+            revision++
+            main.post { done(success) }
+        }
+        return true
+    }
+
     @Synchronized fun delete(context: Context, id: String): Boolean {
         if (busy || current?.let { it.id == id && it.phase == L7ProbePhase.RUNNING } == true) return false
         busy = true

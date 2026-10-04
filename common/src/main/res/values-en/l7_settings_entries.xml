@@ -3,7 +3,7 @@
     <string name="l7_debug_state_title">Floating log status</string>
     <string name="l7_app_version">App version</string>
     <string name="l7_current_phone">Current iPhone</string>
-    <string name="l7_debug_view_hint">View, refresh or copy logs from this run</string>
+    <string name="l7_debug_view_hint">Search, view or copy recent retained logs</string>
     <string name="l7_debug_permission_hint">Allow floating logs to display over other apps</string>
     <string name="l7_report_location_hint">Choose a report location with the system file picker</string>
     <string name="l7_section_app_ui">App interface</string>

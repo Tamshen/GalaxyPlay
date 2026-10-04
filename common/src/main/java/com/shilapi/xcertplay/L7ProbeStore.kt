@@ -38,6 +38,11 @@ internal class L7ProbeStore(private val directory: File) {
         }.getOrNull()
     }
 
+    fun clear() {
+        directory.listFiles().orEmpty().filter { it.name.matches(Regex("[a-f0-9-]{36}\\.json(?:\\.bak|\\.new)?")) }
+            .forEach { check(it.delete()) }
+    }
+
     fun delete(id: String) { AtomicFile(path(id)).delete(); check(!path(id).exists()) }
     private fun path(id: String): File {
         require(id.matches(Regex("[a-f0-9-]{36}")))

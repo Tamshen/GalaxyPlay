@@ -31,7 +31,7 @@ internal object L7ProbeLog {
         val output = mutableListOf<String>()
         line(report.started, "event=begin startedAt=${report.started} version=${report.version} expected=${report.expected}")?.let(output::add)
         report.items.forEachIndexed { index, item ->
-            // 敏感关键字过滤同样适用于权限名称；被过滤时保留序号与结果，原名仅在本地 JSON 查看。
+            // 权限名属于技术证据；异常格式被拒绝时仍保留序号与结果。
             val entry = item.id.takeIf { RemoteLogReport.redact("entry=$it ") != null } ?: "ENTRY_$index"
             val head = "item=$index entry=$entry status=${L7ProbeStatus.of(item)} result=${item.result} reason=${item.reason} at=${item.time}"
             var part = head
@@ -75,6 +75,14 @@ internal object L7ProbeLog {
         val file = File(context.filesDir, "logs/$name")
         if (!file.isFile || file.length() > MAX_BYTES) emptyList()
         else runCatching { AtomicFile(file).openRead().bufferedReader().use { it.readLines() } }.getOrDefault(emptyList())
+    }
+
+    @Synchronized fun clear(context: Context) {
+        files.forEach { name ->
+            val file = File(context.filesDir, "logs/$name")
+            AtomicFile(file).delete()
+            check(!file.exists())
+        }
     }
 
     private fun save(file: File, bytes: ByteArray) {

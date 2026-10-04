@@ -3,9 +3,9 @@ package com.shilapi.xcertplay
 import java.io.Closeable
 import java.io.File
 
-/** Bounded, private diagnostics. Each write is redacted before touching storage. */
+/** 每行先脱敏再落盘，按 UTF-8 字节预算轮转并保留最近八份日志。 */
 internal class SessionLogFile(val file: File) : Closeable {
-    private val lock = Any()
+    private val lock = storageLock
     private var closed = false
     fun reset(header: String) = synchronized(lock) {
         if (!closed) {
@@ -18,12 +18,13 @@ internal class SessionLogFile(val file: File) : Closeable {
     fun append(line: String) = synchronized(lock) {
         if (closed) return@synchronized
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
+        val bytes = (safe + "\n").toByteArray(Charsets.UTF_8)
         runCatching {
-            if (file.length() > MAX_BYTES) {
+            if (file.length() + bytes.size > MAX_BYTES) {
                 rotate()
                 file.writeText("")
             }
-            file.appendText(safe + "\n")
+            file.appendBytes(bytes)
         }
         Unit
     }
@@ -38,6 +39,7 @@ internal class SessionLogFile(val file: File) : Closeable {
     }
     override fun close() = synchronized(lock) { closed = true }
     companion object {
+        internal val storageLock = Any()
         const val MAX_BYTES = 512 * 1024L
         private val ARCHIVE_NAMES = listOf("previous.log") + (2..7).map { "previous-$it.log" }
         val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log"

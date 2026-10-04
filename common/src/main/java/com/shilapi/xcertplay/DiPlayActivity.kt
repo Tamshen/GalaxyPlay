@@ -238,6 +238,7 @@ class DiPlayActivity : ComponentActivity() {
         }
     }
     private var channelDialog: android.app.AlertDialog? = null
+    private var logView: L7LogView? = null
 
     override fun onPause() {
         channelDialog?.dismiss()
@@ -253,6 +254,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        logView?.close(); logView = null
         hotspotSettings?.dispose()
         hotspotTask.close()
         super.onDestroy()
@@ -865,22 +867,8 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun showDebugLogs() {
-        val log = label("", 14, TEXT).apply { typeface = Typeface.MONOSPACE; setTextIsSelectable(true); setPadding(dp(16), dp(8), dp(16), dp(8)) }
-        fun refresh() { log.text = L7DebugLog.buffer.snapshot().lines.joinToString("\n").ifEmpty { getString(R.string.l7_debug_empty) } }
-        refresh()
-        val dialog = L7Dialogs.builder(this).setTitle(R.string.l7_debug_view)
-            .setView(ScrollView(this).apply { addView(log) })
-            .setPositiveButton(R.string.close, null)
-            .setNeutralButton(R.string.l7_debug_refresh, null)
-            .setNegativeButton(R.string.l7_debug_copy, null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { refresh() }
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(getString(R.string.l7_debug_title), log.text))
-                toast(getString(R.string.l7_debug_copied))
-            }
-        }
-        dialog.show()
+        logView?.close()
+        logView = L7LogView(this).also { it.show() }
     }
 
     private fun about(content: LinearLayout) {

@@ -52,6 +52,19 @@ class L7ProbeStoreTest {
         assertThrows(IllegalArgumentException::class.java) { store.delete("../../another-file") }
     }
 
+    @Test fun clearReportsKeepsLogsAndUnrelatedFiles() {
+        val store = L7ProbeStore(temporary.root)
+        val saved = store.save(report())
+        File(temporary.root, "${saved.id}.json.bak").writeText("old report")
+        File(temporary.root, "${saved.id}.json.new").writeText("pending report")
+        File(temporary.root, "diplay.log").writeText("runtime evidence")
+        File(temporary.root, "unrelated.json").writeText("keep")
+        store.clear()
+        assertTrue(store.load().isEmpty())
+        assertEquals(setOf("diplay.log", "unrelated.json"), temporary.root.list()!!.toSet())
+        assertEquals("runtime evidence", File(temporary.root, "diplay.log").readText())
+    }
+
     @Test fun utf8BudgetTruncatesItemsAndRecordsTheLoss() {
         val item = L7ProbeItem("large", "large", "ENVIRONMENT", L7ProbeOutcome.OBSERVED, "QUERY_ONLY",
             mapOf("synthetic" to "界".repeat(400_000)))
