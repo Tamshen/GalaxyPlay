@@ -6,17 +6,8 @@ import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
 /** 首页快捷操作复用日志查看回调与唯一上传任务；进入页面只刷新状态。 */
-internal class L7QuickLogActions(private val context: Context, parent: LinearLayout, onLogs: () -> Unit, onOptions: () -> Unit) {
-    private val deviceId = RemoteLogDevice.id(context)
-    private val upload = L7Components.actionButton(context, context.getString(R.string.l7_log_upload), primary = true) {
-        RemoteLogUpload.start(context); update()
-    }
-    private val retry = L7Components.actionButton(context, context.getString(R.string.l7_log_retry)) {
-        RemoteLogUpload.start(context, retry = true); update()
-    }
-    private val cancel = L7Components.actionButton(context, context.getString(R.string.l7_log_cancel)) {
-        RemoteLogUpload.cancel(); update()
-    }
+internal class L7QuickLogActions(private val context: Context, parent: LinearLayout, onLogs: () -> Unit, onUpload: () -> Unit, onOptions: () -> Unit) {
+    private val upload = L7Components.actionButton(context, context.getString(R.string.l7_log_upload), primary = true, click = onUpload)
     private val options = L7Components.actionButton(context, context.getString(R.string.l7_log_server), click = onOptions)
     private val status = L7Typography.text(context, "", L7Typography.Role.FEEDBACK).apply {
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -32,7 +23,7 @@ internal class L7QuickLogActions(private val context: Context, parent: LinearLay
             ).forEachIndexed { index, button ->
                 group.addView(button, LinearLayout.LayoutParams(-1, -2).apply { if (index > 0) topMargin = L7Components.dp(context, 12) })
             }
-            listOf(status, retry, cancel, options).forEach { view ->
+            listOf(status, options).forEach { view ->
                 group.addView(view, LinearLayout.LayoutParams(-1, -2).apply { topMargin = L7Components.dp(context, 12) })
             }
         }
@@ -59,15 +50,10 @@ internal class L7QuickLogActions(private val context: Context, parent: LinearLay
 
     fun update() {
         val config = RemoteLogConfig.load(context)
-        val current = RemoteLogUpload.status
-        val busy = current.phase == RemoteLogUpload.Phase.UPLOADING
         val valid = config.valid()
-        val name = if (valid) config.forDevice(deviceId).stream else deviceId
-        upload.isEnabled = valid && !busy
-        retry.visibility = if (valid && current.phase == RemoteLogUpload.Phase.FAILED) View.VISIBLE else View.GONE
-        cancel.visibility = if (busy) View.VISIBLE else View.GONE
+        upload.isEnabled = valid
         options.visibility = if (valid) View.GONE else View.VISIBLE
-        val text = if (valid) L7RemoteLogSettings.statusText(context, current, name) else context.getString(R.string.l7_log_config_first)
+        val text = RemoteLogHistory.summary(context) + if (valid) "" else "\n" + context.getString(R.string.l7_log_config_first)
         if (status.text.toString() != text) status.text = text
     }
 }

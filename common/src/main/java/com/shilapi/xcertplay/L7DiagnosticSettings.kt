@@ -13,13 +13,13 @@ internal class L7DiagnosticSettings(
     onExport: () -> Unit,
     onChooseLocation: () -> Unit,
     onPermission: (Boolean) -> Unit,
+    onUpload: () -> Unit,
 ) {
     private var exportFailed = false
     private val export = L7Components.actionRow(context, context.getString(R.string.save_diagnostic_report),
         context.getString(R.string.reports_save_to_downloads_diplay), click = onExport)
     private val state = L7SettingRow(context, context.getString(R.string.l7_debug_state_title), "")
-    private val start = L7Components.actionRow(context, context.getString(R.string.l7_debug_start)) { onPermission(true) }
-    private val stop = L7Components.actionRow(context, context.getString(R.string.l7_debug_stop)) { L7DebugOverlayService.stop(context) }
+    private var overlay: L7SettingRow? = null
     private val remote: L7RemoteLogSettings
 
     init {
@@ -36,10 +36,13 @@ internal class L7DiagnosticSettings(
             card.addView(state)
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_debug_permission),
                 context.getString(R.string.l7_debug_permission_hint)) { onPermission(false) })
-            card.addView(start)
-            card.addView(stop)
+            overlay = L7Components.switchRow(context, context.getString(R.string.l7_debug_title),
+                context.getString(R.string.l7_task_overlay_hint), L7DebugOverlayService.isRunning) { enabled ->
+                if (enabled) onPermission(true) else L7DebugOverlayService.stop(context)
+                overlay?.setSwitchChecked(L7DebugOverlayService.isRunning)
+            }.also(card::addView)
         }
-        remote = L7RemoteLogSettings(context, parent)
+        remote = L7RemoteLogSettings(context, parent, onUpload)
     }
 
     fun update(exporting: Boolean) {
@@ -55,10 +58,8 @@ internal class L7DiagnosticSettings(
         state.setValue(context.getString(R.string.l7_debug_status,
             context.getString(if (Settings.canDrawOverlays(context)) R.string.l7_debug_granted else R.string.l7_debug_denied),
             context.getString(if (running) R.string.l7_debug_running else R.string.l7_debug_stopped)))
-        start.isEnabled = !running
-        stop.isEnabled = running
-        start.setFeedback(if (running) context.getString(R.string.l7_debug_already_running) else "")
-        stop.setFeedback(if (running) "" else context.getString(R.string.l7_debug_not_running))
+        overlay?.setSwitchChecked(running)
+        overlay?.setFeedback(if (Settings.canDrawOverlays(context)) "" else context.getString(R.string.l7_debug_permission_hint))
     }
 
     fun showExportFailure() {

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_task_collect">Collect environment and debug information</string>
+    <string name="l7_task_stop_collect">Stop collection</string>
+    <string name="l7_task_stop_upload">Stop upload</string>
+    <string name="l7_task_end_title">End this task?</string>
+    <string name="l7_task_continue">Keep waiting</string>
+    <string name="l7_task_end_close">End and close</string>
+    <string name="l7_task_end_collect">Collected information is kept; no further checks will run.</string>
+    <string name="l7_task_end_upload">Remaining batches will not be sent. Records already received by the server are kept.</string>
+    <string name="l7_task_preparing_collect">Preparing collection…</string>
+    <string name="l7_task_preparing_upload">Preparing logs for upload…</string>
+    <string name="l7_task_saving">Saving check results…</string>
+    <string name="l7_task_current">Checking: %1$s</string>
+    <string name="l7_task_stopping_collect">Further checks have stopped. Waiting for the current system query to finish. You can close this window; collected information is kept.</string>
+    <string name="l7_task_uploaded">Upload complete</string>
+    <string name="l7_task_upload_failed">Upload failed</string>
+    <string name="l7_task_upload_stopped">Stopping cancels remaining batches. Records already received by the server are kept.</string>
+    <string name="l7_task_overlay_hint">Show the floating log window. Turning it off does not affect the CarPlay connection.</string>
+</resources>

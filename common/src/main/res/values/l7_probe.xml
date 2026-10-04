@@ -21,7 +21,7 @@
     <string name="l7_probe_summary">已验证 %1$d · 受限 %2$d · 待验证 %3$d · 未执行 %4$d</string>
     <string name="l7_probe_running">检查中</string>
     <string name="l7_probe_completed">检查完成</string>
-    <string name="l7_probe_cancelled">已停止调度</string>
+    <string name="l7_probe_cancelled">收集已停止</string>
     <string name="l7_probe_timed_out">检查超时，保留部分结果</string>
     <string name="l7_probe_interrupted">检查中断，保留已有结果</string>
     <string name="l7_probe_historical">历史报告 · %1$s</string>

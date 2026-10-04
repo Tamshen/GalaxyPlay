@@ -94,13 +94,14 @@ try:
         view, upload = ('View logs','Upload logs') if lang=='en' else ('查看日志','上传日志')
         visible=texts()
         assert view in visible and upload in visible, '日志操作未在首屏显示'
-        assert ('No uploads yet' if lang=='en' else '尚未上传') in visible, '导航期间出现上传状态变化'
+        summary = next(t for t in visible if t.startswith(('Not uploaded', 'Uploaded\n', '未上传', '已上传\n')))
         if lang=='en': english()
         screenshot('quick-logs-'+lang)
         tap(view)
         tap('Refresh' if lang=='en' else '刷新')
         tap('Close' if lang=='en' else '关闭')
         assert view in texts()
+        assert summary in texts(), '查看日志改变了上传历史'
         launch('settings-connection')
         visible=texts()
         assert any(('different service' in t if lang=='en' else '不是同一个服务' in t) for t in visible)

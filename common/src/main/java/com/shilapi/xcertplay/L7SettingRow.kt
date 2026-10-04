@@ -19,6 +19,8 @@ internal class L7SettingRow(context: Context, title: String, description: String
     val valueView get() = labels.value
     val feedbackView get() = labels.feedback
     private val accessory = FrameLayout(context)
+    internal var updatingSwitch = false
+        private set
     val textInset = dp(20) + if (icon == null) 0 else dp(48)
 
     init {
@@ -52,6 +54,13 @@ internal class L7SettingRow(context: Context, title: String, description: String
         accessory.addView(view, FrameLayout.LayoutParams(width, height, Gravity.END or Gravity.CENTER_VERTICAL))
         accessory.visibility = VISIBLE
         view.isEnabled = isEnabled
+    }
+
+    /** 外部服务状态回填不等于用户操作，不能再次触发权限或服务调用。 */
+    fun setSwitchChecked(checked: Boolean) {
+        val control = accessory.getChildAt(0) as? android.widget.CompoundButton ?: return
+        updatingSwitch = true
+        try { control.isChecked = checked } finally { updatingSwitch = false }
     }
 
     override fun setEnabled(enabled: Boolean) {

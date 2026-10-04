@@ -21,7 +21,7 @@
     <string name="l7_probe_summary">Verified %1$d · Restricted %2$d · Pending %3$d · Not run %4$d</string>
     <string name="l7_probe_running">Checking</string>
     <string name="l7_probe_completed">Checks completed</string>
-    <string name="l7_probe_cancelled">Scheduling stopped</string>
+    <string name="l7_probe_cancelled">Collection stopped</string>
     <string name="l7_probe_timed_out">Checks timed out; partial results retained</string>
     <string name="l7_probe_interrupted">Checks interrupted; available results retained</string>
     <string name="l7_probe_historical">Previous report · %1$s</string>

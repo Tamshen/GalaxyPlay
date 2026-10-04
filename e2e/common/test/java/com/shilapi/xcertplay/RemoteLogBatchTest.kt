@@ -59,6 +59,7 @@ class RemoteLogBatchTest {
         }
         assertTrue(RemoteLogUpload.start(app))
         await(RemoteLogUpload.Phase.FAILED)
+        assertNull(RemoteLogHistory.last(app))
         assertEquals(listOf(1, 2), received.map { it.first })
         assertEquals(1, RemoteLogUpload.status.completedBatches)
         Thread.sleep(100)
@@ -70,6 +71,8 @@ class RemoteLogBatchTest {
         val status = RemoteLogUpload.status
         assertEquals(status.totalBatches, status.completedBatches)
         assertEquals(status.totalLines, status.uploadedLines)
+        assertEquals(RemoteLogHistory.Entry(status.finishedAt, status.totalLines), RemoteLogHistory.last(app))
+        assertTrue(status.finishedAt > 0)
         assertEquals((3..status.totalBatches).toList(), received.drop(3).map { it.first })
     }
 

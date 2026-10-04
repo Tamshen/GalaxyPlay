@@ -89,6 +89,9 @@ class DiPlayActivity : ComponentActivity() {
     private var diagnosticSettings: L7DiagnosticSettings? = null
     private var debugPage: L7DebugPage? = null
     private val probeState = L7ProbeUiState()
+    private val debugTasks by lazy { L7DebugTasks(this) {
+        probeState.showCurrent(); page = "settings-debug-results"; render()
+    } }
     private val probeExporter = L7ProbeExporter(this)
     private var pendingOverlayStart = false
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -224,6 +227,7 @@ class DiPlayActivity : ComponentActivity() {
         handler.removeCallbacks(tick); handler.post(tick)
         if (l7Ui && L7Routes.isDebug(page)) L7ProbeRunner.refreshEnvironment(this)
         L7DesktopNavigation.ensure(this)
+        if (l7Ui) debugTasks.resume()
         // Back from the car settings: refresh the car hotspot reminder on the home page.
         if (!initialLaunch && (page == "home" || page == "connection" || page in L7Routes.settings)) {
             setupError = runCatching { DiPlayBootstrap.ensure(this) }.exceptionOrNull()?.let { getString(R.string.setup_error_auth) }
@@ -249,11 +253,12 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onStop() {
         wirelessHotspotGate.cancel()
-        if (!isChangingConfigurations) L7ProbeRunner.stop()
+        if (!isChangingConfigurations) { L7ProbeRunner.stop(); debugTasks.background() }
         super.onStop()
     }
 
     override fun onDestroy() {
+        debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
         hotspotSettings?.dispose()
         hotspotTask.close()
@@ -326,7 +331,7 @@ class DiPlayActivity : ComponentActivity() {
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
             "settings-debug-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
-                debugPage = L7DebugPage(this, content, page, probeState, probeExporter, ::showDebugLogs) { destination ->
+                debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks, ::showDebugLogs) { destination ->
                     page = destination; render()
                 }
             }
@@ -817,7 +822,7 @@ class DiPlayActivity : ComponentActivity() {
     private fun diagnostics(content: LinearLayout) {
         if (l7Ui) {
             diagnosticSettings = L7DiagnosticSettings(this, content, ::showDebugLogs,
-                { exportDiagnostics() }, ::chooseReportDestination, ::requestOverlayPermission).also {
+                { exportDiagnostics() }, ::chooseReportDestination, ::requestOverlayPermission, debugTasks::upload).also {
                 it.update(exportInProgress)
             }
             return

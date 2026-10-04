@@ -12,7 +12,7 @@ import android.widget.Toast
 import com.shilapi.xcertplay.host.R
 
 /** 远程日志仍属于诊断页，配置确认保存，上传只由明确按钮触发。 */
-internal class L7RemoteLogSettings(private val context: Context, parent: LinearLayout) {
+internal class L7RemoteLogSettings(private val context: Context, parent: LinearLayout, onUpload: () -> Unit) {
     private val deviceId = RemoteLogDevice.id(context)
     private var logName = deviceId
     private val device = L7Components.actionRow(context, context.getString(R.string.l7_log_device),
@@ -23,18 +23,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
     }.apply { setValue(deviceId) }
     private val server = L7Components.actionRow(context, context.getString(R.string.l7_log_server),
         context.getString(R.string.l7_log_server_hint)) { configure() }
-    private val upload = L7Components.actionRow(context, context.getString(R.string.l7_log_upload)) {
-        RemoteLogUpload.start(context)
-        update()
-    }
-    private val retry = L7Components.actionRow(context, context.getString(R.string.l7_log_retry)) {
-        RemoteLogUpload.start(context, retry = true)
-        update()
-    }
-    private val cancel = L7Components.actionRow(context, context.getString(R.string.l7_log_cancel)) {
-        RemoteLogUpload.cancel()
-        update()
-    }
+    private val upload = L7Components.actionRow(context, context.getString(R.string.l7_log_upload), click = onUpload)
     private val state = L7SettingRow(context, context.getString(R.string.l7_log_state), "")
 
     init {
@@ -44,26 +33,20 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
             card.addView(device)
             card.addView(state)
             card.addView(upload)
-            card.addView(retry)
-            card.addView(cancel)
         }
         update()
     }
 
     fun update() {
         val config = RemoteLogConfig.load(context)
-        val status = RemoteLogUpload.status
-        val busy = status.phase == RemoteLogUpload.Phase.UPLOADING
         val target = if (RemoteLogConfig.validEndpoint(config.endpoint)) config.forDevice(deviceId) else null
         logName = target?.stream ?: deviceId
         device.setValue(logName)
         val editor = RemoteLogEditor(config, context.getString(R.string.l7_log_default_url))
         server.setValue(editor.serverText(target?.endpoint ?: config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) }))
-        upload.isEnabled = config.valid() && !busy
+        upload.isEnabled = config.valid()
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
-        retry.isEnabled = config.valid() && status.phase == RemoteLogUpload.Phase.FAILED
-        cancel.isEnabled = busy
-        state.setValue(statusText(context, status, logName))
+        state.setValue(RemoteLogHistory.summary(context))
     }
 
     companion object {

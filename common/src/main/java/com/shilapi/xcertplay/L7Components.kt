@@ -100,7 +100,7 @@ internal object L7Components {
                     trackTintList = ColorStateList(states, intArrayOf(context.getColor(R.color.product_ui_selected), context.getColor(R.color.product_ui_border)))
                 }
                 // 行点击调用控件入口，拖动与点击都只经这个监听器提交一次。
-                setOnCheckedChangeListener { _, value -> save(value) }
+                setOnCheckedChangeListener { _, value -> if (!updatingSwitch) save(value) }
             }
             setAccessory(control)
             isFocusable = true
