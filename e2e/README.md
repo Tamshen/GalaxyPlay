@@ -46,10 +46,13 @@ e2e/
 
 部分用例使用本机回环 HTTP/TCP/UDP、临时目录与运行时生成的身份，覆盖传输及释放行为，不依赖真实认证文件。阅读时关注触发条件、观察结果和资源清理；L7 功能先看上述前两行，再按实际修改追踪相关核心回归。
 
-## 上游补丁回归
+## 上游核心回归
 
 | 范围 | 主要用例与检阅点 |
 | --- | --- |
+| 会话 / 输入 | `AirPlayControlDiagnosticsTest`、`AirPlayHidInputSemanticsTest`、`CarPlayTouchMapperTest` 检查控制诊断、旋钮语义与触控映射；共享核心按官方 0.2.11 迁入，产品仍使用 L7 单路显示 |
+| L7 隔离 | `L7VehicleIsolationTest` 与车辆字段存储用例检查旧偏好、探测缓存及进程重启不能启用其他车型功能；底层字段解析继续独立回归 |
+| P2P 兼容 | `P2pConfigBuildDiagnosticsTest`、`P2pStartupRecoveryTest` 检查共享核心的配置和有限恢复；不改变 L7 默认 MANUAL 热点方式 |
 | USB / 网络 | `UsbMuxFrameBufferTest`、`UsbMuxIssue100RegressionTest` 覆盖分片及连续帧；`CarPlayVpnScopeTest` 检查限定应用失败时清理；`AirPlayPortSelectorTest` 检查冲突回退与套接字释放；`ManualHotspotConfigTest` 检查有线无需热点 |
 | 窗口 / 定位 | `CarPlayHostDisplaySizeTest` 使用 Mockito 隔离真实控制器，检查缩窗、旋转、拆除期间的最新尺寸及权限；`Iap2WirelessLinkRoleTest`、定位上报用例检查链路订阅隔离及缺失方向 |
 | 诊断 / 释放 | `BoundedDiagnosticWriterTest`、`AsyncDiagnosticLogTest` 检查有界队列与所属日志；`ProcessExitDiagnosticsTest` 检查本应用退出信息边界；无线、I/O、慢读取与 codec 启动用例检查采样及异常释放 |
