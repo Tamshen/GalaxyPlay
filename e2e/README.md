@@ -201,7 +201,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 ## 首页、投屏悬浮菜单与退出
 
-[L7ProjectionNavigationTest](common/test/java/com/shilapi/xcertplay/L7ProjectionNavigationTest.kt) 检查画面/设置/车机/退出四个入口及回调、设置双栏延伸为整高左栏且保留按钮实例/位置/选中态、右侧可操作、左栏空白不透传，返回首页恢复悬浮底板、连接状态触发收起、手动展开保持、固定左侧菜单留白/裁切、拖动入口后菜单位置不变与窗口尺寸适配、全尺寸视频不随侧栏变化、触控透传与遮罩拦截、拖动边界与恢复、透明度刷新。[L7DisplayGeometryTest](common/test/java/com/shilapi/xcertplay/L7DisplayGeometryTest.kt) 检查规格换算、部分占屏、旋转、编码缩放不改变毫米尺寸，以及未测得窗口拒绝协商。几何夹具为合成数据。
+[L7ProjectionNavigationTest](common/test/java/com/shilapi/xcertplay/L7ProjectionNavigationTest.kt) 检查画面/设置/车机/退出四个入口及回调、设置双栏延伸为整高左栏且保留按钮实例/位置/选中态、右侧可操作、左栏空白不透传，返回首页恢复悬浮底板、连接状态触发收起、手动展开保持、API 29/30 绿色状态点与当前页面选中态独立且断开复原、固定左侧菜单留白/裁切、拖动入口后菜单位置不变与窗口尺寸适配、全尺寸视频不随侧栏变化、触控透传与遮罩拦截、拖动边界与恢复、透明度刷新。[L7DisplayGeometryTest](common/test/java/com/shilapi/xcertplay/L7DisplayGeometryTest.kt) 检查规格换算、部分占屏、旋转、编码缩放不改变毫米尺寸，以及未测得窗口拒绝协商。几何夹具为合成数据。
 
 设备回归执行：
 
@@ -209,7 +209,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 ```
 
-[L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开四项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
+[L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开四项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；同时确认首页和设置不再显示底部连接状态。首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
 
 此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
 

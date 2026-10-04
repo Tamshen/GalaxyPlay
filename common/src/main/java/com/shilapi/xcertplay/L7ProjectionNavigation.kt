@@ -69,6 +69,7 @@ internal class L7ProjectionNavigation(
     fun setConnected(value: Boolean) {
         if (connected == value) return
         connected = value
+        navigation.setConnected(value)
         showExpanded(!value)
     }
 

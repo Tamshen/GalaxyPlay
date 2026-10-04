@@ -7,6 +7,7 @@
     <color name="product_ui_border">#33000000</color>
     <color name="product_ui_accent">#1368FB</color>
     <color name="product_ui_selected">#141368FB</color>
+    <color name="product_ui_connected">#247744</color>
     <color name="product_ui_text">#E5000000</color>
     <color name="product_ui_muted">#99000000</color>
     <color name="product_ui_disabled">#66000000</color>

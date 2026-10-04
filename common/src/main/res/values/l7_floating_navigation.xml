@@ -1,6 +1,7 @@
 <resources>
     <string name="l7_rail_expand">展开菜单</string>
     <string name="l7_nav_picture">画面</string>
+    <string name="l7_nav_picture_connected">画面，iPhone 已连接</string>
     <string name="l7_nav_car_home">车机</string>
     <string name="l7_nav_exit">退出</string>
     <string name="l7_about_row_hint">应用版本、项目说明与许可证</string>

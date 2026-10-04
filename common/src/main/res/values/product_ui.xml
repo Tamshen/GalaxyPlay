@@ -4,6 +4,7 @@
     <color name="product_ui_surface">#151E2C</color>
     <color name="product_ui_border">#2A384B</color>
     <color name="product_ui_accent">#A6C8FF</color>
+    <color name="product_ui_connected">#7BD89B</color>
     <color name="product_ui_text">#F1F5FC</color>
     <color name="product_ui_muted">#A8B6CA</color>
     <color name="product_ui_warning">#FFC480</color>

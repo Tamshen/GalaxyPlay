@@ -25,6 +25,7 @@ internal class L7DesktopWindow(private val owner: Context, private val navigate:
     fun show() {
         if (view != null && density != L7UiDensity.value(owner)) remove()
         if (view == null) build()
+        (view as? L7NavigationRail)?.setConnected(CarPlayBackgroundSession.active)
         if (!expanded) view?.alpha = 1f - L7FloatingNavigationPreferences.transparency(owner) / 100f
     }
 

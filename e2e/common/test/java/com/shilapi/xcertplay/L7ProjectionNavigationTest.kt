@@ -6,6 +6,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import com.shilapi.xcertplay.host.R
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,6 +84,44 @@ class L7ProjectionNavigationTest {
         overlay.collapse()
         overlay.setConnected(false)
         assertTrue(overlay.expanded)
+    }
+
+    @Test @Config(sdk = [29, 30])
+    fun connectionBadgeKeepsCurrentPageSelectionAndClearsAfterDisconnect() {
+        val context = activity()
+        val overlay = L7ProjectionNavigation(context, {}) {}
+        overlay.showPage("settings-debug-logs")
+        layout(overlay)
+        val buttons = actions(overlay.getChildAt(1))
+        val picture = buttons[0] as ViewGroup
+        val iconFrame = picture.getChildAt(0) as FrameLayout
+        val icon = iconFrame.getChildAt(0) as ImageView
+        val dot = iconFrame.getChildAt(1)
+        val label = picture.getChildAt(1) as TextView
+        fun bounds() = buttons.map { listOf(it.left, it.top, it.width, it.height) }
+        val originalBounds = bounds()
+        assertEquals(View.INVISIBLE, dot.visibility)
+        overlay.setConnected(true)
+        layout(overlay)
+        assertTrue(overlay.expanded)
+        assertTrue(buttons[1].isSelected)
+        assertFalse(picture.isSelected)
+        assertEquals(originalBounds, bounds())
+        assertEquals(View.VISIBLE, dot.visibility)
+        assertEquals(context.getColor(R.color.product_ui_connected), label.currentTextColor)
+        assertEquals(label.currentTextColor, icon.imageTintList!!.defaultColor)
+        assertEquals("画面，iPhone 已连接", picture.contentDescription)
+        overlay.showPage("home")
+        L7Ui.refresh(overlay)
+        assertTrue(picture.isSelected)
+        assertEquals(View.VISIBLE, dot.visibility)
+        assertEquals(context.getColor(R.color.product_ui_connected), label.currentTextColor)
+        overlay.setConnected(false)
+        layout(overlay)
+        assertEquals(View.INVISIBLE, dot.visibility)
+        assertEquals("画面", picture.contentDescription)
+        assertEquals(context.getColor(R.color.product_ui_accent), label.currentTextColor)
+        assertEquals(originalBounds, bounds())
     }
 
     @Test fun collapsedOverlayPassesTouchesButExpandedPanelConsumesOutsideTap() {
