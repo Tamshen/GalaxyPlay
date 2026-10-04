@@ -61,15 +61,8 @@ internal object L7Components {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, dp(context, 32), dp(context, 32))
             isFocusable = true
-            L7Ui.bind(this) {
-                background = RippleDrawable(ColorStateList.valueOf(context.getColor(R.color.product_ui_ripple)), null, null)
-            }
-            setOnClickListener {
-                if (isEnabled) {
-                    requestFocusFromTouch()
-                    click()
-                }
-            }
+            L7Ui.rowFeedback(this)
+            setOnClickListener { if (isEnabled) click() }
         }
 
     fun valueRow(context: Context, title: String, value: String, click: () -> Unit): L7SettingRow =
@@ -112,9 +105,7 @@ internal object L7Components {
             setAccessory(control)
             isFocusable = true
             setOnClickListener { if (isEnabled && control.isEnabled) control.performClick() }
-            L7Ui.bind(this) {
-                background = RippleDrawable(ColorStateList.valueOf(context.getColor(R.color.product_ui_ripple)), null, null)
-            }
+            L7Ui.rowFeedback(this)
         }
 
     fun styleDialog(dialog: AlertDialog) {

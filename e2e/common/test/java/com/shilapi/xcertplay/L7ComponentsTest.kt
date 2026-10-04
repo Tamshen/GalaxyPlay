@@ -2,9 +2,14 @@ package com.shilapi.xcertplay
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Looper
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.Switch
+import com.shilapi.xcertplay.host.R
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +57,42 @@ class L7ComponentsTest {
         control.isEnabled = false
         row.performClick()
         assertEquals(listOf(true, false), changes)
+    }
+
+    @Test fun rowFeedbackIsBoundedAndHoverClearsOnExitOrDisable() {
+        val context = activity()
+        for (row in listOf(L7Components.actionRow(context, "选择") {},
+            L7Components.switchRow(context, "开关", "说明", false) {})) {
+            val ripple = row.background as RippleDrawable
+            assertFalse("不能向父卡片或相邻条目投射涟漪", ripple.isProjected)
+            row.isHovered = true
+            assertEquals(context.getColor(R.color.product_ui_selected), (ripple.getDrawable(0).current as ColorDrawable).color)
+            row.isHovered = false
+            assertEquals(Color.TRANSPARENT, (ripple.getDrawable(0).current as ColorDrawable).color)
+            row.isHovered = true
+            row.isEnabled = false
+            assertEquals(Color.TRANSPARENT, (ripple.getDrawable(0).current as ColorDrawable).color)
+        }
+    }
+
+    @Test fun touchingAnActionDoesNotForceKeyboardFocusOntoTheRow() {
+        val context = activity()
+        val previous = View(context).apply { isFocusableInTouchMode = true }
+        var clicks = 0
+        val row = L7Components.actionRow(context, "选择") { clicks++ }
+        val parent = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(previous, LinearLayout.LayoutParams(100, 100))
+            addView(row)
+        }
+        context.setContentView(parent)
+        previous.requestFocus()
+        assertTrue(previous.hasFocus())
+        row.performClick()
+        assertEquals(1, clicks)
+        assertTrue(previous.hasFocus())
+        assertFalse(row.hasFocus())
+        assertTrue("键盘仍应能定位条目", row.isFocusable)
     }
 
     @Test fun cancelDiscardsPendingChoiceAndReopenUsesSavedValue() {
