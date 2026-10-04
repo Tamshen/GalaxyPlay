@@ -67,10 +67,10 @@ internal data class RemoteLogReport(
                     }
                     for (line in result.getOrThrow().lineSequence()) yield(name to line)
                 }
-                yield("collection" to "snapshot writerDrained=$drained memoryEvicted=${buffer.evicted}")
             }
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            return build(lines, version, context.getString(R.string.l7_core_source_info)) { shortened }
+            return build(lines, version, context.getString(R.string.l7_core_source_info),
+                "snapshot writerDrained=$drained memoryEvicted=${buffer.evicted}") { shortened }
         }
 
         private fun tail(file: File, limit: Long, onShortened: () -> Unit): String = RandomAccessFile(file, "r").use {
@@ -86,7 +86,8 @@ internal data class RemoteLogReport(
         internal fun create(lines: List<String>, version: String, core: String): RemoteLogReport =
             build(lines.asSequence().map { "runtime" to it }, version, core) { 0 }
 
-        private fun build(lines: Sequence<Pair<String, String>>, version: String, core: String, shortened: () -> Int): RemoteLogReport {
+        private fun build(lines: Sequence<Pair<String, String>>, version: String, core: String,
+                          snapshot: String? = null, shortened: () -> Int): RemoteLogReport {
             val metadata = RemoteLogMetadata(UUID.randomUUID().toString(), Instant.now().toString(), version.take(80), core.take(120))
             val retained = ArrayDeque<Pair<RemoteLogEntry, Int>>()
             var retainedBytes = 0
@@ -108,9 +109,12 @@ internal data class RemoteLogReport(
                 retained += entry to size
                 retainedBytes += size
             }
+            // 无实际内容时不为了摘要发请求，也不能记录为上传成功。
+            if (retained.isEmpty()) return RemoteLogReport(metadata.id, emptyList(), omitted, shortened())
+            val notes = snapshot?.let { listOf(RemoteLogEntry(count++, "collection", it)) }.orEmpty()
             val summary = RemoteLogEntry(count, "collection", "upload_summary retained=${retained.size} " +
                 "omittedLines=$omitted excludedPayloadLines=$excluded redactedLines=$masked truncatedLines=$truncated shortenedSources=${shortened()}")
-            val groups = split(retained.map { it.first } + summary, metadata)
+            val groups = split(retained.map { it.first } + notes + summary, metadata)
             return RemoteLogReport(metadata.id, groups.mapIndexed { index, entries ->
                 RemoteLogBatch(metadata, index + 1, groups.size, entries)
             }, omitted, shortened())

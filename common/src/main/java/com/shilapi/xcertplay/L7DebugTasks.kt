@@ -19,6 +19,7 @@ internal class L7DebugTasks(private val activity: Activity, private val onResult
 
     fun upload() {
         if (window != null) return
+        if (L7ProbeRunner.clearing) { L7Notice.show(activity, text(R.string.l7_log_clear_busy)); return }
         val phase = RemoteLogUpload.status.phase
         // 失败后再次进入仍先展示重试确认，不因打开窗口再次发送。
         if (phase !in listOf(RemoteLogUpload.Phase.FAILED, RemoteLogUpload.Phase.UPLOADING) &&
@@ -92,13 +93,14 @@ internal class L7DebugTasks(private val activity: Activity, private val onResult
             RemoteLogUpload.Phase.UPLOADING -> if (status.totalBatches == 0) R.string.l7_task_preparing_upload else R.string.l7_log_uploading
             RemoteLogUpload.Phase.SUCCESS -> R.string.l7_task_uploaded
             RemoteLogUpload.Phase.FAILED -> R.string.l7_task_upload_failed
+            RemoteLogUpload.Phase.EMPTY -> R.string.l7_log_empty_title
             else -> R.string.l7_log_cancelled
         })
         val summary = L7RemoteLogSettings.statusText(activity, status, name)
         val detail = (if (running) summary.substringAfter('\n', "") else summary) +
             if (running || status.phase == RemoteLogUpload.Phase.CANCELLED) "\n\n" + text(R.string.l7_task_upload_stopped) else ""
         return L7TaskProgress(running, message, detail, status.uploadedLines, status.totalLines,
-            retry = failed, error = failed)
+            retry = failed, error = failed, showProgress = status.phase != RemoteLogUpload.Phase.EMPTY)
     }
 
     private fun text(id: Int) = activity.getString(id)

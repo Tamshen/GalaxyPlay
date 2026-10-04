@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
 parser.add_argument('--failure-only', action='store_true', help='仅复核上传失败重试、历史与悬浮日志开关')
+parser.add_argument('--clear-only', action='store_true', help='仅复核清空后空上传、服务端删除中提示与旧重试丢弃')
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 base = [args.adb, '-s', args.serial]
@@ -43,9 +44,11 @@ class Server(BaseHTTPRequestHandler):
         current = mode
         if current == 'success':
             accepted.append((rows[0]['report_id'], len(rows)))
-        code = 503 if current == 'fail' else 200
+        code = 400 if current == 'deleting' else 503 if current == 'fail' else 200
         body = json.dumps({'code': 200, 'status': [{'name': self.path.split('/')[-2],
                            'successful': len(rows), 'failed': 0}]}).encode()
+        if current == 'deleting':
+            body = json.dumps({'code': 400, 'message': 'Error# stream [synthetic] is being deleted'}).encode()
         try:
             self.send_response(code)
             padding = 50 if current == 'hold' else 0
@@ -159,6 +162,33 @@ try:
     launch()
     assert not {'停止本轮', '重试上传', '取消上传'} & set(texts())
     assert '未上传' in texts()
+    if args.clear_only:
+        for label in ('清空日志', '清空报告'):
+            tap(label); tap('清空')
+            assert '部分内容未能清空，请重试。' not in texts()
+        before = len(received)
+        tap('上传日志'); wait_text('暂无可上传日志')
+        assert len(received) == before
+        assert '重试上传' not in texts()
+        screenshot('empty-after-clear'); tap('关闭')
+        command = 'run-as '+package+' sh -c '+shlex.quote('mkdir -p files/logs; cat >> files/logs/diplay.log')
+        subprocess.run(base+['shell', command], input=b'synthetic clear-upload verification\n', check=True, capture_output=True)
+        mode = 'deleting'
+        tap('上传日志'); wait_text('上传失败')
+        assert any('日志流正在删除中' in t for t in texts())
+        screenshot('stream-deleting'); tap('关闭')
+        old = received[-1]
+        tap('清空报告'); tap('清空'); texts()
+        tap('上传日志'); wait_text('上传失败')
+        assert received[-1] != old, '清空后仍使用旧重试快照'
+        tap('关闭')
+        tap('清空日志'); tap('清空'); texts()
+        before = len(received)
+        tap('上传日志'); wait_text('暂无可上传日志')
+        assert len(received) == before
+        tap('关闭')
+        print('AVD 通过：清空后无内容不请求、删除中 HTTP 400 明确提示、清空报告丢弃旧重试；仅访问本机模拟服务。')
+        raise SystemExit(0)
     if not args.failure_only:
         collect = next(t for t in texts() if t in ('收集环境与调试信息', '重新收集环境与调试信息'))
         tap(collect)

@@ -57,7 +57,8 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
                 RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
                 RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
-                RemoteLogUpload.Phase.FAILED -> when (status.code) {
+                RemoteLogUpload.Phase.EMPTY -> context.getString(R.string.l7_log_empty_hint)
+                RemoteLogUpload.Phase.FAILED -> if (status.streamDeleting) context.getString(R.string.l7_log_stream_deleting) else when (status.code) {
                     0 -> context.getString(R.string.l7_log_network_failed)
                     -1 -> context.getString(R.string.l7_log_partial)
                     else -> context.getString(R.string.l7_log_http_failed, status.code)

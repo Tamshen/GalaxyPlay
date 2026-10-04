@@ -46,10 +46,13 @@
     <string name="l7_log_clear_logs">清空日志</string>
     <string name="l7_log_clear_reports">清空报告</string>
     <string name="l7_log_clear_logs_hint">清空本机保留的运行与环境日志，并停止当前上传。之后产生的新日志会继续记录；已上传的日志不受影响。</string>
-    <string name="l7_log_clear_reports_hint">删除应用内保存的环境与权限报告历史。已导出到系统目录的文件和日志记录会保留。</string>
+    <string name="l7_log_clear_reports_hint">删除应用内保存的环境与权限报告历史，并停止当前上传、丢弃旧的重试快照。已导出到系统目录的文件和日志记录会保留。</string>
     <string name="l7_log_clear_busy">正在收集或整理报告，请完成后再清空。</string>
     <string name="l7_log_cleared">已清空</string>
     <string name="l7_log_clear_failed">部分内容未能清空，请重试。</string>
     <string name="l7_log_never_uploaded">未上传</string>
     <string name="l7_log_last_upload">已上传\n上次成功：%1$s\n共 %2$d 条日志</string>
+    <string name="l7_log_empty_title">暂无可上传日志</string>
+    <string name="l7_log_empty_hint">本机没有可上传的日志或环境检查记录，未发送网络请求。请先开始收集环境与调试信息，或复现问题后再上传。</string>
+    <string name="l7_log_stream_deleting">服务器暂不接收：此设备的日志流正在删除中（HTTP 400）。请等待 OpenObserve 完成删除后再重试；持续出现时请检查服务器删除任务。本地清空不会删除服务器日志流。</string>
 </resources>

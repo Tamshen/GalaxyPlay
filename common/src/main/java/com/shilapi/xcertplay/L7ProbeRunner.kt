@@ -17,6 +17,8 @@ internal object L7ProbeRunner {
         private set
     @Volatile var busy = false
         private set
+    @Volatile var clearing = false
+        private set
     @Volatile var storageFailed = false
         private set
     @Volatile var logFailed = false
@@ -139,8 +141,9 @@ internal object L7ProbeRunner {
     @Synchronized fun clear(context: Context, logs: Boolean, done: (Boolean) -> Unit): Boolean {
         if (busy) return false
         busy = true
+        clearing = true
         val app = context.applicationContext
-        if (logs) RemoteLogUpload.cancel()
+        RemoteLogUpload.cancel()
         worker.execute {
             val success = runCatching {
                 if (logs) {
@@ -155,6 +158,7 @@ internal object L7ProbeRunner {
                     initialized = true
                 }
             }.isSuccess
+            clearing = false
             busy = false
             revision++
             main.post { done(success) }

@@ -43,6 +43,7 @@ class L7DebugTasksTest {
     private fun configure(reply: (JSONArray) -> Int) {
         RemoteLogUpload.cancel()
         L7Agreement.accept(app)
+        L7DebugLog.buffer.append("synthetic task test")
         val http = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         http.createContext("/") { exchange ->
             val records = JSONArray(exchange.requestBody.bufferedReader().use { it.readText() })
@@ -88,5 +89,21 @@ class L7DebugTasksTest {
             tasks.resume(); tick()
             assertEquals(RemoteLogUpload.Phase.CANCELLED, RemoteLogUpload.status.phase)
         } finally { release.countDown() }
+    }
+
+    @Test fun emptyUploadShowsANormalResultWithoutRetryOrAnyHttpRequest() {
+        val received = java.util.concurrent.atomic.AtomicInteger()
+        configure { received.incrementAndGet(); 400 }
+        java.io.File(app.filesDir, "logs").deleteRecursively()
+        L7DebugLog.buffer.clear()
+        controller().upload()
+        await(RemoteLogUpload.Phase.EMPTY)
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        assertTrue(dialog.isShowing)
+        assertEquals(android.view.View.GONE, dialog.getButton(AlertDialog.BUTTON_POSITIVE).visibility)
+        val matches = ArrayList<android.view.View>()
+        dialog.window!!.decorView.findViewsWithText(matches, app.getString(R.string.l7_log_empty_title), android.view.View.FIND_VIEWS_WITH_TEXT)
+        assertTrue(matches.isNotEmpty())
+        assertEquals(0, received.get())
     }
 }

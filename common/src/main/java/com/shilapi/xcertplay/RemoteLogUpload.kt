@@ -4,13 +4,14 @@ import android.content.Context
 
 /** 单个手动任务顺序发送各批；重试跳过已确认批次，保留未确认批次的事件编号。 */
 internal object RemoteLogUpload {
-    enum class Phase { IDLE, UPLOADING, SUCCESS, FAILED, CANCELLED }
+    enum class Phase { IDLE, UPLOADING, SUCCESS, FAILED, CANCELLED, EMPTY }
     data class Status(
         val phase: Phase = Phase.IDLE, val id: String = "", val code: Int = 0,
         val completedBatches: Int = 0, val totalBatches: Int = 0,
         val uploadedLines: Int = 0, val totalLines: Int = 0,
         val omittedLines: Int = 0, val shortenedSources: Int = 0,
         val finishedAt: Long = 0,
+        val streamDeleting: Boolean = false,
     )
     private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport, var next: Int = 0)
     @Volatile var status = Status()
@@ -22,7 +23,7 @@ internal object RemoteLogUpload {
     @Synchronized fun start(context: Context, retry: Boolean = false): Boolean {
         val app = context.applicationContext
         val saved = RemoteLogConfig.load(app)
-        if (!saved.valid() || !allowed(app) || status.phase == Phase.UPLOADING) return false
+        if (!saved.valid() || !allowed(app) || L7ProbeRunner.clearing || status.phase == Phase.UPLOADING) return false
         val config = saved.forDevice(RemoteLogDevice.id(app))
         val retained = if (retry) pending?.takeIf { it.config == config } else null
         if (retained == null) pending = null
@@ -49,8 +50,13 @@ internal object RemoteLogUpload {
         synchronized(this) {
             if (run == generation) {
                 transport = null
-                val phase = if (code in 200..299) Phase.SUCCESS else Phase.FAILED
-                status = task?.state(phase, code) ?: Status(phase, code = code)
+                val phase = when {
+                    task?.report?.batches?.isEmpty() == true -> Phase.EMPTY
+                    code in 200..299 -> Phase.SUCCESS
+                    else -> Phase.FAILED
+                }
+                status = (task?.state(phase, code) ?: Status(phase, code = code)).copy(streamDeleting = sender.streamDeleting)
+                if (phase == Phase.EMPTY) pending = null
                 if (phase == Phase.SUCCESS) {
                     status = status.copy(finishedAt = System.currentTimeMillis())
                     runCatching { RemoteLogHistory.save(app, RemoteLogHistory.Entry(status.finishedAt, status.totalLines)) }

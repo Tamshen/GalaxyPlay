@@ -10,9 +10,12 @@ import java.net.URL
 internal class RemoteLogTransport : Closeable {
     @Volatile private var connection: HttpURLConnection? = null
     @Volatile private var closed = false
+    var streamDeleting = false
+        private set
 
     fun send(config: RemoteLogConfig, batch: RemoteLogBatch): Int {
         require(config.valid())
+        streamDeleting = false
         val request = URL(config.endpoint).openConnection() as HttpURLConnection
         synchronized(this) {
             if (closed) throw IOException("cancelled")
@@ -30,17 +33,16 @@ internal class RemoteLogTransport : Closeable {
             request.setFixedLengthStreamingMode(body.size)
             request.outputStream.use { it.write(body) }
             val status = request.responseCode
-            if (status !in 200..299) return status
-            val bytes = request.inputStream.use { input ->
-                val buffer = ByteArray(4097)
-                var count = 0
-                while (count < buffer.size) {
-                    val read = input.read(buffer, count, buffer.size - count)
-                    if (read < 0) break
-                    count += read
-                }
-                buffer.copyOf(count)
+            if (status !in 200..299) {
+                // 只识别已知错误，不展示或保存可能包含服务器地址、流名及凭据的响应原文。
+                streamDeleting = status == 400 && runCatching {
+                    val body = request.errorStream?.use(::readResponse) ?: byteArrayOf()
+                    body.size <= 4096 && JSONObject(body.toString(Charsets.UTF_8)).optString("message")
+                        .let { "stream" in it.lowercase() && "is being deleted" in it.lowercase() }
+                }.getOrDefault(false)
+                return status
             }
+            val bytes = request.inputStream.use(::readResponse)
             if (bytes.size > 4096) throw IOException("invalid acknowledgement")
             val acknowledgement = JSONObject(bytes.toString(Charsets.UTF_8))
             val streams = acknowledgement.optJSONArray("status")
@@ -56,6 +58,17 @@ internal class RemoteLogTransport : Closeable {
             request.disconnect()
             synchronized(this) { if (connection === request) connection = null }
         }
+    }
+
+    private fun readResponse(input: java.io.InputStream): ByteArray {
+        val buffer = ByteArray(4097)
+        var count = 0
+        while (count < buffer.size) {
+            val read = input.read(buffer, count, buffer.size - count)
+            if (read < 0) break
+            count += read
+        }
+        return buffer.copyOf(count)
     }
 
     override fun close() = synchronized(this) {
