@@ -167,7 +167,6 @@ def navigation_smoke():
     tap('返回设置')
     for category, labels, name in (
         ('连接设置', ['无线连接', '有线连接', '打开车机热点设置', '车机热点详情', '选择 iPhone', '蓝牙设置'], 'connection'),
-        ('诊断与日志', ['查看当前日志', '保存诊断报告', '选择保存位置', '悬浮日志状态', '管理悬浮窗权限', '显示悬浮日志', '关闭悬浮日志'], 'diagnostics'),
         ('关于', ['应用版本', '使用协议'], 'about'),
     ):
         tap(category)
@@ -175,6 +174,13 @@ def navigation_smoke():
         screenshot('hierarchy-' + name + '-day')
         require_labels(labels)
         screenshot('hierarchy-' + name + '-bottom-day')
+        if name == 'about':
+            tap('调试')
+            require_labels(['返回关于', '开始基础检查', '日志与报告'])
+            tap('日志与报告')
+            require_labels(['查看当前日志', '保存诊断报告', '选择保存位置', '管理悬浮窗权限'])
+            tap('返回调试')
+            tap('返回关于')
         tap('返回设置')
     tap('权限与连接帮助')
     require_labels(['返回设置', '应用权限', '蓝牙设置', '无线连接帮助'])

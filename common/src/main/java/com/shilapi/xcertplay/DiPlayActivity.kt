@@ -87,6 +87,9 @@ class DiPlayActivity : ComponentActivity() {
     private var adbStatus: TextView? = null
     private var adbCheckGeneration = 0
     private var diagnosticSettings: L7DiagnosticSettings? = null
+    private var debugPage: L7DebugPage? = null
+    private val probeState = L7ProbeUiState()
+    private val probeExporter = L7ProbeExporter(this)
     private var pendingOverlayStart = false
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val start = pendingOverlayStart
@@ -129,6 +132,10 @@ class DiPlayActivity : ComponentActivity() {
         if (!L7Agreement.require(this)) return
         L7DesktopNavigation.attach(this)
         pendingOverlayStart = savedInstanceState?.getBoolean("pending_overlay_start") ?: false
+        probeState.filter = savedInstanceState?.getInt("probe_filter") ?: 0
+        probeState.query = savedInstanceState?.getString("probe_query").orEmpty()
+        probeState.selectedReport = savedInstanceState?.getString("probe_selected_report")
+        probeExporter.pendingId = savedInstanceState?.getString("probe_export_id")
         if (l7Ui) L7DebugLog.record("L7CarPlay 打开 version=${version()} Android=${Build.VERSION.RELEASE}")
         languagePreferenceAtCreate = AppLocale.preference(this)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
@@ -176,6 +183,10 @@ class DiPlayActivity : ComponentActivity() {
         outState.putBoolean("home_menu_expanded", pageNavigation?.expanded ?: menuExpanded)
         outState.putString("page", page); outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup)
         outState.putBoolean("pending_overlay_start", pendingOverlayStart)
+        outState.putInt("probe_filter", probeState.filter)
+        outState.putString("probe_query", probeState.query)
+        outState.putString("probe_selected_report", probeState.selectedReport)
+        outState.putString("probe_export_id", probeExporter.pendingId)
         super.onSaveInstanceState(outState)
     }
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -204,6 +215,7 @@ class DiPlayActivity : ComponentActivity() {
             return
         }
         handler.removeCallbacks(tick); handler.post(tick)
+        if (l7Ui && L7Routes.isDebug(page)) L7ProbeRunner.refreshEnvironment(this)
         L7DesktopNavigation.ensure(this)
         // Back from the car settings: refresh the car hotspot reminder on the home page.
         if (!initialLaunch && (page == "home" || page == "connection" || page in L7Routes.settings)) {
@@ -227,11 +239,17 @@ class DiPlayActivity : ComponentActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        if (!isChangingConfigurations) L7ProbeRunner.stop()
+        super.onStop()
+    }
+
     private fun render() {
         if (!L7Agreement.require(this)) return
+        if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
         contentScroll = null; connectionSummary = null; homePanel = null; usbButton = null
-        status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null
+        status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null; debugPage = null
         if (l7Ui) {
             renderL7()
             return
@@ -288,7 +306,12 @@ class DiPlayActivity : ComponentActivity() {
             "settings" -> settingsL7(content)
             "settings-connection" -> connectionSettingsL7(content)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
-            "settings-diagnostics" -> diagnostics(content)
+            "settings-debug-logs" -> diagnostics(content)
+            "settings-debug", "settings-debug-results", "settings-debug-history" -> {
+                debugPage = L7DebugPage(this, content, page, probeState, probeExporter) { destination ->
+                    page = destination; render()
+                }
+            }
             "settings-about" -> about(content)
             else -> homeL7(content)
         }
@@ -297,7 +320,12 @@ class DiPlayActivity : ComponentActivity() {
         if (settingsPage) body.addView(column().apply {
             setPaddingRelative(dp(inset), dp(24), dp(inset), dp(8))
             addView(L7Header(this@DiPlayActivity, pageTitle(),
-                onBack = if (page == "settings") null else ({ page = "settings"; render() })
+                backLabel = getString(when {
+                    page == "settings-debug" -> R.string.l7_probe_back_about
+                    L7Routes.isDebug(page) -> R.string.l7_probe_back_debug
+                    else -> R.string.l7_back_settings
+                }),
+                onBack = if (page == "settings") null else ({ page = L7Routes.back(page); render() })
             ), LinearLayout.LayoutParams(-1, -2))
         })
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
@@ -365,7 +393,10 @@ class DiPlayActivity : ComponentActivity() {
         "settings-general" -> R.string.l7_general_settings
         "settings-permissions" -> R.string.permissions_and_connection_help
         "settings" -> R.string.settings
-        "settings-diagnostics" -> R.string.l7_diagnostics_title
+        "settings-debug" -> R.string.l7_probe_title
+        "settings-debug-results" -> R.string.l7_probe_environment
+        "settings-debug-history" -> R.string.l7_probe_history
+        "settings-debug-logs" -> R.string.l7_probe_logs
         "settings-about" -> R.string.about
         else -> R.string.carplay
     })
@@ -378,13 +409,11 @@ class DiPlayActivity : ComponentActivity() {
             Triple("settings-audio", R.string.audio_routing, R.drawable.ic_l7_audio),
             Triple("settings-general", R.string.l7_general_settings, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
-            Triple("settings-diagnostics", R.string.l7_diagnostics_title, R.drawable.ic_dp_diagnostics),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
         val hints = listOf(R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
             R.string.l7_display_row_hint, R.string.l7_audio_row_hint, R.string.l7_general_row_hint,
-            R.string.l7_permissions_row_hint,
-            R.string.l7_diagnostics_row_hint, R.string.l7_about_row_hint)
+            R.string.l7_permissions_row_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))
         })
@@ -839,7 +868,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun about(content: LinearLayout) {
-        if (l7Ui) { L7AboutSettings.add(this, content, version()); return }
+        if (l7Ui) { L7AboutSettings.add(this, content, version()) { page = "settings-debug"; render() }; return }
         content.addView(label(getString(R.string.diplay), 40, TEXT, true))
         content.addView(label(getString(R.string.carplay_at_home_in_your_car), 20, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
         section(content, "${getString(R.string.about_public_preview_prefix)}${version()}") { card ->
@@ -1419,6 +1448,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun refreshStatus() {
         diagnosticSettings?.update(exportInProgress)
+        debugPage?.update()
         val running = CarPlayBackgroundSession.hasSession()
         homePanel?.update(L7HomePanel.configured(this), running, CarPlayBackgroundSession.active,
             connectionRequestPending, setupError)

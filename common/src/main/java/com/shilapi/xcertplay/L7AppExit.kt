@@ -35,6 +35,7 @@ internal object L7AppExit {
         if (exiting) return
         exiting = true
         RemoteLogUpload.cancel()
+        L7ProbeRunner.stop()
         L7DesktopNavigation.stop(context)
         L7DebugOverlayService.stop(context)
         val finish = Runnable { finish(context) }

@@ -1,0 +1,1435 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "carplay_e5",
+      "package": "com.ecarx.carplay",
+      "manifestSha256": "1c91728a1a4d550adec52a0816b9917fe7f516208ac947026b2417c1b6736d2b"
+    },
+    {
+      "id": "android_auto_e5",
+      "package": "com.ecarx.android.auto",
+      "manifestSha256": "27fca3a614b4c35441d52bf52f589433b7f3a5e5ffc0398827909b8c27266101"
+    },
+    {
+      "id": "carmap_l6",
+      "package": "com.flyme.auto.map",
+      "manifestSha256": "9e3cfe205e8129c2740f357d8ef0e5a0f67c186b0fc3707aedbe64cba89253fd"
+    },
+    {
+      "id": "phonelink_l6",
+      "package": "com.geely.linkhmi",
+      "manifestSha256": "62183d77b3951df11b1d839c6e2c61d084abfa6c843dc6e57a82b780f50806cd"
+    },
+    {
+      "id": "jaxb_project",
+      "package": "com.ecarx.config",
+      "manifestSha256": "80e5edf35125d062175899a0040ed011a1d1c6c67d94890d4dbd07dab2806c63"
+    },
+    {
+      "id": "jaxb_archive",
+      "package": "com.lge.car",
+      "manifestSha256": "a8f5bdd6a12baae804c476c76351bfcc889962650c7f683a72a55da3e8cbf4d2"
+    },
+    {
+      "id": "carconfig_reader",
+      "package": null,
+      "manifestSha256": "b503a172a882a260e106a47a8fc008d6715ae0f0349b7412bb410e6f370331ab"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "android. permission. BLUETOOTH_CONNECT",
+      "warnings": [
+        "WHITESPACE_IN_NAME"
+      ],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.BIND_PROJECTION_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "android_auto_e5"
+      ]
+    },
+    {
+      "name": "android.car.permission.CAR_CONTROL_AUDIO_VOLUME",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_DISPLAY_IN_CLUSTER",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_DRIVING_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_ENERGY",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_ENERGY_PORTS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_EXTERIOR_ENVIRONMENT",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_EXTERIOR_LIGHTS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_FOCUS",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_HANDLE_USB_AOAP_DEVICE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_IDENTIFICATION",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_INFO",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_MILEAGE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_MONITOR_INPUT",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_POWER",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_POWERTRAIN",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_PROJECTION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_SPEED",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_TIRES",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CAR_VENDOR_EXTENSION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carconfig_reader",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.CONTROL_CAR_CLIMATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.car.permission.READ_CAR_DISPLAY_UNITS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.intent.action.MANAGE_NETWORK_USAGE",
+      "warnings": [
+        "INTENT_ACTION_AS_REQUEST"
+      ],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission-group.LOCATION",
+      "warnings": [
+        "PERMISSION_GROUP_AS_REQUEST"
+      ],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_BLUETOOTH_SHARE",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_COARSE_LOCATION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_FINE_LOCATION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_GPS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_NETWORK_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCESS_WIFI_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.ACCES_MOCK_LOCATION",
+      "warnings": [
+        "SUSPECTED_TYPO"
+      ],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.AUTHENTICATE_ACCOUNTS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BIND_ACCESSIBILITY_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "carplay_e5"
+      ]
+    },
+    {
+      "name": "android.permission.BIND_INCALL_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "carplay_e5"
+      ]
+    },
+    {
+      "name": "android.permission.BIND_JOB_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_project"
+      ]
+    },
+    {
+      "name": "android.permission.BIND_TELECOM_CONNECTION_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "carplay_e5"
+      ]
+    },
+    {
+      "name": "android.permission.BLUETOOTH",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_ADMIN",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_CONNECT",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_MAP",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_PRIVILEGED",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_SCAN",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BLUETOOTH_STACK",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.BROADCAST_STICKY",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CALL_PHONE",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CAMERA",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CAPTURE_AUDIO_HOTWORD",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CAPTURE_VIDEO_OUTPUT",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CHANGE_NETWORK_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CHANGE_WIFI_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CONTROL_INCALL_EXPERIENCE",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.CREATE_USERS",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.DUMP",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": [
+        "carmap_l6",
+        "carplay_e5"
+      ]
+    },
+    {
+      "name": "android.permission.FORCE_STOP_PACKAGES",
+      "warnings": [],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.FOREGROUND_SERVICE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.GET_TASKS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.GRANT_RUNTIME_PERMISSIONS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.INJECT_EVENTS",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.INTERACT_ACROSS_USERS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.INTERACT_ACROSS_USERS_FULL",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.INTERNAL_SYSTEM_WINDOW",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.INTERNET",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.LOCAL_MAC_ADDRESS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MANAGE_EXTERNAL_STORAGE",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MANAGE_ONGOING_CALLS",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MANAGE_OWN_CALLS",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MANAGE_USB",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MANAGE_USERS",
+      "warnings": [],
+      "requests": [
+        "carplay_e5",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MEDIA_CONTENT_CONTROL",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MODIFY_AUDIO_ROUTING",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MODIFY_AUDIO_SETTINGS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MODIFY_PHONE_STATE",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MONITOR_INPUT",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.NETWORK_SETTINGS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.NETWORK_STACK",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.NFC",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.OVERRIDE_WIFI_CONFIG",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.PACKAGE_USAGE_STATS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.QUERY_ALL_PACKAGES",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_CONTACTS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_EXTERNAL_STORAGE",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_FRAME_BUFFER",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_LOGS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_PHONE_STATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.READ_PRIVILEGED_PHONE_STATE",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.RECEIVE_BOOT_COMPLETED",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.RECORD_AUDIO",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.REORDER_TASKS",
+      "warnings": [],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.REQUEST_INSTALL_PACKAGES",
+      "warnings": [],
+      "requests": [
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.START_ACTIVITIES_FROM_BACKGROUND",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.START_TASKS_FROM_RECENTS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.SYSTEM_ALERT_WINDOW",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.TETHER_PRIVILEGED",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.UPDATE_APP_OPS_STATS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.VIBRATE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.WAKE_LOCK",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.WRITE_CONTACTS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.WRITE_EXTERNAL_STORAGE",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive",
+        "jaxb_project",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.WRITE_SECURE_SETTINGS",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carmap_l6",
+        "carplay_e5",
+        "jaxb_archive"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "android.permission.WRITE_SETTINGS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6",
+        "jaxb_archive",
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.android.launcher.permission.INSTALL_SHORTCUT",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.android.launcher.permission.READ_SETTINGS",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.android.launcher.permission.UNINSTALL_SHORTCUT",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.autonavi.permission.ACCESS_LOCATION",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.android.auto.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [
+        "android_auto_e5"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.carplay.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+      "warnings": [],
+      "requests": [
+        "carplay_e5"
+      ],
+      "definitions": [
+        "carplay_e5"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.carplay.PROVIDER_PERMISSION",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "carplay_e5"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.media.provider.READ_DYNAMIC_SOURCE_DATA",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.media.provider.READ_SOURCE_LIST_DATA",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ecarx.media.provider.WRITE_DYNAMIC_SOURCE_DATA",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.flyme.auto.coreservice.permission.CONNECTION",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": [
+        "carmap_l6"
+      ]
+    },
+    {
+      "name": "com.flyme.auto.data.permission.DATA",
+      "warnings": [],
+      "requests": [
+        "carmap_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.flyme.auto.map.permission.SEND_MAP_DATA",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "carmap_l6"
+      ],
+      "accessProtections": [
+        "carmap_l6"
+      ]
+    },
+    {
+      "name": "com.flymelink.permission.LINK_UNION_BASE_PROVIDER",
+      "warnings": [],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.geely.linkservice.LinkService",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "phonelink_l6"
+      ]
+    },
+    {
+      "name": "com.huawei.hiviewlite.permission.USE_SERVICE",
+      "warnings": [],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.huawei.permission.NEARBY_OPERATOR_FUNCTION",
+      "warnings": [],
+      "requests": [
+        "phonelink_l6"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "com.ucar.permission.UCAR_NOTIFICATION_RECEIVER",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "phonelink_l6"
+      ]
+    },
+    {
+      "name": "ecarx.openapi.permission.ACCESS_NIGHT_MODE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "ecarx.openapi.permission.ACCESS_WINDOW_TYPE",
+      "warnings": [],
+      "requests": [
+        "android_auto_e5",
+        "carplay_e5"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "ecarx.openapi.permission.NAVI_SERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [],
+      "accessProtections": [
+        "android_auto_e5"
+      ]
+    },
+    {
+      "name": "ecarx.permission.PUSH",
+      "warnings": [],
+      "requests": [
+        "jaxb_project"
+      ],
+      "definitions": [],
+      "accessProtections": []
+    },
+    {
+      "name": "ecarx.permission.com.ecarx.android.auto",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "android_auto_e5"
+      ],
+      "accessProtections": [
+        "android_auto_e5"
+      ]
+    },
+    {
+      "name": "geely.car.permission.CAR_IPLM",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.CAR_TEMIL",
+      "warnings": [],
+      "requests": [
+        "jaxb_archive"
+      ],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.CAR_TEMMANAGER",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.CAR_XCALLSERVICE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.DIAG",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.FACTORY",
+      "warnings": [],
+      "requests": [
+        "carconfig_reader",
+        "jaxb_archive"
+      ],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.FACTORYRESET",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.PERSISTENCE",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.POWER",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    },
+    {
+      "name": "geely.car.permission.RAWNET",
+      "warnings": [],
+      "requests": [],
+      "definitions": [
+        "jaxb_archive"
+      ],
+      "accessProtections": []
+    }
+  ]
+}
