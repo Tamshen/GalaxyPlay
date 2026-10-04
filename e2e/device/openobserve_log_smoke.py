@@ -73,7 +73,10 @@ if backup.stdout.strip():
 try:
     adb('shell','am','force-stop','com.ecarx.carplay')
     adb('shell','run-as','com.ecarx.carplay','rm','-f',prefs)
-    launch();tap('OpenObserve 日志服务器');fill();screenshot('configuration');tap('取消')
+    launch()
+    find('上传状态')
+    summary = next(n.get('text') for n in nodes() if n.get('text', '').startswith(('未上传', '已上传\n')))
+    tap('OpenObserve 日志服务器');fill();screenshot('configuration');tap('取消')
     current=subprocess.run(base+['exec-out','run-as','com.ecarx.carplay','cat',prefs],capture_output=True).stdout.decode()
     assert url not in current, '取消却保存配置'
     tap('OpenObserve 日志服务器');fill();tap('保存')
@@ -81,7 +84,7 @@ try:
     values={n.get('name'):n.text for n in saved}
     assert values.get('endpoint')==url and values.get('authorization')==authorization
     find('上传日志');screenshot('configured')
-    assert any(n.get('text') in ('尚未上传','已停止上传；已到达服务器的报告仍会保留') for n in nodes()), '保存配置改变了上传状态'
+    assert any(n.get('text') == summary for n in nodes()), '保存配置改变了上传历史'
     tap('OpenObserve 日志服务器');tap('恢复打包默认值')
     assert '请先填写 OpenObserve 写入地址和认证信息' in [n.get('text') for n in nodes()]
     screenshot('defaults')

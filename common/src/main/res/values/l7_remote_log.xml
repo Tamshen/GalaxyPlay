@@ -9,7 +9,7 @@
     <string name="l7_log_upload">上传日志</string>
     <string name="l7_log_view_short">查看日志</string>
     <string name="l7_log_quick_hint">点击上传后发送最近日志及已收集的环境与权限结果。</string>
-    <string name="l7_log_retry">重试上次上传</string>
+    <string name="l7_log_retry">重试上传</string>
     <string name="l7_log_cancel">取消上传</string>
     <string name="l7_log_state">上传状态</string>
     <string name="l7_log_unconfigured">未配置</string>
@@ -50,4 +50,6 @@
     <string name="l7_log_clear_busy">正在收集或整理报告，请完成后再清空。</string>
     <string name="l7_log_cleared">已清空</string>
     <string name="l7_log_clear_failed">部分内容未能清空，请重试。</string>
+    <string name="l7_log_never_uploaded">未上传</string>
+    <string name="l7_log_last_upload">已上传\n上次成功：%1$s\n共 %2$d 条日志</string>
 </resources>

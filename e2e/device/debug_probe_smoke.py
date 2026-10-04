@@ -141,6 +141,7 @@ try:
     before = {r['runId'] for r in reports()}
     tap('重新收集')
     refreshed = wait_report(before)
+    tap('查看检查结果')
     find('全部')
     assert refreshed['runId'] != report['runId']
     batch = refreshed['runId'].replace('-', '')[:12]
@@ -168,6 +169,7 @@ try:
     tap('重新检查此项')
     single = wait_report(before)
     assert [i['capabilityId'] for i in single['items']] == ['ENV-SYSTEM']
+    tap('查看检查结果')
     tap('报告操作')
     tap('导出检查报告（JSON）')
     time.sleep(.7)

@@ -11,6 +11,7 @@ internal class L7DebugPage(
     private val page: String,
     private val state: L7ProbeUiState,
     exporter: L7ProbeExporter,
+    private val tasks: L7DebugTasks,
     private val onLogs: () -> Unit,
     private val onNavigate: (String) -> Unit,
 ) {
@@ -19,14 +20,13 @@ internal class L7DebugPage(
     private var quickLogs: L7QuickLogActions? = null
     private var summary: L7SettingRow? = null
     private var start: L7SettingRow? = null
-    private var stop: L7SettingRow? = null
     private var view: L7SettingRow? = null
     private var revision = -1L
 
     init {
         L7ProbeRunner.load(activity)
         when (page) {
-            "settings-debug-results" -> results = L7ProbeResultsView(activity, parent, state, exporter, onNavigate)
+            "settings-debug-results" -> results = L7ProbeResultsView(activity, parent, state, exporter, tasks, onNavigate)
             "settings-debug-history" -> history()
             else -> home()
         }
@@ -34,17 +34,14 @@ internal class L7DebugPage(
     }
 
     private fun home() {
-        quickLogs = L7QuickLogActions(activity, parent, onLogs) { onNavigate("settings-debug-logs") }
+        quickLogs = L7QuickLogActions(activity, parent, onLogs, tasks::upload) { onNavigate("settings-debug-logs") }
         L7SettingsSection.add(parent, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
-                if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity))) {
+                if (tasks.collect()) {
                     state.showCurrent()
                     update()
-                } else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
-            }.also(card::addView)
-            stop = L7Components.actionRow(activity, labels.text(R.string.l7_probe_stop)) {
-                L7ProbeRunner.stop(); update()
+                }
             }.also(card::addView)
             view = L7Components.actionRow(activity, labels.text(R.string.l7_probe_results)) {
                 state.selectedReport = if (L7ProbeRunner.current == null) L7ProbeRunner.history.firstOrNull()?.id else null
@@ -84,7 +81,6 @@ internal class L7DebugPage(
             val text = labels.text(if (latest == null) R.string.l7_probe_start else R.string.l7_probe_recollect)
             if (title.text.toString() != text) title.text = text
         }
-        stop?.isEnabled = current?.phase == L7ProbePhase.RUNNING
         view?.isEnabled = latest != null
     }
 

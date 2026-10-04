@@ -37,6 +37,7 @@ internal object L7Dialogs {
         var cancelable = true
         var cancel: DialogInterface.OnCancelListener? = null
         var dismiss: DialogInterface.OnDismissListener? = null
+        var closeRequest: (() -> Unit)? = null
         val actions = linkedMapOf<Int, Action>()
     }
 
@@ -56,6 +57,7 @@ internal object L7Dialogs {
         fun setOnDismissListener(listener: DialogInterface.OnDismissListener) = apply {
             content.dismiss = listener; platform.setOnDismissListener(listener)
         }
+        fun setOnCloseRequest(listener: () -> Unit) = apply { content.closeRequest = listener }
 
         fun setItems(items: Array<out CharSequence>, click: DialogInterface.OnClickListener) = apply {
             content.items = items; content.itemClick = click; content.singleChoice = false
@@ -82,7 +84,7 @@ internal object L7Dialogs {
         fun setNeutralButton(label: Int, click: DialogInterface.OnClickListener?) = setNeutralButton(context.getString(label), click)
         fun setNeutralButton(label: CharSequence, click: DialogInterface.OnClickListener?) = action(AlertDialog.BUTTON_NEUTRAL, label, click)
 
-        fun create(): AlertDialog = if (context.resources.getBoolean(R.bool.config_l7_product_ui))
+        fun create(): AlertDialog = if (content.closeRequest != null || context.resources.getBoolean(R.bool.config_l7_product_ui))
             L7ModalDialog(context, content) else platform.create()
         fun show(): AlertDialog = create().apply { show() }
     }

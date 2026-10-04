@@ -20,6 +20,7 @@ internal class L7ProbeResultsView(
     parent: LinearLayout,
     private val state: L7ProbeUiState,
     private val exporter: L7ProbeExporter,
+    private val tasks: L7DebugTasks,
     private val onNavigate: (String) -> Unit,
 ) {
     private val labels = L7ProbeLabels(activity)
@@ -53,8 +54,7 @@ internal class L7ProbeResultsView(
             }.apply { contentDescription = labels.text(R.string.l7_probe_filter) }, slot())
             addView(control(labels.text(R.string.l7_probe_search_short)) { search() }, slot())
             addView(control(labels.text(R.string.l7_probe_again)) {
-                if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity))) { state.showCurrent(); update(true) }
-                else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
+                if (tasks.collect()) { state.showCurrent(); update(true) }
             }.apply { isEnabled = !L7ProbeRunner.busy }, slot())
             addView(control(labels.text(R.string.l7_probe_report_actions)) { actions(report) }, slot())
         })
@@ -98,10 +98,10 @@ internal class L7ProbeResultsView(
                 "${labels.text(R.string.l7_probe_facts)}\n${item.json().toString(2)}")
             .setNegativeButton(R.string.close, null)
             .setPositiveButton(R.string.l7_probe_recheck_item) { _, _ ->
-                if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity), item.id)) {
+                if (tasks.collect(item.id)) {
                     state.showCurrent()
                     onNavigate("settings-debug-results")
-                } else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
+                }
             }.show()
     }
 

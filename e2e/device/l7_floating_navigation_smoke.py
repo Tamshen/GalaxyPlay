@@ -292,7 +292,7 @@ try:
         if label == '调试与日志':
             tap('日志与报告')
             labels = {n.attrib.get('text') for n in nodes()}
-            assert {'日志与报告', '悬浮日志', '查看当前日志', '保存诊断报告', '管理悬浮窗权限', '显示悬浮日志', '关闭悬浮日志'} <= labels
+            assert {'日志与报告', '悬浮日志', '查看当前日志', '保存诊断报告', '管理悬浮窗权限'} <= labels
             screenshot('diagnostics-night')
             tap('查看当前日志')
             tap('刷新')

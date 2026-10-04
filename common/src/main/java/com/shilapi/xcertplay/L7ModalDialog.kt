@@ -44,6 +44,12 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
     override fun getButton(whichButton: Int): Button? = actions[whichButton]
     override fun getListView(): ListView? = choices
 
+    override fun cancel() {
+        // 任务弹窗先处理终止确认，不能先关闭窗口再通知业务。
+        content.closeRequest?.let { it(); return }
+        super.cancel()
+    }
+
     override fun setCancelable(flag: Boolean) {
         super.setCancelable(flag)
         canCancel = flag

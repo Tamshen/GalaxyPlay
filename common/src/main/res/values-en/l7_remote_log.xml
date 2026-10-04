@@ -7,7 +7,7 @@
     <string name="l7_log_upload">Upload logs</string>
     <string name="l7_log_view_short">View logs</string>
     <string name="l7_log_quick_hint">Tap Upload to send recent logs and collected environment and permission results.</string>
-    <string name="l7_log_retry">Retry last upload</string>
+    <string name="l7_log_retry">Retry upload</string>
     <string name="l7_log_cancel">Cancel upload</string>
     <string name="l7_log_state">Upload status</string>
     <string name="l7_log_unconfigured">Not configured</string>
@@ -48,4 +48,6 @@
     <string name="l7_log_clear_busy">Reports are being collected or processed. Wait until this finishes before clearing.</string>
     <string name="l7_log_cleared">Cleared</string>
     <string name="l7_log_clear_failed">Some content could not be cleared. Please retry.</string>
+    <string name="l7_log_never_uploaded">Not uploaded</string>
+    <string name="l7_log_last_upload">Uploaded\nLast successful upload: %1$s\n%2$d log records</string>
 </resources>

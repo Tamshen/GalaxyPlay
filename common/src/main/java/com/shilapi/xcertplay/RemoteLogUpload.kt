@@ -10,6 +10,7 @@ internal object RemoteLogUpload {
         val completedBatches: Int = 0, val totalBatches: Int = 0,
         val uploadedLines: Int = 0, val totalLines: Int = 0,
         val omittedLines: Int = 0, val shortenedSources: Int = 0,
+        val finishedAt: Long = 0,
     )
     private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport, var next: Int = 0)
     @Volatile var status = Status()
@@ -50,7 +51,11 @@ internal object RemoteLogUpload {
                 transport = null
                 val phase = if (code in 200..299) Phase.SUCCESS else Phase.FAILED
                 status = task?.state(phase, code) ?: Status(phase, code = code)
-                if (phase == Phase.SUCCESS) pending = null
+                if (phase == Phase.SUCCESS) {
+                    status = status.copy(finishedAt = System.currentTimeMillis())
+                    runCatching { RemoteLogHistory.save(app, RemoteLogHistory.Entry(status.finishedAt, status.totalLines)) }
+                    pending = null
+                }
             }
         }
     }

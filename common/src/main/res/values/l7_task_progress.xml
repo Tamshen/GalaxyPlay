@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_task_collect">收集环境与调试信息</string>
+    <string name="l7_task_stop_collect">停止收集</string>
+    <string name="l7_task_stop_upload">停止上传</string>
+    <string name="l7_task_end_title">终止当前任务？</string>
+    <string name="l7_task_continue">继续等待</string>
+    <string name="l7_task_end_close">终止并关闭</string>
+    <string name="l7_task_end_collect">终止后保留已收集的信息，不再继续检查。</string>
+    <string name="l7_task_end_upload">终止后不再发送剩余批次，已被服务器接收的日志会保留。</string>
+    <string name="l7_task_preparing_collect">正在准备收集…</string>
+    <string name="l7_task_preparing_upload">正在整理上传日志…</string>
+    <string name="l7_task_saving">正在保存检查结果…</string>
+    <string name="l7_task_current">正在检查：%1$s</string>
+    <string name="l7_task_stopping_collect">已停止后续检查，正在等待当前系统查询结束。可直接关闭，已收集的信息会保留。</string>
+    <string name="l7_task_uploaded">上传完成</string>
+    <string name="l7_task_upload_failed">上传失败</string>
+    <string name="l7_task_upload_stopped">停止只取消未完成批次，已被服务器接收的日志会保留。</string>
+    <string name="l7_task_overlay_hint">开启后显示悬浮日志；关闭不影响 CarPlay 连接。</string>
+</resources>
