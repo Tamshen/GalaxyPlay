@@ -11,4 +11,15 @@
     <string name="l7_exit_app">Exit app</string>
     <string name="l7_exit_title">Exit L7CarPlay?</string>
     <string name="l7_exit_message">This will disconnect CarPlay, close floating logs and background services, and end the app process.</string>
+    <string name="l7_reset_section">Reset application</string>
+    <string name="l7_reset_title">Reset all settings</string>
+    <string name="l7_reset_hint">Erase all app data and return to first-use setup</string>
+    <string name="l7_reset_warning">This cannot be undone. All settings, app pairing records, imported authentication, logs and check reports will be deleted.</string>
+    <string name="l7_reset_message">Connections, log uploads and overlays will stop before Android erases app data and runtime permissions. The app will close. Open it again to read the first-use agreement and grant permissions.\n\nThe installed app and bundled authentication remain. System Bluetooth pairings, hotspot settings, exported files and logs already on the server are not deleted.</string>
+    <string name="l7_reset_confirm">Erase all and exit</string>
+    <string name="l7_reset_progress">Stopping connections and erasing app data…\nThe app will close. Please open it again shortly.</string>
+    <string name="l7_reset_failed">Could not erase app data</string>
+    <string name="l7_reset_failed_hint">The system did not accept the request; reset completion has not been confirmed. Connections have stopped. Open app settings, then choose Storage and Clear data.</string>
+    <string name="l7_reset_open_settings">Open app settings</string>
+    <string name="l7_reset_manual_hint">Could not open app settings. Find L7 CarPlay in the system app manager, then choose Storage and Clear data.</string>
 </resources>

@@ -248,3 +248,7 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 `python3 e2e/device/task_dialog_smoke.py --clear-only` 在 AVD 使用本机模拟接口验证清空后无内容不发送、删除中 HTTP 400 提示及旧重试丢弃，结束恢复服务器配置与上传历史。会清空 AVD 日志及报告，不在实车运行。`python3 e2e/device/connection_guide_smoke.py --wifi-only` 检查 Wi-Fi 跳转和读取失败恢复，不启停或写入热点。
 
 显式远端联调可用 `python3 e2e/device/openobserve_http_probe.py --send`：读取本地配置，向当前 AVD 日志流发送两条合成记录，对照 Content-Type 并输出脱敏状态；不读取车辆日志，不属于默认回归。
+
+### 全量重置
+
+`L7ResetSettingsTest` 在 API 29/30 验证取消不执行、确认只执行一次、系统拒绝 / 异常恢复、清理等待上限与迟到回调。中文 AVD 可运行 `python3 e2e/device/reset_settings_smoke.py --reset-and-restore`：实际清空本应用数据并验证首次使用入口，原私有数据仅保存在脚本内存，结束后恢复数据、运行时权限和应用操作授权；不上传、不读取车机日志。勿中断脚本进程，进程退出会丢失内存备份。截图留在忽略目录。

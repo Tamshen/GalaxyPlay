@@ -10,4 +10,15 @@
     <string name="l7_exit_app">退出应用</string>
     <string name="l7_exit_title">退出 L7CarPlay？</string>
     <string name="l7_exit_message">将断开 CarPlay、关闭悬浮日志和后台服务，并结束应用进程。</string>
+    <string name="l7_reset_section">应用重置</string>
+    <string name="l7_reset_title">清空所有配置</string>
+    <string name="l7_reset_hint">删除全部应用数据，恢复到初次安装状态</string>
+    <string name="l7_reset_warning">此操作无法撤销。配置、应用配对记录、导入的认证、日志和检查报告将全部删除。</string>
+    <string name="l7_reset_message">将先停止连接、日志上传和悬浮窗，再由系统清除本应用数据及运行时授权。应用随后关闭，请手动重新打开，阅读首次使用协议并重新授权。\n\n已安装的应用和内置认证保留。车机系统中的蓝牙配对、热点配置、已导出的文件及服务器上的日志不会删除。</string>
+    <string name="l7_reset_confirm">全部清空并退出</string>
+    <string name="l7_reset_progress">正在停止连接并清空应用数据…\n应用即将关闭，请稍后重新打开。</string>
+    <string name="l7_reset_failed">未能清空应用数据</string>
+    <string name="l7_reset_failed_hint">系统未接受清理请求，尚未确认重置完成。连接已停止。可打开本应用的系统设置，在“存储”中选择“清除数据”。</string>
+    <string name="l7_reset_open_settings">打开应用设置</string>
+    <string name="l7_reset_manual_hint">无法打开应用设置。请在车机系统的应用管理中找到 L7 CarPlay，进入“存储”后选择“清除数据”。</string>
 </resources>

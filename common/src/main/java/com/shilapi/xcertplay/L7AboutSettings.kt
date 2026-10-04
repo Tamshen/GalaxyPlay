@@ -17,5 +17,6 @@ internal object L7AboutSettings {
                 text(R.string.l7_agreement_entry_hint)) { L7Agreement.showDetails(activity) })
         }
         L7OpenSourceSettings.add(parent)
+        L7ResetSettings.add(activity, parent)
     }
 }

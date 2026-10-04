@@ -32,6 +32,22 @@ internal object L7AppExit {
     }
 
     fun exit(context: Context) {
+        stop(context) { finish(context) }
+    }
+
+    /** 系统统一清理应用数据并结束进程，避免遗漏未知旧配置或被内存缓存写回。 */
+    fun reset(context: Context, onRejected: () -> Unit,
+              clearData: () -> Boolean = { context.getSystemService(ActivityManager::class.java).clearApplicationUserData() }) {
+        stop(context) {
+            stopServices(context)
+            if (!runCatching(clearData).getOrDefault(false)) {
+                exiting = false
+                onRejected()
+            }
+        }
+    }
+
+    private fun stop(context: Context, completion: () -> Unit) {
         if (exiting) return
         exiting = true
         L7StartupGuard.stopped()
@@ -39,7 +55,10 @@ internal object L7AppExit {
         L7ProbeRunner.stop()
         L7DesktopNavigation.stop(context)
         L7DebugOverlayService.stop(context)
-        val finish = Runnable { finish(context) }
+        var completed = false
+        val finish = Runnable {
+            if (!completed) { completed = true; completion() }
+        }
         handler.postDelayed(finish, 6_000)
         CarPlayBackgroundSession.stop {
             handler.post { handler.removeCallbacks(finish); finish.run() }
@@ -49,9 +68,7 @@ internal object L7AppExit {
     private fun finish(context: Context) {
         if (finishing) return
         finishing = true
-        context.stopService(Intent(context, DiPlaySessionService::class.java))
-        context.stopService(Intent(context, CarPlayVpnService::class.java))
-        L7DebugOverlayService.stop(context)
+        stopServices(context)
         val manager = context.getSystemService(ActivityManager::class.java)
         manager.appTasks.forEach { runCatching { it.finishAndRemoveTask() } }
         // 留一个主线程周期完成窗口与服务销毁；仅允许结束本应用 UID/包名所属进程。
@@ -62,5 +79,11 @@ internal object L7AppExit {
             }.forEach { Process.killProcess(it.pid) }
             Process.killProcess(Process.myPid())
         }, 150)
+    }
+
+    private fun stopServices(context: Context) {
+        context.stopService(Intent(context, DiPlaySessionService::class.java))
+        context.stopService(Intent(context, CarPlayVpnService::class.java))
+        L7DebugOverlayService.stop(context)
     }
 }
