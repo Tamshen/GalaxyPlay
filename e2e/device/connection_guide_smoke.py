@@ -85,7 +85,7 @@ try:
     adb('shell', 'cmd', 'appops', 'set', package, 'WRITE_SETTINGS', 'deny')
     if args.wifi_only:
         launch('settings-connection-wireless')
-        tap('Wi-Fi 设置')
+        tap('原生 Wi-Fi 设置')
         assert 'com.android.settings' in adb('shell', 'dumpsys', 'activity', 'top').decode()
         screenshot('wifi-settings')
         adb('shell', 'input', 'keyevent', '4')
@@ -93,7 +93,7 @@ try:
         tap('重新读取热点配置'); wait('未能读取热点配置')
         assert any('读取与设置权限不同' in t for t in texts())
         screenshot('read-failure-wifi')
-        tap('Wi-Fi 设置')
+        tap('原生 Wi-Fi 设置')
         assert 'com.android.settings' in adb('shell', 'dumpsys', 'activity', 'top').decode()
         adb('shell', 'input', 'keyevent', '4')
         launch('settings-connection-wireless')

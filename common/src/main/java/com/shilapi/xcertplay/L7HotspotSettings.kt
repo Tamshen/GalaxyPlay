@@ -126,26 +126,16 @@ internal class L7HotspotSettings(
     private fun text(id: Int) = activity.getString(id)
 
     companion object {
-        /** 原生直达入口保留；定制固件不提供该组件时，回退到它实际支持的 Wi-Fi 设置。 */
-        fun openSettings(activity: Activity) {
-            val candidates = listOf(
-                Intent("com.android.settings.WIFI_TETHER_SETTINGS").setPackage("com.android.settings"),
-                Intent().setClassName("com.android.settings", "com.android.settings.Settings\$WifiTetherSettingsActivity"),
-                Intent().setClassName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity"),
-            )
-            if (candidates.none { runCatching { activity.startActivity(it) }.isSuccess }) {
-                L7Dialogs.builder(activity).setTitle(R.string.open_car_hotspot_settings)
-                    .setMessage(R.string.l7_hotspot_settings_missing).setNegativeButton(R.string.close, null)
-                    .setPositiveButton(R.string.l7_hotspot_wifi_settings) { _, _ -> openWifiSettings(activity) }.show()
-            }
-        }
+        fun openWifiSettings(activity: Activity) = openSettings(activity)
 
-        fun openWifiSettings(activity: Activity) {
-            // 不限制包名，沿用系统 Wi-Fi action，允许 Flyme 固件自己的设置页处理。
-            val candidates = listOf(Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_WIRELESS_SETTINGS))
-            if (candidates.none { runCatching { activity.startActivity(it) }.isSuccess }) {
+        /** 沿用热点功能调整前的跳转：查询原有热点 action，不可用时打开无线网络设置。 */
+        fun openSettings(activity: Activity) {
+            val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
+            val target = activity.packageManager.resolveActivity(hotspot, 0)?.activityInfo?.packageName
+            if (target != null && runCatching { activity.startActivity(hotspot) }.isSuccess) return
+            if (runCatching { activity.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }.isFailure) {
                 L7Dialogs.builder(activity).setTitle(R.string.l7_hotspot_wifi_settings)
-                    .setMessage(R.string.l7_hotspot_wifi_missing).setPositiveButton(R.string.close, null).show()
+                    .setMessage(R.string.l7_hotspot_settings_missing).setPositiveButton(R.string.close, null).show()
             }
         }
     }

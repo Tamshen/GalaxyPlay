@@ -927,23 +927,7 @@ class DiPlayActivity : ComponentActivity() {
         dialog.show()
     }
 
-    // BYD maps the AOSP tether action to its own hotspot screen; other firmware falls back to Wi-Fi settings.
-    // BYD shows that screen as a dialog and closes it unless its own settings or the car home screen is on top,
-    // so the home screen goes first.
-    private fun openCarWifiSettings() {
-        if (l7Ui) { L7HotspotSettings.openSettings(this); return }
-        val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
-        val target = packageManager.resolveActivity(hotspot, 0)?.activityInfo?.packageName
-        if (target == null) {
-            openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
-            return
-        }
-        if (target == "com.byd.carsettings") {
-            runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
-        }
-        if (runCatching { startActivity(hotspot) }.isSuccess) return
-        openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
-    }
+    private fun openCarWifiSettings() = L7HotspotSettings.openSettings(this)
 
     private fun openCarClientWifiSettings() {
         val wifi = Intent(Settings.ACTION_WIFI_SETTINGS)
