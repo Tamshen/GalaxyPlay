@@ -9,7 +9,7 @@ import java.io.RandomAccessFile
 import java.time.Instant
 import java.util.UUID
 
-/** 只收集有界文本日志和日志设备编号，不上传完整设备报告或原始硬件标识。 */
+/** 设备由写入 URL 的日志流区分，正文只包含有界文本及报告信息。 */
 internal data class RemoteLogReport(val id: String, val body: ByteArray, val lineCount: Int) {
     companion object {
         const val MAX_BODY = 256 * 1024
@@ -37,10 +37,10 @@ internal data class RemoteLogReport(val id: String, val body: ByteArray, val lin
             }
             lines += L7DebugLog.buffer.snapshot().lines
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            return create(lines, version, context.getString(R.string.l7_core_source_info), RemoteLogDevice.id(context))
+            return create(lines, version, context.getString(R.string.l7_core_source_info))
         }
 
-        internal fun create(lines: List<String>, version: String, core: String, deviceId: String): RemoteLogReport {
+        internal fun create(lines: List<String>, version: String, core: String): RemoteLogReport {
             // 每条日志一个 OpenObserve 事件；按实际 JSON 字节预算保留最近记录。
             val id = UUID.randomUUID().toString()
             val collected = Instant.now().toString()
@@ -52,7 +52,6 @@ internal data class RemoteLogReport(val id: String, val body: ByteArray, val lin
                 if (!seen.add(safe)) continue
                 // _timestamp 由服务端填接收时间，避免车机时钟异常使日志落到错误的查询时间段。
                 val event = JSONObject().put("report_id", id).put("event_id", "$id:$index")
-                    .put("device_id", deviceId)
                     .put("collected_at", collected).put("app_version", version.take(80))
                     .put("core_version", core.take(120)).put("line_index", index).put("message", safe)
                 val size = event.toString().toByteArray(Charsets.UTF_8).size + 1
@@ -62,7 +61,6 @@ internal data class RemoteLogReport(val id: String, val body: ByteArray, val lin
             }
             if (selected.isEmpty()) {
                 selected.add(JSONObject().put("report_id", id).put("event_id", "$id:empty")
-                    .put("device_id", deviceId)
                     .put("collected_at", collected).put("app_version", version.take(80))
                     .put("core_version", core.take(120)).put("line_index", 0).put("message", "No diagnostic lines available"))
             }

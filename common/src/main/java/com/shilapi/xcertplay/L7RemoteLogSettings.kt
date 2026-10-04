@@ -53,7 +53,8 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         val config = RemoteLogConfig.load(context)
         val status = RemoteLogUpload.status
         val busy = status.phase == RemoteLogUpload.Phase.UPLOADING
-        server.setValue(config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) })
+        server.setValue(if (RemoteLogConfig.validEndpoint(config.endpoint)) config.forDevice(deviceId).endpoint
+            else config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) })
         upload.isEnabled = config.valid() && !busy
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
         retry.isEnabled = config.valid() && status.phase == RemoteLogUpload.Phase.FAILED

@@ -14,8 +14,9 @@ internal object RemoteLogUpload {
 
     @Synchronized fun start(context: Context, retry: Boolean = false): Boolean {
         val app = context.applicationContext
-        val config = RemoteLogConfig.load(app)
-        if (!config.valid() || !L7Agreement.accepted(app) || L7AppExit.exiting || status.phase == Phase.UPLOADING) return false
+        val saved = RemoteLogConfig.load(app)
+        if (!saved.valid() || !L7Agreement.accepted(app) || L7AppExit.exiting || status.phase == Phase.UPLOADING) return false
+        val config = saved.forDevice(RemoteLogDevice.id(app))
         val retained = if (retry) pending?.takeIf { it.first == config }?.second else null
         val run = ++generation
         val sender = RemoteLogTransport().also { transport = it }

@@ -10,6 +10,14 @@ internal data class RemoteLogConfig(val endpoint: String, val authorization: Str
     fun valid(): Boolean = validEndpoint(endpoint) && validAuthorization(authorization)
     val stream: String get() = URI(endpoint).path.split('/').dropLast(1).last()
 
+    /** 保留用户配置的服务器、代理前缀及组织，只替换示例中的日志流名称。 */
+    fun forDevice(device: String): RemoteLogConfig {
+        require(validEndpoint(endpoint))
+        require(device.matches(Regex("l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}")))
+        val organizationUrl = endpoint.substringBeforeLast('/').substringBeforeLast('/')
+        return copy(endpoint = "$organizationUrl/$device/_json")
+    }
+
     companion object {
         fun validEndpoint(value: String): Boolean = runCatching {
             val uri = URI(value)
