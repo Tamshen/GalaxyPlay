@@ -45,7 +45,7 @@ bash scripts/build-l7-host.sh --check
 
 | 项目 | 版本 | 用途 | 许可 |
 | --- | --- | --- | --- |
-| [DiPlay](https://github.com/shihabal3amri/DiPlay) | 0.2.8+patch.0.2.11 | 接收核心及精选上游补丁 | [GPL-3.0](docs/第三方许可.md#diplay) |
+| [DiPlay](https://github.com/shihabal3amri/DiPlay) | 0.2.11 | 接收核心，保留 L7 专用适配 | [GPL-3.0](docs/第三方许可.md#diplay) |
 | [DiPlay · carlito12345](https://github.com/carlito12345/DiPlay) | 参考 0.2.11 | 吉利二改；蓝牙媒体交接、方控接入及音频兼容参考 | [来源与许可](docs/第三方许可.md#diplay-geely-reference) |
 
 感谢 carlito12345 开源分享车机适配实现；参考项目版本不代表 L7 核心升级或全部功能已合入。应用「关于」提供项目地址与参考说明；其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，也可在「关于 → 第三方许可」离线查看。
