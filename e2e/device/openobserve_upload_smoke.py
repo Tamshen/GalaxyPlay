@@ -59,8 +59,12 @@ def find(label):
 adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-diagnostics')
 find('OpenObserve 日志服务器')
 find('日志名称')
-stream = next(n.get('text') for n in nodes() if re.fullmatch(r'l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}', n.get('text', '')))
+stream = next(n.get('text') for n in nodes() if re.fullmatch(r'(?:[a-z0-9]+(?:_[a-z0-9]+)*_)?[a-f0-9]{5}(?:_[a-f0-9]{5}){3}', n.get('text', '')))
 actual_endpoint = urllib.parse.urlunsplit((url.scheme, url.netloc, f'{prefix}/{organization}/{stream}/_json', '', ''))
+if example_stream == '{HeadUnit}-{DeviceID}':
+    actual_endpoint = endpoint.replace('{HeadUnit}', stream[:-24]).replace('{DeviceID}', stream[-23:])
+elif example_stream == '{DeviceID}':
+    actual_endpoint = endpoint.replace('{DeviceID}', stream)
 assert actual_endpoint in [n.get('text') for n in nodes()], '应用实际上传地址与 .env 的组织及本机日志名称不一致，未上传'
 lines = '\n'.join(f'{marker} sample={index} level=info AVD synthetic upload verification' for index in range(1, 4)) + '\n'
 command = 'run-as com.ecarx.carplay sh -c ' + shlex.quote('mkdir -p files/logs && cat >> files/logs/diplay.log')

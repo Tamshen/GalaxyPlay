@@ -8,20 +8,33 @@ import java.util.Base64
 /** 应用内配置优先于打包默认值；上传凭据与 MFi 认证完全独立。 */
 internal data class RemoteLogConfig(val endpoint: String, val authorization: String) {
     fun valid(): Boolean = validEndpoint(endpoint) && validAuthorization(authorization)
+    // OpenObserve 将连字符等字符转换为下划线，响应里的流名使用规范化结果。
     val stream: String get() = URI(endpoint).path.split('/').dropLast(1).last()
+        .replace(Regex("[^a-zA-Z0-9_:]"), "_")
 
     /** 保留用户配置的服务器、代理前缀及组织，只替换示例中的日志流名称。 */
     fun forDevice(device: String): RemoteLogConfig {
         require(validEndpoint(endpoint))
-        require(device.matches(Regex("l7_[a-f0-9]{5}(?:_[a-f0-9]{5}){3}")))
+        require(RemoteLogDevice.validName(device))
         val organizationUrl = endpoint.substringBeforeLast('/').substringBeforeLast('/')
-        return copy(endpoint = "$organizationUrl/$device/_json")
+        val slot = endpoint.substringBeforeLast('/').substringAfterLast('/')
+        val target = when (slot) {
+            "{HeadUnit}-{DeviceID}" -> "${device.dropLast(24)}-${device.takeLast(23)}"
+            "{DeviceID}" -> device.takeLast(23)
+            else -> device
+        }
+        return copy(endpoint = "$organizationUrl/$target/_json")
     }
 
     companion object {
         fun validEndpoint(value: String): Boolean = runCatching {
-            val uri = URI(value)
-            value.length <= 2048 && uri.scheme in listOf("https", "http") &&
+            val slot = value.substringBeforeLast('/').substringAfterLast('/')
+            val prefix = value.substringBeforeLast('/').substringBeforeLast('/')
+            val templateValid = if ('{' in value || '}' in value) {
+                slot in setOf("{HeadUnit}-{DeviceID}", "{DeviceID}") && '{' !in prefix && '}' !in prefix
+            } else true
+            val uri = URI(value.replace("{HeadUnit}", "head_unit").replace("{DeviceID}", "device_id"))
+            templateValid && value.length <= 2048 && uri.scheme in listOf("https", "http") &&
                 !uri.host.isNullOrBlank() && uri.rawUserInfo == null && uri.rawQuery == null &&
                 uri.rawFragment == null && (uri.port == -1 || uri.port in 1..65535) &&
                 Regex("(?:/[^/]+)*/api/[^/]+/[^/]+/_json").matches(uri.path)

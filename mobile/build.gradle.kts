@@ -27,8 +27,13 @@ val logDefaults = providers.fileContents(rootProject.layout.projectDirectory.fil
 val logServerUrl = providers.environmentVariable("L7_LOG_SERVER_URL").getOrElse(logDefaults["L7_LOG_SERVER_URL"].orEmpty())
 val logAuthorization = providers.environmentVariable("L7_LOG_AUTHORIZATION").getOrElse(logDefaults["L7_LOG_AUTHORIZATION"].orEmpty())
 check(logServerUrl.isEmpty() || runCatching {
-    val uri = URI(logServerUrl)
-    logServerUrl.length <= 2048 && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() &&
+    val slot = logServerUrl.substringBeforeLast('/').substringAfterLast('/')
+    val prefix = logServerUrl.substringBeforeLast('/').substringBeforeLast('/')
+    val templateValid = if ('{' in logServerUrl || '}' in logServerUrl) {
+        slot in setOf("{HeadUnit}-{DeviceID}", "{DeviceID}") && '{' !in prefix && '}' !in prefix
+    } else true
+    val uri = URI(logServerUrl.replace("{HeadUnit}", "head_unit").replace("{DeviceID}", "device_id"))
+    templateValid && logServerUrl.length <= 2048 && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() &&
         uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
         (uri.port == -1 || uri.port in 1..65535) &&
         Regex("(?:/[^/]+)*/api/[^/]+/[^/]+/_json").matches(uri.path)

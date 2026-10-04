@@ -23,10 +23,10 @@
     <string name="l7_log_http_failed">上传失败：HTTP %1$d，请检查写入地址、认证信息和权限</string>
     <string name="l7_log_url_label">OpenObserve 写入 URL</string>
     <string name="l7_log_token_label">Authorization（含 Basic 前缀）</string>
-    <string name="l7_log_config_hint">从 OpenObserve 复制 /api/组织/流/_json 完整地址和 Authorization 值。上传时会将示例中的流名替换为本机日志名称。建议使用 HTTPS 与写入专用凭据；HTTP 不加密。</string>
+    <string name="l7_log_config_hint">填写完整写入地址和 Authorization。流名可用 {HeadUnit}-{DeviceID}，上传时自动替换为车机型号与设备哈希。普通示例地址也支持。建议使用 HTTPS 与写入专用凭据；HTTP 不加密。</string>
     <string name="l7_log_reset">恢复打包默认值</string>
     <string name="l7_log_save_failed">配置保存失败，请重试</string>
-    <string name="l7_log_url_error">请输入以 /api/组织/流/_json 结尾的 HTTP 或 HTTPS 地址，不含账号密码、查询参数或片段</string>
+    <string name="l7_log_url_error">请输入 /api/组织/流/_json 地址；流名可用 {HeadUnit}-{DeviceID} 或 {DeviceID}，不含账号密码、查询参数或片段</string>
     <string name="l7_log_token_error">请填写 Basic 空格加 Base64 编码的用户名:写入凭据</string>
     <string name="l7_log_partial">OpenObserve 未全部写入，重试可能产生重复记录</string>
 </resources>
