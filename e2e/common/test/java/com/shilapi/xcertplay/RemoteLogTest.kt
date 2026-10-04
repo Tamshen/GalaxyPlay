@@ -1,6 +1,10 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import com.shilapi.xcertplay.host.R
 import com.sun.net.httpserver.HttpServer
 import org.json.JSONObject
 import org.json.JSONArray
@@ -96,7 +100,7 @@ class RemoteLogTest {
         }
     }
 
-    @Test fun noUploadWithoutConsentAndOnlyManualRetryReusesReport() {
+    @Test fun quickActionsOnlyUploadAfterClickAndConsentAndManualRetryReusesReport() {
         val ids = CopyOnWriteArrayList<String>()
         val endpoint = serve { exchange ->
             assertEquals(token, exchange.requestHeaders.getFirst("Authorization"))
@@ -109,17 +113,38 @@ class RemoteLogTest {
             exchange.responseBody.use { it.write(response) }
         }
         RemoteLogConfig.save(context, RemoteLogConfig(endpoint, token))
-        assertFalse(RemoteLogUpload.start(context))
+        val content = LinearLayout(context)
+        var views = 0
+        val actions = L7QuickLogActions(context, content, { views++ }, {})
+        fun button(id: Int): Button {
+            val matches = ArrayList<View>()
+            content.findViewsWithText(matches, context.getString(id), View.FIND_VIEWS_WITH_TEXT)
+            return matches.filterIsInstance<Button>().single()
+        }
+        actions.update()
+        assertTrue(ids.isEmpty())
+        button(R.string.l7_log_view_short).performClick()
+        assertEquals(1, views)
+        button(R.string.l7_log_upload).performClick()
         assertTrue(ids.isEmpty())
         assertTrue(L7Agreement.accept(context))
-        assertTrue(RemoteLogUpload.start(context))
+        actions.update()
+        assertTrue(ids.isEmpty())
+        button(R.string.l7_log_upload).performClick()
         awaitPhase(RemoteLogUpload.Phase.FAILED)
         Thread.sleep(150)
         assertEquals(1, ids.size)
-        assertTrue(RemoteLogUpload.start(context, retry = true))
+        actions.update()
+        val retry = button(R.string.l7_log_retry)
+        assertEquals(View.VISIBLE, retry.visibility)
+        retry.performClick()
         awaitPhase(RemoteLogUpload.Phase.SUCCESS)
+        actions.update()
+        assertEquals(View.GONE, retry.visibility)
         assertEquals(2, ids.size)
         assertEquals(ids[0], ids[1])
+        assertTrue(L7RemoteLogSettings.statusText(context, RemoteLogUpload.status, RemoteLogDevice.id(context))
+            .contains(RemoteLogDevice.id(context)))
     }
 
     @Test fun cancelBlocksRepeatedClicksAndLateCompletionCannotRestoreSuccess() {

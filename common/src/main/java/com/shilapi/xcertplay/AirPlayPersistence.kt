@@ -322,6 +322,18 @@ object AirPlayPersistence {
             .getString(KEY_MANUAL_HOTSPOT_SSID, null)
             .orEmpty()
 
+    /** 系统读取或明确接受的配置一次写入，避免下次建链读到新名称和旧密码。 */
+    fun saveNativeHotspotCredentials(context: Context, value: com.shilapi.xcertplay.network.NativeHotspotCredentials) {
+        require(value.valid())
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_MANUAL_HOTSPOT_SSID, value.ssid)
+            .putString(KEY_MANUAL_HOTSPOT_PASSPHRASE, value.password)
+            .putString(KEY_MANUAL_HOTSPOT_SECURITY, value.security.name)
+            .putString(KEY_MANUAL_HOTSPOT_BAND, ManualHotspotBand.AUTO.name)
+            .putInt(KEY_MANUAL_HOTSPOT_CHANNEL, 0)
+            .apply()
+    }
+
     fun saveManualHotspotSsid(context: Context, ssid: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_MANUAL_HOTSPOT_SSID, ssid)

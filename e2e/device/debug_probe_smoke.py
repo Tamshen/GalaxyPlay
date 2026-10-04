@@ -112,10 +112,10 @@ try:
     launch('settings')
     assert not any(n.get('text') == '诊断与日志' for n in nodes().iter('node'))
     tap('关于')
-    assert not any(n.get('text') == '调试' for n in nodes().iter('node')), '关于页仍保留重复调试入口'
+    assert not any(n.get('text') == '调试与日志' for n in nodes().iter('node')), '关于页仍保留重复调试入口'
     tap('返回设置')
     before = {r['runId'] for r in reports()}
-    tap('调试')
+    tap('调试与日志')
     find('返回设置')
     find(collect_label())
     assert before == {r['runId'] for r in reports()}, '打开调试页自动开始了扫描'
@@ -131,7 +131,7 @@ try:
     find('检查完成')
     screenshot('debug-completed-day')
     tap('查看检查结果')
-    find('返回调试')
+    find('返回调试与日志')
     for heading in ('项目', '状态', '原因', '全部'):
         find(heading)
     screenshot('debug-table-all-day')
@@ -177,9 +177,9 @@ try:
     assert exported['runId'] == single['runId']
     screenshot('debug-export-day')
     time.sleep(4.6)  # 保存反馈是自动消退的窗口内提示，系统返回会离开结果页。
-    tap('返回调试')
+    tap('返回调试与日志')
     tap('历史检查报告')
-    find('返回调试')
+    find('返回调试与日志')
     screenshot('debug-history-day')
     adb('shell', 'input', 'keyevent', '4')
     find('返回设置')
@@ -187,7 +187,7 @@ try:
     find('查看当前日志')
     find('OpenObserve 日志服务器')
     screenshot('debug-logs-day')
-    tap('返回调试')
+    tap('返回调试与日志')
     tap('返回设置')
     tap('关于')
     find('应用版本')

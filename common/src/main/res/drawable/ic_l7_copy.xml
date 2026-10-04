@@ -1,0 +1,7 @@
+<!-- 复制动作：沿用同组图标的 80 单位画布、圆角和主题描边。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text"
+        android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M29,32 L52,32 Q57,32 57,37 L57,59 Q57,64 52,64 L29,64 Q24,64 24,59 L24,37 Q24,32 29,32 M34,24 L34,21 Q34,17 38,17 L61,17 Q66,17 66,22 L66,45 Q66,49 62,49" />
+</vector>

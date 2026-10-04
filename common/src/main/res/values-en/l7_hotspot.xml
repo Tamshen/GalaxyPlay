@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_hotspot_use_saved">Connect with saved details</string>
+    <string name="l7_hotspot_read">Read hotspot configuration again</string>
+    <string name="l7_hotspot_reading">Reading the Android native hotspot name and password…</string>
+    <string name="l7_hotspot_read_ok">System hotspot configuration read and saved.</string>
+    <string name="l7_hotspot_read_permission">The system denied access to the name or password. View them in Android native hotspot settings and enter them here. Saved details are kept.</string>
+    <string name="l7_hotspot_read_invalid">The system did not provide complete, usable credentials. Check native hotspot settings and enter them manually.</string>
+    <string name="l7_hotspot_read_unavailable">Hotspot configuration cannot be read on this system. Check Android native hotspot settings and enter the details manually.</string>
+    <string name="l7_hotspot_start">Start native hotspot</string>
+    <string name="l7_hotspot_create">Generate CarPlay hotspot configuration</string>
+    <string name="l7_hotspot_starting">Starting the native hotspot. Please wait…</string>
+    <string name="l7_hotspot_start_permission">Allow this app to modify system settings, then return and tap Start again. Some head units still require manual activation in Android native settings.</string>
+    <string name="l7_hotspot_write_permission">The system denied hotspot configuration changes. Modify system settings permission does not grant hotspot configuration access. Copy the generated name and password into Android native settings.</string>
+    <string name="l7_hotspot_already_on">The hotspot is already on. Its name and password were kept. Reuse it, or turn it off in native settings before changing its configuration.</string>
+    <string name="l7_hotspot_unsupported">This firmware does not expose the required interface. Configure and enable the hotspot in Android native settings.</string>
+    <string name="l7_hotspot_write_failed">The system did not confirm the new configuration. Generated details were not saved in the app. Check native settings.</string>
+    <string name="l7_hotspot_ready">Native hotspot is on. You can now start wireless CarPlay.</string>
+    <string name="l7_hotspot_ready_no_details">Native hotspot is on, but its credentials could not be read. Enter them manually before connecting.</string>
+    <string name="l7_hotspot_timeout">Timed out waiting for the hotspot. Check its state in native settings before retrying.</string>
+    <string name="l7_hotspot_failed">Native hotspot operation failed. Check system settings.</string>
+    <string name="l7_hotspot_cancelled">Stopped waiting. A submitted system request may still complete; the app will not turn off the hotspot.</string>
+    <string name="l7_hotspot_session_active">Disconnect CarPlay before adjusting hotspot settings.</string>
+    <string name="l7_hotspot_settings_hint">Android Settings → Network &amp; internet → Hotspot &amp; tethering.</string>
+    <string name="l7_hotspot_actions_hint">Existing native hotspot details are reused. Generate and apply new details when needed. Exiting the app keeps the hotspot on.</string>
+    <string name="l7_hotspot_cancel">Stop waiting</string>
+    <string name="l7_hotspot_grant">Allow modifying system settings</string>
+    <string name="l7_hotspot_not_saved">Not saved</string>
+    <string name="l7_hotspot_create_hint">Generate a dedicated hotspot name and a random 16-character WPA2 password with uppercase letters, lowercase letters and digits. Applying changes requires the hotspot to be off. If access is denied, copy the details into Android native settings.</string>
+    <string name="l7_hotspot_copy_name">Copy hotspot name</string>
+    <string name="l7_hotspot_copy_password">Copy hotspot password</string>
+    <string name="l7_hotspot_copied">Copied</string>
+    <string name="l7_hotspot_apply_start">Apply and start</string>
+    <string name="l7_hotspot_settings_missing">Android native hotspot settings could not be opened. Open Android Settings and find Hotspot &amp; tethering. The hotspot entry on the vehicle launcher is a different service.</string>
+    <string name="l7_hotspot_busy">A native hotspot operation is in progress. Wait for it to finish or stop waiting first.</string>
+</resources>

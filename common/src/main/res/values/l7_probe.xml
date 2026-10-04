@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_probe_back_debug">返回调试</string>
+    <string name="l7_probe_back_debug">返回调试与日志</string>
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
     <string name="l7_probe_executor">当前执行身份与辅助连接</string>
-    <string name="l7_probe_title">调试</string>
+    <string name="l7_probe_title">调试与日志</string>
     <string name="l7_probe_entry_hint">检查运行环境、权限与接口，查看日志和报告</string>
     <string name="l7_probe_environment">环境与权限</string>
     <string name="l7_probe_modules">调试模块</string>

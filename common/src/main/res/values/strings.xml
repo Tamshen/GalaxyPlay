@@ -1,7 +1,7 @@
 <resources>
-    <string name="built_in_car_hotspot">Built-in car hotspot</string>
+    <string name="built_in_car_hotspot">Android native hotspot</string>
     <string name="wifi_direct">Wi-Fi Direct</string>
-    <string name="hotspot_hint_manual">Built-in car hotspot · Keep the car hotspot, Bluetooth and your iPhone’s Wi-Fi on.</string>
+    <string name="hotspot_hint_manual">Enable the hotspot in Android native settings, not the vehicle launcher hotspot. Keep Bluetooth and iPhone Wi-Fi on.</string>
     <string name="hotspot_hint_local">Open Connection setup to save your built-in car hotspot details.</string>
     <string name="hotspot_hint_p2p">Wi-Fi Direct · Keep the car’s Wi-Fi switch, Bluetooth and your iPhone’s Wi-Fi on.</string>
     <string name="cluster_size_standard">Standard · sharpest</string>
@@ -12,10 +12,10 @@
     <string name="marker_up">Up</string>
     <string name="marker_down">Down</string>
     <string name="marker_centre_default">Centre · default</string>
-    <string name="hotspot_mode_manual_desc">Use the car’s own hotspot. Select 5 GHz in car settings if available.</string>
+    <string name="hotspot_mode_manual_desc">Wireless CarPlay uses the hotspot in Android native settings. It is a different service from the hotspot on the vehicle launcher. Enable the native hotspot; select 5 GHz when available.</string>
     <string name="hotspot_mode_p2p_desc">Alternative setup. Requires the car’s Wi-Fi switch on; a 2.4 GHz connection may stutter.</string>
-    <string name="hotspot_details_off">Hotspot is off · Turn it on in car settings.</string>
-    <string name="hotspot_details_saved">Details saved · Check that the car hotspot is on before connecting.</string>
+    <string name="hotspot_details_off">Native hotspot is off. Enable it in Android native settings.</string>
+    <string name="hotspot_details_saved">Details saved. Make sure the Android native hotspot is on with the same name and password.</string>
     <string name="permission_enabled_ready">Permission enabled · ready to use</string>
     <string name="permission_not_enabled">Permission not enabled yet</string>
     <string name="clipboard_usage_access">DiPlay Usage Access</string>
@@ -59,12 +59,12 @@
     <string name="status_waiting_reenumeration">Waiting for iPhone re-enumeration</string>
     <string name="status_attaching_ncm">Attaching NCM/AirPlay network</string>
     <string name="status_failed">Failed: %1$s</string>
-    <string name="msg_car_hotspot_off">The car hotspot “%1$s” is off. Turn it on in the car settings before connecting.</string>
+    <string name="msg_car_hotspot_off">Android native hotspot “%1$s” is off. Enable it in native settings, not from the vehicle launcher hotspot entry.</string>
     <string name="home_public_preview">PUBLIC PREVIEW  ·\u0020\u0020</string>
     <string name="choose_iphone_prefix">Choose iPhone ·\u0020</string>
     <string name="audio_saved_value">Saved: %1$d</string>
     <string name="about_public_preview_prefix">Public preview ·\u0020</string>
-    <string name="msg_car_hotspot_connect">DiPlay connects through the car hotspot “%1$s”. Turn it on in the car settings, then connect.</string>
+    <string name="msg_car_hotspot_connect">Enable “%1$s” in Android native hotspot settings. The vehicle launcher hotspot is different. You can also try Start native hotspot in Connection setup.</string>
     <string name="edit_saved_hotspot_prefix">Edit saved hotspot ·\u0020</string>
     <string name="cluster_adb_multi_device">If ADB lists several devices, use adb -s &lt;car-device-ID&gt; shell appops set %1$s GET_USAGE_STATS allow. Find the ID with adb devices.</string>
     <string name="status_ready_for_prefix">Ready for\u0020</string>
@@ -116,8 +116,8 @@
     <string name="byd_navigation">BYD navigation</string>
     <string name="cancel">Cancel</string>
     <string name="car_home">Car home</string>
-    <string name="car_hotspot_details">Car hotspot details</string>
-    <string name="car_hotspot_is_off">Car hotspot is off</string>
+    <string name="car_hotspot_details">Hotspot name and password</string>
+    <string name="car_hotspot_is_off">Android native hotspot is off</string>
     <string name="car_marker_horizontal">Car marker · horizontal</string>
     <string name="car_marker_vertical">Car marker · vertical</string>
     <string name="carplay">CarPlay</string>
@@ -160,7 +160,7 @@
     <string name="connection_setup">Connection setup</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">Copied to the car clipboard. Run the command on your computer.</string>
     <string name="copy_command">Copy command</string>
-    <string name="copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av">Copy these from the car’s hotspot settings. Use 5 GHz if available. Saving here does not change the car’s hotspot.</string>
+    <string name="copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av">Enter the name and password from Android native hotspot settings, not the vehicle launcher hotspot. Saving here only updates connection details; it does not change the system hotspot. Use 5 GHz when available.</string>
     <string name="could_not_decode_image">Could not decode image</string>
     <string name="could_not_encode_image">Could not encode image</string>
     <string name="could_not_reset_wi_fi_direct_close_the_other_projection_ap">Could not reset Wi-Fi Direct. Close the other projection app and try again.</string>
@@ -253,7 +253,7 @@
     <string name="open">Open</string>
     <string name="open_after_the_car_starts">Open after the car starts</string>
     <string name="open_bluetooth">Open Bluetooth</string>
-    <string name="open_car_hotspot_settings">Open car hotspot settings</string>
+    <string name="open_car_hotspot_settings">Open Android native hotspot settings</string>
     <string name="open_car_settings">Open car settings</string>
     <string name="open_car_wi_fi_settings">Open car Wi-Fi settings</string>
     <string name="open_carplay">Open CarPlay</string>
@@ -324,7 +324,7 @@
     <string name="save_details">Save details</string>
     <string name="save_diagnostic_report">Save diagnostic report</string>
     <string name="save_hotspot_details_and_use_this_mode">Save hotspot details and use this mode</string>
-    <string name="save_the_name_and_password_from_the_car_s_hotspot_settings">Save the name and password from the car’s hotspot settings first</string>
+    <string name="save_the_name_and_password_from_the_car_s_hotspot_settings">Read or enter the Android native hotspot name and password</string>
     <string name="save_your_hotspot_details_in_connection_setup_first">Save your hotspot details in Connection setup first</string>
     <string name="saved_for_your_next_connection">Saved for your next connection</string>
     <string name="saving_report">Saving report…</string>
