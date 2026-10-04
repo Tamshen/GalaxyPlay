@@ -54,7 +54,8 @@ internal class AudioChannelPreview(
                 if (closed || generation.get() != request) return@submit
                 activeTrack.set(built)
                 context?.let {
-                    route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel) { line ->
+                    route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel,
+                        preferBus = AirPlayPersistence.loadL7AudioBusEnabled(it)) { line ->
                         L7DebugLog.record("Audio preview stream=$channel $line")
                     }
                 }

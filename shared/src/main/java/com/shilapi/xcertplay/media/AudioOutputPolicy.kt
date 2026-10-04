@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.media
 
 import android.media.AudioAttributes
 
-/** 播放用途与协议角色分开：用户改输出策略时，Siri 仍保有助手的混音优先级。 */
+/** 播放用途与协议角色分开：用户改输出策略时，仍按原协议角色参与焦点协调。 */
 enum class AudioOutputRole(val usage: Int, val contentType: Int, val channels: Int) {
     MEDIA(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_MUSIC, 2),
     ASSISTANT(AudioAttributes.USAGE_ASSISTANT, AudioAttributes.CONTENT_TYPE_SPEECH, 1),

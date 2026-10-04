@@ -11,12 +11,11 @@ class AudioOutputPolicyTest {
         assertEquals(2, AudioOutputPolicy.usage(AudioChannel.PHONE, 101))
     }
 
-    @Test fun overridingAssistantOutputDoesNotChangeItsProtocolRoleOrPriority() {
+    @Test fun overridingAssistantOutputDoesNotChangeItsProtocolRole() {
         val selection = AudioChannelMapper.map("speechRecognition", 100, AudioChannelMappingMode.MOBILE_COMPATIBLE)
         assertEquals(1, AudioOutputPolicy.usage(selection.channel, 101))
         assertEquals(AudioChannel.MEDIA, AudioOutputPolicy.routingChannel(selection.channel, 101))
         assertEquals(AudioChannel.ASSISTANT, selection.channel)
-        assertEquals(3, L7AudioMixPolicy.priority(selection.channel))
         assertEquals(AudioChannel.PHONE, AudioOutputPolicy.routingChannel(AudioChannel.PHONE, 101))
     }
 

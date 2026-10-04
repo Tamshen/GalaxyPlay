@@ -64,13 +64,13 @@ e2e/
 
 追加 `--dialogs-only` 可单独检查上述弹窗、协议及 USB 取消，不重复页面扫描；同样保留英文首页。
 
-蓝牙媒体与焦点回归：[AudioFocusCoordinatorTest](shared/test/java/com/shilapi/xcertplay/media/AudioFocusCoordinatorTest.kt) 检查永久失焦后的明确恢复、电话优先、旧监听隔离和焦点关闭；[CarPlayMediaSessionTest](common/test/java/com/shilapi/xcertplay/CarPlayMediaSessionTest.kt) 检查媒体键不另建焦点、手机暂停状态优先与关闭队列；[L7BluetoothMediaGuardTest](common/test/java/com/shilapi/xcertplay/L7BluetoothMediaGuardTest.kt) 用模拟端口覆盖目标确认、权限/请求拒绝、断开确认、超时、次数上限及迟到事件。该端口不代表已验证 L7 隐藏 API 或真实蓝牙断开；媒体服务测试核对框架保存的 PlaybackState，Robolectric 不提供完整车机媒体服务。
+蓝牙媒体与焦点回归：[AudioFocusCoordinatorTest](shared/test/java/com/shilapi/xcertplay/media/AudioFocusCoordinatorTest.kt) 检查原版导航不申请焦点、Siri MAY_DUCK、失焦与拒绝不静音、系统降音恢复、多流选择、明确恢复、旧监听隔离和焦点关闭；[CarPlayMediaSessionTest](common/test/java/com/shilapi/xcertplay/CarPlayMediaSessionTest.kt) 检查媒体键不另建焦点、手机暂停状态优先与关闭队列；[L7BluetoothMediaGuardTest](common/test/java/com/shilapi/xcertplay/L7BluetoothMediaGuardTest.kt) 用模拟端口覆盖目标确认、权限/请求拒绝、断开确认、超时、次数上限及迟到事件。该端口不代表已验证 L7 隐藏 API 或真实蓝牙断开；媒体服务测试核对框架保存的 PlaybackState，Robolectric 不提供完整车机媒体服务。
 
 [CarPlayPlaybackStatusTest](shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt) 还检查手机首次暂停必须发布、增量状态去重以及新会话重置，避免音乐流已经建立时错误发布播放状态。
 
-[L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例核对助手 TRANSIENT 与导航 MAY_DUCK。
+[L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例在 API 29/30 观察实际 AudioTrack 音量，核对原版助手 MAY_DUCK 与导航不申请焦点。
 
-设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖互斥开关独立保存。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
+设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖原版默认值、旧选择保留与恢复范围；`L7AudioSettingsTest` 检查恢复前确认、取消不保存及界面刷新。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
 
 全部 Android 编译和测试在 `mobiledevops/android-sdk-image:latest` 的 Docker 工具链内执行；完整测试默认采用 `linux/amd64`。Apple Silicon 调试的 ARM64 混合构建入口见 [构建说明](../docs/开发与验证.md)，不将调试打包成功写成完整测试通过。在仓库根目录运行：
 
