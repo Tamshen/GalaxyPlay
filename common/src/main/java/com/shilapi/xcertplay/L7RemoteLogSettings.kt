@@ -57,7 +57,8 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         val target = if (RemoteLogConfig.validEndpoint(config.endpoint)) config.forDevice(deviceId) else null
         logName = target?.stream ?: deviceId
         device.setValue(logName)
-        server.setValue(target?.endpoint ?: config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) })
+        val editor = RemoteLogEditor(config, context.getString(R.string.l7_log_default_url))
+        server.setValue(editor.serverText(target?.endpoint ?: config.endpoint.ifEmpty { context.getString(R.string.l7_log_unconfigured) }))
         upload.isEnabled = config.valid() && !busy
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
         retry.isEnabled = config.valid() && status.phase == RemoteLogUpload.Phase.FAILED
@@ -82,6 +83,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
 
     private fun configure() {
         val config = RemoteLogConfig.load(context)
+        val editor = RemoteLogEditor(config, context.getString(R.string.l7_log_default_url))
         val body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         fun field(label: Int, value: String, password: Boolean, limit: Int): EditText {
             body.addView(L7Components.text(context, context.getString(label), secondary = true))
@@ -97,8 +99,12 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 body.addView(this, LinearLayout.LayoutParams(-1, -2))
             }
         }
-        val url = field(R.string.l7_log_url_label, config.endpoint, false, 2048)
-        val token = field(R.string.l7_log_token_label, config.authorization, true, 4096)
+        val url = field(R.string.l7_log_url_label, editor.endpointText, false, 2048).apply {
+            if (editor.masksEndpoint) hint = RemoteLogEditor.MASK
+        }
+        val token = field(R.string.l7_log_token_label, "", true, 4096).apply {
+            if (editor.hasAuthorization) hint = RemoteLogEditor.MASK
+        }
         val dialog = L7Dialogs.builder(context).setTitle(R.string.l7_log_server)
             .setMessage(R.string.l7_log_config_hint).setView(body)
             .setNeutralButton(R.string.l7_log_reset) { _, _ ->
@@ -108,10 +114,11 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val next = RemoteLogConfig(url.text.toString().trim(), token.text.toString().trim())
+                val next = editor.resolve(url.text.toString(), token.text.toString())
                 when {
                     !RemoteLogConfig.validEndpoint(next.endpoint) -> url.error = context.getString(R.string.l7_log_url_error)
                     !next.valid() -> token.error = context.getString(R.string.l7_log_token_error)
+                    next == config -> dialog.dismiss()
                     !RemoteLogConfig.save(context, next) -> token.error = context.getString(R.string.l7_log_save_failed)
                     else -> { RemoteLogUpload.cancel(); dialog.dismiss(); update() }
                 }

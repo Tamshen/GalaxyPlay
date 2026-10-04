@@ -216,3 +216,5 @@ python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
 
 AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英文热点引导、生成窗口、原生设置跳转和日志首屏入口，不上传、不写入热点。无线预检会临时将模拟器 WRITE_SETTINGS 设为拒绝，验证提示后恢复原 AppOps；中文 AVD 可用 `--gate-only` 单独检查。脚本仅接受 emulator 序列号，截图保存在忽略目录。
+
+日志地址遮蔽：`RemoteLogEditorTest` 覆盖内置地址遮蔽、空字段保留、手动覆盖和更换地址不复用认证；中文 AVD 使用内置默认值时执行 `python3 e2e/device/log_server_mask_smoke.py`，检查列表/弹窗及保存/取消不覆盖配置，不上传或打印真实地址。
