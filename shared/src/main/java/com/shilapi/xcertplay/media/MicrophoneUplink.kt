@@ -56,6 +56,7 @@ internal class MicrophoneUplink(
         )
         if (minBuffer <= 0) {
             Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
+            stats.failure(MicrophoneFailureStage.MIN_BUFFER, code = minBuffer)
             release()
             return false
         }
@@ -72,6 +73,7 @@ internal class MicrophoneUplink(
         }
         if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
             Log.w(TAG, "microphone Opus encoder is unavailable")
+            stats.failure(MicrophoneFailureStage.ENCODER)
             release()
             return false
         }
@@ -97,6 +99,7 @@ internal class MicrophoneUplink(
         }
         if (nextRecorder.state != AudioRecord.STATE_INITIALIZED) {
             Log.w(TAG, "microphone recorder failed to initialize")
+            stats.failure(MicrophoneFailureStage.RECORDER_INITIALIZATION, code = nextRecorder.state)
             nextRecorder.release()
             nextEncoder?.close()
             release()
@@ -223,7 +226,7 @@ internal class MicrophoneUplink(
         } else {
             listOf(MicrophonePacketizer.toWirePcm(frame))
         }
-        stats.encoded(bodies.size, bodies.count { it.isEmpty() })
+        stats.encoded(bodies.size, if (bodies.isEmpty()) 1 else bodies.count { it.isEmpty() })
         bodies.forEach { body ->
             sendPacket(
                 socket = socket,

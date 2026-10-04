@@ -41,6 +41,7 @@ object AirPlayPersistence {
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
     private const val KEY_CALL_PROCESSING_ENABLED = "l7_call_processing_enabled"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
+    private const val KEY_L7_AUDIO_BUS_ENABLED = "l7_audio_bus_enabled"
     private const val KEY_BLUETOOTH_MEDIA_EXCLUSIVE = "bluetooth_media_exclusive"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
     private const val KEY_ASSISTANT_AUDIO_CHANNEL = "assistant_audio_channel"
@@ -151,11 +152,34 @@ object AirPlayPersistence {
 
     fun loadAudioFocusEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, true)
+            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
 
     fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_AUDIO_FOCUS_ENABLED, enabled)
+            .apply()
+    }
+
+    fun loadL7AudioBusEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_L7_AUDIO_BUS_ENABLED, false)
+
+    fun saveL7AudioBusEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_L7_AUDIO_BUS_ENABLED, enabled).apply()
+    }
+
+    /** 只恢复音频，不清除配对、认证或蓝牙媒体交接设置。 */
+    fun restoreUpstreamAudioDefaults(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
+            .putBoolean(KEY_L7_AUDIO_BUS_ENABLED, false)
+            .putBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
+            .putBoolean(KEY_CALL_PROCESSING_ENABLED, true)
+            .putInt(KEY_MEDIA_AUDIO_CHANNEL, 0)
+            .putInt(KEY_ASSISTANT_AUDIO_CHANNEL, 0)
+            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, 0)
+            .remove(KEY_NAVIGATION_STREAM_TYPE)
+            .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS)
             .apply()
     }
 

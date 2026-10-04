@@ -47,23 +47,3 @@ internal object L7AudioRoutePolicy {
         return matches.singleOrNull()
     }
 }
-
-/** 本应用内部混音与系统焦点分开判断，不修改原车音量组。 */
-internal object L7AudioMixPolicy {
-    fun priority(channel: AudioChannel): Int = when (channel) {
-        AudioChannel.PHONE -> 4
-        AudioChannel.ASSISTANT -> 3
-        AudioChannel.NAVIGATION -> 2
-        AudioChannel.MEDIA -> 1
-    }
-
-    fun volume(channel: AudioChannel, active: Collection<AudioChannel>, allowed: Boolean,
-               ducked: Boolean): Float {
-        if (!allowed) return 0f
-        if (AudioChannel.PHONE in active && channel != AudioChannel.PHONE) return 0f
-        if (AudioChannel.ASSISTANT in active && channel == AudioChannel.NAVIGATION) return 0f
-        if (channel == AudioChannel.MEDIA &&
-            (ducked || AudioChannel.ASSISTANT in active || AudioChannel.NAVIGATION in active)) return 0.2f
-        return if (ducked) 0.2f else 1f
-    }
-}

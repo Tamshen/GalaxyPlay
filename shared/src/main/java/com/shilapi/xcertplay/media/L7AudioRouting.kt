@@ -11,7 +11,8 @@ import android.util.Log
 import java.io.Closeable
 
 /** 会话拥有监听器；关闭绑定后，迟到回调不能操作已释放的播放/录音对象。 */
-internal class L7AudioRouting(context: Context?, private val report: (String) -> Unit) : Closeable {
+internal class L7AudioRouting(context: Context?, private val preferBus: Boolean = false,
+                              private val report: (String) -> Unit) : Closeable {
     private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val handler = Handler(Looper.getMainLooper())
     private val bindings = mutableSetOf<Binding>()
@@ -43,6 +44,12 @@ internal class L7AudioRouting(context: Context?, private val report: (String) ->
 
         internal fun select() {
             if (released || closed) return
+            if (!preferBus || !useBus) {
+                // 原版策略只观察实际路由，不向系统写入任何首选设备。
+                emit("Audio: route policy=system channel=$channel direction=${if (input) "input" else "output"}")
+                reportActual()
+                return
+            }
             val devices = runCatching {
                 manager?.getDevices(if (input) AudioManager.GET_DEVICES_INPUTS else AudioManager.GET_DEVICES_OUTPUTS)
                     ?.toList().orEmpty()

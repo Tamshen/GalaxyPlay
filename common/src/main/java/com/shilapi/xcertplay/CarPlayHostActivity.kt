@@ -3080,7 +3080,7 @@ class CarPlayHostActivity : ComponentActivity() {
             navigationChannel = AirPlayPersistence.loadNavigationAudioChannel(this),
             assistantChannel = AirPlayPersistence.loadAssistantAudioChannel(this),
             context = this,
-            enableL7AudioRouting = true,
+            enableL7AudioRouting = AirPlayPersistence.loadL7AudioBusEnabled(this),
             callProcessingEnabled = AirPlayPersistence.loadCallProcessingEnabled(this),
             onVideoFailure = { codec, reason -> onVideoFailure(controllerGeneration, codec, reason) },
             navigationStreamType = navigationStreamType,

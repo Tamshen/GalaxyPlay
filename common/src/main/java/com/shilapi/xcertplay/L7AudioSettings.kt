@@ -26,6 +26,10 @@ internal object L7AudioSettings {
                 text(R.string.l7_call_processing_note), AirPlayPersistence.loadCallProcessingEnabled(context)) {
                 AirPlayPersistence.saveCallProcessingEnabled(context, it)
             })
+            card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
+                text(R.string.l7_audio_bus_note), AirPlayPersistence.loadL7AudioBusEnabled(context)) {
+                AirPlayPersistence.saveL7AudioBusEnabled(context, it)
+            })
             if (context.resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)) {
                 card.addView(L7Components.switchRow(context, text(R.string.advanced_audio_channel_mapping),
                     text(R.string.use_usage_content_type_routing_instead_of_stream_type),
@@ -36,6 +40,17 @@ internal object L7AudioSettings {
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes), footer = text(R.string.l7_audio_roles_note)) {
             add(context, it, open)
+            it.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
+                text(R.string.l7_audio_restore_hint)) {
+                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
+                    .setMessage(R.string.l7_audio_restore_confirm)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
+                        AirPlayPersistence.restoreUpstreamAudioDefaults(context)
+                        parent.removeAllViews()
+                        page(context, parent, open)
+                    }.show()
+            })
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it) }
     }

@@ -31,7 +31,7 @@ class L7AudioRoutingLifecycleTest {
     @Test fun missingBusUsesSystemRouteAndClosedBindingIgnoresLateEvents() {
         val probe = RouteProbe()
         val log = mutableListOf<String>()
-        val router = L7AudioRouting(null) { log.add(it) }
+        val router = L7AudioRouting(null, preferBus = true) { log.add(it) }
         val binding = router.bind(probe.routing, AudioChannel.MEDIA, false, 48_000, 2)
         assertEquals(1, probe.preferredCalls)
         assertTrue(log.any { it.contains("preferredId=-1") })
@@ -44,6 +44,21 @@ class L7AudioRoutingLifecycleTest {
         assertEquals(reads, probe.reads)
         assertEquals(1, probe.removals)
         router.close()
+    }
+
+    @Test fun upstreamDefaultObservesOutputAndInputWithoutSettingPreferredDevice() {
+        val router = L7AudioRouting(null) {}
+        val media = RouteProbe()
+        val siri = RouteProbe()
+        router.bind(media.routing, AudioChannel.MEDIA, false, 48_000, 2)
+        router.bind(siri.routing, AudioChannel.ASSISTANT, true, 24_000, 1)
+        assertEquals(0, media.preferredCalls)
+        assertEquals(0, siri.preferredCalls)
+        assertTrue(media.reads > 0)
+        assertTrue(siri.reads > 0)
+        router.close()
+        assertEquals(1, media.removals)
+        assertEquals(1, siri.removals)
     }
 
     @Test fun sessionCloseReleasesAllListenersAndRejectsNewBindings() {
