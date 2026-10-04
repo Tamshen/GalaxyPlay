@@ -36,6 +36,8 @@ internal data class RemoteLogReport(val id: String, val body: ByteArray, val lin
                 }
             }
             lines += L7DebugLog.buffer.snapshot().lines
+            // 环境与权限是本次分析的依据，放在预算优先保留端，避免被大量会话日志挤掉。
+            lines += L7ProbeLog.read(context)
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
             return create(lines, version, context.getString(R.string.l7_core_source_info))
         }

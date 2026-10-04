@@ -19,6 +19,8 @@ internal object L7ProbeRunner {
         private set
     @Volatile var storageFailed = false
         private set
+    @Volatile var logFailed = false
+        private set
     @Volatile var environment: String? = null
         private set
     @Volatile var revision = 0L
@@ -43,6 +45,7 @@ internal object L7ProbeRunner {
         val id = UUID.randomUUID().toString()
         busy = true
         storageFailed = false
+        logFailed = false
         current = L7ProbeReport(id, "pending", "pending", System.currentTimeMillis(), L7ProbePhase.RUNNING)
         revision++
         val timeout = Runnable { if (current?.id == id) stop(L7ProbePhase.TIMED_OUT) }
@@ -88,6 +91,9 @@ internal object L7ProbeRunner {
             } finally {
                 main.removeCallbacks(timeout)
                 persist(app)
+                current?.takeIf { it.id == id }?.let { report ->
+                    runCatching { L7ProbeLog.write(app, report) }.onFailure { logFailed = true }
+                }
                 busy = false
                 revision++
             }

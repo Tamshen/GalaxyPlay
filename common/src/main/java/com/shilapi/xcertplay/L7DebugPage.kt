@@ -36,7 +36,7 @@ internal class L7DebugPage(
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
                 if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity))) {
-                    state.selectedReport = null
+                    state.showCurrent()
                     update()
                 } else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
             }.also(card::addView)
@@ -61,18 +61,25 @@ internal class L7DebugPage(
         val current = L7ProbeRunner.current
         val latest = current ?: L7ProbeRunner.history.firstOrNull()
         summary?.apply {
-            titleView.text = latest?.let { if (current == null) activity.getString(R.string.l7_probe_historical,
+            val title = latest?.let { if (current == null) activity.getString(R.string.l7_probe_historical,
                 labels.time(it.started)) else labels.phase(it) } ?: labels.text(R.string.l7_probe_idle)
+            if (titleView.text.toString() != title) titleView.text = title
             setValue(latest?.let(labels::summary) ?: "")
             setFeedback(when {
                 L7ProbeRunner.storageFailed -> labels.text(R.string.l7_probe_storage_failed)
+                L7ProbeRunner.logFailed -> labels.text(R.string.l7_probe_log_failed)
                 current?.phase == L7ProbePhase.RUNNING -> activity.getString(R.string.l7_probe_progress,
                     current.items.count { it.reason != "NOT_RUN" }, current.expected)
                 L7ProbeRunner.busy -> labels.text(if (current == null) R.string.l7_probe_loading else R.string.l7_probe_cleanup)
+                current != null -> activity.getString(R.string.l7_probe_logged, L7ProbeLog.batch(current))
                 else -> ""
             })
         }
         start?.isEnabled = !L7ProbeRunner.busy
+        start?.titleView?.let { title ->
+            val text = labels.text(if (latest == null) R.string.l7_probe_start else R.string.l7_probe_recollect)
+            if (title.text.toString() != text) title.text = text
+        }
         stop?.isEnabled = current?.phase == L7ProbePhase.RUNNING
         view?.isEnabled = latest != null
     }
@@ -83,6 +90,7 @@ internal class L7DebugPage(
         L7SettingsSection.add(parent, labels.text(R.string.l7_probe_history), footer = labels.text(R.string.l7_probe_historical_hint)) { card ->
             if (reports.isEmpty()) card.addView(L7SettingRow(activity, labels.text(R.string.l7_probe_history_empty)))
             reports.forEach { report -> card.addView(L7Components.actionRow(activity, labels.time(report.started), labels.summary(report)) {
+                state.showCurrent()
                 state.selectedReport = report.id
                 onNavigate("settings-debug-results")
             }.apply { setValue(labels.phase(report)) }) }

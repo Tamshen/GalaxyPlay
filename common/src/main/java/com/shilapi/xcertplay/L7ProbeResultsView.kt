@@ -11,6 +11,7 @@ internal class L7ProbeUiState {
     var filter = 0
     var query = ""
     var selectedReport: String? = null
+    fun showCurrent() { filter = 0; query = ""; selectedReport = null }
 }
 
 /** 结果行只展示名称与结论，权限原名和有限证据在同套模态框中展开。 */
@@ -37,62 +38,57 @@ internal class L7ProbeResultsView(
             panel.addView(L7Components.text(activity, labels.text(R.string.l7_probe_idle), secondary = true))
             return
         }
-        L7SettingsSection.add(panel, labels.text(R.string.l7_probe_environment),
-            footer = labels.text(R.string.l7_probe_limited)) { card ->
-            val historical = state.selectedReport != null
-            card.addView(L7SettingRow(activity, if (historical) activity.getString(R.string.l7_probe_historical,
-                labels.time(report.started)) else labels.time(report.started), labels.summary(report)).apply {
-                setValue(labels.phase(report))
-                if (L7ProbeRunner.environment != null && report.environment != L7ProbeRunner.environment)
-                    setFeedback(labels.text(R.string.l7_probe_stale))
-            })
-            val filters = listOf(R.string.l7_probe_all, R.string.l7_probe_verified, R.string.l7_probe_restricted,
-                R.string.l7_probe_pending, R.string.l7_probe_not_run).map(labels::text)
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_filter)) {
+        panel.addView(L7Components.text(activity,
+            "${labels.phase(report)} · ${labels.time(report.started)}\n${labels.summary(report)}", secondary = true).apply { textSize = 15f })
+        if (state.selectedReport != null) panel.addView(L7Components.text(activity, labels.text(R.string.l7_probe_historical_hint), true))
+        if (L7ProbeRunner.environment != null && report.environment != L7ProbeRunner.environment)
+            panel.addView(L7Components.text(activity, labels.text(R.string.l7_probe_stale), true))
+        val filters = listOf(R.string.l7_probe_all, R.string.l7_probe_filter_supported, R.string.l7_probe_no_permission,
+            R.string.l7_probe_error, R.string.l7_probe_unsupported, R.string.l7_probe_pending, R.string.l7_probe_not_run).map(labels::text)
+        panel.addView(LinearLayout(activity).apply {
+            setPadding(0, dp(8), 0, dp(8))
+            addView(control(filters[state.filter.coerceIn(filters.indices)]) {
                 L7Dialogs.builder(activity).setTitle(R.string.l7_probe_filter)
                     .setItems(filters.toTypedArray()) { _, index -> state.filter = index; update(true) }.show()
-            }.apply { setValue(filters[state.filter.coerceIn(filters.indices)]) })
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_search)) { search() }
-                .apply { setValue(state.query) })
-        }
+            }.apply { contentDescription = labels.text(R.string.l7_probe_filter) }, slot())
+            addView(control(labels.text(R.string.l7_probe_search_short)) { search() }, slot())
+            addView(control(labels.text(R.string.l7_probe_again)) {
+                if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity))) { state.showCurrent(); update(true) }
+                else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
+            }.apply { isEnabled = !L7ProbeRunner.busy }, slot())
+            addView(control(labels.text(R.string.l7_probe_report_actions)) { actions(report) }, slot())
+        })
+        panel.addView(L7Components.text(activity, labels.text(R.string.l7_probe_table_hint), true).apply {
+            textSize = 13f; setPadding(0, 0, 0, dp(8))
+        })
+        if (state.query.isNotBlank()) panel.addView(L7Components.text(activity, state.query, true))
         val items = report.items.filter { item ->
             (state.query.isBlank() || item.name.contains(state.query, true) || labels.name(item).contains(state.query, true)) &&
-                when (state.filter) {
-                    1 -> item.result == L7ProbeOutcome.VERIFIED
-                    2 -> item.result == L7ProbeOutcome.DENIED
-                    3 -> item.result !in setOf(L7ProbeOutcome.VERIFIED, L7ProbeOutcome.DENIED) && item.reason != "NOT_RUN"
-                    4 -> item.reason == "NOT_RUN"
-                    else -> true
-                }
+                L7ProbeStatus.of(item).matches(state.filter)
         }
-        actions(report)
         if (items.isEmpty()) panel.addView(L7Components.text(activity, labels.text(R.string.l7_probe_empty), secondary = true))
-        else L7SettingsSection.add(panel, labels.text(R.string.l7_probe_results)) { card ->
-            items.forEach { item -> card.addView(L7Components.actionRow(activity, labels.name(item), labels.reason(item)) {
-                showItem(item)
-            }) }
-        }
+        else panel.addView(L7ProbeTable(activity, items, ::showItem))
     }
 
     private fun actions(report: L7ProbeReport) {
-        L7SettingsSection.add(panel, labels.text(R.string.l7_probe_logs), footer = labels.text(R.string.l7_probe_report_scope)) { card ->
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_copy)) {
-                activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(
-                    ClipData.newPlainText(labels.text(R.string.l7_probe_title), labels.readable(report)))
-                L7Notice.show(activity, labels.text(R.string.l7_probe_copied))
-            })
-            for ((title, choose) in listOf(R.string.l7_probe_export to false, R.string.l7_probe_export_choose to true)) {
-                card.addView(L7Components.actionRow(activity, labels.text(title)) { exporter.export(report, choose) }
-                    .apply { isEnabled = report.phase != L7ProbePhase.RUNNING })
-            }
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_delete)) {
-                L7Dialogs.builder(activity).setTitle(R.string.l7_probe_delete).setMessage(R.string.l7_probe_delete_confirm)
-                    .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.l7_probe_delete) { _, _ ->
-                        if (L7ProbeRunner.delete(activity, report.id)) onNavigate("settings-debug-history")
+        val options = listOf(R.string.l7_probe_copy, R.string.l7_probe_export, R.string.l7_probe_export_choose, R.string.l7_probe_delete)
+        L7Dialogs.builder(activity).setTitle(R.string.l7_probe_report_actions)
+            .setItems(options.map(labels::text).toTypedArray()) { _, index ->
+                when (index) {
+                    0 -> {
+                        activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                            ClipData.newPlainText(labels.text(R.string.l7_probe_title), labels.readable(report)))
+                        L7Notice.show(activity, labels.text(R.string.l7_probe_copied))
+                    }
+                    1, 2 -> if (report.phase != L7ProbePhase.RUNNING) exporter.export(report, index == 2)
                         else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
-                    }.show()
-            }.apply { isEnabled = !L7ProbeRunner.busy })
-        }
+                    3 -> L7Dialogs.builder(activity).setTitle(R.string.l7_probe_delete).setMessage(R.string.l7_probe_delete_confirm)
+                        .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.l7_probe_delete) { _, _ ->
+                            if (L7ProbeRunner.delete(activity, report.id)) onNavigate("settings-debug-history")
+                            else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
+                        }.show()
+                }
+            }.show()
     }
 
     private fun showItem(item: L7ProbeItem) {
@@ -103,7 +99,7 @@ internal class L7ProbeResultsView(
             .setNegativeButton(R.string.close, null)
             .setPositiveButton(R.string.l7_probe_recheck_item) { _, _ ->
                 if (L7ProbeRunner.start(activity, L7ProbeEnvironment.window(activity), item.id)) {
-                    state.selectedReport = null
+                    state.showCurrent()
                     onNavigate("settings-debug-results")
                 } else L7Notice.show(activity, labels.text(R.string.l7_probe_busy))
             }.show()
@@ -116,5 +112,11 @@ internal class L7ProbeResultsView(
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.done) { _, _ ->
                 state.query = input.text.toString().trim().take(160); update(true)
             }.show()
+    }
+
+    private fun dp(value: Int) = L7Components.dp(activity, value)
+    private fun slot() = LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) }
+    private fun control(title: String, action: () -> Unit) = L7Components.actionButton(activity, title, click = action).apply {
+        L7Ui.button(this, compact = true)
     }
 }
