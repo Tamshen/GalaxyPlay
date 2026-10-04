@@ -132,7 +132,7 @@ object AirPlayPersistence {
 
     fun loadAdvancedAudioChannelMapping(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
+            .getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, true)
 
     fun saveAdvancedAudioChannelMapping(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -152,7 +152,7 @@ object AirPlayPersistence {
 
     fun loadAudioFocusEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
+            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, true)
 
     fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -169,18 +169,26 @@ object AirPlayPersistence {
     }
 
     /** 只恢复音频，不清除配对、认证或蓝牙媒体交接设置。 */
-    fun restoreUpstreamAudioDefaults(context: Context) {
+    fun restoreBoyueAudioDefaults(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
+            .putBoolean(KEY_AUDIO_FOCUS_ENABLED, true)
             .putBoolean(KEY_L7_AUDIO_BUS_ENABLED, false)
-            .putBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
+            .putBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, true)
             .putBoolean(KEY_CALL_PROCESSING_ENABLED, true)
             .putInt(KEY_MEDIA_AUDIO_CHANNEL, 0)
             .putInt(KEY_ASSISTANT_AUDIO_CHANNEL, 0)
-            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, 0)
+            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, 14)
             .remove(KEY_NAVIGATION_STREAM_TYPE)
             .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS)
-            .apply()
+            .putBoolean("l7_boyue_audio_0211", true)
+            .commit()
+    }
+
+    /** 升级时一次切换到已选定的博越配置，之后保留用户手动调整。 */
+    fun migrateBoyueAudioDefaults(context: Context) {
+        if (!context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("l7_boyue_audio_0211", false)) {
+            restoreBoyueAudioDefaults(context)
+        }
     }
 
     fun loadCallProcessingEnabled(context: Context): Boolean =
@@ -212,7 +220,7 @@ object AirPlayPersistence {
 
     fun loadNavigationAudioChannel(context: Context): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_NAVIGATION_AUDIO_CHANNEL, 0)
+            .getInt(KEY_NAVIGATION_AUDIO_CHANNEL, loadNavigationStreamType(context))
             .takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0
 
     fun saveNavigationAudioChannel(context: Context, channel: Int) {

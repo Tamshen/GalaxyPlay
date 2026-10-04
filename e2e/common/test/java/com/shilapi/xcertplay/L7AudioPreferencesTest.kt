@@ -11,13 +11,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class L7AudioPreferencesTest {
-    @Test fun defaultAudioMatchesUpstreamWithoutOverwritingExplicitChoices() {
+    @Test fun defaultAudioMatchesBoyueWithoutOverwritingExplicitChoices() {
         val context = context()
-        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
+        assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
         assertFalse(AirPlayPersistence.loadL7AudioBusEnabled(context))
-        assertFalse(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
+        assertTrue(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
         assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
         AirPlayPersistence.saveAudioFocusEnabled(context, true)
         AirPlayPersistence.saveMediaAudioChannel(context, 3)
         assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
@@ -41,14 +41,14 @@ class L7AudioPreferencesTest {
         val unrelated = prefs.all.filterKeys { it !in setOf("audio_focus_enabled", "l7_audio_bus_enabled",
             "advanced_audio_channel_mapping", "l7_call_processing_enabled", "media_audio_channel",
             "assistant_audio_channel", "navigation_audio_channel", "media_buffer_ms") }
-        AirPlayPersistence.restoreUpstreamAudioDefaults(context)
-        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
+        AirPlayPersistence.restoreBoyueAudioDefaults(context)
+        assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
         assertFalse(AirPlayPersistence.loadL7AudioBusEnabled(context))
-        assertFalse(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
+        assertTrue(AirPlayPersistence.loadAdvancedAudioChannelMapping(context))
         assertTrue(AirPlayPersistence.loadCallProcessingEnabled(context))
         assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
         assertEquals(0, AirPlayPersistence.loadAssistantAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
         assertEquals(300, AirPlayPersistence.loadMediaBufferMillis(context))
         unrelated.forEach { (key, value) -> assertEquals(value, prefs.all[key]) }
     }
@@ -62,6 +62,21 @@ class L7AudioPreferencesTest {
         assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
         AirPlayPersistence.saveBluetoothMediaExclusive(context, true)
         assertTrue(AirPlayPersistence.loadBluetoothMediaExclusive(context))
+        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
+    }
+    @Test fun upgradeAppliesProfileOnceAndKeepsLaterManualChoices() {
+        val context = context()
+        AirPlayPersistence.saveNavigationAudioChannel(context, 5)
+        AirPlayPersistence.saveAudioFocusEnabled(context, false)
+        AirPlayPersistence.saveWirelessEnabled(context, false)
+        AirPlayPersistence.migrateBoyueAudioDefaults(context)
+        assertEquals(14, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
+        assertFalse(AirPlayPersistence.loadWirelessEnabled(context))
+        AirPlayPersistence.saveNavigationAudioChannel(context, 0)
+        AirPlayPersistence.saveAudioFocusEnabled(context, false)
+        AirPlayPersistence.migrateBoyueAudioDefaults(context)
+        assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
         assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
     }
     private fun context() = Robolectric.buildActivity(Activity::class.java).setup().get()

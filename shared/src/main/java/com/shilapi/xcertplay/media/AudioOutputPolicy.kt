@@ -15,16 +15,16 @@ enum class AudioOutputRole(val usage: Int, val contentType: Int, val channels: I
     }
 }
 
-/** 0 按原用途内置推荐；1–10 保留旧设置；101–103 明确选择标准用途策略。 */
+/** 0 按原用途内置推荐；1–20 对齐博越车机流设置；101–103 明确选择标准用途策略。 */
 object AudioOutputPolicy {
     const val BUILTIN = 0
     const val MEDIA = 101
     const val ASSISTANT = 102
     const val NAVIGATION = 103
-    val choices: List<Int> = listOf(BUILTIN, MEDIA, ASSISTANT, NAVIGATION) + (1..10)
+    val choices: List<Int> = listOf(BUILTIN, MEDIA, ASSISTANT, NAVIGATION) + (1..20)
 
     fun valid(choice: Int): Boolean = choice == BUILTIN || isLegacy(choice) || choice in MEDIA..NAVIGATION
-    fun isLegacy(choice: Int): Boolean = choice in 1..10
+    fun isLegacy(choice: Int): Boolean = choice in 1..20
 
     fun usage(role: AudioOutputRole, choice: Int): Int = when (choice) {
         MEDIA -> AudioOutputRole.MEDIA.usage
@@ -35,11 +35,12 @@ object AudioOutputPolicy {
 
     internal fun usage(channel: AudioChannel, choice: Int): Int = when (channel) {
         AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
+        AudioChannel.RINGTONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         else -> usage(role(channel), choice)
     }
 
     internal fun routingChannel(channel: AudioChannel, choice: Int): AudioChannel = when {
-        channel == AudioChannel.PHONE -> channel
+        channel == AudioChannel.PHONE || channel == AudioChannel.RINGTONE -> channel
         choice == MEDIA -> AudioChannel.MEDIA
         choice == ASSISTANT -> AudioChannel.ASSISTANT
         choice == NAVIGATION -> AudioChannel.NAVIGATION
@@ -50,6 +51,6 @@ object AudioOutputPolicy {
         AudioChannel.MEDIA -> AudioOutputRole.MEDIA
         AudioChannel.ASSISTANT -> AudioOutputRole.ASSISTANT
         AudioChannel.NAVIGATION -> AudioOutputRole.NAVIGATION
-        AudioChannel.PHONE -> error("电话不参与三用途试听")
+        AudioChannel.PHONE, AudioChannel.RINGTONE -> error("电话与铃声不参与三用途试听")
     }
 }

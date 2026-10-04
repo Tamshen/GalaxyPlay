@@ -57,6 +57,8 @@ class AndroidMediaSink(
     onVideoFailure: ((VideoCodec, String) -> Unit)? = null,
     private val assistantChannel: Int = 0,
     private val callProcessingEnabled: Boolean = true,
+    enableL7AudioProfile: Boolean = false,
+    private val wirelessAudio: Boolean = false,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -69,10 +71,12 @@ class AndroidMediaSink(
     @Volatile private var videoSizeChanged = onVideoSizeChanged
     @Volatile private var mainVideoSize = videoWidth to videoHeight
     private val appContext = context?.applicationContext
+    private val factoryAudio = if (enableL7AudioProfile) L7FactoryAudioProfile.load() else null
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
         audioFocusEnabled,
         onAudioDiagnostic,
+        factoryRouting = factoryAudio != null,
     )
     private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
     private val audioRouting = if (appContext != null)
@@ -238,7 +242,8 @@ class AndroidMediaSink(
             if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) callMode.acquire(id)
             if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
-                MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled) { callMode.release(id) }
+                MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled,
+                    factorySource = factoryAudio?.microphoneSource(config.audioType, config.sampleRate, wirelessAudio)) { callMode.release(id) }
             }
             if (!uplink.start()) onMicrophoneStopped(id)
         } catch (error: Exception) {
@@ -335,6 +340,7 @@ class AndroidMediaSink(
             assistantChannel,
             audioFocusCoordinator,
             audioRouting,
+            factoryAudio,
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
@@ -863,6 +869,7 @@ private class AudioRenderer(
     private val assistantChannel: Int,
     private val audioFocusCoordinator: AudioFocusCoordinator,
     private val audioRouting: L7AudioRouting?,
+    private val factoryAudio: L7FactoryAudioProfile?,
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
@@ -1124,7 +1131,7 @@ private class AudioRenderer(
         AudioChannel.MEDIA -> mediaChannel
         AudioChannel.NAVIGATION -> navigationChannel
         AudioChannel.ASSISTANT -> assistantChannel
-        AudioChannel.PHONE -> 0
+        AudioChannel.PHONE, AudioChannel.RINGTONE -> 0
     }.takeIf(AudioOutputPolicy::valid) ?: 0
 
     private fun audioAttributesFor(
@@ -1141,6 +1148,7 @@ private class AudioRenderer(
                 Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
             }
         }
+        factoryAudio?.let { return it.attributes(selection.channel, contentTypeFor(selection.contentType), streamOverride) }
         return AudioAttributes.Builder()
             .setUsage(AudioOutputPolicy.usage(selection.channel, streamOverride))
             .setContentType(contentTypeFor(selection.contentType))
@@ -1148,6 +1156,9 @@ private class AudioRenderer(
     }
 
     private fun mappedSelection(): AudioChannelSelection {
+        if (factoryAudio != null && format.audioType.equals("alert", true)) {
+            return AudioChannelSelection(AudioChannel.RINGTONE, AudioContentType.SPEECH)
+        }
         val mode = if (advancedAudioChannelMapping) {
             AudioChannelMappingMode.AUTOMOTIVE_BUS
         } else {
@@ -1161,16 +1172,16 @@ private class AudioRenderer(
     }
 
     private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
-        AudioAttributes.Builder()
+        factoryAudio?.attributes(selection.channel, contentTypeFor(selection.contentType), 0) ?: AudioAttributes.Builder()
             .setUsage(usageFor(selection.channel))
             .setContentType(contentTypeFor(selection.contentType))
             .build()
 
-    /** 原版导航不参与焦点申请，也不因其他流失焦被本应用静音。 */
+    /** L7 对齐博越配置，导航也参与共享焦点；通用核心保留无厂商配置分支。 */
     private fun requestAudioFocus() {
         val channel = mappedChannel ?: return
         val attributes = trackAttributes ?: return
-        if (channel == AudioChannel.NAVIGATION) {
+        if (channel == AudioChannel.NAVIGATION && factoryAudio == null) {
             runCatching { report("Audio: focus skipped channel=NAVIGATION policy=diplay-0.2.11") }
             return
         }
@@ -1212,6 +1223,7 @@ private class AudioRenderer(
     private fun usageFor(channel: AudioChannel): Int = when (channel) {
         AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
         AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
+        AudioChannel.RINGTONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
         AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
     }

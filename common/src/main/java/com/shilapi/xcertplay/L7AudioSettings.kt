@@ -46,7 +46,7 @@ internal object L7AudioSettings {
                     .setMessage(R.string.l7_audio_restore_confirm)
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
-                        AirPlayPersistence.restoreUpstreamAudioDefaults(context)
+                        AirPlayPersistence.restoreBoyueAudioDefaults(context)
                         parent.removeAllViews()
                         page(context, parent, open)
                     }.show()

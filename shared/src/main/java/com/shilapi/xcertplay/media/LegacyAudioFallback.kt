@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay.media
 
 /** A ROM can reject a legacy stream by throwing or returning an uninitialized track. */
-internal object LegacyAudioFallback {
+object LegacyAudioFallback {
     fun <T> build(
         createLegacy: () -> T,
         isInitialized: (T) -> Boolean,

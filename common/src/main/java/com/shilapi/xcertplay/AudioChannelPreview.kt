@@ -4,6 +4,8 @@ import android.content.Context
 import com.shilapi.xcertplay.media.AudioPreviewRoute
 import com.shilapi.xcertplay.media.AudioOutputRole
 import com.shilapi.xcertplay.media.AudioOutputPolicy
+import com.shilapi.xcertplay.media.L7FactoryAudioProfile
+import com.shilapi.xcertplay.media.LegacyAudioFallback
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -53,13 +55,14 @@ internal class AudioChannelPreview(
                 check(built.state == AudioTrack.STATE_INITIALIZED) { "Audio output did not initialize" }
                 if (closed || generation.get() != request) return@submit
                 activeTrack.set(built)
+                built.setVolume(0.6f)
                 context?.let {
                     route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel,
-                        preferBus = AirPlayPersistence.loadL7AudioBusEnabled(it)) { line ->
+                        preferBus = AirPlayPersistence.loadL7AudioBusEnabled(it),
+                        focusEnabled = AirPlayPersistence.loadAudioFocusEnabled(it)) { line ->
                         L7DebugLog.record("Audio preview stream=$channel $line")
                     }
                 }
-                built.setVolume(0.6f)
                 built.play()
                 var written = 0
                 while (written < pcm.size && !closed && generation.get() == request) {
@@ -96,14 +99,7 @@ internal class AudioChannelPreview(
     }
 
     private fun createTrack(channel: Int, role: AudioOutputRole): AudioTrack {
-        val attributes = if (!AudioOutputPolicy.isLegacy(channel)) {
-            AudioAttributes.Builder()
-                .setUsage(AudioOutputPolicy.usage(role, channel))
-                .setContentType(role.contentType)
-                .build()
-        } else {
-            AudioAttributes.Builder().setLegacyStreamType(channel).build()
-        }
+        val attributes = L7FactoryAudioProfile.load().attributes(role, channel)
         val channels = role.channels
         val mask = if (role.channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
         val minimum = AudioTrack.getMinBufferSize(
@@ -111,21 +107,19 @@ internal class AudioChannelPreview(
         )
         check(minimum > 0) { "No PCM output buffer is available" }
         val bufferSize = maxOf(minimum, SAMPLE_RATE / 10 * channels * 2)
-        return if (AudioOutputPolicy.isLegacy(channel)) {
-            // 与会话的传统音频流路径一致，拒绝时明确报错，不让默认输出冒充所选流。
-            AudioTrack(channel, SAMPLE_RATE, mask, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM)
-        } else AudioTrack.Builder()
+        fun usageTrack() = AudioTrack.Builder()
             .setAudioAttributes(attributes)
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(SAMPLE_RATE)
-                    .setChannelMask(mask)
-                    .build(),
-            )
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(bufferSize)
-            .build()
+            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(SAMPLE_RATE).setChannelMask(mask).build())
+            .setTransferMode(AudioTrack.MODE_STREAM).setBufferSizeInBytes(bufferSize).build()
+        return if (AudioOutputPolicy.isLegacy(channel)) LegacyAudioFallback.build(
+            createLegacy = { AudioTrack(channel, SAMPLE_RATE, mask, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM) },
+            isInitialized = { it.state == AudioTrack.STATE_INITIALIZED }, release = { it.release() },
+            createFallback = {
+                L7DebugLog.record("Audio preview stream=$channel rejected; fallback=usage ${attributes.usage}")
+                usageTrack()
+            },
+        ) else usageTrack()
     }
 
     fun stop() {

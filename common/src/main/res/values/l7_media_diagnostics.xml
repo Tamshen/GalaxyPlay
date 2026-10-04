@@ -15,20 +15,30 @@
         <item>8 · 拨号按键</item>
         <item>9 · 语音合成（系统保留）</item>
         <item>10 · 无障碍（系统限制）</item>
+        <item>11 · 车机扩展流</item>
+        <item>12 · 车机扩展流</item>
+        <item>13 · 车机扩展流</item>
+        <item>14 · 导航（博越默认）</item>
+        <item>15 · 车机扩展流</item>
+        <item>16 · 车机扩展流</item>
+        <item>17 · 车机扩展流</item>
+        <item>18 · 车机扩展流</item>
+        <item>19 · 车机扩展流</item>
+        <item>20 · 车机扩展流</item>
     </string-array>
     <string name="l7_audio_media">媒体音乐</string>
     <string name="l7_audio_assistant">语音助手（Siri）</string>
     <string name="l7_audio_navigation">导航播报</string>
-    <string name="l7_audio_roles_note">默认对齐 DiPlay 原版 0.2.11 的系统用途。每项可修改或试听；旧安装保留已有选择，可用“恢复原版默认音频”清除音频覆盖。修改下次连接生效。</string>
+    <string name="l7_audio_roles_note">默认采用博越 DiPlay 0.2.11 音频配置：媒体与 Siri 自动用途，导航流 14，开启音频焦点与高级映射。本次升级会应用一次该配置，之后保留手动修改。每项可试听，下次连接生效。</string>
     <string name="l7_audio_route_select">高级输出策略</string>
     <string name="l7_audio_route_choose">选择</string>
-    <string name="l7_audio_route_help">默认按媒体、Siri 或导航用途交由系统路由。可选择其他用途策略；传统流 1–10 仅供排查，数字不是扬声器位置。试听只验证 PCM 输出，真实语音仍需连接手机确认。选择和试听不保存，保存后下次连接生效。</string>
+    <string name="l7_audio_route_help">媒体、Siri 和导航独立输出，默认导航采用博越流 14。可改用自动用途或传统流 1–20；数字不是扬声器位置。固件拒绝传统流时回退对应用途，日志会记录。试听与连接使用同一路由策略，但 PCM 试听不能代替真实语音验证。选择和试听不保存。</string>
     <string name="l7_audio_test_play">试听此声道（2 秒）</string>
     <string name="l7_audio_test_stop">停止试听</string>
     <string name="l7_audio_test_ready">试听不会保存设置。请确认车机音量已开启，并在停车时操作。</string>
     <string name="l7_audio_test_playing">正在试听 %1$s…</string>
     <string name="l7_audio_test_stopped">试听已停止，设置未保存。</string>
-    <string name="l7_audio_test_sent">测试音已发送，请确认是否听到。实际输出：%1$s。是否可用以实车听感为准。</string>
+    <string name="l7_audio_test_sent">测试音已发送，请确认是否听到。\n实际输出：%1$s。\n是否可用以实车听感为准。</string>
     <string name="l7_audio_output_speaker">系统扬声器</string>
     <string name="l7_audio_output_earpiece">听筒</string>
     <string name="l7_audio_output_bus">车载 BUS</string>
@@ -44,7 +54,7 @@
     <string name="l7_call_processing_note">通话时使用系统支持的音效；若出现回声、音量或路由异常可关闭。修改下次连接生效。</string>
     <string name="l7_audio_bus">尝试 L7 BUS 路由</string>
     <string name="l7_audio_bus_note">默认关闭，播放与录音交给系统，保持原版音频路径。仅在确认车机支持后开启；设备缺失或请求失败时回退系统。修改下次连接生效。</string>
-    <string name="l7_audio_restore">恢复原版默认音频</string>
-    <string name="l7_audio_restore_hint">DiPlay 0.2.11 · 清除音频覆盖设置</string>
-    <string name="l7_audio_restore_confirm">恢复媒体、Siri 和导航的默认系统用途，关闭音频焦点、BUS 路由及高级映射，恢复默认缓冲与通话音效。仅修改音频设置；配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
+    <string name="l7_audio_restore">恢复博越默认音频</string>
+    <string name="l7_audio_restore_hint">博越 DiPlay 0.2.11 · 重新应用音频配置</string>
+    <string name="l7_audio_restore_confirm">恢复媒体与 Siri 自动用途、导航流 14，开启音频焦点与高级映射，关闭额外 BUS 路由，恢复默认缓冲与通话音效。仅修改音频设置；配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
 </resources>
