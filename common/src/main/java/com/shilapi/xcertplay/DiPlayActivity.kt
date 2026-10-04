@@ -239,10 +239,15 @@ class DiPlayActivity : ComponentActivity() {
         if (initialLaunch) {
             initialLaunch = false
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
-                DiPlayPreferences.autoConnect(this) && intent.getStringExtra("page") == null) {
-                handler.post { connect(AirPlayPersistence.loadWirelessEnabled(this)) }
+                DiPlayPreferences.autoConnect(this) && intent.getStringExtra("page") == null &&
+                L7StartupGuard.allowAutomatic(this)) {
+                handler.post {
+                    if (!isFinishing && !isDestroyed) connect(AirPlayPersistence.loadWirelessEnabled(this))
+                }
             }
         }
+        L7StartupGuard.showNotice(this, ::showDebugLogs)
+        L7StartupGuard.healthyHome(this)
     }
     private var channelDialog: android.app.AlertDialog? = null
     private var logView: L7LogView? = null
@@ -1386,6 +1391,7 @@ class DiPlayActivity : ComponentActivity() {
     }
     private fun openProjection() {
         if (!L7Agreement.require(this)) return
+        L7StartupGuard.authorizeHost(this)
         startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     private fun choosePhone() {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_startup_recovery_title">Automatic connection paused</string>
+    <string name="l7_startup_recovery_hint">The app exited abnormally during startup or connection 3 times in a row. Automatic connection has been turned off. Settings and authentication data are kept. Connect manually or view logs, then re-enable automatic connection in General settings after troubleshooting.</string>
+    <string name="l7_startup_recovery_storage">Startup recovery state could not be saved. Automatic connection is paused for this run. Check available storage; manual actions and logs remain available.</string>
+</resources>

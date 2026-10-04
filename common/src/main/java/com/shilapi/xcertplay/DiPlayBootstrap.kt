@@ -76,6 +76,6 @@ internal object DiPlayPreferences {
     }
     fun autoConnect(context: Context) = prefs(context).getBoolean("auto_connect", false)
     fun saveAutoConnect(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean("auto_connect", value).apply()
+        L7StartupGuard.setEnabled(context, value)
     }
 }
