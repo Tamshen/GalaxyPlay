@@ -30,7 +30,7 @@ L7 仅指吉利银河 L7 汽车型号。项目名称为 L7CarPlay，应用显示
 - shared 承载 DiPlay 协议、传输、媒体、认证；common 承载宿主与界面；mobile 是 L7 APK 入口。
 - L7 配置、UI、系统服务和硬件接入集中在适配层，不另起协议栈；保留上游源码署名与许可。
 - 优先标准 Android API；厂商接口隔离调用并处理不可用情况，以真实固件、权限和结果验证。
-- origin 为 Tamshen/L7CarPlay，upstream 为 shihabal3amri/DiPlay；功能分支从 main 创建。
+- origin 为 Tamshen/L7CarPlay，upstream 为 shihabal3amri/DiPlay；日常改动直接在 main 分批提交，不为每项任务新建分支。确需隔离时使用临时分支，完成后合回 main 并删除已合并分支。
 - 当前主线采用源码快照。上游在独立临时检出中审查，按官方发布标签同步完整核心源码基线并保留 L7 适配，不将完整上游提交图重新并入产品分支。
 - 上游同步与产品功能分开提交；冲突逐项处理，不整文件盲选；同步检查默认值、资源释放、包名、签名、认证和测试。
 - 产品版本与官方核心基线唯一维护于 gradle/l7-version.properties；产品 versionCode 递增，核心版本和提交指向实际同步的发布标签，不维护 patch 版本。
