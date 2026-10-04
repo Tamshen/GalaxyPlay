@@ -15,6 +15,7 @@ internal data class L7TaskProgress(
     val running: Boolean, val message: String, val detail: String = "",
     val completed: Int = 0, val total: Int = 0, val waiting: Boolean = false,
     val result: Boolean = false, val retry: Boolean = false, val error: Boolean = false,
+    val resultLabel: Int = R.string.l7_probe_results, val showProgress: Boolean = true,
 )
 
 /** 同一窗口展示执行、停止和结果；返回先确认，关闭后撤销轮询与窗口引用。 */
@@ -91,14 +92,15 @@ internal class L7TaskProgressDialog(
         text(message, state.message)
         text(detail, state.detail)
         detail.visibility = if (state.detail.isEmpty()) View.GONE else View.VISIBLE
-        L7Ui.text(message, if (state.error) R.color.product_ui_warning else R.color.product_ui_text)
+        L7Ui.text(message, if (state.error) R.color.product_ui_danger else R.color.product_ui_text)
+        progress.visibility = if (state.showProgress) View.VISIBLE else View.GONE
         progress.isIndeterminate = state.waiting || state.running && state.total <= 0
         progress.progress = if (state.total > 0) (state.completed * 100L / state.total).toInt().coerceIn(0, 100) else 0
         progress.contentDescription = state.message
         val action = when {
             state.running -> stopLabel
             state.retry -> R.string.l7_log_retry
-            state.result -> R.string.l7_probe_results
+            state.result -> state.resultLabel
             else -> null
         }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {

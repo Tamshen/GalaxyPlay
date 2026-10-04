@@ -105,6 +105,11 @@ def start_waiting():
         if not host():
             screenshot('home')
             tap('有线连接')
+            if find('有线连接 · 3 步') is not None:
+                tap('有线连接')
+            if find('USB 尚未就绪') is not None:
+                assert find('开始等待 USB 连接') is not None, '本场景需 USB Host 支持；能力不足提示应使用 connection_guide_smoke.py 验证'
+                tap('开始等待 USB 连接')
         time.sleep(.8)
         if find('While using the app') is not None:
             tap('While using the app')
@@ -187,7 +192,7 @@ def check_home():
     require_menu(fixed_menu, '首页设置按钮进入后菜单位置变化')
     adb('shell', 'input', 'keyevent', '4')
     tap('无线连接')
-    assert find('返回设置') is not None and find('热点名称与密码') is not None, '无线入口没有进入配置与连接页'
+    assert find('返回连接方式') is not None and find('无线连接 · 3 步') is not None, '无线入口没有进入配置与连接页'
     tap('设置')
     adb('shell', 'input', 'keyevent', '4')
     screenshot('home-restored')

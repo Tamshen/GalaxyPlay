@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
-parser.add_argument('--gate-only', action='store_true', help='中文 AVD：仅临时拒绝修改设置权限以检查无线预检，结束恢复原值')
+parser.add_argument('--gate-only', action='store_true', help='中文 AVD：仅临时拒绝修改设置权限以检查原生热点开启权限，结束恢复原值')
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 package = 'com.ecarx.carplay'
@@ -65,8 +65,8 @@ def check_gate():
     mode = match.group(1) if match else 'default'
     try:
         adb('shell', 'cmd', 'appops', 'set', package, 'WRITE_SETTINGS', 'deny')
-        launch('settings-connection'); tap('无线连接')
-        assert any('需要允许本应用修改系统设置' in t for t in texts()), '无线连接未经过原生热点预检'
+        launch('settings-connection-wireless'); tap('一键开启原生热点')
+        assert any('需要允许本应用修改系统设置' in t for t in texts()), '原生热点开启未提示授权要求'
         screenshot('wireless-permission-fallback')
         adb('shell', 'input', 'keyevent', '4')
     finally:
@@ -75,7 +75,7 @@ def check_gate():
 if args.gate_only:
     check_gate()
     launch('settings-debug')
-    print('无线连接预检通过：权限不足提示原生设置授权，未开启热点，原 AppOps 已恢复。')
+    print('原生热点开启权限检查通过：权限不足提示原生设置授权，未开启热点，原 AppOps 已恢复。')
     raise SystemExit
 
 original_night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
@@ -102,7 +102,7 @@ try:
         tap('Close' if lang=='en' else '关闭')
         assert view in texts()
         assert summary in texts(), '查看日志改变了上传历史'
-        launch('settings-connection')
+        launch('settings-connection-wireless')
         visible=texts()
         assert any(('different service' in t if lang=='en' else '不是同一个服务' in t) for t in visible)
         if lang=='en': english()
@@ -116,7 +116,7 @@ try:
         tap('Cancel' if lang=='en' else '取消')
         tap('Open Android native hotspot settings' if lang=='en' else '打开 Android 原生热点设置')
         assert 'com.android.settings' in {n.get('package') for n in nodes().iter('node')}, '未进入 Android 原生设置'
-        launch('settings-connection')
+        launch('settings-connection-wireless')
     check_gate()
     adb('shell', 'cmd', 'uimode', 'night', 'yes')
     launch('settings-debug'); screenshot('quick-logs-zh-night')

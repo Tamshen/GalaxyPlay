@@ -5,10 +5,19 @@ import org.junit.Test
 
 class L7RoutesTest {
     @Test fun everyConfigurationPageBelongsToSettingsAndReturnsToItsRoot() {
-        L7Routes.settings.filter { it != "settings" && !L7Routes.isDebug(it) }.forEach {
+        L7Routes.settings.filter { it != "settings" && !L7Routes.isDebug(it) && !it.startsWith("settings-connection-") }.forEach {
             assertEquals("settings", L7Routes.navigation(it))
             assertEquals("settings", L7Routes.back(it))
             assertEquals(it, L7Routes.normalize(it))
+        }
+    }
+
+    @Test fun wirelessAndUsbHaveSeparateGuidesUnderConnectionSettings() {
+        listOf("settings-connection-wireless", "settings-connection-usb").forEach {
+            assertEquals(it, L7Routes.normalize(it))
+            assertEquals("settings", L7Routes.navigation(it))
+            assertEquals("settings-connection", L7Routes.back(it))
+            assertEquals(it, L7Routes.destination("home", "settings", it))
         }
     }
 

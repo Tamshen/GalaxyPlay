@@ -24,7 +24,7 @@
     <string name="l7_hotspot_settings_hint">Android Settings → Network &amp; internet → Hotspot &amp; tethering.</string>
     <string name="l7_hotspot_actions_hint">Existing native hotspot details are reused. Generate and apply new details when needed. Exiting the app keeps the hotspot on.</string>
     <string name="l7_hotspot_cancel">Stop waiting</string>
-    <string name="l7_hotspot_grant">Allow modifying system settings</string>
+    <string name="l7_hotspot_grant">Allow system changes</string>
     <string name="l7_hotspot_not_saved">Not saved</string>
     <string name="l7_hotspot_create_hint">Generate a dedicated hotspot name and a random 16-character WPA2 password with uppercase letters, lowercase letters and digits. Applying changes requires the hotspot to be off. If access is denied, copy the details into Android native settings.</string>
     <string name="l7_hotspot_copy_name">Copy hotspot name</string>

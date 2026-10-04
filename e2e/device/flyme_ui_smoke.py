@@ -166,7 +166,7 @@ def navigation_smoke():
     tap('取消')
     tap('返回设置')
     for category, labels, name in (
-        ('连接设置', ['无线连接', '有线连接', '打开车机热点设置', '车机热点详情', '选择 iPhone', '蓝牙设置'], 'connection'),
+        ('连接设置', ['无线连接', '有线连接', '选择连接方式'], 'connection'),
         ('关于', ['应用版本', '使用协议'], 'about'),
         ('调试与日志', ['返回设置', '环境与权限', '日志与报告'], 'debug'),
     ):
@@ -266,9 +266,22 @@ def bluetooth_smoke():
 
 
 
+def enter_usb_waiting():
+    launch('settings-connection-usb')
+    tap('有线连接')
+    current = nodes()
+    if any(n.get('text') == '开始等待 USB 连接' for n in current):
+        tap('开始等待 USB 连接')
+        return True
+    assert any(n.get('text') == 'USB 尚未就绪' for n in current), '缺少 USB 未就绪提示'
+    screenshot('usb-unavailable'); tap('关闭')
+    print('当前 AVD 未声明 USB Host，已验证强提示；未执行 USB 等待场景。', flush=True)
+    return False
+
+
 def connection_smoke():
-    launch()
-    tap('USB 有线连接')
+    if not enter_usb_waiting():
+        return
     current = nodes()
     if any(n.attrib.get('text') == 'Only this time' for n in current):
         tap('Only this time')
@@ -346,12 +359,14 @@ try:
         print('弹窗主题检查通过：待选值和确认状态保留，取消后恢复原值。', flush=True)
         raise SystemExit(0)
     tap('连接设置')
+    tap('无线连接')
     settings_selected()
     tap('车机热点详情')
     screenshot('hotspot-modal-day')
     tap('取消')
     settings_selected()
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+    launch('settings')
     tap('CarPlay 认证')
     settings_selected()
     tap('选择认证来源')
@@ -404,8 +419,9 @@ try:
     tap('取消')
     adb('shell', 'settings', 'delete', 'system', 'font_scale')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
-    launch()
-    tap('USB 有线连接')
+    if not enter_usb_waiting():
+        print('其余设置检查通过；USB 等待场景需支持 USB Host 的设备。', flush=True)
+        raise SystemExit(0)
     current = nodes()
     # 模拟器如出现录音授权，只授予本次使用，避免预先绕过权限流程。
     if any(n.attrib.get('text') == 'Only this time' for n in current):

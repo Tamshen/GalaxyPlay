@@ -44,7 +44,7 @@ class L7HomePanelTest {
         assertTrue(panel.quick.isEnabled)
         panel.update(true, false, false, false, "认证配置需要检查")
         assertFalse(panel.quick.isEnabled)
-        assertFalse(panel.usb.isEnabled)
+        assertTrue(panel.usb.isEnabled)
         assertTrue(panel.wireless.isEnabled)
         assertTrue(panel.settings.isEnabled)
     }
