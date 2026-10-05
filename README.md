@@ -24,7 +24,7 @@ UI 规范与离线示例位于工作区 `衍生项目/FlymeAutoUI/galaxyplay/组
 
 项目开发遵循 [开发规范](AGENTS.md)，测试统一放在 [e2e](e2e/README.md)，凭据与报告处理见 [安全与隐私](SECURITY.md)，当前产品变化见 [更新记录](更新记录.md)。
 
-工作区目录为 `GalaxyPlay/`，其中 `GalaxyPlay/` 是源码仓库，`TODO/` 是独立待办仓库。源码远端为 [Tamshen/GalaxyPlay](https://github.com/Tamshen/GalaxyPlay)。
+工作区根目录保留 `L7Play/`，其中 `GalaxyPlay/` 是源码仓库，`TODO/` 是独立待办仓库。源码远端为 [Tamshen/GalaxyPlay](https://github.com/Tamshen/GalaxyPlay)。
 
 ## 快速构建
 
