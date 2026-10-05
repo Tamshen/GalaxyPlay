@@ -80,11 +80,11 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 `L7SteeringDiagnosticsTest` 检查同一输入关联、蓝牙与队列耗时、过滤与旧会话原因、取消和有界记录；媒体回调测试覆盖重复 DOWN、UP、未知键和迟到 OEM 主线程回调。`L7BluetoothMediaGuardTest` 检查替换、暂停和关闭取消通知不重放命令；`L7SteeringLogTest` 检查方控轮转不覆盖连接日志、清除后可继续记录。
 
-`VehicleSteeringCaptureTest` 在 API 29／30 覆盖未知键不消费、已知媒体键单次转发、DOWN／UP 证据、广播缺失／错误类型、厂商自定义数字字段白名单、文字与设备标识排除、L7 额外采集关闭、车型切换与迟到标签固定、40 输入每秒限流。`VehicleSteeringDebugPageTest` 核对三车型状态、进页不发命令、取消不标记、实物按键选择只写标记；这些用例不证明 L6 实车分发或控制成功。
+`VehicleSteeringCaptureTest` 检查数字白名单、非文字输入、限流及控制不变；`SteeringListeningControllerTest` 检查未启用／无事件不提问、原 trace 绑定、多入口成组、弹窗期间新事件隔离、忽略、导航排除、最大组长、过期／车型切换／后台停止和旧弹窗拒绝。`VehicleSteeringDebugPageTest` 在 API 29／30 检查启用、收到输入才弹问、选择写回同一 trace、后台关闭和不自动恢复；`VehicleSteeringObserverTest` 检查显式启用、默认落盘与撤回后停止。
 
-`python3 e2e/device/vehicle_steering_smoke.py` 仅允许 AVD，检查三种车型中文日间／英文夜间、待测按键选择／取消、未连接时的合成 F1 与 type=2 被动输入及默认落盘；不连接手机或上传，结束恢复偏好、协议、车型文件及昼夜。合成输入不代表真实 L6 方控通过，截图保存在忽略目录 `build/previews/vehicle-steering/`。
+`python3 e2e/device/vehicle_steering_smoke.py` 仅允许 AVD，检查三车型中文日间／英文夜间的完整顺序：启用后无输入不弹问、合成广播／F1 到达后选择或忽略、同 trace 标注、停止后不再弹问及落盘。结束恢复偏好、协议、车型文件与昼夜；不连接手机或上传，合成事件不代表真实 L6 方控通过。截图留在忽略目录 `build/previews/vehicle-steering/`。原 steering_debug_smoke.py 的预先标记动作属于旧版交互，由新脚本替代。
 
-`python3 e2e/device/steering_debug_smoke.py --adb ../tools/scripts/adb.sh` 仅在已同意协议的中文 AVD 检查入口、问题标记实际落盘、清屏保留日志、昼夜与两级返回。不建立连接或上传，不证明物理方控修复；截图留在忽略目录。
+`python3 e2e/device/steering_debug_smoke.py --adb ../tools/scripts/adb.sh` 作为兼容入口执行上述同一流程，不再维护先选按键的旧测试。
 
 ## 基础调试回归
 

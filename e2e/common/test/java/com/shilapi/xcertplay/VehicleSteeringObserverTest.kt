@@ -36,6 +36,7 @@ class VehicleSteeringObserverTest {
 
     @Test fun disconnectedBroadcastHasOneObservationAndIsIncludedInPersistentLogs() {
         L7SteeringDiagnostics.initialize(context)
+        SteeringListening.controller.start("l6")
         send()
         val events = L7SteeringDiagnostics.store.snapshot().events
         assertEquals(1, events.count { it.stage == "OBSERVE_ONLY" && it.source == "vehicle-broadcast" })
@@ -54,13 +55,17 @@ class VehicleSteeringObserverTest {
         assertTrue(L7SteeringDiagnostics.store.snapshot().events.isEmpty())
         L7Agreement.accept(context)
         L7SteeringDiagnostics.initialize(context)
+        SteeringListening.controller.start("l6")
         send()
         assertEquals(1, L7SteeringDiagnostics.store.snapshot().events.count { it.stage == "OBSERVE_ONLY" })
     }
 
-    @Test fun l7BroadcastKeepsExtraObservationDisabled() {
+    @Test fun l7BroadcastIsNotObservedUntilListenerIsExplicitlyEnabled() {
         L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L7)
         send()
         assertTrue(L7SteeringDiagnostics.store.snapshot().events.isEmpty())
+        SteeringListening.controller.start("l7")
+        send()
+        assertEquals(1, L7SteeringDiagnostics.store.snapshot().events.count { it.stage == "OBSERVE_ONLY" })
     }
 }

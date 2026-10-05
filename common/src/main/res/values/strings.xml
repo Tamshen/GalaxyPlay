@@ -491,7 +491,36 @@
     <string name="l7_steering_test_key">标记准备测试的按键</string>
     <string name="l7_steering_test_key_hint">先选按键，再按实物键，最后标记正常或失效；记录默认进入日志，上传由你发起。</string>
     <string-array name="l7_steering_test_keys">
-        <item>左键／上一曲</item><item>右键／下一曲</item><item>播放／暂停</item>
-        <item>语音短按</item><item>语音长按</item><item>音量加</item><item>音量减</item><item>其他按键</item>
+        <item>左键</item>
+        <item>右键</item>
+        <item>播放／暂停键</item>
+        <item>语音短按</item>
+        <item>语音长按</item>
+        <item>音量加</item>
+        <item>音量减</item>
+        <item>其他方控键</item>
+        <item>不是方控／误触</item>
     </string-array>
+    <string name="l7_debug_details">查看技术明细</string>
+    <string name="l7_listen_step">1. 启用监听</string>
+    <string name="l7_listen_intro">启用后按一次方控。收到信号后，会询问你刚才按了哪个键；标注完成再测下一个。监听最长两分钟，离开页面自动停止。</string>
+    <string name="l7_listen_status">当前状态</string>
+    <string name="l7_listen_start">启用监听日志</string>
+    <string name="l7_listen_stop">停止监听</string>
+    <string name="l7_listen_idle">尚未开始</string>
+    <string name="l7_listen_waiting">正在监听，请按一个方控键</string>
+    <string name="l7_listen_received">已收到按键信号</string>
+    <string name="l7_listen_stopped">监听已停止，记录已保留</string>
+    <string name="l7_listen_question">刚才按了哪个方控键？选择后会与这组输入绑定，然后继续监听。标注期间请先不要再按其他键。</string>
+    <string name="l7_listen_skip">忽略这组输入</string>
+    <string name="l7_listen_no_input">按了方控，但没有收到信号</string>
+    <string name="l7_listen_no_input_hint">记录本次未收到输入，供上传后排查。</string>
+    <string name="l7_listen_records">2. 已标注的按键</string>
+    <string name="l7_listen_saved">收到的信号和标注都会保存到日志；标注不改变方控映射。</string>
+    <string name="l7_listen_empty">启用监听并按方控，收到信号后再选择按键。</string>
+    <string name="l7_listen_sample">第 %1$d 组输入</string>
+    <string name="l7_listen_bound">已绑定 %1$d 条输入记录</string>
+    <string name="l7_listen_finish">3. 结束并上传</string>
+    <string name="l7_listen_upload_hint">停止监听后，到日志页手动上传本次记录。</string>
+    <string name="l7_listen_no_input_saved">已记录：本次按键没有收到输入</string>
 </resources>

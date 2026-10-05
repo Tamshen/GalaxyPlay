@@ -36,7 +36,36 @@
     <string name="l7_steering_test_key">Mark the key to test</string>
     <string name="l7_steering_test_key_hint">Select a key, press the physical control, then mark success or failure. Records enter the logs by default; you initiate uploads.</string>
     <string-array name="l7_steering_test_keys">
-        <item>Left / Previous</item><item>Right / Next</item><item>Play / Pause</item>
-        <item>Voice short press</item><item>Voice long press</item><item>Volume up</item><item>Volume down</item><item>Other key</item>
+        <item>Left key</item>
+        <item>Right key</item>
+        <item>Play / Pause key</item>
+        <item>Voice short press</item>
+        <item>Voice long press</item>
+        <item>Volume up</item>
+        <item>Volume down</item>
+        <item>Other steering key</item>
+        <item>Not a steering control / Accidental input</item>
     </string-array>
+    <string name="l7_debug_details">View technical details</string>
+    <string name="l7_listen_step">1. Start listening</string>
+    <string name="l7_listen_intro">Start listening and press one steering control. After an input arrives, choose the key you pressed before testing the next one. Listening stops after two minutes or when you leave this page.</string>
+    <string name="l7_listen_status">Current status</string>
+    <string name="l7_listen_start">Start input logging</string>
+    <string name="l7_listen_stop">Stop listening</string>
+    <string name="l7_listen_idle">Not started</string>
+    <string name="l7_listen_waiting">Listening — press one steering control</string>
+    <string name="l7_listen_received">Control input received</string>
+    <string name="l7_listen_stopped">Listening stopped; records saved</string>
+    <string name="l7_listen_question">Which steering control did you just press? Your choice will be linked to this input group, then listening will continue. Wait until you finish labeling before pressing another key.</string>
+    <string name="l7_listen_skip">Ignore this input group</string>
+    <string name="l7_listen_no_input">Pressed a control but received no input</string>
+    <string name="l7_listen_no_input_hint">Record the missing input for investigation after upload.</string>
+    <string name="l7_listen_records">2. Labeled controls</string>
+    <string name="l7_listen_saved">Inputs and labels are saved to the logs. Labels do not change control mappings.</string>
+    <string name="l7_listen_empty">Start listening and press a control. Choose its label after an input arrives.</string>
+    <string name="l7_listen_sample">Input group %1$d</string>
+    <string name="l7_listen_bound">Linked to %1$d input records</string>
+    <string name="l7_listen_finish">3. Finish and upload</string>
+    <string name="l7_listen_upload_hint">Stop listening, then upload the records manually from Logs.</string>
+    <string name="l7_listen_no_input_saved">Recorded: no input arrived for this press</string>
 </resources>
