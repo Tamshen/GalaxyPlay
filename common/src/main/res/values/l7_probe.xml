@@ -2,10 +2,10 @@
 <resources>
     <string name="l7_probe_reporting_media">媒体中心上报</string>
     <string name="l7_probe_reporting_hud">HUD 导航上报</string>
-    <string name="l7_probe_reporting_qnx">媒体 QNX 上报</string>
+    <string name="l7_probe_reporting_qnx">系统媒体显示</string>
     <string name="l7_probe_reporting_short">授权 %1$s/%2$s · SDK %3$s/%4$s</string>
     <string name="l7_probe_reporting_details">候选权限 %1$s 项：已声明 %2$s，已授权 %3$s，定义可见 %4$s，AppOps 限制 %5$s。当前应用可见 SDK 类 %6$s/%7$s。实际上报尚未验证，不能据此判定支持或不支持。</string>
-    <string name="l7_probe_qnx_unconfirmed">QNX 下游协议尚未确认；此项复查媒体中心入口，不代表 QNX 已收到数据。</string>
+    <string name="l7_probe_qnx_unconfirmed">此项复查 Android 媒体服务入口；注册、字段更新与系统实际显示仍需分别验证。</string>
     <string name="l7_probe_next_reporting">下一步：查看下方每项候选权限的声明、授权、定义和 AppOps，结合厂商服务的实际拒绝原因核对要求。候选权限不等于必需权限，应用自身广播权限不代表厂商授权，SDK 类不可见不等于车机不支持。采集不会注册媒体源、抢占焦点或发送上报。</string>
     <string name="l7_probe_back_debug">返回调试</string>
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
