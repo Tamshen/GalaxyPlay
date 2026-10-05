@@ -15,6 +15,7 @@ internal class AudioFocusCoordinator(
     private val enabled: Boolean,
     private val report: (String) -> Unit = {},
     private val factoryRouting: Boolean = false,
+    private val template: AudioRoutingTemplate? = null,
 ) : java.io.Closeable {
     private data class Entry(val channel: AudioChannel, val attributes: AudioAttributes)
 
@@ -102,7 +103,7 @@ internal class AudioFocusCoordinator(
         if (request != null && requestedChannel == primary.channel) { applyVolumes(); return }
         val generation = ++requestGeneration
         request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
-        val gain = when (primary.channel) {
+        val gain = (if (factoryRouting) template?.focusGain(primary.channel) else null) ?: when (primary.channel) {
             AudioChannel.MEDIA -> AudioManager.AUDIOFOCUS_GAIN
             AudioChannel.PHONE -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
             AudioChannel.ASSISTANT -> if (factoryRouting) AudioManager.AUDIOFOCUS_GAIN_TRANSIENT else AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK

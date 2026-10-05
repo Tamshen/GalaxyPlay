@@ -13,7 +13,7 @@ class AudioPreviewRoute(context: Context, track: AudioTrack, role: AudioOutputRo
         AudioOutputPolicy.routingChannel(role.channel, choice),
         false, sampleRate, channels, useBus = !AudioOutputPolicy.isLegacy(choice))
 
-    private val focus = AudioFocusCoordinator(context, focusEnabled, report, factoryRouting = true)
+    private val focus = AudioFocusCoordinator(context, focusEnabled, report, factoryRouting = true, template = template)
     init { focus.acquire(track, role.channel, track.audioAttributes) }
 
     fun reportActual() = binding.reportActual()

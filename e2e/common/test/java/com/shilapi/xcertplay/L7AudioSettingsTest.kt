@@ -27,6 +27,8 @@ class L7AudioSettingsTest {
         val context = context()
         val parent = LinearLayout(context)
         for (mode in L7AudioTemplates.Mode.entries) {
+            L7AudioTemplates.selectModel(context, if (mode == L7AudioTemplates.Mode.L6)
+                L7AudioTemplates.Model.L6 else L7AudioTemplates.Model.L7)
             L7AudioTemplates.select(context, mode)
             parent.removeAllViews()
             L7AudioSettings.page(context, parent, {}, {}) { _, _, _, _ -> }
@@ -38,6 +40,44 @@ class L7AudioSettingsTest {
             assertNotNull(row(parent, context.getString(R.string.music_buffer)))
             assertNotNull(row(parent, context.getString(R.string.l7_template_select)))
         }
+    }
+
+    @Test fun modelSelectionRequiresConfirmationAndL6RestoreKeepsItsModel() {
+        val context = context()
+        val parent = LinearLayout(context)
+        L7AudioSettings.page(context, parent) { _, _, _, _ -> }
+        fun chooseL6() {
+            row(parent, context.getString(R.string.l7_template_model))!!.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            val selector = ShadowAlertDialog.getLatestAlertDialog()
+            selector.listView.performItemClick(selector.listView.adapter.getView(1, null, selector.listView), 1, 1L)
+        }
+        chooseL6()
+        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertEquals(L7AudioTemplates.Model.L7, L7AudioTemplates.model(context))
+        chooseL6()
+        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
+        assertEquals(context.getString(R.string.l7_template_l6),
+            row(parent, context.getString(R.string.l7_template_select))!!.valueView.text.toString())
+        row(parent, context.getString(R.string.l7_template_select))!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val options = ShadowAlertDialog.getLatestAlertDialog()
+        assertEquals(2, options.listView.adapter.count)
+        options.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(
+            com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION, 19))
+        parent.removeAllViews(); L7AudioSettings.page(context, parent) { _, _, _, _ -> }
+        row(parent, context.getString(R.string.l7_audio_restore))!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val restore = ShadowAlertDialog.getLatestAlertDialog()
+        assertTrue(restore.findViewById<android.widget.TextView>(android.R.id.message).text.contains(
+            context.getString(R.string.l7_template_model_l6)))
+        restore.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
+        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
+        assertEquals(19, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION))
     }
 
     @Test fun cancellingProfileSelectionPreservesModeAndVisibleRows() {

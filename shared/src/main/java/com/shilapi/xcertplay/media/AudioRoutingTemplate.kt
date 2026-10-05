@@ -9,6 +9,7 @@ class AudioRoutingTemplate private constructor(
     val preferBus: Boolean,
     private val choices: Map<String, Int>,
     private val buses: Map<String, String>,
+    private val focusGains: Map<String, Int> = emptyMap(),
 ) {
     fun choice(role: AudioOutputRole): Int = choices.getValue(role.name.lowercase())
 
@@ -17,13 +18,15 @@ class AudioRoutingTemplate private constructor(
 
     internal fun knownBus(address: String): Boolean = buses.values.any { it.equals(address, true) }
 
+    internal fun focusGain(channel: AudioChannel): Int? = focusGains[channel.name.lowercase()]
+
     fun withChoice(role: AudioOutputRole, choice: Int): AudioRoutingTemplate {
         require(AudioOutputPolicy.valid(choice))
-        return AudioRoutingTemplate(name, preferBus, choices + (role.name.lowercase() to choice), buses)
+        return AudioRoutingTemplate(name, preferBus, choices + (role.name.lowercase() to choice), buses, focusGains)
     }
 
     fun withBusEnabled(enabled: Boolean): AudioRoutingTemplate =
-        AudioRoutingTemplate(name, enabled, choices, buses)
+        AudioRoutingTemplate(name, enabled, choices, buses, focusGains)
 
     fun toJson(): String = JSONObject().apply {
         put("version", 1)
@@ -31,6 +34,7 @@ class AudioRoutingTemplate private constructor(
         put("preferBus", preferBus)
         put("choices", JSONObject(choices))
         put("outputBuses", JSONObject(buses))
+        if (focusGains.isNotEmpty()) put("focusGains", JSONObject(focusGains))
     }.toString(2)
 
     companion object {
@@ -47,7 +51,8 @@ class AudioRoutingTemplate private constructor(
             val reader = JSONTokener(json)
             val obj = reader.nextValue() as? JSONObject ?: error("需要 JSON 对象")
             require(reader.nextClean() == 0.toChar())
-            require(keys(obj) == setOf("version", "name", "preferBus", "choices", "outputBuses"))
+            val required = setOf("version", "name", "preferBus", "choices", "outputBuses")
+            require(keys(obj).containsAll(required) && keys(obj).all { it in required || it == "focusGains" })
             require(obj.get("version") == 1)
             val name = obj.get("name") as? String ?: error("名称必须是文字")
             require(name.isNotBlank() && name.length <= 64 && name.none { it.isISOControl() })
@@ -67,7 +72,20 @@ class AudioRoutingTemplate private constructor(
                 address
             }
             require(!enabled || buses.isNotEmpty())
-            return AudioRoutingTemplate(name, enabled, choices, buses)
+            return AudioRoutingTemplate(name, enabled, choices, buses, parseFocusGains(obj))
+        }
+
+        private fun parseFocusGains(obj: JSONObject): Map<String, Int> {
+            if (!obj.has("focusGains")) return emptyMap()
+            val raw = obj.getJSONObject("focusGains")
+            require(keys(raw).all { it in outputs })
+            return keys(raw).associateWith { channel ->
+                val value = raw.get(channel)
+                require(value is Int && value in 1..4)
+                // 通话焦点固定为短时请求，模板不能改成长期占用。
+                require(channel != "phone" || value == 2)
+                value as Int
+            }
         }
 
         private fun keys(obj: JSONObject): Set<String> = obj.keys().asSequence().toSet()

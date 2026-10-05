@@ -78,6 +78,7 @@ class AndroidMediaSink(
         audioFocusEnabled,
         onAudioDiagnostic,
         factoryRouting = factoryAudio != null,
+        template = audioRoutingTemplate,
     )
     private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
     private val callTimeline = CallAudioTimeline(onAudioDiagnostic, ::audioRecoveryState)

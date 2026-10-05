@@ -12,6 +12,7 @@ import com.shilapi.xcertplay.media.AudioRoutingTemplate
 /** 编辑的是草稿；校验或保存失败时保留原文件和编辑内容。 */
 internal object L7AudioTemplateEditor {
     fun show(context: Context, changed: () -> Unit) {
+        val model = L7AudioTemplates.model(context)
         val editor = EditText(context).apply {
             setText(L7AudioTemplates.load(context).toJson())
             typeface = Typeface.MONOSPACE
@@ -29,12 +30,16 @@ internal object L7AudioTemplateEditor {
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 if (committed) return@setOnClickListener
+                if (model != L7AudioTemplates.model(context)) {
+                    Toast.makeText(context, R.string.l7_template_model_changed, Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
                 val template = runCatching { AudioRoutingTemplate.parse(editor.text.toString()) }.getOrNull()
                 if (template == null) {
                     editor.error = context.getString(R.string.l7_template_invalid)
                     return@setOnClickListener
                 }
-                if (runCatching { L7AudioTemplates.saveCustom(context, template) }.isFailure) {
+                if (runCatching { L7AudioTemplates.saveCustom(context, template, model) }.isFailure) {
                     Toast.makeText(context, R.string.l7_template_save_failed, Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }

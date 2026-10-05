@@ -15,19 +15,29 @@ internal object L7AudioSettings {
         val mode = L7AudioTemplates.mode(context)
         val custom = mode == L7AudioTemplates.Mode.CUSTOM
         fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, open) }
-        val names = listOf(text(R.string.l7_template_l7), text(R.string.l7_template_bus), text(R.string.l7_template_custom))
+        val model = L7AudioTemplates.model(context)
+        val modelNames = listOf(text(R.string.l7_template_model_l7), text(R.string.l7_template_model_l6))
+        val modes = L7AudioTemplates.modes(context)
+        val names = modes.map { text(modeName(it)) }
         val summary = when (mode) {
             L7AudioTemplates.Mode.L7 -> R.string.l7_template_l7_note
+            L7AudioTemplates.Mode.L6 -> R.string.l7_template_l6_note
             L7AudioTemplates.Mode.BUS -> R.string.l7_template_bus_note
             L7AudioTemplates.Mode.CUSTOM -> if (L7AudioTemplates.customInvalid(context))
                 R.string.l7_template_recovery else R.string.l7_template_custom_note
         }
         L7SettingsSection.add(parent, text(R.string.l7_template_title),
-            description = text(summary), footer = text(R.string.l7_setting_apply_hint)) { card ->
-            card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[mode.ordinal]) {
-                L7Components.select(context, text(R.string.l7_template_select), names, mode.ordinal,
+            description = context.getString(summary, modelNames[model.ordinal]), footer = text(R.string.l7_setting_apply_hint)) { card ->
+            card.addView(L7Components.valueRow(context, text(R.string.l7_template_model), modelNames[model.ordinal]) {
+                L7Components.select(context, text(R.string.l7_template_model), modelNames, model.ordinal,
                     text(R.string.l7_save_next_connection)) { selected ->
-                    change(context) { L7AudioTemplates.select(context, L7AudioTemplates.Mode.entries[selected]); refresh() }
+                    change(context) { L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.entries[selected]); refresh() }
+                }
+            })
+            card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[modes.indexOf(mode)]) {
+                L7Components.select(context, text(R.string.l7_template_select), names, modes.indexOf(mode),
+                    text(R.string.l7_save_next_connection)) { selected ->
+                    change(context) { L7AudioTemplates.select(context, modes[selected]); refresh() }
                 }
             })
             if (custom) {
@@ -39,14 +49,14 @@ internal object L7AudioSettings {
                     text(R.string.l7_template_export_note), click = it)) }
             }
             card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
-                text(R.string.l7_template_restore_note)) {
+                context.getString(R.string.l7_template_restore_note, modelNames[model.ordinal])) {
                 L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
-                    .setMessage(R.string.l7_template_restore_confirm)
+                    .setMessage(context.getString(R.string.l7_template_restore_confirm, modelNames[model.ordinal]))
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
                         change(context) {
                             AirPlayPersistence.restoreUsageAudioDefaults(context)
-                            L7AudioTemplates.select(context, L7AudioTemplates.Mode.L7)
+                            L7AudioTemplates.select(context, L7AudioTemplates.defaultMode(context))
                             refresh()
                         }
                     }.show()
@@ -84,6 +94,13 @@ internal object L7AudioSettings {
 
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it) }
+    }
+
+    private fun modeName(mode: L7AudioTemplates.Mode): Int = when (mode) {
+        L7AudioTemplates.Mode.L7 -> R.string.l7_template_l7
+        L7AudioTemplates.Mode.L6 -> R.string.l7_template_l6
+        L7AudioTemplates.Mode.BUS -> R.string.l7_template_bus
+        L7AudioTemplates.Mode.CUSTOM -> R.string.l7_template_custom
     }
 
     fun add(context: Context, parent: LinearLayout,

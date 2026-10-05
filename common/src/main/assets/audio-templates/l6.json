@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "L6",
+  "preferBus": false,
+  "choices": {
+    "media": 101,
+    "navigation": 103,
+    "assistant": 102
+  },
+  "outputBuses": {},
+  "focusGains": {
+    "media": 1,
+    "navigation": 3,
+    "assistant": 2,
+    "phone": 2,
+    "ringtone": 3
+  }
+}
