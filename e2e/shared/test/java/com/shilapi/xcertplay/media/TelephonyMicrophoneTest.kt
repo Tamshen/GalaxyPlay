@@ -121,6 +121,34 @@ class TelephonyMicrophoneTest {
         assertFalse(microphone.joinToString("\n").contains("head="))
     }
 
+    @Test fun callStopAndActualReleaseAreCorrelatedAfterRecorderAndModeAreReleased() {
+        sink.close()
+        val diagnostics = CopyOnWriteArrayList<String>()
+        sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
+        manager.mode = AudioManager.MODE_NORMAL
+        sink.onMicrophoneStarted(telephony, config("telephony"))
+        val record = awaitCapture()
+        sink.onMicrophoneStopped(telephony)
+        assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
+        val events = diagnostics.filter { it.contains("Audio: callLifecycle") }
+        val stop = events.indexOfFirst { it.contains("stage=STOP_REQUESTED") }
+        val released = events.indexOfFirst { it.contains("stage=RELEASED") }
+        assertTrue(stop >= 0 && released > stop)
+        assertTrue(events[stop].contains("callPhase=ACTIVE"))
+        assertTrue(events[released].contains("callPhase=AFTER_RELEASE"))
+        assertTrue(events[released].contains("audioMode=0"))
+        assertTrue(events[released].contains("callUplinks=0"))
+    }
+
+    @Test fun siriMicrophoneDoesNotCreateACallEpoch() {
+        sink.close()
+        val diagnostics = CopyOnWriteArrayList<String>()
+        sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
+        sink.onMicrophoneStarted(speechRecognition, config("speechrecognition")); awaitCapture()
+        sink.onMicrophoneStopped(speechRecognition)
+        assertFalse(diagnostics.any { it.contains("Audio: callLifecycle") })
+    }
+
     @Test fun diagnosticCallbackFailureDoesNotStopSpeechRecognitionCapture() {
         sink.close()
         sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })

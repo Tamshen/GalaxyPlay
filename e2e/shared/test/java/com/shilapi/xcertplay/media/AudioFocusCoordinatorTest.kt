@@ -23,6 +23,25 @@ class AudioFocusCoordinatorTest {
     private val audio = context.getSystemService(AudioManager::class.java)
     private val shadow = shadowOf(audio)
 
+    @Test fun diagnosticSnapshotObservesPhoneReleaseWithoutRequestingFocusOrChangingVolumes() {
+        val media = track(); val phone = track()
+        val focus = AudioFocusCoordinator(context, true, factoryRouting = true)
+        try {
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            focus.acquire(media, AudioChannel.MEDIA, attributes())
+            focus.acquire(phone, AudioChannel.PHONE, attributes(2))
+            val request = shadow.lastAudioFocusRequest
+            assertTrue(focus.diagnosticState().contains("focusChannel=PHONE"))
+            assertSame(request, shadow.lastAudioFocusRequest)
+            assertEquals(0f, volume(media), 0f)
+            focus.release(phone)
+            val recovered = shadow.lastAudioFocusRequest
+            assertTrue(focus.diagnosticState().contains("focusChannel=MEDIA focusHeld=true"))
+            assertSame(recovered, shadow.lastAudioFocusRequest)
+            assertEquals(1f, volume(media), 0f)
+        } finally { focus.close(); media.release(); phone.release() }
+    }
+
     @Test fun navigationDucksOnlyMediaAndReleaseRestoresIt() {
         val media = track(); val navigation = track()
         val focus = AudioFocusCoordinator(context, true, factoryRouting = true)

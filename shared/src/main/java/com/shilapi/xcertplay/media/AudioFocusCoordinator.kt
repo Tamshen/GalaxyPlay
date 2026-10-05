@@ -69,6 +69,11 @@ internal class AudioFocusCoordinator(
 
     fun resumeMedia() = onMediaPlaying(true)
 
+    /** 读取当前状态不会请求或放弃焦点，用于通话结束后的统计关联。 */
+    @Synchronized fun diagnosticState(): String =
+        "focusEnabled=$enabled focusGeneration=$requestGeneration focusChannel=${requestedChannel ?: "none"} " +
+            "focusHeld=$focusHeld focusVolume=$focusVolume mediaSuppressed=$mediaSuppressed focusTracks=${active.size}"
+
     @Synchronized
     override fun close() {
         closed = true
