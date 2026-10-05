@@ -11,7 +11,7 @@
     <string name="l7_probe_packages">Visibility of reference packages</string>
     <string name="l7_probe_executor">Execution identity and auxiliary connections</string>
     <string name="l7_probe_title">Debug</string>
-    <string name="l7_probe_entry_hint">Environment, permission, steering and voice tests; details are logged by default</string>
+    <string name="l7_probe_entry_hint">Environment, steering, voice, media and HUD tests; details are logged by default</string>
     <string name="l7_probe_environment">Environment and permissions</string>
     <string name="l7_probe_modules">Debug modules</string>
     <string name="l7_probe_logs">Logs and reports</string>

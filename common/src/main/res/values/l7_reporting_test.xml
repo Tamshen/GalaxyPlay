@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_report_cleared">记录测试信息已清除</string>
+    <string name="l7_report_residual">记录仍有残留或异常</string>
+    <string name="l7_report_first_issue">本轮首个异常：%1$s</string>
+    <string name="l7_report_media_title">媒体上报测试</string>
+    <string name="l7_report_navigation_title">HUD 导航上报测试</string>
+    <string name="l7_report_media_hint">使用无声测试曲目检查歌名、播放状态、进度与封面更新，可观察原车媒体卡片；不会向手机发送控制。请先结束 CarPlay 连接。</string>
+    <string name="l7_report_navigation_hint">手动发送导航开始、测试路名与结束，随后观察 HUD／仪表。当前接口不发送未经确认的转向、距离或 ETA。请先结束 CarPlay 连接。</string>
+    <string name="l7_report_status">测试状态</string>
+    <string name="l7_report_start">开始上报测试</string>
+    <string name="l7_report_end">结束上报并注销</string>
+    <string name="l7_report_actions">手动更新</string>
+    <string name="l7_report_track">切换测试曲目 A／B</string>
+    <string name="l7_report_play_pause">切换播放／暂停</string>
+    <string name="l7_report_progress">测试进度增加 15 秒</string>
+    <string name="l7_report_cover">切换封面 A／B／无封面</string>
+    <string name="l7_report_road">切换测试路名 A／B</string>
+    <string name="l7_report_refresh">重新检查服务并发布当前路名</string>
+    <string name="l7_report_lifetime">返回页面或临时切到原车界面可继续观察。测试最长两分钟；点击结束、开始真实连接、撤回协议或退出应用时会停止并注销。</string>
+    <string name="l7_report_evidence">接口与日志证据</string>
+    <string name="l7_report_evidence_hint">接口返回只代表调用结果，实际显示请手动记录。结束后请检查原车测试信息是否清除。所有操作与错误默认进入脱敏日志，可从日志页手动上传。</string>
+    <string name="l7_report_visible">记录显示正常</string>
+    <string name="l7_report_missing">记录未显示或异常</string>
+    <string name="l7_report_logs">查看与上传测试日志</string>
+    <string name="l7_report_confirm">请在停车时测试。将向原车服务发送合成媒体／导航信息；播放操作可能切换当前媒体源。测试没有声音，最长两分钟。结束会尝试停止上报并注销，请同时观察原车显示。</string>
+    <string name="l7_report_idle">尚未开始</string>
+    <string name="l7_report_running">测试进行中；显示待观察</string>
+    <string name="l7_report_stopping">正在注销；清理结果待确认</string>
+    <string name="l7_report_stopped">本地已释放；原车清除待观察</string>
+    <string name="l7_report_other_running">另一个上报测试正在运行或清理</string>
+    <string name="l7_report_phone_busy">请先结束当前 CarPlay 连接，再开始手动测试。</string>
+    <string name="l7_report_run">测试编号：%1$d</string>
+    <string name="l7_report_no_evidence">尚无本次测试调用；服务不可用或拒绝时会显示具体阶段。</string>
+    <string name="l7_report_road_a">GalaxyPlay 测试道路 A</string>
+    <string name="l7_report_road_b">GalaxyPlay 测试道路 B</string>
+    <string name="l7_report_track_a">GalaxyPlay 测试曲目 A</string>
+    <string name="l7_report_track_b">GalaxyPlay 测试曲目 B</string>
+    <string name="l7_report_artist">调试测试数据</string>
+</resources>

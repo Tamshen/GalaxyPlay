@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="l7_report_cleared">Record test information as cleared</string>
+    <string name="l7_report_residual">Record residual or abnormal information</string>
+    <string name="l7_report_first_issue">First issue in this run: %1$s</string>
+    <string name="l7_report_media_title">Media reporting test</string>
+    <string name="l7_report_navigation_title">HUD navigation reporting test</string>
+    <string name="l7_report_media_hint">Use silent test tracks to check title, playback state, progress and artwork in the vehicle media card. No commands are sent to a phone. End the CarPlay connection first.</string>
+    <string name="l7_report_navigation_hint">Send navigation start, test road names and stop, then inspect the HUD or cluster. Unverified turn, distance and ETA fields are excluded. End the CarPlay connection first.</string>
+    <string name="l7_report_status">Test status</string>
+    <string name="l7_report_start">Start reporting test</string>
+    <string name="l7_report_end">End reporting and unregister</string>
+    <string name="l7_report_actions">Manual updates</string>
+    <string name="l7_report_track">Switch test track A / B</string>
+    <string name="l7_report_play_pause">Toggle play / pause</string>
+    <string name="l7_report_progress">Advance test progress by 15 seconds</string>
+    <string name="l7_report_cover">Switch artwork A / B / none</string>
+    <string name="l7_report_road">Switch test road A / B</string>
+    <string name="l7_report_refresh">Recheck service and publish current road</string>
+    <string name="l7_report_lifetime">You can leave this page to inspect the vehicle UI. Tests stop after two minutes, when ended, on a real connection, on consent withdrawal or on app exit.</string>
+    <string name="l7_report_evidence">Interface and log evidence</string>
+    <string name="l7_report_evidence_hint">A returned call does not confirm display. Record what you see, and check that test information clears after ending. Actions and errors enter the redacted log and can be uploaded manually from Logs.</string>
+    <string name="l7_report_visible">Record display as normal</string>
+    <string name="l7_report_missing">Record missing or abnormal display</string>
+    <string name="l7_report_logs">View and upload test logs</string>
+    <string name="l7_report_confirm">Test while parked. Synthetic media or navigation information will be sent to vehicle services. Play may change the current media source. Tests are silent and last at most two minutes. Ending attempts to stop and unregister; also inspect the vehicle display.</string>
+    <string name="l7_report_idle">Not started</string>
+    <string name="l7_report_running">Test running; inspect display</string>
+    <string name="l7_report_stopping">Unregistering; cleanup pending</string>
+    <string name="l7_report_stopped">Released locally; inspect vehicle cleanup</string>
+    <string name="l7_report_other_running">Another reporting test is running or cleaning up</string>
+    <string name="l7_report_phone_busy">End the current CarPlay connection before starting a manual test.</string>
+    <string name="l7_report_run">Test run: %1$d</string>
+    <string name="l7_report_no_evidence">No calls in this test yet. Unavailable or rejected services will show the affected stage.</string>
+    <string name="l7_report_road_a">GalaxyPlay test road A</string>
+    <string name="l7_report_road_b">GalaxyPlay test road B</string>
+    <string name="l7_report_track_a">GalaxyPlay test track A</string>
+    <string name="l7_report_track_b">GalaxyPlay test track B</string>
+    <string name="l7_report_artist">Debug test data</string>
+</resources>

@@ -4148,6 +4148,7 @@ internal object CarPlayBackgroundSession {
     @Synchronized
     fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int, owner: Any,
               display: CarPlaySessionDisplay? = null, stop: (() -> Unit) -> Unit) {
+        L7ReportingTests.stop("CARPLAY_SESSION")
         if (this.controller !== controller) {
             bluetoothMediaGuard?.close()
             bluetoothMediaGuard = null
