@@ -96,6 +96,8 @@ class AndroidMediaSink(
     /** 按协议的语音流状态判断，不将电话录音或媒体存在视为 Siri 活动。 */
     @Synchronized fun isAssistantAudioActive(): Boolean =
         !closed && (assistantAudioTypes.isNotEmpty() || assistantMicrophoneTypes.isNotEmpty())
+    /** 本地调试录音避让已存在的电话或 Siri 上行。 */
+    fun hasMicrophoneUplink(): Boolean = !closed && microphoneUplinks.isNotEmpty()
     private val audioRenderers = ConcurrentHashMap<AudioStreamId, AudioRenderer>()
     private val microphoneUplinks = ConcurrentHashMap<AudioStreamId, MicrophoneUplink>()
     private val pendingVideoCodec = ConcurrentHashMap<Int, VideoCodec>()

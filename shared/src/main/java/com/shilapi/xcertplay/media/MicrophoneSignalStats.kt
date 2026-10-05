@@ -4,7 +4,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** 只保留 PCM 能量摘要，不保存人声；跨 read 的半个样本也正确拼接。 */
-internal class MicrophoneSignalStats {
+class MicrophoneSignalStats {
     var samples = 0L
         private set
     var zeros = 0L

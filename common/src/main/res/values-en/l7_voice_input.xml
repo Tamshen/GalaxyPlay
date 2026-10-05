@@ -1,0 +1,45 @@
+<resources>
+    <string name="l7_voice_title">Voice input test</string>
+    <string name="l7_voice_permission">Microphone permission</string>
+    <string name="l7_voice_permission_hint">Tap to grant access, then start manually. Reconnect if the current CarPlay session was opened without microphone access.</string>
+    <string name="l7_voice_privacy">Manual capture on this page only, for up to 10 seconds. Leaving or backgrounding stops capture. No recording is saved or automatically uploaded.</string>
+    <string name="l7_voice_granted">Granted</string>
+    <string name="l7_voice_missing">Not granted</string>
+    <string name="l7_voice_permission_ready">Access granted. Start the test manually.</string>
+    <string name="l7_voice_permission_denied">Access denied. Enable microphone access in system app permissions and retry.</string>
+    <string name="l7_voice_local">Local microphone test</string>
+    <string name="l7_voice_local_hint">Speak toward the head unit and watch the levels. RMS and peak are PCM values. Zero samples do not indicate speech recognition. Siri cannot be requested during this test.</string>
+    <string name="l7_voice_source">Standard input source</string>
+    <string name="l7_voice_start">Start test (10 seconds)</string>
+    <string name="l7_voice_stop">Stop test</string>
+    <string name="l7_voice_level">Capture levels</string>
+    <string name="l7_voice_stats">%1$d ms · %2$d bytes\nRMS %3$d · Peak %4$d · Zero samples %5$d%%</string>
+    <string name="l7_voice_route">Device type %1$s · Silenced by system: %2$s</string>
+    <string name="l7_voice_yes">Yes</string>
+    <string name="l7_voice_no">No</string>
+    <string name="l7_voice_idle">Not started</string>
+    <string name="l7_voice_starting">Starting</string>
+    <string name="l7_voice_capturing">Capturing</string>
+    <string name="l7_voice_stopping">Stopping</string>
+    <string name="l7_voice_stopped">Stopped</string>
+    <string name="l7_voice_complete">10-second test complete</string>
+    <string name="l7_voice_interrupted">Call or Siri took over; local test stopped</string>
+    <string name="l7_voice_failed">Test failed</string>
+    <string name="l7_voice_failure">Failure: %1$s · code=%2$s</string>
+    <string name="l7_voice_occupied">A call or Siri is using the microphone. Finish it before testing.</string>
+    <string name="l7_voice_carplay">CarPlay voice uplink</string>
+    <string name="l7_voice_siri">Start Siri voice test</string>
+    <string name="l7_voice_uplink">Latest uplink summary</string>
+    <string name="l7_voice_uplink_hint">Connect, request Siri, then speak toward the head unit. Summaries show protocol microphone capture and send counts. A queued request or sent packets do not confirm recognition on the phone.</string>
+    <string name="l7_voice_disconnected">No active CarPlay session</string>
+    <string name="l7_voice_connected">Connected; ready to test</string>
+    <string name="l7_voice_stop_first">Stop the local test first</string>
+    <string name="l7_voice_uplink_active">Microphone uplink active</string>
+    <string name="l7_voice_siri_queued">Request queued. Waiting for the phone to open its voice stream.</string>
+    <string name="l7_voice_siri_failed">Request was not queued. Check the connection and retry.</string>
+    <string name="l7_voice_empty_uplink">No microphone summary in this session yet</string>
+    <string name="l7_voice_logs">View or export logs</string>
+    <string name="l7_voice_clear">Clear page history</string>
+    <string name="l7_voice_events">Recent voice markers</string>
+    <string name="l7_voice_empty">No test records yet</string>
+</resources>

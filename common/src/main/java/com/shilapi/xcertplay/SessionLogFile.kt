@@ -42,6 +42,7 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
         internal val storageLock = Any()
         const val MAX_BYTES = 512 * 1024L
         private val ARCHIVE_NAMES = listOf("previous.log") + (2..7).map { "previous-$it.log" }
-        val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log" + listOf("steering-previous-2.log", "steering-previous.log", "steering.log")
+        val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log" + listOf("steering-previous-2.log", "steering-previous.log", "steering.log",
+            "voice-input-previous-2.log", "voice-input-previous.log", "voice-input.log")
     }
 }
