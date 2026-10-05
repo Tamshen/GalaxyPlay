@@ -7,10 +7,10 @@ import com.shilapi.xcertplay.media.AudioRoutingTemplate
 import java.io.File
 import java.io.InputStream
 
-/** 内置资源只读；L7／L6 显式选择，各自保留方案和原子保存的自定义文件。 */
+/** 内置资源只读；L7／L6 自动应用适配方案；自定义车型独立保存文件，各文件原子写入。 */
 internal object L7AudioTemplates {
-    enum class Model(val id: String) { L7("l7"), L6("l6") }
-    enum class Mode(val id: String) { L7("l7"), BUS("l7-bus"), CUSTOM("custom"), L6("l6") }
+    enum class Model(val id: String) { L7("l7"), L6("l6"), CUSTOM("custom") }
+    enum class Mode(val id: String) { L7("l7"), BUS("l7-bus"), CUSTOM("custom"), L6("l6"), SYSTEM("system") }
     private const val PREFS = "l7_audio_templates"
     private const val MODEL = "model"
 
@@ -18,27 +18,43 @@ internal object L7AudioTemplates {
         it.id == context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(MODEL, null)
     } ?: Model.L7
 
-    fun modes(context: Context): List<Mode> = if (model(context) == Model.L6)
-        listOf(Mode.L6, Mode.CUSTOM) else listOf(Mode.L7, Mode.BUS, Mode.CUSTOM)
-
-    fun defaultMode(context: Context): Mode = if (model(context) == Model.L6) Mode.L6 else Mode.L7
-
-    @Synchronized fun selectModel(context: Context, model: Model) {
-        // 切换前先完成旧 L7 偏好的迁移，避免之后的默认恢复覆盖尚未迁移的选择。
-        mode(context)
-        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(MODEL, model.id).commit())
-        mode(context)
+    fun modes(context: Context): List<Mode> = when (model(context)) {
+        Model.L7 -> listOf(Mode.L7, Mode.BUS, Mode.CUSTOM)
+        Model.L6 -> listOf(Mode.L6, Mode.CUSTOM)
+        Model.CUSTOM -> listOf(Mode.SYSTEM, Mode.CUSTOM)
     }
 
-    private fun modeKey(context: Context): String = if (model(context) == Model.L6) "mode_l6" else "mode"
+    fun defaultMode(context: Context): Mode = defaultMode(model(context))
+
+    private fun defaultMode(model: Model): Mode = when (model) {
+        Model.L7 -> Mode.L7
+        Model.L6 -> Mode.L6
+        Model.CUSTOM -> Mode.SYSTEM
+    }
+
+    @Synchronized fun selectModel(context: Context, model: Model) {
+        // 先迁移旧 L7 配置；重新选车型自动填入适配方案，但不删除已编辑的文件。
+        mode(context)
+        val preset = builtin(context, defaultMode(model))
+        if (model == Model.CUSTOM && !customExists(context, model)) writeCustom(context, preset, model)
+        val selected = if (model == Model.CUSTOM) Mode.CUSTOM else defaultMode(model)
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(MODEL, model.id).putString(modeKey(model), selected.id).commit())
+    }
+
+    private fun modeKey(model: Model): String = when (model) {
+        Model.L7 -> "mode"
+        Model.L6 -> "mode_l6"
+        Model.CUSTOM -> "mode_custom"
+    }
 
     @Synchronized fun mode(context: Context): Mode {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.getString(modeKey(context), null)?.let { id ->
+        prefs.getString(modeKey(model(context)), null)?.let { id ->
             return modes(context).firstOrNull { it.id == id } ?: defaultMode(context)
         }
-        val selected = if (model(context) == Model.L6) Mode.L6 else migrateLegacy(context)
-        check(prefs.edit().putString(modeKey(context), selected.id).commit())
+        val selected = if (model(context) == Model.L7) migrateLegacy(context) else defaultMode(context)
+        check(prefs.edit().putString(modeKey(model(context)), selected.id).commit())
         return selected
     }
 
@@ -66,7 +82,7 @@ internal object L7AudioTemplates {
             // 新建自定义草稿沿用当前方案；已有文件一律保留。
             writeCustom(context, load(context))
         }
-        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(modeKey(context), mode.id).commit())
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(modeKey(model(context)), mode.id).commit())
     }
 
     @Synchronized fun saveCustom(context: Context, template: AudioRoutingTemplate, expectedModel: Model = model(context)) {
@@ -100,19 +116,23 @@ internal object L7AudioTemplates {
         }
     }
 
-    private fun customExists(context: Context): Boolean {
-        val base = file(context).baseFile
+    private fun customExists(context: Context, targetModel: Model = model(context)): Boolean {
+        val base = file(context, targetModel).baseFile
         // Android 10/11 的 AtomicFile 可从备份恢复，切换方案不能抢先覆盖该备份。
         return base.exists() || File(base.path + ".bak").exists()
     }
 
     private fun readCustom(context: Context): AudioRoutingTemplate = file(context).openRead().use { parse(it) }
 
-    private fun file(context: Context): AtomicFile = AtomicFile(File(context.filesDir,
-        if (model(context) == Model.L6) "audio-template-l6.json" else "audio-template.json"))
+    private fun file(context: Context, targetModel: Model = model(context)): AtomicFile =
+        AtomicFile(File(context.filesDir, when (targetModel) {
+            Model.L7 -> "audio-template.json"
+            Model.L6 -> "audio-template-l6.json"
+            Model.CUSTOM -> "audio-template-custom.json"
+        }))
 
-    private fun writeCustom(context: Context, template: AudioRoutingTemplate) {
-        val target = file(context)
+    private fun writeCustom(context: Context, template: AudioRoutingTemplate, targetModel: Model = model(context)) {
+        val target = file(context, targetModel)
         val stream = target.startWrite()
         try {
             stream.write(template.toJson().toByteArray(Charsets.UTF_8))

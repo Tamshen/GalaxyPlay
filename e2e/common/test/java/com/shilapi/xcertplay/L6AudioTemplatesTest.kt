@@ -34,7 +34,7 @@ class L6AudioTemplatesTest {
         assertEquals(2, json.getJSONObject("focusGains").getInt("phone"))
     }
 
-    @Test fun modelSwitchPreservesBothFilesModesAndFrozenSessionTemplate() {
+    @Test fun modelSwitchAppliesPresetAndPreservesBothFilesAndFrozenSessionTemplate() {
         val context = context()
         L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(AudioOutputRole.MEDIA, 20))
         val frozen = L7AudioTemplates.load(context)
@@ -43,10 +43,12 @@ class L6AudioTemplatesTest {
         L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(AudioOutputRole.NAVIGATION, 19))
         val l6 = File(context.filesDir, "audio-template-l6.json").readText()
         L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L7)
-        assertEquals(L7AudioTemplates.Mode.CUSTOM, L7AudioTemplates.mode(context))
+        assertEquals(L7AudioTemplates.Mode.L7, L7AudioTemplates.mode(context))
+        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
         assertEquals(20, L7AudioTemplates.load(context).choice(AudioOutputRole.MEDIA))
         L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L6)
-        assertEquals(L7AudioTemplates.Mode.CUSTOM, L7AudioTemplates.mode(context))
+        assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
+        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
         assertEquals(19, L7AudioTemplates.load(context).choice(AudioOutputRole.NAVIGATION))
         assertEquals(l7, File(context.filesDir, "audio-template.json").readText())
         assertEquals(l6, File(context.filesDir, "audio-template-l6.json").readText())
@@ -62,7 +64,8 @@ class L6AudioTemplatesTest {
         assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
         AirPlayPersistence.restoreUsageAudioDefaults(context)
         L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L7)
-        assertEquals(L7AudioTemplates.Mode.CUSTOM, L7AudioTemplates.mode(context))
+        assertEquals(L7AudioTemplates.Mode.L7, L7AudioTemplates.mode(context))
+        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
         assertEquals(18, L7AudioTemplates.load(context).choice(AudioOutputRole.NAVIGATION))
         assertTrue(L7AudioTemplates.load(context).preferBus)
     }

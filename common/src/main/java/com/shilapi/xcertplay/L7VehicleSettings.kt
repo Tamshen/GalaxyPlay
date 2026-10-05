@@ -23,6 +23,11 @@ internal object L7VehicleSettings {
                     }
                 }
             })
+            card.addView(L7SettingRow(context, text(R.string.l7_vehicle_profile),
+                text(if (model == L7AudioTemplates.Model.CUSTOM) R.string.l7_vehicle_custom_note
+                    else R.string.l7_vehicle_preset_note)).apply {
+                setValue(text(L7AudioSettings.modeName(L7AudioTemplates.mode(context))))
+            })
             val detected = L7AudioModelDetector.detect()
             card.addView(L7Components.valueRow(context, text(R.string.l7_template_detect),
                 detected?.let { L7AudioModelConfirmation.name(context, it) } ?: text(R.string.l7_template_detect_unknown)) {

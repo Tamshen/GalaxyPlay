@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""仅在 AVD 检查首页车型入口、独立车型页、两车型音频页与取消契约，结束恢复原偏好／文件／昼夜；不连接手机。"""
+"""仅在 AVD 检查首页车型入口、独立车型页、L7／L6／自定义车型音频页与取消契约，结束恢复原偏好／文件／昼夜；不连接手机。"""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import subprocess
@@ -73,12 +74,16 @@ def launch(page="settings-vehicle"):
 
 
 def screenshot(name):
+    nodes()
+    time.sleep(.2)
     (output / name).write_bytes(adb('exec-out', 'screencap', '-p'))
 
 
 paths = ('shared_prefs/diplay.xml', 'shared_prefs/l7_audio_templates.xml',
          'files/audio-template.json', 'files/audio-template.json.bak',
-         'files/audio-template-l6.json', 'files/audio-template-l6.json.bak')
+         'files/audio-template-l6.json', 'files/audio-template-l6.json.bak',
+         'files/audio-template-custom.json', 'files/audio-template-custom.json.bak',
+         'shared_prefs/l7_agreement.xml')
 original = {path: read(path) for path in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
@@ -89,6 +94,9 @@ labels = {
 }
 
 try:
+    # 仅用于 AVD 页面回归；原协议记录结束恢复，主动阅读／勾选另由协议组件回归覆盖。
+    digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+    write('shared_prefs/l7_agreement.xml', f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
     for language, names in labels.items():
         model, l6, l7, profile, l6_profile, l7_profile, custom, save, cancel, edit, detect, category, auth, back = names
         adb('shell', 'am', 'force-stop', package)
@@ -147,9 +155,38 @@ try:
         launch()
         tap(model); tap(l6); tap(save)
         launch("settings-audio")
-        assert custom in visible()
+        assert l6_profile in visible() and edit not in visible()
         assert previous == read('files/audio-template-l6.json')
-    print('中英文设置首页首项、独立车型页与返回、车型确认／取消、昼夜、自定义取消及切换保留通过；未建立手机会话')
+        tap(profile); tap(custom); tap(save)
+        assert previous == read('files/audio-template-l6.json')
+        launch()
+        custom_model = '自定义' if language == 'zh' else 'Custom'
+        before = read('shared_prefs/l7_audio_templates.xml')
+        old_custom = read('files/audio-template-custom.json')
+        tap(model)
+        options = visible()
+        assert l7 in options and l6 in options and custom_model in options
+        screenshot(language + '-three-models.png')
+        tap(custom_model); tap(cancel)
+        assert before == read('shared_prefs/l7_audio_templates.xml')
+        assert old_custom == read('files/audio-template-custom.json')
+        tap(model); tap(custom_model); tap(save)
+        assert custom_model in visible()
+        launch('settings-audio')
+        assert custom in visible() and edit in visible()
+        generic = read('files/audio-template-custom.json')
+        assert generic and previous == read('files/audio-template-l6.json')
+        screenshot(language + '-custom-night.png')
+        tap(edit); tap(cancel)
+        assert generic == read('files/audio-template-custom.json')
+        adb('shell', 'cmd', 'uimode', 'night', 'no')
+        adb('shell', 'am', 'force-stop', package)
+        launch('settings-audio')
+        screenshot(language + '-custom-day.png')
+        tap('恢复用途路由' if language == 'zh' else 'Restore usage routing'); tap(save)
+        assert ('系统默认' if language == 'zh' else 'System default') in visible()
+        assert generic == read('files/audio-template-custom.json')
+    print('中英文设置首页首项、独立车型页与返回、三车型确认／取消、L7／L6 自动适配、昼夜、自定义独立文件及恢复保留通过；未建立手机会话')
 except Exception:
     screenshot('failure.png')
     (output / 'failure.xml').write_bytes(adb('shell', 'cat', '/sdcard/l6-audio-model.xml'))
@@ -160,4 +197,4 @@ finally:
         write(path, data)
     adb('shell', 'cmd', 'uimode', 'night', night)
     assert all(read(path) == data for path, data in original.items())
-    print('原偏好、两车型文件及昼夜设置已恢复')
+    print('原偏好、三项车型文件、协议记录及昼夜设置已恢复')

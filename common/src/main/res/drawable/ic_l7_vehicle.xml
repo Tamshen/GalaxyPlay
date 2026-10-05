@@ -1,6 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 原创车型图标：沿用 Flyme Auto 的 80 单位网格、4 单位线宽与主题颜色。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M4,10L6,4H18L20,10M4,10H20V18H4ZM4,18V20M20,18V20M7,14H8M16,14H17" />
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@color/product_ui_text" android:fillType="evenOdd"
+        android:pathData="M24,16H56L63,34H66V62H62V68H56V62H24V68H18V62H14V34H17ZM26.8,20L21.4,34H58.6L53.2,20ZM18,38V58H62V38Z" />
+    <path android:fillColor="@color/product_ui_text"
+        android:pathData="M22,44H32V48H22ZM48,44H58V48H48ZM32,52H48V56H32Z" />
 </vector>

@@ -297,3 +297,5 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 真实 Android VM 薄子类验证：Docker 内 `:common:assembleDebugAndroidTest` 后在 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，执行 `adb shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，预期 `SDK_SUBCLASS_OK`。仅检查代码生成、装箱和实例隔离，不调用原厂服务。
 
 `python3 e2e/device/debug_logs_module_smoke.py` 检查独立调试／日志分类、中英文昼夜、返回父级、旧日志路由兼容、显式采集与逐项事实默认落盘；不点击上传，不清除原有报告，恢复中文和原昼夜。日志默认持久化、上传集合及清空报告保留证据由 `L7DebugLogPersistenceTest` 覆盖。
+
+车型三项回归使用 `CustomVehicleTemplatesTest`（API 29／30）核对系统初始值、三份文件隔离、已知车型自动适配、损坏与 AtomicFile 备份恢复、迟到保存拒绝和恢复默认保留。AVD 脚本 `l6_audio_model_smoke.py` 增补第三车型、中英文确认／取消、自动适配和自定义恢复；协议同意仅使用临时夹具，结束恢复原记录，不代替主动阅读／勾选契约测试。
