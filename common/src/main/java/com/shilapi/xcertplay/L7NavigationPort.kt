@@ -8,6 +8,7 @@ import java.lang.reflect.Proxy
 
 internal interface L7NavigationPort : Closeable {
     fun initialize()
+    fun ready(): Boolean = true
     fun start()
     fun road(value: String)
     fun stop()
@@ -22,6 +23,8 @@ internal class L7ReflectiveNavigation(context: Context) : L7NavigationPort {
     @Volatile private var valid = true
     private var callback: Any? = null
     private var callbackType: Class<*>? = null
+    private var serviceInstance: Any? = null
+    private var serviceGetter: java.lang.reflect.Method? = null
 
     override fun initialize() {
         if (!valid) return
@@ -34,6 +37,9 @@ internal class L7ReflectiveNavigation(context: Context) : L7NavigationPort {
         api = Class.forName("ecarx.fw.api.ICreator", false, sdk.loader)
             .getMethod("create", Context::class.java).invoke(factory, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
+        val instance = Class.forName("com.autolink.adaptersrv.diminteraction.EcarxNaviInstance", false, sdk.loader)
+        serviceInstance = instance.getMethod("getInstance", Context::class.java).invoke(null, app)
+        serviceGetter = instance.getMethod("getService")
         val register = type.methods.single { it.name == "registerNavigationInteractionCallback" && it.parameterCount == 1 }
         val callbackClass = register.parameterTypes.single()
         val handler = InvocationHandler { proxy, method, args ->
@@ -50,18 +56,23 @@ internal class L7ReflectiveNavigation(context: Context) : L7NavigationPort {
             }.toTypedArray(), handler)
         callbackType = callbackClass
         if (valid) register.invoke(api, callback)
-        L7DebugLog.record("Navigation: sdk source=${sdk.source} registered=RETURNED authorization=UNCONFIRMED target=UNKNOWN")
+        L7DebugLog.record("Navigation: sdk source=${sdk.source} callbackRegistration=RETURNED_NO_ACK serviceReady=${ready()} authorization=UNCONFIRMED target=UNKNOWN")
     }
-    override fun start() { if (!valid) return; requireNotNull(apiType).getMethod("notifyTurnByTurnStarted").invoke(api) }
-    override fun road(value: String) { if (!valid) return; requireNotNull(apiType).getMethod("updateNextGuidancePointName", String::class.java).invoke(api, value) }
-    override fun stop() { requireNotNull(apiType).getMethod("notifyTurnByTurnStopped").invoke(api) }
+    override fun ready(): Boolean {
+        val service = serviceGetter?.invoke(serviceInstance) as? android.os.IInterface ?: return false
+        return service.asBinder().isBinderAlive
+    }
+    private fun requireReady() { check(ready()) { "SDK_SERVICE_NOT_READY" } }
+    override fun start() { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("notifyTurnByTurnStarted").invoke(api) }
+    override fun road(value: String) { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("updateNextGuidancePointName", String::class.java).invoke(api, value) }
+    override fun stop() { requireReady(); requireNotNull(apiType).getMethod("notifyTurnByTurnStopped").invoke(api) }
     override fun invalidate() { valid = false }
     override fun close() {
         invalidate()
         val target = api
         try {
             callbackType?.let { if (target != null) apiType?.getMethod("unregisterNavigationInteractionCallback", it)?.invoke(target, callback) }
-        } finally { callback = null; callbackType = null; api = null }
+        } finally { callback = null; callbackType = null; api = null; serviceInstance = null; serviceGetter = null }
     }
     companion object { const val API = "ecarx.fw.api.diminteraction.EcarxNaviInteraction" }
 }

@@ -5,7 +5,6 @@ import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.io.Closeable
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** 已确认的启停与路名接口按变化发布；不猜测距离、ETA 或图标编号，不抢原车导航焦点。 */
@@ -22,6 +21,10 @@ internal class L7NavigationSession(
     private var attempted = false
     private var started = false
     private var publishedRoad: String? = null
+    private var connected = false
+    private var failures = 0
+    private var reportedAvailability: Boolean? = null
+    private var pendingRoad: String? = null
 
     fun update(value: CarPlayNavigationSnapshot) {
         if (closed || !current()) return
@@ -33,24 +36,47 @@ internal class L7NavigationSession(
     }
     private fun publish() {
         val value = latest
-        if (!value.active) { if (started) stop(); return }
+        if (!value.active && !started) return
         if (!attempted) {
             attempted = true
             initialized = call("initialize") { port.initialize() }
         }
         if (!initialized || closed || !current()) return
+        val available = try { port.ready() } catch (error: Exception) {
+            log("Navigation: stage=serviceReady exceptionType=${error.javaClass.simpleName}"); false
+        }
+        if (reportedAvailability != available) {
+            reportedAvailability = available
+            log("Navigation: stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
+        }
+        if (!available) {
+            if (connected) publishedRoad = null
+            connected = false
+            return
+        }
+        if (!connected) { publishedRoad = null; if (value.active) started = false; failures = 0 }
+        connected = true
+        if (!value.active) {
+            if (failures < 3) stop()
+            if (!started) { pendingRoad = null; failures = 0 }
+            return
+        }
+        val road = value.road.orEmpty().take(256)
+        if (pendingRoad != road) { pendingRoad = road; failures = 0 }
+        if (failures >= 3) return
         if (!started) {
             // 即使开始调用在远端执行后抛错，退出也要尝试清理。
             started = true
-            if (!call("start") { port.start() }) { stop(); initialized = false; return }
+            if (!call("start") { port.start() }) { stop(); failures++; return }
         }
         if (closed || !current()) return
-        val road = value.road.orEmpty().take(256)
-        if (publishedRoad != road && call("road") { port.road(road) }) publishedRoad = road
+        if (publishedRoad != road) {
+            if (call("road") { port.road(road) }) { publishedRoad = road; failures = 0 }
+            else failures++
+        }
     }
     private fun stop() {
-        call("stop") { port.stop() }
-        started = false
+        if (call("stop") { port.stop() }) started = false else failures++
         publishedRoad = null
     }
     private fun call(stage: String, action: () -> Unit): Boolean = try {

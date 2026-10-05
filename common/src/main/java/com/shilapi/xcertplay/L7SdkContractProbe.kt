@@ -47,6 +47,9 @@ internal object L7SdkContractProbe {
             type.getMethod("notifyTurnByTurnStarted")
             type.getMethod("notifyTurnByTurnStopped")
             type.getMethod("updateNextGuidancePointName", String::class.java)
+            val instance = Class.forName("com.autolink.adaptersrv.diminteraction.EcarxNaviInstance", false, loader)
+            instance.getMethod("getInstance", Context::class.java)
+            instance.getMethod("getService")
             result["navigationMapping"] = "START_STOP_ROAD_ONLY_OTHER_UNITS_UNCONFIRMED"
         }
         return result
