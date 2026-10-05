@@ -1,0 +1,5 @@
+<resources>
+    <!-- 投屏、悬浮入口与桌面前景引用同一 E5 标志；控件继续使用 Flyme 主题色。 -->
+    <item name="ic_l7_projection" type="drawable">@drawable/ic_carplay_mark</item>
+    <item name="ic_diplay_notification" type="drawable">@drawable/ic_carplay_mark</item>
+</resources>

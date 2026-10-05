@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.ImageView
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
 
@@ -26,6 +27,11 @@ internal class L7HomePanel(
     init {
         orientation = VERTICAL
         gravity = Gravity.CENTER
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_carplay)
+            contentDescription = context.getString(R.string.carplay_icon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LayoutParams(dp(80), dp(80)).apply { bottomMargin = dp(24) })
         addView(L7Components.text(context, context.getString(R.string.l7_entry_title)).apply {
             textSize = 40f
             gravity = Gravity.CENTER
@@ -79,6 +85,8 @@ internal class L7HomePanel(
     private fun entry(top: Int = 0) = LayoutParams(-1, -2).apply {
         topMargin = L7Components.dp(context, top)
     }
+
+    private fun dp(value: Int) = L7Components.dp(context, value)
 
     companion object {
         fun configured(context: Context): Boolean {
