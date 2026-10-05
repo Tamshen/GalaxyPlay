@@ -509,6 +509,8 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
+    private val audioModelConfirmation = L7AudioModelConfirmation(this)
+
     private fun loadPersistedSettings() {
         displayScaleTenths = AirPlayPersistence.loadDisplayScaleTenths(this)
         // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
@@ -883,6 +885,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        audioModelConfirmation.close()
         vpnGate.dispose()
         wiredFailureDialog?.dismiss()
         wiredFailureDialog = null
@@ -3603,6 +3606,7 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         wiredStartupWait = null
+        if (l7DebugLogs && audioModelConfirmation.ensure { maybeStartCarPlay() }) return
         startCarPlay(size)
     }
 

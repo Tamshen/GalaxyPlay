@@ -53,7 +53,7 @@
     <string name="l7_hevc_use_avc">Use H.264 and reconnect</string>
     <string name="l7_call_processing">Call echo cancellation and noise suppression</string>
     <string name="l7_call_processing_note">Use supported system effects during calls. Turn off if echo, volume or routing becomes worse. Applies on the next connection.</string>
-    <string name="l7_audio_bus">Try L7 BUS routing</string>
+    <string name="l7_audio_bus">Try BUS routing</string>
     <string name="l7_audio_bus_note">Off by default: playback and recording use system routing, matching the upstream audio path. Enable only after confirming vehicle support. Missing or rejected devices fall back to the system. Applies on the next connection.</string>
     <string name="l7_audio_restore">Restore usage routing</string>
     <string name="l7_audio_restore_hint">Apply recommended usage settings</string>

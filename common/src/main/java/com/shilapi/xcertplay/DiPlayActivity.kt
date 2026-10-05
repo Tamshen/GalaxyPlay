@@ -79,6 +79,7 @@ class DiPlayActivity : ComponentActivity() {
     private var phoneDialog: AlertDialog? = null
     private var pendingWireless = false
     private var initialLaunch = true
+    private val audioModelConfirmation = L7AudioModelConfirmation(this)
     private var notificationTransport = true
     private var exportInProgress = false
     private var navigationStreamType = 14
@@ -249,6 +250,16 @@ class DiPlayActivity : ComponentActivity() {
             setupError = runCatching { DiPlayBootstrap.ensure(this) }.exceptionOrNull()?.let { getString(R.string.setup_error_auth) }
             render()
         }
+        if (!l7Ui || !audioModelConfirmation.ensure {
+            if (page == "settings-audio") render()
+            startAutomaticallyIfNeeded()
+        }) startAutomaticallyIfNeeded()
+        L7StartupGuard.showNotice(this, ::showDebugLogs)
+        L7StartupGuard.healthyHome(this)
+    }
+
+    private fun startAutomaticallyIfNeeded() {
+        if (isFinishing || isDestroyed || !L7Agreement.canUse(this)) return
         if (initialLaunch) {
             initialLaunch = false
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
@@ -259,8 +270,6 @@ class DiPlayActivity : ComponentActivity() {
                 }
             }
         }
-        L7StartupGuard.showNotice(this, ::showDebugLogs)
-        L7StartupGuard.healthyHome(this)
     }
     private var channelDialog: android.app.AlertDialog? = null
     private var logView: L7LogView? = null
@@ -281,6 +290,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        audioModelConfirmation.close()
         audioTemplateFiles.close()
         voiceDebugPage?.close(); voiceDebugPage = null
         debugTasks.dispose(isChangingConfigurations)
@@ -1385,6 +1395,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun connect(wireless: Boolean, nativeHotspotPrepared: Boolean = false) {
         if (!L7Agreement.require(this)) return
+        if (l7Ui && audioModelConfirmation.ensure { connect(wireless, nativeHotspotPrepared) }) return
         if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
             !L7WirelessPrerequisites.ensure(this, ::choosePhone)) return
         if (wireless && hotspotTask.status.busy) { connectionProblem(getString(R.string.l7_hotspot_busy)); return }
