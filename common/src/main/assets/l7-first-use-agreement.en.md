@@ -1,12 +1,12 @@
 # First-use Notice and Risk Acknowledgment
 
-Software: L7CarPlay
+Software: GalaxyPlay
 
 Maintainer: Tamshen
 
-Agreement version: 2026-10-03
+Agreement version: 2026-10-06
 
-Last updated: 2026-10-03
+Last updated: 2026-10-06
 
 Source code: https://github.com/Tamshen/L7CarPlay
 

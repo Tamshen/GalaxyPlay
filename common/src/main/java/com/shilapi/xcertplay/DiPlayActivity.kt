@@ -162,7 +162,7 @@ class DiPlayActivity : ComponentActivity() {
         probeState.selectedReport = savedInstanceState?.getString("probe_selected_report")
         probeExporter.pendingId = savedInstanceState?.getString("probe_export_id")
         audioTemplateFiles.restore(savedInstanceState)
-        if (l7Ui) L7DebugLog.record("L7CarPlay 打开 version=${version()} Android=${Build.VERSION.RELEASE}")
+        if (l7Ui) L7DebugLog.record("GalaxyPlay 打开 version=${version()} Android=${Build.VERSION.RELEASE}")
         languagePreferenceAtCreate = AppLocale.preference(this)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
         WindowCompat.setDecorFitsSystemWindows(window, true)

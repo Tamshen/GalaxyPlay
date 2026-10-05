@@ -55,7 +55,7 @@ def overlay_bounds():
     # Android 11 的 uiautomator dump 只返回焦点窗口；悬浮菜单不抢焦点，从系统窗口读取真实边界。
     windows = adb('shell', 'dumpsys', 'window', 'windows')
     for window in re.split(r'(?=  Window #\d+ Window\{)', windows):
-        if 'L7CarPlay 桌面菜单}:\n' in window and 'isVisible=true' in window:
+        if 'GalaxyPlay 桌面菜单}:\n' in window and 'isVisible=true' in window:
             bounds = re.search(r'mFrame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]', window)
             assert bounds, '悬浮窗口没有可见边界'
             return tuple(map(int, bounds.groups()))
@@ -109,12 +109,12 @@ tap_overlay('画面')
 assert find('有线连接') is not None and overlay_bounds() is None
 print('后台悬浮入口、拖动、固定四项菜单、返回首页与应用内隐藏通过', flush=True)
 tap('有线连接')
-assert find('返回 L7CarPlay') is not None
+assert find('返回 GalaxyPlay') is not None
 before = host_id()
 desktop()
 tap_overlay('展开桌面菜单')
 tap_overlay('画面')
-assert find('返回 L7CarPlay') is not None and host_id() == before
+assert find('返回 GalaxyPlay') is not None and host_id() == before
 assert 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package)
 screenshot('returned-to-session')
 desktop()

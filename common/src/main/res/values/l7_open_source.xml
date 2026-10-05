@@ -4,11 +4,11 @@
     <string name="l7_source_diplay_name" translatable="false">DiPlay</string>
     <string name="l7_source_diplay_description">CarPlay 接收核心 · GPL-3.0</string>
     <string name="l7_source_diplay_url" translatable="false">https://github.com/shihabal3amri/DiPlay</string>
-    <string name="l7_source_diplay_details">DiPlay 是 L7 CarPlay 的直接上游，提供 CarPlay 协议、连接、认证与媒体接收核心。L7 CarPlay 基于原版 0.2.11 维护银河 L7 专用适配。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；保留原作者署名及各文件许可声明。完整许可见“第三方许可”。</string>
+    <string name="l7_source_diplay_details">DiPlay 是 GalaxyPlay 的直接上游，提供 CarPlay 协议、连接、认证与媒体接收核心。GalaxyPlay 基于原版 0.2.11 维护银河 L7 专用适配。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；保留原作者署名及各文件许可声明。完整许可见“第三方许可”。</string>
     <string name="l7_source_geely_name" translatable="false">DiPlay · carlito12345</string>
     <string name="l7_source_geely_url" translatable="false">https://github.com/carlito12345/DiPlay</string>
     <string name="l7_source_geely_description">吉利二改 · 音频配置与热点设置来源</string>
-    <string name="l7_source_geely_details">感谢 carlito12345 开源分享 DiPlay 吉利车机二次开发项目。L7 CarPlay 参考其蓝牙媒体交接、方控接入与音频兼容实现，按银河 L7 的实际能力逐项评估适配。\n\n已按 v0.2.11 发布版本适配音频配置、焦点与热点设置跳转；不表示其全部功能已合入或新包已通过 L7 实车验证。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；各源码文件的原署名与许可声明继续保留。完整许可见“第三方许可”。</string>
+    <string name="l7_source_geely_details">感谢 carlito12345 开源分享 DiPlay 吉利车机二次开发项目。GalaxyPlay 参考其蓝牙媒体交接、方控接入与音频兼容实现，按银河 L7 的实际能力逐项评估适配。\n\n已按 v0.2.11 发布版本适配音频配置、焦点与热点设置跳转；不表示其全部功能已合入或新包已通过 L7 实车验证。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；各源码文件的原署名与许可声明继续保留。完整许可见“第三方许可”。</string>
     <string name="l7_licenses_title">第三方许可</string>
     <string name="l7_licenses_hint">查看依赖声明与许可原文</string>
     <string name="l7_licenses_load_failed">许可文件暂时无法读取，请重新打开。</string>

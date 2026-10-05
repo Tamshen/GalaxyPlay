@@ -1,6 +1,6 @@
-# L7CarPlay
+# GalaxyPlay
 
-L7CarPlay 是吉利银河 L7 专用 CarPlay 接收端，接收核心沿用 [DiPlay](https://github.com/shihabal3amri/DiPlay)。目标为 Flyme OS / Android 11、1440×1920 竖屏，最低 Android 10，包名 `com.ecarx.carplay`。
+GalaxyPlay 是面向银河车机的 CarPlay 接收端，当前以银河 L7 适配为主，并提供 L6 独立音频方案及车型选择，接收核心沿用 [DiPlay](https://github.com/shihabal3amri/DiPlay)。目标为 Flyme OS / Android 11、1440×1920 竖屏，最低 Android 10，包名 `com.ecarx.carplay`。
 
 支持车机原生热点无线连接与 USB 有线连接，认证来源包括应用内置、文字导入、USB CH341 和 Remote MFi。应用版本与核心基线分别维护于 [版本配置](gradle/l7-version.properties)。实车 HEVC、语音及蓝牙焦点仍有待验项，详见开发说明。
 
@@ -8,9 +8,9 @@ L7CarPlay 是吉利银河 L7 专用 CarPlay 接收端，接收核心沿用 [DiPl
 
 ## 包名与界面说明
 
-包名 `com.ecarx.carplay` 对齐其他银河车型同类应用的命名方式，方便用户识别、记忆和操作。界面参考 Flyme Auto 与其他银河车型 CarPlay 应用的布局、图标和交互习惯，并针对银河 L7 竖屏适配，方便沿用熟悉的操作方式。当前首页、设置与悬浮菜单由 L7CarPlay 原生组件实现。
+包名 `com.ecarx.carplay` 对齐其他银河车型同类应用的命名方式，方便用户识别、记忆和操作。界面参考 Flyme Auto 与其他银河车型 CarPlay 应用的布局、图标和交互习惯，并针对银河 L7 竖屏适配，方便沿用熟悉的操作方式。当前首页、设置与悬浮菜单由 GalaxyPlay 原生组件实现。
 
-L7CarPlay 由本项目维护者独立维护。包名和界面风格不代表官方产品身份、原厂签名、系统权限，或 Apple、吉利、ECARX、Flyme Auto 等相关权利人的授权、认证与认可。代码和资源的来源、署名及适用许可见[第三方许可](docs/第三方许可.md)。
+GalaxyPlay 由本项目维护者独立维护。包名和界面风格不代表官方产品身份、原厂签名、系统权限，或 Apple、吉利、ECARX、Flyme Auto 等相关权利人的授权、认证与认可。代码和资源的来源、署名及适用许可见[第三方许可](docs/第三方许可.md)。
 
 ## 文档入口
 
@@ -56,13 +56,13 @@ bash scripts/build-l7-host.sh --check
 
 ## 首次使用须知与风险确认协议
 
-软件名称：L7CarPlay
+软件名称：GalaxyPlay
 
 维护者：Tamshen
 
-协议版本：2026-10-03
+协议版本：2026-10-06
 
-更新日期：2026-10-03
+更新日期：2026-10-06
 
 源代码地址：https://github.com/Tamshen/L7CarPlay
 

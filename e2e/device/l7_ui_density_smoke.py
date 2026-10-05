@@ -55,8 +55,8 @@ def launch(page):
         if find('显示与性能') is None:
             tap('设置')
         tap('显示与性能')
-    if page == 'home' and find('有线连接') is None and find('返回 L7CarPlay') is not None:
-        tap('返回 L7CarPlay')
+    if page == 'home' and find('有线连接') is None and find('返回 GalaxyPlay') is not None:
+        tap('返回 GalaxyPlay')
 
 
 def screenshot(name):
@@ -119,17 +119,17 @@ try:
     print('三档、自定义、非法输入、取消、重启保存和系统 DPI 隔离通过', flush=True)
     launch('home')
     tap('有线连接')
-    assert find('返回 L7CarPlay') is not None
+    assert find('返回 GalaxyPlay') is not None
     host_before = adb('shell', 'dumpsys', 'activity', 'activities')
     host_id = re.search(r'ActivityRecord\{(\w+)[^\n]*CarPlayHostActivity', host_before).group(1)
     for label, name in [('大 · 320 DPI', 'large'), ('中（默认） · 280 DPI', 'medium')]:
-        tap('返回 L7CarPlay')
+        tap('返回 GalaxyPlay')
         launch('settings-display')
         choose(label)
         assert 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package)
         launch('home')
         tap('查看连接进度')
-        assert find('返回 L7CarPlay') is not None
+        assert find('返回 GalaxyPlay') is not None
         assert re.search(r'ActivityRecord\{' + host_id + r'[^\n]*CarPlayHostActivity',
                          adb('shell', 'dumpsys', 'activity', 'activities')), '缩放重建了投屏宿主'
         screenshot(name + '-usb')

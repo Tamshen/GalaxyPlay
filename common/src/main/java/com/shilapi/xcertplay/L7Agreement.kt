@@ -8,7 +8,7 @@ import java.security.MessageDigest
 
 /** 同意只对当前正文有效，独立于应用版本；不记录设备或手机标识。 */
 internal object L7Agreement {
-    const val VERSION = "2026-10-03"
+    const val VERSION = "2026-10-06"
     private const val PREFERENCES = "l7_agreement"
     private var cachedDocument: String? = null
     private var cachedDigest: String? = null

@@ -9,7 +9,7 @@
     <string name="l7_floating_transparency">Floating icon transparency</string>
     <string name="l7_floating_hint">The menu collapses after connecting. Drag the icon to move it. Tap the icon or press Back to open the four-item menu at the top left. Transparency changes apply when returning to the display.</string>
     <string name="l7_exit_app">Exit app</string>
-    <string name="l7_exit_title">Exit L7CarPlay?</string>
+    <string name="l7_exit_title">Exit GalaxyPlay?</string>
     <string name="l7_exit_message">This will disconnect CarPlay, close floating logs and background services, and end the app process.</string>
     <string name="l7_reset_section">Reset application</string>
     <string name="l7_reset_title">Reset all settings</string>
@@ -21,5 +21,5 @@
     <string name="l7_reset_failed">Could not erase app data</string>
     <string name="l7_reset_failed_hint">The system did not accept the request; reset completion has not been confirmed. Connections have stopped. Open app settings, then choose Storage and Clear data.</string>
     <string name="l7_reset_open_settings">Open app settings</string>
-    <string name="l7_reset_manual_hint">Could not open app settings. Find L7 CarPlay in the system app manager, then choose Storage and Clear data.</string>
+    <string name="l7_reset_manual_hint">Could not open app settings. Find GalaxyPlay in the system app manager, then choose Storage and Clear data.</string>
 </resources>

@@ -55,7 +55,7 @@ def tap(text):
             if handle is not None:
                 tap_node(handle)
     # 等待页的悬浮菜单会拦截底层操作；先通过画面入口收起，再检查等待卡片。
-    if text in ('返回 L7CarPlay', '取消连接'):
+    if text in ('返回 GalaxyPlay', '取消连接'):
         state = adb('shell', 'dumpsys', 'activity', 'activities')
         if re.search(r'mResumedActivity.*CarPlayHostActivity', state):
             picture = next((n for n in nodes() if n.attrib.get('content-desc') == '画面'), None)
@@ -147,7 +147,7 @@ def navigation_smoke():
     tap('返回设置')
     tap('显示与性能')
     settings_selected()
-    assert not any(n.attrib.get('text') in ('L7CarPlay', 'L7 CarPlay') for n in nodes()), '子页重复显示应用标题栏'
+    assert not any(n.attrib.get('text') in ('GalaxyPlay', 'GalaxyPlay') for n in nodes()), '子页重复显示应用标题栏'
     require_labels(['返回设置', 'CarPlay 尺寸', '分辨率', '帧率', '高效视频', '全屏显示'])
     screenshot('hierarchy-display-day')
     # 重新点击当前侧栏分类应返回首页，不能困在同一个子页。
@@ -157,7 +157,7 @@ def navigation_smoke():
     screenshot('hierarchy-audio-day')
     tap('返回设置')
     tap('通用设置')
-    require_labels(['打开 L7CarPlay 时连接', '车机启动后打开', '向 iPhone 报告位置', '应用语言'])
+    require_labels(['打开 GalaxyPlay 时连接', '车机启动后打开', '向 iPhone 报告位置', '应用语言'])
     tap('画面')
     tap('设置')
     require_labels(['返回设置', '应用语言'])
@@ -288,17 +288,17 @@ def connection_smoke():
     current = nodes()
     if any(n.attrib.get('text') == 'Only this time' for n in current):
         tap('Only this time')
-    require_labels(['返回 L7CarPlay', '取消连接'])
+    require_labels(['返回 GalaxyPlay', '取消连接'])
     screenshot('usb-wait-day')
     adb('shell', 'cmd', 'uimode', 'night', 'yes')
     time.sleep(1)
-    require_labels(['返回 L7CarPlay', '取消连接'])
+    require_labels(['返回 GalaxyPlay', '取消连接'])
     screenshot('usb-wait-night')
     adb('shell', 'settings', 'put', 'system', 'font_scale', '1.5')
     time.sleep(1)
-    require_labels(['返回 L7CarPlay', '取消连接'])
+    require_labels(['返回 GalaxyPlay', '取消连接'])
     screenshot('usb-wait-large-night')
-    tap('返回 L7CarPlay')
+    tap('返回 GalaxyPlay')
     services = adb('shell', 'dumpsys', 'activity', 'services', 'com.ecarx.carplay')
     assert 'DiPlaySessionService' in services, '返回结束了等待会话'
     tap('查看连接进度')
@@ -431,7 +431,7 @@ try:
         tap('Only this time')
     time.sleep(1)
     screenshot('usb-wait-day')
-    tap('返回 L7CarPlay')
+    tap('返回 GalaxyPlay')
     launch('settings-display')
     tap('帧率')
     current = nodes()
