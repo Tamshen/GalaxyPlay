@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="l7_vehicle_settings">车型设置</string>
-    <string name="l7_vehicle_row_hint">选择车型并确认自动识别结果</string>
-    <string name="l7_vehicle_settings_note">选择车型以应用对应的音频方案。确认保存后下次连接生效，当前连接及两车型的自定义文件保留。</string>
+    <string name="l7_vehicle_row_hint">L7、L6 或自定义，确认后填入适配配置</string>
+    <string name="l7_vehicle_settings_note">选择 L7 或 L6，确认后自动填入对应适配配置；选择自定义，在音频页编辑或导入独立配置。下次连接生效，当前连接与已保存文件保留。</string>
     <string name="l7_template_title">音频方案</string>
     <string name="l7_template_select">当前方案</string>
     <string name="l7_template_l7">L7 配置</string>
@@ -11,7 +11,7 @@
     <string name="l7_template_detect">自动识别车型</string>
     <string name="l7_template_detect_unknown">未能确认车型，请手动选择。</string>
     <string name="l7_template_detect_title">确认识别车型</string>
-    <string name="l7_template_detect_confirm">识别到%1$s。请核对实际车型，确认后使用对应音频方案；两车型的自定义文件保留，当前连接不变。下次连接生效。</string>
+    <string name="l7_template_detect_confirm">识别到%1$s。请核对实际车型，确认后自动填入对应适配配置；已保存的自定义文件保留，当前连接不变。下次连接生效。</string>
     <string name="l7_template_detect_retain">保留当前车型</string>
     <string name="l7_template_model_l7">银河 L7</string>
     <string name="l7_template_model_l6">银河 L6</string>
@@ -29,12 +29,18 @@
     <string name="l7_template_file_note">查看和编辑自定义模板，保存前会检查格式。</string>
     <string name="l7_template_import_note">选择 JSON 文件，检查通过并确认后替换自定义模板。</string>
     <string name="l7_template_export_note">将当前模板保存为 JSON 文件，便于备份和调试。</string>
-    <string name="l7_template_restore_note">恢复%1$s默认方案与播放设置，保留两车型的自定义模板。</string>
-    <string name="l7_template_restore_confirm">恢复%1$s默认配置、默认缓冲、音频焦点与通话音效。两车型的自定义模板文件、配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
+    <string name="l7_template_restore_note">恢复%1$s默认方案与播放设置，保留各车型的自定义模板。</string>
+    <string name="l7_template_restore_confirm">恢复%1$s默认配置、默认缓冲、音频焦点与通话音效。各车型的自定义模板文件、配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
     <string name="l7_template_bus_custom_note">使用文件中的输出 BUS 地址；缺失、格式不支持或请求失败时回退系统。传统音道与录音仍交给系统。</string>
     <string name="l7_template_schema_hint">version 为 1；choices 为音乐、导航、Siri 的策略键，支持 0、1–20、101–103；outputBuses 为输出地址。可选 focusGains 支持 1–4，通话固定为 2。编号不是扬声器位置。</string>
     <string name="l7_template_invalid">配置文件无效。请检查格式、策略键和 BUS 地址；文件不能超过 16 KB。</string>
     <string name="l7_template_save_failed">配置文件保存失败，请重试。原配置仍会保留。</string>
     <string name="l7_template_import_confirm">已检查模板「%1$s」。确认替换自定义模板并选用此方案？下次连接生效。</string>
     <string name="l7_template_exported">配置文件已导出。</string>
+    <string name="l7_template_model_custom">自定义</string>
+    <string name="l7_template_system">系统默认</string>
+    <string name="l7_template_system_note">使用标准音频用途，由车机安排输出；可切换自定义模板编辑或导入配置。</string>
+    <string name="l7_vehicle_profile">适配配置</string>
+    <string name="l7_vehicle_preset_note">选择此车型后自动填入对应默认配置；音频页可进一步调整。</string>
+    <string name="l7_vehicle_custom_note">独立保存自定义配置，在音频页编辑或导入；首次使用系统默认值。</string>
 </resources>

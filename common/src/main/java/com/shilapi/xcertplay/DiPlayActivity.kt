@@ -357,7 +357,7 @@ class DiPlayActivity : ComponentActivity() {
             header.addView(label(getString(R.string.app_name), 24, TEXT, true).apply {
                 setPadding(dp(12), 0, 0, 0)
             }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            header.addView(label(getString(R.string.l7_vehicle_name), 18, MUTED))
+            header.addView(label(L7AudioModelConfirmation.name(this, L7AudioTemplates.model(this)), 18, MUTED))
             content.addView(header)
             content.addView(space(24))
         }

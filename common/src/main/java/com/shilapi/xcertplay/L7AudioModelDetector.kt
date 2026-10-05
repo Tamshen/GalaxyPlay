@@ -7,11 +7,11 @@ internal object L7AudioModelDetector {
     fun detect(device: String = Build.DEVICE, product: String = Build.PRODUCT,
                model: String = Build.MODEL): L7AudioTemplates.Model? {
         val values = listOf(device, product, model)
-        val found = L7AudioTemplates.Model.entries.filter { candidate ->
-            val code = if (candidate == L7AudioTemplates.Model.L7) "g636" else "g733"
+        val identifiers = mapOf(L7AudioTemplates.Model.L7 to "g636", L7AudioTemplates.Model.L6 to "g733")
+        val found = identifiers.filter { (_, code) ->
             val token = Regex("(?i)(?:^|[^a-z0-9])$code(?:$|[^a-z0-9])")
             values.any { token.containsMatchIn(it) }
         }
-        return found.singleOrNull()
+        return found.keys.singleOrNull()
     }
 }

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "System",
+  "preferBus": false,
+  "choices": {
+    "media": 101,
+    "navigation": 103,
+    "assistant": 102
+  },
+  "outputBuses": {}
+}

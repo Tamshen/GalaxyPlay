@@ -43,7 +43,11 @@ internal class L7AudioModelConfirmation(
         private fun preferences(context: Context) = context.getSharedPreferences("l7_audio_templates", Context.MODE_PRIVATE)
 
         fun name(context: Context, model: L7AudioTemplates.Model): String = context.getString(
-            if (model == L7AudioTemplates.Model.L6) R.string.l7_template_model_l6 else R.string.l7_template_model_l7)
+            when (model) {
+                L7AudioTemplates.Model.L7 -> R.string.l7_template_model_l7
+                L7AudioTemplates.Model.L6 -> R.string.l7_template_model_l6
+                L7AudioTemplates.Model.CUSTOM -> R.string.l7_template_model_custom
+            })
 
         fun markReviewed(context: Context, model: L7AudioTemplates.Model? = L7AudioModelDetector.detect()) {
             model?.let { check(preferences(context).edit().putString(REVIEWED, it.id).commit()) }

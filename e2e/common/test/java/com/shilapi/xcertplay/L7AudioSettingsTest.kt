@@ -27,8 +27,11 @@ class L7AudioSettingsTest {
         val context = context()
         val parent = LinearLayout(context)
         for (mode in L7AudioTemplates.Mode.entries) {
-            L7AudioTemplates.selectModel(context, if (mode == L7AudioTemplates.Mode.L6)
-                L7AudioTemplates.Model.L6 else L7AudioTemplates.Model.L7)
+            L7AudioTemplates.selectModel(context, when (mode) {
+                L7AudioTemplates.Mode.L6 -> L7AudioTemplates.Model.L6
+                L7AudioTemplates.Mode.SYSTEM -> L7AudioTemplates.Model.CUSTOM
+                else -> L7AudioTemplates.Model.L7
+            })
             L7AudioTemplates.select(context, mode)
             parent.removeAllViews()
             L7AudioSettings.page(context, parent, {}, {}) { _, _, _, _ -> }
@@ -120,6 +123,27 @@ class L7AudioSettingsTest {
         assertNull(row(parent, context.getString(R.string.l7_audio_media)))
         L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
         assertEquals(3, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
+    }
+
+    @Test fun customVehicleShowsEditorAndRestoresSystemDefaultsWithoutDeletingItsFile() {
+        val context = context()
+        L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.CUSTOM)
+        L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(
+            com.shilapi.xcertplay.media.AudioOutputRole.MEDIA, 18))
+        val file = java.io.File(context.filesDir, "audio-template-custom.json")
+        val previous = file.readText()
+        val parent = LinearLayout(context)
+        L7AudioSettings.page(context, parent, {}, {}) { _, _, _, _ -> }
+        assertNotNull(row(parent, context.getString(R.string.l7_template_edit)))
+        row(parent, context.getString(R.string.l7_audio_restore))!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(L7AudioTemplates.Model.CUSTOM, L7AudioTemplates.model(context))
+        assertEquals(L7AudioTemplates.Mode.SYSTEM, L7AudioTemplates.mode(context))
+        assertEquals(context.getString(R.string.l7_template_system),
+            row(parent, context.getString(R.string.l7_template_select))!!.valueView.text.toString())
+        assertEquals(previous, file.readText())
     }
 
     private fun row(view: View, label: String): L7SettingRow? {

@@ -34,6 +34,7 @@ class L7VehicleSettingsTest {
             row(parent, context.getString(R.string.l7_template_model))!!.performClick()
             shadowOf(Looper.getMainLooper()).idle()
             val selector = ShadowAlertDialog.getLatestAlertDialog()
+            assertEquals(3, selector.listView.adapter.count)
             selector.listView.performItemClick(selector.listView.adapter.getView(1, null, selector.listView), 1, 1L)
         }
         chooseL6()
@@ -80,6 +81,35 @@ class L7VehicleSettingsTest {
         assertEquals(context.getString(R.string.l7_template_detect_unknown), ShadowToast.getTextOfLatestToast())
         assertEquals(L7AudioTemplates.Model.L6, L7AudioTemplates.model(context))
         assertNotNull(row(parent, context.getString(R.string.l7_template_model)))
+    }
+
+    @Test fun thirdModelCancelsWithoutCreatingFileAndConfirmedChoiceShowsIndependentProfile() {
+        val context = context()
+        val parent = LinearLayout(context)
+        L7VehicleSettings.page(context, parent)
+        fun chooseCustom() {
+            row(parent, context.getString(R.string.l7_template_model))!!.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            val selector = ShadowAlertDialog.getLatestAlertDialog()
+            assertEquals(context.getString(R.string.l7_template_model_custom), selector.listView.adapter.getItem(2))
+            selector.listView.performItemClick(selector.listView.adapter.getView(2, null, selector.listView), 2, 2L)
+        }
+        chooseCustom(); click(AlertDialog.BUTTON_NEGATIVE)
+        assertEquals(L7AudioTemplates.Model.L7, L7AudioTemplates.model(context))
+        assertFalse(java.io.File(context.filesDir, "audio-template-custom.json").exists())
+        chooseCustom(); click(AlertDialog.BUTTON_POSITIVE)
+        assertEquals(L7AudioTemplates.Model.CUSTOM, L7AudioTemplates.model(context))
+        assertEquals(context.getString(R.string.l7_template_model_custom),
+            row(parent, context.getString(R.string.l7_template_model))!!.valueView.text.toString())
+        assertEquals(context.getString(R.string.l7_template_custom),
+            row(parent, context.getString(R.string.l7_vehicle_profile))!!.valueView.text.toString())
+        row(parent, context.getString(R.string.l7_template_model))!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val selector = ShadowAlertDialog.getLatestAlertDialog()
+        selector.listView.performItemClick(selector.listView.adapter.getView(1, null, selector.listView), 1, 1L)
+        click(AlertDialog.BUTTON_POSITIVE)
+        assertEquals(context.getString(R.string.l7_template_l6),
+            row(parent, context.getString(R.string.l7_vehicle_profile))!!.valueView.text.toString())
     }
 
     private fun buildIdentity(device: String) {
