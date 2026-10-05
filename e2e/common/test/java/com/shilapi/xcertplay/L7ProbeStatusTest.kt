@@ -13,6 +13,10 @@ class L7ProbeStatusTest {
 
     @Test fun grantedPermissionDoesNotClaimVerifiedInterfaceAndUnknownDoesNotMeanUnsupported() {
         assertEquals(L7ProbeStatus.GRANTED, L7ProbeStatus.of(item(L7ProbeOutcome.OBSERVED, "GRANTED_NOT_CALLED")))
+        assertEquals(L7ProbeStatus.GRANTED, L7ProbeStatus.of(item(L7ProbeOutcome.OBSERVED, "SPECIAL_ACCESS_ALLOWED")))
+        assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(item(L7ProbeOutcome.UNKNOWN, "NOT_DECLARED")))
+        assertEquals(L7ProbeStatus.NO_PERMISSION, L7ProbeStatus.of(item(L7ProbeOutcome.DENIED, "SPECIAL_ACCESS_DENIED")))
+        assertEquals(L7ProbeStatus.NOT_APPLICABLE, L7ProbeStatus.of(item(L7ProbeOutcome.NOT_APPLICABLE, "API_NOT_APPLICABLE")))
         assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(item(L7ProbeOutcome.UNKNOWN, "DEFINITION_NOT_VISIBLE")))
         assertEquals(L7ProbeStatus.NO_PERMISSION, L7ProbeStatus.of(item(L7ProbeOutcome.DENIED, "NOT_DECLARED")))
         assertEquals(L7ProbeStatus.ERROR, L7ProbeStatus.of(item(L7ProbeOutcome.UNKNOWN, "QUERY_FAILED")))

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="setup_error_auth">CarPlay authentication is not ready. Import credentials in settings, or configure USB or Remote MFi authentication.</string>
+    <string name="l7_probe_sdk_contract">Vendor SDK contracts (read only)</string>
+    <string name="l7_probe_media_sessions">System media sessions (read only)</string>
+    <string name="l7_probe_sdk_contract_checked">SDK contract evidence collected. See details for loading results; service access is unverified.</string>
 </resources>

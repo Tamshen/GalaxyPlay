@@ -456,4 +456,7 @@
     <string name="video_play">Play</string>
     <string name="video_pause">Pause</string>
     <string name="video_cannot_play">This video can\'t play on the car screen. Protected video, such as Apple TV+, needs a licensed receiver.</string>
+    <string name="l7_probe_sdk_contract">厂商 SDK 契约（只读）</string>
+    <string name="l7_probe_media_sessions">系统媒体会话（只读）</string>
+    <string name="l7_probe_sdk_contract_checked">SDK 契约证据已收集；加载结果见详情，服务准入未验证。</string>
 </resources>

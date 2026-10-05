@@ -29,10 +29,22 @@ internal class L7SteeringWheel(
     fun onVoiceKey(): Boolean = press(3, "hardware-key")
 
     private fun press(type: Int, source: String): Boolean {
-        if (closed || !sessionActive() || type !in 3..4) return false
-        if (type == 4 && !assistantActive()) return false
+        val active = sessionActive()
+        val assistant = assistantActive()
+        L7DebugLog.record("Control: wheel input source=$source type=$type session=$active assistant=$assistant closed=$closed")
+        val reason = when {
+            closed -> "CLOSED"
+            !active -> "NO_SESSION"
+            type !in 3..4 -> "UNSUPPORTED_TYPE"
+            type == 4 && !assistant -> "SHORT_PRESS_INACTIVE"
+            else -> null
+        }
+        if (reason != null) { L7DebugLog.record("Control: wheel drop reason=$reason"); return false }
         val now = SystemClock.elapsedRealtime()
-        if (lastEvent?.let { now - it < 300 } == true) return true
+        if (lastEvent?.let { now - it < 300 } == true) {
+            L7DebugLog.record("Control: wheel drop reason=DUPLICATE")
+            return true
+        }
         lastEvent = now
         val sent = voicePress()
         L7DebugLog.record("Control: wheel voice source=$source type=$type sent=$sent")

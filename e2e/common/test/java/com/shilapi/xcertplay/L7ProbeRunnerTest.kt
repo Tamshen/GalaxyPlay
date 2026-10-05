@@ -28,16 +28,18 @@ class L7ProbeRunnerTest {
 
     @Test fun loadingHistoryDoesNotStartScanningOrUpload() {
         val upload = RemoteLogUpload.status
+        val before = L7ProbeRunner.current
         L7ProbeRunner.load(app)
         awaitIdle()
-        assertNull(L7ProbeRunner.current)
+        assertEquals(before, L7ProbeRunner.current)
         assertEquals(upload, RemoteLogUpload.status)
     }
 
     @Test fun missingAgreementPreventsAnyNewRun() {
+        val before = L7ProbeRunner.current
         L7Agreement.revoke(app)
         assertFalse(L7ProbeRunner.start(app, emptyMap()))
-        assertNull(L7ProbeRunner.current)
+        assertEquals(before, L7ProbeRunner.current)
     }
 
     @Test fun deadlineMarksPartialRunWithoutAcceptingTheBlockedQueryResult() {
@@ -106,4 +108,50 @@ class L7ProbeRunnerTest {
             assertEquals(L7ProbePhase.COMPLETED, L7ProbeRunner.current!!.phase)
         } finally { release.countDown() }
     }
+
+    @Test fun singleReportingRecheckIncludesCandidateEvidenceWithoutScanningEverythingOrUploading() {
+        L7Agreement.accept(app)
+        val upload = RemoteLogUpload.status
+        assertTrue(L7ProbeRunner.start(app, emptyMap(), "REPORT-HUD"))
+        awaitIdle()
+        val report = L7ProbeRunner.current!!
+        assertEquals(L7ProbePhase.COMPLETED, report.phase)
+        assertEquals(1, report.expected)
+        assertEquals(listOf("REPORT-HUD"), report.items.map { it.id })
+        assertEquals("ecarx.openapi.permission.NAVI_SERVICE", report.items.single().facts["candidatePermissions"])
+        assertEquals("NOT_RUN", report.items.single().facts["effectiveCall"])
+        assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(report.items.single()))
+        assertEquals(upload, RemoteLogUpload.status)
+    }
+    @Test fun sdkSignatureRecheckStaysPendingWithoutInitializingServicesOrUploading() {
+        L7Agreement.accept(app)
+        val upload = RemoteLogUpload.status
+        assertTrue(L7ProbeRunner.start(app, emptyMap(), "ENV-SDK-CONTRACT"))
+        awaitIdle()
+        val report = L7ProbeRunner.current!!
+        assertEquals(listOf("ENV-SDK-CONTRACT"), report.items.map { it.id })
+        assertEquals(L7ProbeOutcome.UNKNOWN, report.items.single().result)
+        assertEquals("SDK_CONTRACT_CHECKED", report.items.single().reason)
+        assertEquals("CLASS_SIGNATURE_AND_PACKAGE_QUERY_ONLY", report.items.single().facts["effectiveCall"])
+        assertEquals("UNTESTED_NO_BINDER_CALL", report.items.single().facts["mediaServiceAuthorization"])
+        assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(report.items.single()))
+        assertEquals(upload, RemoteLogUpload.status)
+    }
+
+    @Test fun singleHotspotRecheckRunsOnlyTheReadAndNeverUploadsOrOverwritesStoredCredentials() {
+        L7Agreement.accept(app)
+        val upload = RemoteLogUpload.status
+        val ssid = AirPlayPersistence.loadManualHotspotSsid(app)
+        val password = AirPlayPersistence.loadManualHotspotPassphrase(app)
+        assertTrue(L7ProbeRunner.start(app, emptyMap(), "HOTSPOT-STATE"))
+        awaitIdle()
+        val report = L7ProbeRunner.current!!
+        assertEquals(1, report.expected)
+        assertEquals(listOf("HOTSPOT-STATE"), report.items.map { it.id })
+        assertEquals("QUERY_ONLY", report.items.single().facts["effectiveCall"])
+        assertEquals(upload, RemoteLogUpload.status)
+        assertEquals(ssid, AirPlayPersistence.loadManualHotspotSsid(app))
+        assertEquals(password, AirPlayPersistence.loadManualHotspotPassphrase(app))
+    }
+
 }

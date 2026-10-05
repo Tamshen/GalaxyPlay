@@ -25,9 +25,10 @@ object CarHotspotTethering {
     fun permitted(context: Context): Boolean = Settings.System.canWrite(context) ||
         context.checkSelfPermission("android.permission.TETHER_PRIVILEGED") == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-    /** Blocking; serialize startup and connection requests, checking cancellation after acquiring the lock. */
+    /** 串行处理开启与连接请求，取得锁后再次检查取消。 */
     fun enable(context: Context, isCancelled: () -> Boolean, log: (String) -> Unit): Result =
-        enable(15_000L, isCancelled, { permitted(context) }, { CarHotspotStatus.isEnabled(context) }) { receiver ->
+        enable(15_000L, isCancelled, { permitted(context) }, { CarHotspotStatus.isEnabled(context) },
+            { log("car hotspot apState=${CarHotspotStatus.state(context)} $it") }) { receiver ->
             if (Build.VERSION.SDK_INT >= 30) {
                 startAndroid11(context, receiver)
                 return@enable
@@ -65,42 +66,52 @@ object CarHotspotTethering {
         isCancelled: () -> Boolean,
         canWrite: () -> Boolean,
         isEnabled: () -> Boolean?,
+        log: (String) -> Unit = {},
         start: (ResultReceiver) -> Unit,
     ): Result {
-        if (isCancelled()) return Result.CANCELLED
-        if (isEnabled() == true) return Result.READY
-        if (!canWrite()) return Result.PERMISSION_REQUIRED
-        if (isEnabled() == null) return Result.UNSUPPORTED
+        fun finish(result: Result): Result { log("event=finish result=$result"); return result }
+        if (isCancelled()) return finish(Result.CANCELLED)
+        val initial = isEnabled()
+        log("event=preflight alreadyEnabled=$initial")
+        if (initial == true) return finish(Result.READY)
+        if (!canWrite()) return finish(Result.PERMISSION_REQUIRED)
+        if (initial == null) return finish(Result.UNSUPPORTED)
         val response = AtomicInteger(-1)
         try {
-            if (isCancelled()) return Result.CANCELLED
+            if (isCancelled()) return finish(Result.CANCELLED)
+            log("event=startRequested")
             start(object : ResultReceiver(null) {
                 override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                     response.set(resultCode)
+                    log("event=callback rawCode=$resultCode")
                 }
             })
-        } catch (error: InvocationTargetException) {
-            return if (error.targetException is SecurityException) Result.PERMISSION_REQUIRED else Result.FAILED
-        } catch (_: ReflectiveOperationException) {
-            return Result.UNSUPPORTED
-        } catch (_: SecurityException) {
-            return Result.PERMISSION_REQUIRED
-        } catch (_: RuntimeException) {
-            return Result.FAILED
+            log("event=startReturned")
+        } catch (error: Exception) {
+            val cause = if (error is InvocationTargetException) error.targetException else error
+            log("event=startRejected exceptionType=${cause.javaClass.simpleName}")
+            return finish(when (cause) {
+                is SecurityException -> Result.PERMISSION_REQUIRED
+                is ReflectiveOperationException -> Result.UNSUPPORTED
+                else -> Result.FAILED
+            })
         }
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
         while (true) {
-            if (isCancelled()) return Result.CANCELLED
-            if (isEnabled() == true) return Result.READY
-            if (response.get() == 14 || response.get() == 15) return Result.PERMISSION_REQUIRED
-            if (response.get() > 0) return Result.FAILED
+            if (isCancelled()) return finish(Result.CANCELLED)
+            if (isEnabled() == true) {
+                log("event=stateConfirmed hotspotEnabled=true")
+                return finish(Result.READY)
+            }
+            if (response.get() == 14 || response.get() == 15) return finish(Result.PERMISSION_REQUIRED)
+            if (response.get() > 0) return finish(Result.FAILED)
             val remainingMillis = (deadline - System.nanoTime()) / 1_000_000L
-            if (remainingMillis <= 0) return Result.TIMED_OUT
+            if (remainingMillis <= 0) return finish(Result.TIMED_OUT)
             try {
                 Thread.sleep(minOf(250L, remainingMillis))
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
-                return Result.CANCELLED
+                return finish(Result.CANCELLED)
             }
         }
     }

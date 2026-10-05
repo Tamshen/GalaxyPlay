@@ -25,6 +25,7 @@ android {
 
     defaultConfig {
         minSdk = 28
+        testInstrumentationRunner = "com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation"
     }
 
     compileOptions {
@@ -56,6 +57,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.dexmaker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

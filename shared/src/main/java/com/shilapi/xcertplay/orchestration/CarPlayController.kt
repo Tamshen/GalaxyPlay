@@ -210,6 +210,11 @@ class CarPlayController(
     private val playbackStatus = com.shilapi.xcertplay.media.CarPlayPlaybackStatus()
 
     /** Told when the iPhone starts or stops playing media; may run on any thread. */
+    /** 媒体控制注册以真实 AirPlay 会话为准，不等待首次声音。 */
+    private val navigationInput = com.shilapi.xcertplay.hud.CarPlayNavigationInput()
+    @Volatile var navigationListener: ((com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot) -> Unit)? = null
+    fun navigationSnapshot() = navigationInput.snapshot()
+    @Volatile var sessionStateListener: ((Boolean) -> Unit)? = null
     @Volatile var playbackListener: ((Boolean) -> Unit)? = null
 
     /** 增量歌曲信息和封面只通知当前会话，不参与音频焦点申请。 */
@@ -266,6 +271,10 @@ class CarPlayController(
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
             if (activeSession !== session) {
+                if (activeSession != null) {
+                    sessionStateListener?.invoke(false)
+                    navigationInput.clear()
+                }
                 BydNavigationOutputs.start(appContext)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                 // The gear may have changed since /info.
@@ -275,6 +284,7 @@ class CarPlayController(
                 }
             }
             activeSession = session
+            sessionStateListener?.invoke(true)
             if (config.transport == CarPlayTransport.WIRED) audioConnectionListener?.invoke(true)
             debugLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
@@ -286,6 +296,8 @@ class CarPlayController(
         override fun onSessionEnded(session: AirPlaySession) {
             if (activeSession === session) {
                 activeSession = null
+                navigationInput.clear()
+                sessionStateListener?.invoke(false)
                 audioConnectionListener?.invoke(false)
                 BydNavigationOutputs.endNow()
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
@@ -461,11 +473,25 @@ class CarPlayController(
         }
     }
 
-    fun sendMediaButton(index: Int): Boolean {
+    /** 不输出的本地会话所有权，用于蓝牙交接等待期间拒绝旧命令。 */
+    fun activeMediaSessionOwner(): Any? = activeSession
+
+    fun sendMediaButton(index: Int): Boolean = sendMediaButton(index, activeSession)
+
+    fun sendMediaButton(index: Int, expectedOwner: Any?): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
+        if (session !== expectedOwner) return false
         return try {
-            touchExecutor.execute { session.sendMedia(index) }
+            touchExecutor.execute {
+                if (closed || activeSession !== session) {
+                    debugLog("Audio: media execute index=$index drop=STALE_SESSION")
+                } else try {
+                    debugLog("Audio: media execute index=$index channelWritten=${session.sendMediaChecked(index)}")
+                } catch (error: Exception) {
+                    debugLog("Audio: media execute index=$index exceptionType=${error.javaClass.simpleName}")
+                }
+            }
             true
         } catch (_: Exception) {
             false
@@ -477,6 +503,10 @@ class CarPlayController(
             if (closed) return
             closed = true
         }
+        sessionStateListener?.invoke(false)
+        sessionStateListener = null
+        navigationListener = null
+        navigationInput.clear()
         audioConnectionListener?.invoke(false)
         audioConnectionListener = null
         val teardownStarted = System.nanoTime()
@@ -562,6 +592,7 @@ class CarPlayController(
 
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
+        navigationInput.accept(frame)?.let { navigationListener?.invoke(it) }
         BydNavigationOutputs.onFrame(frame)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         synchronized(playbackStatus) {

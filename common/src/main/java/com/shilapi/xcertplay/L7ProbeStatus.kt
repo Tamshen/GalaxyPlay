@@ -31,7 +31,7 @@ internal enum class L7ProbeStatus(val label: Int, val color: Int, val icon: Int)
             item.reason == "FEATURE_NOT_SUPPORTED" || item.id == "ENV-USB" && item.facts["usbHostFeature"] == "false" -> UNSUPPORTED
             item.result == L7ProbeOutcome.FAILED || item.reason == "QUERY_FAILED" -> ERROR
             item.result == L7ProbeOutcome.VERIFIED -> SUPPORTED
-            item.result == L7ProbeOutcome.OBSERVED && item.reason == "GRANTED_NOT_CALLED" -> GRANTED
+            item.result == L7ProbeOutcome.OBSERVED && item.reason in setOf("GRANTED_NOT_CALLED", "SPECIAL_ACCESS_ALLOWED") -> GRANTED
             item.result == L7ProbeOutcome.NOT_APPLICABLE -> NOT_APPLICABLE
             else -> PENDING
         }

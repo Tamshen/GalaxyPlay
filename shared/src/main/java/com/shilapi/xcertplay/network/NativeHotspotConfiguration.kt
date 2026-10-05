@@ -43,7 +43,7 @@ enum class NativeHotspotProblem { PERMISSION, UNSUPPORTED, INVALID, FAILED, ACTI
 class NativeHotspotRead(val credentials: NativeHotspotCredentials? = null, val problem: NativeHotspotProblem? = null)
 
 /** 隐藏接口按能力调用；固件拒绝时交回原生设置，不绕过系统授权。 */
-class NativeHotspotConfiguration(context: Context) {
+class NativeHotspotConfiguration(context: Context, private val log: (String) -> Unit = {}) {
     private val app = context.applicationContext
     private val wifi = app.getSystemService(WifiManager::class.java)
 
@@ -88,6 +88,7 @@ class NativeHotspotConfiguration(context: Context) {
             false -> Unit
         }
         wifi ?: return NativeHotspotProblem.UNSUPPORTED
+        val method = if (Build.VERSION.SDK_INT >= 30) "setSoftApConfiguration" else "setWifiApConfiguration"
         return try {
             val accepted = if (Build.VERSION.SDK_INT >= 30) {
                 // Android 11 的 setSsid 是系统 API，新 SDK 已移出公开桩；按目标固件反射调用。
@@ -103,11 +104,18 @@ class NativeHotspotConfiguration(context: Context) {
                 }
                 wifi.javaClass.getMethod("setWifiApConfiguration", WifiConfiguration::class.java).invoke(wifi, config) == true
             }
+            log("hotspot write method=$method accepted=$accepted")
             if (!accepted) NativeHotspotProblem.FAILED else {
                 val actual = read().credentials
-                if (actual != null && !credentials.matches(actual)) NativeHotspotProblem.FAILED else null
+                val matches = actual?.let(credentials::matches)
+                log("hotspot write readbackAvailable=${actual != null} readbackMatches=$matches")
+                if (matches == false) NativeHotspotProblem.FAILED else null
             }
-        } catch (error: Exception) { problem(error) }
+        } catch (error: Exception) {
+            val cause = if (error is InvocationTargetException) error.targetException else error
+            log("hotspot write method=$method exceptionType=${cause.javaClass.simpleName}")
+            problem(error)
+        }
     }
 
     private fun checked(value: NativeHotspotCredentials) = if (value.valid()) NativeHotspotRead(value)

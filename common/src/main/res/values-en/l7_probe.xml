@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="l7_probe_reporting_media">Media center reporting</string>
+    <string name="l7_probe_reporting_hud">HUD navigation reporting</string>
+    <string name="l7_probe_reporting_qnx">Media QNX reporting</string>
+    <string name="l7_probe_reporting_short">Granted %1$s/%2$s · SDK %3$s/%4$s</string>
+    <string name="l7_probe_reporting_details">%1$s candidate permissions: %2$s declared, %3$s granted, %4$s definitions visible, %5$s restricted by AppOps. SDK classes visible to this app: %6$s/%7$s. Actual reporting is untested; these checks cannot establish support or lack of support.</string>
+    <string name="l7_probe_qnx_unconfirmed">The downstream QNX protocol is unconfirmed. This check examines the media center entry point; it does not confirm QNX reception.</string>
+    <string name="l7_probe_next_reporting">Next: inspect each candidate permission declaration, grant, definition and AppOps below, then confirm requirements against actual service rejection evidence. Candidates are not confirmed requirements; app-owned broadcast permissions do not grant vendor access. Invisible SDK classes do not establish lack of vehicle support. Collection does not register media sources, take focus or send reports.</string>
     <string name="l7_probe_back_debug">Back to Debug and logs</string>
     <string name="l7_probe_packages">Visibility of reference packages</string>
     <string name="l7_probe_executor">Execution identity and auxiliary connections</string>
@@ -40,10 +47,13 @@
     <string name="l7_probe_evidence">Check details</string>
     <string name="l7_probe_query_only">State query succeeded; verifies only this query</string>
     <string name="l7_probe_definition_not_visible">Definition unavailable or undefined; interface support is unknown</string>
-    <string name="l7_probe_not_declared">The current APK does not declare this permission</string>
+    <string name="l7_probe_not_declared">The current APK does not declare this permission; grants after declaration remain untested</string>
     <string name="l7_probe_not_granted">This app has not been granted this permission</string>
     <string name="l7_probe_app_op_restricted">AppOps restricts this operation</string>
     <string name="l7_probe_granted_not_called">Permission granted; interface calls and effects are not yet verified</string>
+    <string name="l7_probe_special_allowed">Special access allowed; ordinary grant results are retained separately. Interface calls and effects remain unverified</string>
+    <string name="l7_probe_special_unknown">Special access state is unknown</string>
+    <string name="l7_probe_api_not_applicable">Not applicable to this Android version</string>
     <string name="l7_probe_query_failed">Query restricted or failed; see details</string>
     <string name="l7_probe_next_query">Next: run an explicit test in the corresponding feature and check its effect.</string>
     <string name="l7_probe_next_permission">Next: check the permission definition and grant requirements. Scanning does not request permissions.</string>
@@ -99,4 +109,17 @@
     <string name="l7_probe_recollect">Collect environment and debug info again</string>
     <string name="l7_probe_logged">This collection was written to logs · %1$s</string>
     <string name="l7_probe_log_failed">Check results retained, but writing logs failed. Collect again.</string>
+    <string name="l7_probe_hotspot_state">Native hotspot state</string>
+    <string name="l7_probe_hotspot_config">Native hotspot configuration</string>
+    <string name="l7_probe_hotspot_legacy">Legacy hotspot configuration</string>
+    <string name="l7_probe_hotspot_state_read">AP state read. This confirms only the state query, not a phone connection.</string>
+    <string name="l7_probe_valid_config">Valid configuration read. The report stores no hotspot name or password.</string>
+    <string name="l7_probe_empty_config">The system returned no configuration. Write and startup capabilities remain unconfirmed.</string>
+    <string name="l7_probe_masked_password">The system masked the password. Stored credentials are retained.</string>
+    <string name="l7_probe_invalid_config">Configuration fields are incomplete or invalid. Stored credentials are retained.</string>
+    <string name="l7_probe_hotspot_denied">The system denied this read query. Other hotspot interfaces are checked independently.</string>
+    <string name="l7_probe_service_unavailable">The system service is unavailable. Recheck on the target firmware.</string>
+    <string name="l7_probe_interface_not_visible">The interface is not callable by this app. Hotspot support remains unconfirmed.</string>
+    <string name="l7_probe_invalid_response">The response type, state, or security mode is not recognized.</string>
+    <string name="l7_probe_next_hotspot">Next: compare all three read results with candidate permissions. Failed reads preserve stored credentials and do not prove write or startup failure. Collection does not change the hotspot; use connection settings explicitly, then verify phone connectivity.</string>
 </resources>

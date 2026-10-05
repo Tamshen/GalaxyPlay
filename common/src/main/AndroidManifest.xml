@@ -3,8 +3,27 @@
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 用户主动授予，用于尝试开启 Android 原生热点；不代表获得配置写入权限。 -->
+    <!-- 原生热点候选权限；声明不代表获得系统签名或特权授权，以实车调用为准。 -->
+    <!-- 仅用于只读系统媒体会话查询；普通 APK 声明后仍可能被系统拒绝。 -->
+    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.NETWORK_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.OVERRIDE_WIFI_CONFIG" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.TETHER_PRIVILEGED" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.NETWORK_STACK" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
-    <queries><package android:name="com.android.settings" /></queries>
+    <!-- 只让诊断读取已核对的参考包，避免 Android 11 包可见性过滤造成误判。 -->
+    <queries>
+        <package android:name="com.android.settings" />
+        <package android:name="com.ecarx.android.auto" />
+        <package android:name="com.ecarx.config" />
+        <package android:name="com.flyme.auto.map" />
+        <package android:name="com.flyme.auto.settings" />
+        <package android:name="com.geely.linkhmi" />
+        <package android:name="com.huawei.dmsdpdevice" />
+        <package android:name="com.huawei.nearby" />
+        <package android:name="com.lge.car" />
+        <package android:name="ecarx.xsf.mediacenter" />
+    </queries>
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
@@ -14,6 +33,12 @@
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <application>
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.media-artwork"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/l7_media_artwork_paths" />
+        </provider>
         <activity android:name="com.shilapi.xcertplay.L7AgreementActivity"
             android:exported="false"
             android:configChanges="uiMode"

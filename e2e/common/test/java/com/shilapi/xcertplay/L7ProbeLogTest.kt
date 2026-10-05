@@ -75,4 +75,19 @@ class L7ProbeLogTest {
         assertTrue(lines.last().contains("event=end"))
         assertTrue(lines.all { it.length <= 700 })
     }
+
+    @Test fun allPermissionResultsSurviveLargeDetailsAndSpecialAccessEvidenceIsLogged() {
+        val items = (1..163).map { index -> L7ProbeItem("PERM:example.$index", "example.$index", "PERMISSION",
+            L7ProbeOutcome.OBSERVED, "SPECIAL_ACCESS_ALLOWED", mapOf("granted" to "false", "specialAccess" to "ALLOWED",
+                "specialAccessMethod" to "Settings.System.canWrite", "protectionBase" to "SIGNATURE",
+                "protectionFlags" to "PRIVILEGED", "model" to "测试".repeat(600))) }
+        val lines = L7ProbeLog.lines(report(items))
+        items.indices.forEach { index -> assertTrue(lines.any {
+            "item=$index entry=${items[index].id} status=GRANTED" in it
+        }) }
+        assertTrue(lines.any { "specialAccess=ALLOWED" in it })
+        assertTrue(lines.any { "protectionBase=SIGNATURE" in it })
+        assertTrue(lines.any { "event=truncated" in it })
+        assertTrue(lines.last().contains("event=end"))
+    }
 }

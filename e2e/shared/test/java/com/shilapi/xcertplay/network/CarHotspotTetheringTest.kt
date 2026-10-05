@@ -113,10 +113,37 @@ class CarHotspotTetheringTest {
         assertEquals(1, calls.get())
     }
 
+    @Test fun diagnosticsSeparateExistingHotspotFromStartupAndCallbackFromState() {
+        val events = mutableListOf<String>()
+        assertEquals(Result.READY, CarHotspotTethering.enable(20, { false }, { false }, { true }, events::add) {
+            fail("已开热点不应重启")
+        })
+        assertTrue(events.any { it.contains("alreadyEnabled=true") })
+        assertFalse(events.any { it.contains("startRequested") })
+        events.clear()
+        assertEquals(Result.TIMED_OUT, CarHotspotTethering.enable(20, { false }, { true }, { false }, events::add) {
+            it.send(0, null)
+        })
+        assertTrue(events.any { it.contains("startRequested") })
+        assertTrue(events.any { it.contains("rawCode=0") })
+        assertFalse(events.any { it.contains("stateConfirmed") })
+        assertTrue(events.last().contains("TIMED_OUT"))
+    }
+
+    @Test fun diagnosticDenialKeepsOnlyExceptionType() {
+        val events = mutableListOf<String>()
+        assertEquals(Result.PERMISSION_REQUIRED,
+            CarHotspotTethering.enable(20, { false }, { true }, { false }, events::add) {
+                throw InvocationTargetException(SecurityException("PrivateCredentialExample"))
+            })
+        assertTrue(events.any { it.contains("exceptionType=SecurityException") })
+        assertFalse(events.joinToString().contains("PrivateCredentialExample"))
+    }
+
     private fun enable(
         canWrite: Boolean = true,
         state: () -> Boolean? = { false },
         cancelled: () -> Boolean = { false },
         start: (ResultReceiver) -> Unit = { fail("Unexpected hotspot mutation") },
-    ): Result = CarHotspotTethering.enable(20, cancelled, { canWrite }, state, start)
+    ): Result = CarHotspotTethering.enable(20, cancelled, { canWrite }, state, start = start)
 }

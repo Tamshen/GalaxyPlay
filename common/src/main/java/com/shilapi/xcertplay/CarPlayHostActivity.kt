@@ -4078,6 +4078,11 @@ internal object CarPlayBackgroundSession {
         }.also { it.start() }
     }
 
+    /** 设置页更新当前会话的既有保护器；不创建会话或重置尝试预算。 */
+    @Synchronized fun updateBluetoothMediaAutomatic(enabled: Boolean) {
+        bluetoothMediaGuard?.setAutomatic(enabled)
+    }
+
     /** 手机播放命令与 A2DP 断开确认协调；暂停取消等待，旧控制器不能恢复播放。 */
     fun beforeMediaCommand(expected: CarPlayController, index: Int, action: () -> Unit) {
         val guard = synchronized(this) {

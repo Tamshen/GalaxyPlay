@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="l7_probe_reporting_media">媒体中心上报</string>
+    <string name="l7_probe_reporting_hud">HUD 导航上报</string>
+    <string name="l7_probe_reporting_qnx">媒体 QNX 上报</string>
+    <string name="l7_probe_reporting_short">授权 %1$s/%2$s · SDK %3$s/%4$s</string>
+    <string name="l7_probe_reporting_details">候选权限 %1$s 项：已声明 %2$s，已授权 %3$s，定义可见 %4$s，AppOps 限制 %5$s。当前应用可见 SDK 类 %6$s/%7$s。实际上报尚未验证，不能据此判定支持或不支持。</string>
+    <string name="l7_probe_qnx_unconfirmed">QNX 下游协议尚未确认；此项复查媒体中心入口，不代表 QNX 已收到数据。</string>
+    <string name="l7_probe_next_reporting">下一步：查看下方每项候选权限的声明、授权、定义和 AppOps，结合厂商服务的实际拒绝原因核对要求。候选权限不等于必需权限，应用自身广播权限不代表厂商授权，SDK 类不可见不等于车机不支持。采集不会注册媒体源、抢占焦点或发送上报。</string>
     <string name="l7_probe_back_debug">返回调试与日志</string>
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
     <string name="l7_probe_executor">当前执行身份与辅助连接</string>
@@ -40,10 +47,13 @@
     <string name="l7_probe_evidence">检查详情</string>
     <string name="l7_probe_query_only">状态查询成功；仅证明该查询可用</string>
     <string name="l7_probe_definition_not_visible">定义不可见或未定义，不能判定接口是否支持</string>
-    <string name="l7_probe_not_declared">当前 APK 未声明该权限</string>
+    <string name="l7_probe_not_declared">当前 APK 未声明该权限；补声明后的授权结果待测</string>
     <string name="l7_probe_not_granted">当前应用未获授该权限</string>
     <string name="l7_probe_app_op_restricted">AppOps 明确限制了该操作</string>
     <string name="l7_probe_granted_not_called">已获授权限；尚未验证接口调用或实际效果</string>
+    <string name="l7_probe_special_allowed">特殊访问已允许；普通权限查询结果另行保留，接口调用和实际效果待验证</string>
+    <string name="l7_probe_special_unknown">特殊访问状态尚无法确定</string>
+    <string name="l7_probe_api_not_applicable">当前系统版本不适用</string>
     <string name="l7_probe_query_failed">查询受限或失败，查看详情中的原因</string>
     <string name="l7_probe_next_query">下一步：在对应功能中执行明确的测试，核对实际效果。</string>
     <string name="l7_probe_next_permission">下一步：核对权限定义和授权条件；扫描不会自动申请权限。</string>
@@ -99,4 +109,17 @@
     <string name="l7_probe_recollect">重新收集环境与调试信息</string>
     <string name="l7_probe_logged">本批信息已写入日志 · %1$s</string>
     <string name="l7_probe_log_failed">检查结果已保留，但日志写入失败，请重新收集</string>
+    <string name="l7_probe_hotspot_state">原生热点状态</string>
+    <string name="l7_probe_hotspot_config">原生热点新版配置</string>
+    <string name="l7_probe_hotspot_legacy">原生热点兼容配置</string>
+    <string name="l7_probe_hotspot_state_read">已读取 AP 状态，仅证明状态接口可调用，不代表手机已连接。</string>
+    <string name="l7_probe_valid_config">已读取有效配置；报告不保存热点名称或密码。</string>
+    <string name="l7_probe_empty_config">系统返回空配置；不能据此判断写入或开启能力。</string>
+    <string name="l7_probe_masked_password">系统已掩码密码，不能用于建链；已有配置保留。</string>
+    <string name="l7_probe_invalid_config">配置字段不完整或无效；已有配置保留。</string>
+    <string name="l7_probe_hotspot_denied">系统拒绝该读取接口；其余热点接口分别检测。</string>
+    <string name="l7_probe_service_unavailable">对应系统服务不可用，待当前固件复验。</string>
+    <string name="l7_probe_interface_not_visible">当前应用无法调用该接口，不能据此判定车机不支持热点。</string>
+    <string name="l7_probe_invalid_response">系统返回类型、状态或安全模式无法识别。</string>
+    <string name="l7_probe_next_hotspot">下一步：分别核对三条读取结果与候选权限。读取失败不覆盖已存配置，也不证明写入或开启失败。收集不会启停或改写热点；写入与开启需在连接设置主动操作，手机接入另行验证。</string>
 </resources>

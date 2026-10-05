@@ -42,8 +42,9 @@ internal data class L7ProbeReport(
     val expected: Int = 0,
     val finished: Long? = null,
     val truncated: Boolean = false,
+    val probeVersion: Int = 5,
 ) {
-    fun json() = JSONObject().put("schemaVersion", 1).put("probeVersion", 1).put("runId", id)
+    fun json() = JSONObject().put("schemaVersion", 1).put("probeVersion", probeVersion).put("runId", id)
         .put("caseId", "BASIC").put("executorContext", "L7_APP").put("environmentGeneration", environment)
         .put("appVersion", version).put("startedAt", started).put("finishedAt", finished ?: JSONObject.NULL)
         .put("executionState", phase.name).put("expectedItems", expected).put("truncated", truncated)
@@ -59,7 +60,7 @@ internal data class L7ProbeReport(
                 L7ProbePhase.valueOf(json.getString("executionState")),
                 json.getJSONArray("items").let { array -> (0 until array.length()).map { L7ProbeItem.read(array.getJSONObject(it)) } },
                 json.getInt("expectedItems"), if (json.isNull("finishedAt")) null else json.getLong("finishedAt"),
-                json.optBoolean("truncated"))
+                json.optBoolean("truncated"), json.optInt("probeVersion", 1))
         }
     }
 }
