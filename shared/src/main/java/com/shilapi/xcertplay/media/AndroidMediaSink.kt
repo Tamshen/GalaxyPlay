@@ -344,6 +344,7 @@ class AndroidMediaSink(
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
+            wirelessAudio,
         ).also { audioRenderers[id] = it }
     }
 }
@@ -873,8 +874,14 @@ private class AudioRenderer(
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
+    private val wirelessAudio: Boolean,
 ) : Closeable {
-    private data class AudioPacket(val rtp: ByteArray, val sample: Int)
+    private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
+
+    private val e5Realtime = E5WirelessAudioBuffer.applies(wirelessAudio, format)
+    private val playoutClock = if (e5Realtime) WirelessAudioPlayoutClock(format.sampleRate) else null
+    private var pendingPacket: AudioPacket? = null
+    private var pendingDueNs = 0L
 
     private var routeBinding: L7AudioRouting.Binding? = null
     private var trackAttributes: AudioAttributes? = null
@@ -937,7 +944,7 @@ private class AudioRenderer(
             val previous = lastArrivalNs.getAndSet(now)
             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
         }
-        if (!started || !queue.offer(AudioPacket(rtp, sample))) {
+        if (!started || !queue.offer(AudioPacket(rtp, sample, System.nanoTime()))) {
             if (started) packetsDropped.incrementAndGet()
             if (started && !droppedPacketsLogged) {
                 droppedPacketsLogged = true
@@ -969,7 +976,7 @@ private class AudioRenderer(
             requestAudioFocus()
             while (running) {
                 diagnosticStage = "packet"
-                queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
+                nextPacket()?.let(::handle)
                 // 尾包之后仍需轮询解码输出，避免短句等待下一个网络包才播放。
                 diagnosticStage = "decoder-output"
                 codec?.let(::drainCodec)
@@ -993,6 +1000,21 @@ private class AudioRenderer(
             runCatching { logStatsIfDue(force = true) }
             release()
         }
+    }
+
+    private fun nextPacket(): AudioPacket? {
+        if (pendingPacket == null) {
+            val packet = queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS) ?: return null
+            val clock = playoutClock ?: return packet
+            pendingPacket = packet
+            pendingDueNs = clock.dueNs(packet.sample, packet.receivedNs)
+        }
+        val remaining = pendingDueNs - System.nanoTime()
+        if (remaining > 0) {
+            TimeUnit.NANOSECONDS.sleep(minOf(remaining, AUDIO_POLL_MILLIS * 1_000_000L))
+            return null
+        }
+        return pendingPacket.also { pendingPacket = null }
     }
 
     private fun configureCodec(mime: String) {
@@ -1056,8 +1078,9 @@ private class AudioRenderer(
         val streamOverride = channelOverride(selection.channel)
         var attributes = audioAttributesFor(selection, streamOverride)
         trackAttributes = attributes
-        val plan = MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
-            format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
+        val plan = if (e5Realtime) E5WirelessAudioBuffer.plan(format.sampleRate, format.channels, minBuffer)
+            else MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
+                format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
         var routeLabel: String
@@ -1101,11 +1124,13 @@ private class AudioRenderer(
             false, format.sampleRate, format.channels, useBus = !AudioOutputPolicy.isLegacy(streamOverride))
         diagnosticStage = "track-capacity"
         val capacityBytes = built.bufferSizeInFrames * frameBytes
-        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes, PREBUFFER_WRITE_CHUNK_BYTES)
+        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
+            if (e5Realtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
         report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
             "rate=${format.sampleRate} channels=${format.channels} " +
             "route=$routeLabel " +
             "bufferMs=${capacityBytes * 1000L / bytesPerSecond} startMs=${startThresholdBytes * 1000L / bytesPerSecond} " +
+            "wireless=$wirelessAudio jitterTargetMs=${if (e5Realtime) E5WirelessAudioBuffer.JITTER_MILLIS else 0} " +
             "trackState=${built.state} usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType}")
         Log.i(
             TAG,
@@ -1409,7 +1434,7 @@ private class AudioRenderer(
             val writeLength = if (playbackStarted) {
                 length - written
             } else {
-                minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES)
+                minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES, (startThresholdBytes - prebufferBytes).coerceAtLeast(frameBytes))
             }
             val writeStarted = System.nanoTime()
             diagnosticStage = "track-write"
@@ -1450,7 +1475,7 @@ private class AudioRenderer(
 
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
-        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
+        if (bufferProgress.shouldRebuffer(!e5Realtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
                 track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
             // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
             // then use the configured start threshold again when music resumes.
