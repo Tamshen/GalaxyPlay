@@ -17,7 +17,7 @@ internal class L7PermissionProbe(
     private val pm = context.packageManager
     private val own = pm.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
     private val declared = own.requestedPermissions.orEmpty().toSet()
-    private val catalog = JSONObject(context.assets.open("l7-permission-catalog.json").bufferedReader().use { it.readText() })
+    private val catalog = JSONObject(context.assets.open("galaxyplay-permission-catalog.json").bufferedReader().use { it.readText() })
     private val candidates = catalog.getJSONArray("permissions").let { array ->
         (0 until array.length()).map { array.getJSONObject(it) }.associateBy { it.getString("name") }
     }

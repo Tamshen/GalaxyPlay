@@ -42,19 +42,19 @@ class RemoteLogTest {
     @After fun after() { RemoteLogUpload.cancel(); server?.stop(0) }
 
     @Test fun configurationRejectsEmbeddedCredentialsAndHeaderInjection() {
-        listOf("https://logs.example/api/default/l7carplay/_json", "http://127.0.0.1:8080/api/default/l7carplay/_json").forEach {
+        listOf("https://logs.example/api/default/galaxyplay/_json", "http://127.0.0.1:8080/api/default/galaxyplay/_json").forEach {
             assertTrue(RemoteLogConfig(it, token).valid())
         }
-        listOf("", "ftp://logs.example/api/default/l7carplay/_json", "https://u:p@logs.example/api/default/l7carplay/_json", "https://logs.example/api/default/l7carplay/_json?t=x",
-            "https://logs.example/api/default/l7carplay/_json#x", "https://logs.example:99999/api/default/l7carplay/_json", "https://logs.example/\n").forEach {
+        listOf("", "ftp://logs.example/api/default/galaxyplay/_json", "https://u:p@logs.example/api/default/galaxyplay/_json", "https://logs.example/api/default/galaxyplay/_json?t=x",
+            "https://logs.example/api/default/galaxyplay/_json#x", "https://logs.example:99999/api/default/galaxyplay/_json", "https://logs.example/\n").forEach {
             assertFalse(RemoteLogConfig(it, token).valid())
         }
-        assertFalse(RemoteLogConfig("https://logs.example/api/default/l7carplay/_json", "x\r\nHeader: y").valid())
+        assertFalse(RemoteLogConfig("https://logs.example/api/default/galaxyplay/_json", "x\r\nHeader: y").valid())
     }
 
     @Test fun applicationOverrideCanBeClearedWithoutChangingBuildDefaults() {
         val defaults = RemoteLogConfig.load(context)
-        val changed = RemoteLogConfig("https://logs.example/api/default/l7carplay/_json", token)
+        val changed = RemoteLogConfig("https://logs.example/api/default/galaxyplay/_json", token)
         assertTrue(RemoteLogConfig.save(context, changed))
         assertEquals(changed, RemoteLogConfig.load(context))
         assertTrue(RemoteLogConfig.reset(context))
@@ -207,7 +207,7 @@ class RemoteLogTest {
 
     @Test fun http200WithPartialIngestionIsReportedAsFailure() {
         val endpoint = serve { exchange ->
-            val response = acknowledgement("l7carplay", 0, 1)
+            val response = acknowledgement("galaxyplay", 0, 1)
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
         }
@@ -257,7 +257,7 @@ class RemoteLogTest {
         http.createContext("/", handler)
         http.start()
         server = http
-        return "http://127.0.0.1:${http.address.port}/api/default/l7carplay/_json"
+        return "http://127.0.0.1:${http.address.port}/api/default/galaxyplay/_json"
     }
 
     private fun awaitPhase(phase: RemoteLogUpload.Phase) {

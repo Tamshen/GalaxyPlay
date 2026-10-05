@@ -143,7 +143,7 @@ internal class CarPlayMediaSession(
     private fun publish() {
         val playing = phonePlaying ?: audioActive
         if (session == null && (connected || audioActive || playing)) {
-            session = MediaSession(context, "L7CarPlay").apply {
+            session = MediaSession(context, "GalaxyPlay").apply {
                 setCallback(callback, handler)
                 setMetadata(NowPlayingMetadata.androidMetadata(nowPlaying, artwork))
                 isActive = true

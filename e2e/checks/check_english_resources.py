@@ -43,7 +43,7 @@ def check():
                     FORMAT.findall("".join(target_item.itertext()))
                 ), f"格式占位符不同：{module}: {key}"
             checked += 1
-    for name in ("l7-first-use-agreement.en.md", "l7-third-party-notices.en.txt"):
+    for name in ("galaxyplay-first-use-agreement.en.md", "galaxyplay-third-party-notices.en.txt"):
         assert not HAN.search((ROOT / "common/src/main/assets" / name).read_text()), f"英文正文含中文：{name}"
     print(f"英文资源检查通过：{checked} 项，含选项数组及格式占位符；英文正文无中文残留。")
 

@@ -7,7 +7,7 @@ body:
       value: '请在停车状态下测试。问题报告公开可见，上传前检查诊断文件并移除个人信息，不要提交认证材料。'
   - type: input
     id: version
-    attributes: {label: L7CarPlay 版本, placeholder: '0.2.8'}
+    attributes: {label: GalaxyPlay 版本, placeholder: '0.2.8'}
     validations: {required: true}
   - type: input
     id: car

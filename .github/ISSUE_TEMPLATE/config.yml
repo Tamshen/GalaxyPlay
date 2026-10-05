@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: L7 安装与连接说明
-    url: https://github.com/Tamshen/L7CarPlay/blob/main/docs/使用说明.md
+    url: https://github.com/Tamshen/GalaxyPlay/blob/main/docs/使用说明.md
     about: 提交问题前请先检查连接、认证配置与诊断日志。

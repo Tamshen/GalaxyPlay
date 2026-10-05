@@ -10,5 +10,5 @@ RUN yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null \
        "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358"
 
 # JDK 25 由仓库 Daemon JVM 配置下载到缓存，基础 JDK 仅启动 Wrapper。
-ENV GRADLE_USER_HOME=/var/cache/l7carplay/gradle
+ENV GRADLE_USER_HOME=/var/cache/galaxyplay/gradle
 WORKDIR /workspace

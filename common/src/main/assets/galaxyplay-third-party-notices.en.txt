@@ -1,6 +1,6 @@
-L7CarPlay — Third-party notices and licenses
+GalaxyPlay — Third-party notices and licenses
 
-L7CarPlay is an independently maintained CarPlay receiver for Galaxy L7. This document records source attribution, dependencies and resource rights. Complete license texts follow these notices. Source code and build instructions: https://github.com/Tamshen/L7CarPlay
+GalaxyPlay is an independently maintained CarPlay receiver for Galaxy L7. This document records source attribution, dependencies and resource rights. Complete license texts follow these notices. Source code and build instructions: https://github.com/Tamshen/GalaxyPlay
 
 Direct upstream
 
@@ -92,7 +92,7 @@ https://github.com/MobileDevOps/android-sdk-image
 
 Retained source notices
 
-DiAuto — AGPL-3.0-only source notice inherited through the DiPlay host files. The current home screen, settings and floating menus use L7CarPlay native components with Flyme Auto reference styling. Existing source-file attribution and licenses remain. DiAuto is not included as a separate SDK, module or Gradle dependency.
+DiAuto — AGPL-3.0-only source notice inherited through the DiPlay host files. The current home screen, settings and floating menus use GalaxyPlay native components with Flyme Auto reference styling. Existing source-file attribution and licenses remain. DiAuto is not included as a separate SDK, module or Gradle dependency.
 https://github.com/shihabal3amri/DiAuto
 
 Resources and branding
@@ -106,7 +106,7 @@ Flyme Auto references and icon material — Rights remain with their respective 
 Apple CarPlay — CarPlay branding and the original CarPlay icon belong to Apple Inc. Source-code licensing does not grant the same rights to these resources.
 https://developer.apple.com/assets/elements/icons/carplay/carplay-96x96_2x.png
 
-L7CarPlay is not affiliated with or endorsed by Apple or Geely. Experimental builds do not constitute Apple product certification.
+GalaxyPlay is not affiliated with or endorsed by Apple or Geely. Experimental builds do not constitute Apple product certification.
 
 Authentication materials
 
