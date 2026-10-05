@@ -40,6 +40,8 @@ internal class AudioChannelPreview(
     fun play(channel: Int, role: AudioOutputRole) {
         if (closed) return
         require(AudioOutputPolicy.valid(channel))
+        val template = context?.let { L7AudioTemplates.load(it) }
+        val focusEnabled = context?.let { AirPlayPersistence.loadAudioFocusEnabled(it) } ?: true
         val request = generation.incrementAndGet()
         pending?.cancel(true)
         activeTrack.get()?.let { runCatching { it.stop() } }
@@ -58,8 +60,7 @@ internal class AudioChannelPreview(
                 built.setVolume(0.6f)
                 context?.let {
                     route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel,
-                        preferBus = AirPlayPersistence.loadL7AudioBusEnabled(it),
-                        focusEnabled = AirPlayPersistence.loadAudioFocusEnabled(it)) { line ->
+                        template = template, focusEnabled = focusEnabled) { line ->
                         L7DebugLog.record("Audio preview stream=$channel $line")
                     }
                 }

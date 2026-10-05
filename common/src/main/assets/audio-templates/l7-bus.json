@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "name": "L7 BUS",
+  "preferBus": true,
+  "choices": {
+    "media": 101,
+    "navigation": 103,
+    "assistant": 102
+  },
+  "outputBuses": {
+    "media": "bus0_media_out",
+    "navigation": "bus1_navigation_out",
+    "assistant": "bus2_voice_command_out",
+    "ringtone": "bus3_call_ring_out",
+    "phone": "bus4_call_out"
+  }
+}

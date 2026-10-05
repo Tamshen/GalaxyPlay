@@ -12,6 +12,7 @@ import java.io.Closeable
 
 /** 会话拥有监听器；关闭绑定后，迟到回调不能操作已释放的播放/录音对象。 */
 internal class L7AudioRouting(context: Context?, private val preferBus: Boolean = false,
+                              private val template: AudioRoutingTemplate? = null,
                               private val report: (String) -> Unit) : Closeable {
     private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val handler = Handler(Looper.getMainLooper())
@@ -44,8 +45,8 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
 
         internal fun select() {
             if (released || closed) return
-            if (!preferBus || !useBus) {
-                // 原版策略只观察实际路由，不向系统写入任何首选设备。
+            if (!preferBus || !useBus || input) {
+                // 默认、传统流与录音只观察实际路由，不向系统写入首选设备。
                 emit("Audio: route policy=system channel=$channel direction=${if (input) "input" else "output"}")
                 reportActual()
                 return
@@ -56,7 +57,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
             }.getOrElse { emptyList() }
             val selected = if (useBus) runCatching { L7AudioRoutePolicy.select(devices.map {
                 L7AudioDevice(it.id, it.address, input, it.sampleRates.toList(), it.channelCounts.toList())
-            }, channel, input, sampleRate, channels) }.getOrNull() else null
+            }, channel, input, sampleRate, channels, template) }.getOrNull() else null
             val target = selected?.let { match -> devices.firstOrNull { it.id == match.id } }
             val accepted = runCatching { routing.setPreferredDevice(target) }.getOrDefault(false)
             // 请求被拒绝时清除旧偏好，不能带着失效设备 ID 继续播放。
@@ -64,7 +65,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
                 runCatching { routing.setPreferredDevice(null) }.getOrDefault(false)
             } else target == null && accepted
             emit("Audio: route request channel=$channel direction=${if (input) "input" else "output"} " +
-                "candidate=${if (useBus) L7AudioRoutePolicy.candidate(channel, input, sampleRate) else "legacy-override"} " +
+                "candidate=${if (useBus) L7AudioRoutePolicy.candidate(channel, input, sampleRate, template) else "legacy-override"} " +
                 "preferredId=${target?.id ?: -1} accepted=$accepted systemFallback=$fallback")
             reportActual()
         }
@@ -72,9 +73,9 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
         fun reportActual() = synchronized(this@L7AudioRouting) {
             if (released || closed) return@synchronized
             val device = runCatching { routing.routedDevice }.getOrNull()
-            // 只记录已知 BUS 地址，蓝牙 MAC、设备序列号等其他地址不采样。
+            // 仅记录固件配置中确认的 BUS；观察真实路由不等于请求或进入头枕。
             val bus = runCatching { device?.address?.trim() }.getOrNull()?.takeIf {
-                it.equals(L7AudioRoutePolicy.candidate(channel, input, sampleRate), ignoreCase = true)
+                L7AudioRoutePolicy.knownBus(it) || template?.knownBus(it) == true
             } ?: "system-or-unknown"
             val actual = "id=${device?.id ?: -1} type=${device?.type ?: -1} bus=$bus"
             if (lastActual != actual) {

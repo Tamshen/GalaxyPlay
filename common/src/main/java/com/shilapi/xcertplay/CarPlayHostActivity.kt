@@ -3125,18 +3125,24 @@ class CarPlayHostActivity : ComponentActivity() {
         val diagnosticLog = sessionLog
         L7VoiceDiagnostics.initialize(applicationContext)
         val voiceOwner = L7VoiceDiagnostics.store.session()
+        // 当前会话固定一份模板，设置修改从下次连接起生效。
+        val audioTemplate = if (l7DebugLogs) L7AudioTemplates.load(this) else null
         return AndroidMediaSink(
             surface = null,
             videoWidth = videoWidth,
             videoHeight = videoHeight,
             preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
-            advancedAudioChannelMapping = advancedAudioChannelMapping,
+            advancedAudioChannelMapping = if (audioTemplate != null) true else advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
-            mediaChannel = AirPlayPersistence.loadMediaAudioChannel(this),
-            navigationChannel = AirPlayPersistence.loadNavigationAudioChannel(this),
-            assistantChannel = AirPlayPersistence.loadAssistantAudioChannel(this),
+            mediaChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA)
+                ?: AirPlayPersistence.loadMediaAudioChannel(this),
+            navigationChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION)
+                ?: AirPlayPersistence.loadNavigationAudioChannel(this),
+            assistantChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.ASSISTANT)
+                ?: AirPlayPersistence.loadAssistantAudioChannel(this),
             context = this,
-            enableL7AudioRouting = AirPlayPersistence.loadL7AudioBusEnabled(this),
+            enableL7AudioRouting = audioTemplate?.preferBus ?: AirPlayPersistence.loadL7AudioBusEnabled(this),
+            audioRoutingTemplate = audioTemplate,
             enableL7AudioProfile = l7DebugLogs,
             wirelessAudio = wirelessEnabled,
             callProcessingEnabled = AirPlayPersistence.loadCallProcessingEnabled(this),
