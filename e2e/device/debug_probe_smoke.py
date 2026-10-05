@@ -227,7 +227,7 @@ try:
     time.sleep(.7)
     labels = [n.get('text', '') for n in nodes().iter('node')]
     assert any('报告已保存' in value for value in labels), '导出没有返回保存成功'
-    exported = json.loads(adb('shell', 'cat', '/sdcard/Download/L7CarPlay/L7CarPlay-check-' + single['runId'] + '.json'))
+    exported = json.loads(adb('shell', 'cat', '/sdcard/Download/GalaxyPlay/GalaxyPlay-check-' + single['runId'] + '.json'))
     assert exported['runId'] == single['runId']
     screenshot('debug-export-day')
     time.sleep(4.6)  # 保存反馈是自动消退的窗口内提示，系统返回会离开结果页。

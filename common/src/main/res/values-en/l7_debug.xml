@@ -6,8 +6,8 @@
     <string name="l7_debug_title">Floating logs</string>
     <string name="l7_debug_desc">Enable this to view connection, reconnection, video and audio logs over other screens. Drag the title to move the window or collapse it to reduce obstruction. Recent logs remain after a disconnect and are included in diagnostic reports.</string>
     <string name="l7_debug_permission">Manage overlay permission</string>
-    <string name="l7_debug_permission_help">Find L7CarPlay in system settings and allow it to display over other apps. The log window will open when you return.</string>
-    <string name="l7_debug_permission_denied">Overlay permission is off. Enable it for L7CarPlay in system settings.</string>
+    <string name="l7_debug_permission_help">Find GalaxyPlay in system settings and allow it to display over other apps. The log window will open when you return.</string>
+    <string name="l7_debug_permission_denied">Overlay permission is off. Enable it for GalaxyPlay in system settings.</string>
     <string name="l7_debug_start">Show floating logs</string>
     <string name="l7_debug_stop">Close floating logs</string>
     <string name="l7_debug_view">View current logs</string>

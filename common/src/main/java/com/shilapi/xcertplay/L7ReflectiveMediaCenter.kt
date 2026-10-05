@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.net.Uri
+import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.vendor.SdkSubclass
@@ -144,7 +145,7 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                 "getSourceType" -> source
                 "getPlaybackStatus" -> if (value.playing) 1 else 0
                 "getPackageName" -> app.packageName
-                "getAppName" -> "L7 CarPlay"
+                "getAppName" -> app.getString(R.string.app_name)
                 "getUuid" -> snapshotTrack
                 else -> false
             }

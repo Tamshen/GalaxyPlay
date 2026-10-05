@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "L7CarPlay"
+rootProject.name = "GalaxyPlay"
 include(":common")
 include(":mobile")
 include(":automotive")

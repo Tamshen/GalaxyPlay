@@ -1,9 +1,9 @@
 # 首次使用须知与风险确认协议
 
-软件名称：L7CarPlay  
+软件名称：GalaxyPlay
 维护者：Tamshen  
-协议版本：2026-10-03  
-更新日期：2026-10-03  
+协议版本：2026-10-06
+更新日期：2026-10-06
 源代码地址：https://github.com/Tamshen/L7CarPlay  
 联系方式：https://github.com/Tamshen/L7CarPlay/issues
 

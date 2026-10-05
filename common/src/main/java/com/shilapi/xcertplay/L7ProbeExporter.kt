@@ -43,8 +43,8 @@ internal class L7ProbeExporter(activity: ComponentActivity) {
                 if (uri != null) { DiagnosticExportStore.write(appContext.contentResolver, uri, body); uri.toString() }
                 else {
                     DiagnosticExportStore.saveToDownloads(appContext.contentResolver, fileName(id), body,
-                        "application/json", "L7CarPlay")
-                    "Downloads/L7CarPlay/${fileName(id)}"
+                        "application/json", "GalaxyPlay")
+                    "Downloads/GalaxyPlay/${fileName(id)}"
                 }
             }
             busy = false
@@ -56,6 +56,6 @@ internal class L7ProbeExporter(activity: ComponentActivity) {
         }, "l7-probe-export").apply { isDaemon = true; start() }
     }
 
-    private fun fileName(id: String) = "L7CarPlay-check-$id.json"
+    private fun fileName(id: String) = "GalaxyPlay-check-$id.json"
     companion object { @Volatile var busy = false; private set }
 }

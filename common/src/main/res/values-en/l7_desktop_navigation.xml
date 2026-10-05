@@ -6,5 +6,5 @@
     <string name="l7_desktop_permission">Enable desktop overlay</string>
     <string name="l7_desktop_permission_hint">Allow this to return quickly from the vehicle home screen. CarPlay can still connect without it.</string>
     <string name="l7_desktop_home_permission">Enable overlay permission to return quickly from the home screen</string>
-    <string name="l7_desktop_notification">Desktop floating menu is enabled for quick access to L7CarPlay</string>
+    <string name="l7_desktop_notification">Desktop floating menu is enabled for quick access to GalaxyPlay</string>
 </resources>

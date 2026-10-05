@@ -83,7 +83,7 @@ internal class L7ProbeLabels(private val context: Context) {
             statuses.count { it.matches(5) || it.matches(6) })
     }
     fun readable(report: L7ProbeReport) = buildString {
-        appendLine("L7 CarPlay ${report.version} · ${text(R.string.l7_probe_title)}")
+        appendLine("${text(R.string.app_name)} ${report.version} · ${text(R.string.l7_probe_title)}")
         appendLine("${report.id} · ${time(report.started)} · ${phase(report)}")
         appendLine(summary(report))
         report.items.forEach { appendLine("${name(it)}: ${reason(it)}") }

@@ -8,7 +8,7 @@
     <string name="l7_floating_transparency">悬浮图标透明度</string>
     <string name="l7_floating_hint">连接后菜单自动收起。图标可以拖动；点击图标或按返回键，四项菜单固定在左上角展开。透明度返回投屏页后生效。</string>
     <string name="l7_exit_app">退出应用</string>
-    <string name="l7_exit_title">退出 L7CarPlay？</string>
+    <string name="l7_exit_title">退出 GalaxyPlay？</string>
     <string name="l7_exit_message">将断开 CarPlay、关闭悬浮日志和后台服务，并结束应用进程。</string>
     <string name="l7_reset_section">应用重置</string>
     <string name="l7_reset_title">清空所有配置</string>
@@ -20,5 +20,5 @@
     <string name="l7_reset_failed">未能清空应用数据</string>
     <string name="l7_reset_failed_hint">系统未接受清理请求，尚未确认重置完成。连接已停止。可打开本应用的系统设置，在“存储”中选择“清除数据”。</string>
     <string name="l7_reset_open_settings">打开应用设置</string>
-    <string name="l7_reset_manual_hint">无法打开应用设置。请在车机系统的应用管理中找到 L7 CarPlay，进入“存储”后选择“清除数据”。</string>
+    <string name="l7_reset_manual_hint">无法打开应用设置。请在车机系统的应用管理中找到 GalaxyPlay，进入“存储”后选择“清除数据”。</string>
 </resources>

@@ -6,5 +6,5 @@
     <string name="l7_desktop_permission">开启桌面悬浮权限</string>
     <string name="l7_desktop_permission_hint">授权后可从车机桌面快速返回；未授权仍可正常连接。</string>
     <string name="l7_desktop_home_permission">点击开启悬浮权限，即可从桌面快速返回</string>
-    <string name="l7_desktop_notification">桌面悬浮菜单已开启，可快速返回 L7CarPlay</string>
+    <string name="l7_desktop_notification">桌面悬浮菜单已开启，可快速返回 GalaxyPlay</string>
 </resources>
