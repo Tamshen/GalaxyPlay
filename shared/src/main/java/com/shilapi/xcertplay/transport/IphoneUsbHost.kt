@@ -121,7 +121,15 @@ class IphoneUsbHost(
 
     /** Returns the new matching device after the vendor request caused Android USB re-enumeration. */
     fun parseAttachedDevice(intent: Intent): UsbDevice? {
-        if (intent.action != UsbManager.ACTION_USB_DEVICE_ATTACHED) return null
+        return parseDeviceEvent(intent, UsbManager.ACTION_USB_DEVICE_ATTACHED)
+    }
+
+    /** 仅交付匹配的 USB 拔出事件，其他外设不改变 iPhone 启动状态。 */
+    fun parseDetachedDevice(intent: Intent): UsbDevice? =
+        parseDeviceEvent(intent, UsbManager.ACTION_USB_DEVICE_DETACHED)
+
+    private fun parseDeviceEvent(intent: Intent, action: String): UsbDevice? {
+        if (intent.action != action) return null
         val device = intent.usbDevice() ?: return null
         return device.takeIf { matcher.matches(it.vendorId, it.productId) }
     }
@@ -136,6 +144,12 @@ class IphoneUsbHost(
     fun registerAttachReceiver(onAttached: (UsbDevice) -> Unit): Closeable =
         registerReceiver(IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
             parseAttachedDevice(it)?.let(onAttached)
+        }
+
+    /** 与附加接收器相同，句柄关闭后不再接收拔出通知。 */
+    fun registerDetachReceiver(onDetached: (UsbDevice) -> Unit): Closeable =
+        registerReceiver(IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)) {
+            parseDetachedDevice(it)?.let(onDetached)
         }
 
     /**

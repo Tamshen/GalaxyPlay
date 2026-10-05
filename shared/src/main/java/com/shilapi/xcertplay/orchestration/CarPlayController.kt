@@ -194,6 +194,8 @@ class CarPlayController(
     @Volatile private var uiListener: AirPlaySessionListener? = listener
     @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
     private val iphonePermission = IphoneUsbPermissionGate()
+    private val iphoneReenumeration = IphoneUsbReenumeration()
+    @Volatile private var currentIphoneDevice: String? = null
     private val iphoneGeneration = AtomicInteger()
     private val permissionGrant = AtomicBoolean(false)
     private val availabilityPollGeneration = AtomicInteger(0)
@@ -258,6 +260,7 @@ class CarPlayController(
 
     private var permissionCloseable: Closeable? = null
     private var attachCloseable: Closeable? = null
+    private var detachCloseable: Closeable? = null
     private var ch341PermissionCloseable: Closeable? = null
     private var vpnLatch = CountDownLatch(1)
     private val teardownComplete = CountDownLatch(1)
@@ -418,6 +421,7 @@ class CarPlayController(
         if (config.transport == CarPlayTransport.WIRED) {
             permissionCloseable = iphoneHost.registerPermissionReceiver(::onIphonePermission)
             attachCloseable = iphoneHost.registerAttachReceiver(::onIphoneAttached)
+            detachCloseable = iphoneHost.registerDetachReceiver(::onIphoneDetached)
         }
         startMfi()
     }
@@ -1472,6 +1476,8 @@ class CarPlayController(
     private fun invalidateIphonePermission() {
         iphoneGeneration.incrementAndGet()
         iphonePermission.invalidate()
+        iphoneReenumeration.clear()
+        currentIphoneDevice = null
     }
 
     private fun startIphone() {
@@ -1480,30 +1486,47 @@ class CarPlayController(
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.IPHONE
         reenumerationAttempts = 0
-        onStatus(CarPlayStatus.DiscoveringIphone)
+        onStatus(CarPlayStatus.DiscoveringIphone, iphoneGeneration.get())
         checkIphoneAvailability()
     }
 
     private fun checkIphoneAvailability() {
         if (closed || phase != Phase.IPHONE) return
-        val device = iphoneHost.discover().firstOrNull()
-        if (device == null) {
-            onStatus(CarPlayStatus.WaitingForIphone)
-            scheduleAvailabilityPoll(Phase.IPHONE, ::checkIphoneAvailability)
-        } else {
-            debugLog(
-                "wired iPhone discovered vid=0x${device.vendorId.toString(16)} " +
-                    "pid=0x${device.productId.toString(16)}",
-            )
+        val generation = iphoneGeneration.get()
+        try {
+            val device = iphoneHost.discover().firstOrNull()
+            if (device == null) {
+                onStatus(CarPlayStatus.WaitingForIphone, generation)
+                scheduleAvailabilityPoll(Phase.IPHONE, ::checkIphoneAvailability)
+            } else {
+                debugLog(
+                    "wired iPhone discovered vid=0x${device.vendorId.toString(16)} " +
+                        "pid=0x${device.productId.toString(16)}",
+                )
+                availabilityPollGeneration.incrementAndGet()
+                requestIphonePermission(device)
+            }
+        } catch (error: RuntimeException) {
             availabilityPollGeneration.incrementAndGet()
-            requestIphonePermission(device)
+            fail(error, generation)
         }
     }
 
     private fun requestIphonePermission(device: UsbDevice) {
         val generation = iphoneGeneration.get()
         mainHandler.post {
-            if (generation == iphoneGeneration.get()) doRequestIphonePermission(device)
+            if (generation != iphoneGeneration.get() || !waitingForIphonePermission()) return@post
+            try {
+                // 使用当前描述符；发现后拔出或同路径替换不能继续使用排队的旧对象。
+                val current = iphoneHost.discover().firstOrNull { it.deviceName == device.deviceName }
+                if (current != null) doRequestIphonePermission(current)
+                else if (phase == Phase.REENUMERATION) checkReenumerationAvailability()
+                else checkIphoneAvailability()
+            } catch (error: RuntimeException) {
+                invalidateIphonePermission()
+                availabilityPollGeneration.incrementAndGet()
+                fail(error, iphoneGeneration.get())
+            }
         }
     }
 
@@ -1513,7 +1536,10 @@ class CarPlayController(
     private fun doRequestIphonePermission(device: UsbDevice) {
         if (!waitingForIphonePermission()) return
         val generation = iphoneGeneration.get()
+        if (phase == Phase.REENUMERATION && !acceptsReenumeratedIphone(device)) return
         val ticket = iphonePermission.begin(device.deviceName) ?: return
+        currentIphoneDevice = device.deviceName
+        iphoneReenumeration.clear()
         try {
             when (val request = iphoneHost.requestPermission(device, ticket.id)) {
                 is IphoneUsbHost.PermissionRequest.AlreadyGranted -> {
@@ -1580,6 +1606,11 @@ class CarPlayController(
             override fun run() {
                 if (!waitingForIphonePermission() || !iphonePermission.isPending(ticket)) return
                 try {
+                    if (!usbManager.deviceList.containsKey(device.deviceName)) {
+                        onIphoneDetached(device)
+                        // 两次查询间设备可能已重现；未失效的请求仍须继续轮询和超时检查。
+                        if (!iphonePermission.isPending(ticket)) return
+                    }
                     if (usbManager.hasPermission(device)) {
                         onIphonePermission(IphoneUsbHost.PermissionResult.Granted(device, ticket.id))
                         return
@@ -1601,29 +1632,88 @@ class CarPlayController(
     }
 
     private fun beginReenumeration(device: UsbDevice) {
+        val attachedDevices = iphoneHost.discover().map { it.deviceName }.toSet()
         phase = Phase.REENUMERATION
+        iphoneReenumeration.begin(device.deviceName, attachedDevices)
         reenumerationAttempts += 1
         connectionDiagnostic("USB transition requested count=$reenumerationAttempts")
-        onStatus(CarPlayStatus.SelectingConfiguration)
         val generation = iphoneGeneration.get()
+        onStatus(CarPlayStatus.SelectingConfiguration, generation)
         iphoneHost.requestCarPlayReenumerationAsync(device, executor) { transition ->
-            if (closed || generation != iphoneGeneration.get() || phase != Phase.REENUMERATION) return@requestCarPlayReenumerationAsync
-            when (transition) {
-                IphoneUsbHost.TransitionResult.ReenumerationRequested ->
-                    onStatus(CarPlayStatus.WaitingForReenumeration, generation)
-                is IphoneUsbHost.TransitionResult.Failed -> fail(transition.error, generation)
+            // 与设备事件在主线程串行处理，早到的附加广播由设备列表复查补齐。
+            mainHandler.post {
+                if (closed || generation != iphoneGeneration.get() || phase != Phase.REENUMERATION ||
+                    !iphoneReenumeration.isActive()) return@post
+                when (transition) {
+                    IphoneUsbHost.TransitionResult.ReenumerationRequested -> {
+                        iphoneReenumeration.completeTransition()
+                        checkReenumerationAvailability()
+                    }
+                    is IphoneUsbHost.TransitionResult.Failed -> {
+                        iphoneReenumeration.clear()
+                        fail(transition.error, generation)
+                    }
+                }
             }
+        }
+    }
+
+    private fun acceptsReenumeratedIphone(device: UsbDevice): Boolean =
+        iphoneReenumeration.accepts(device.deviceName, IphoneCarPlayConfiguration.find(device) != null)
+
+    private fun checkReenumerationAvailability() {
+        if (closed || phase != Phase.REENUMERATION || !iphoneReenumeration.isActive()) return
+        val generation = iphoneGeneration.get()
+        try {
+            val devices = iphoneHost.discover()
+            iphoneReenumeration.observe(devices.map { it.deviceName }.toSet())
+            val device = devices.firstOrNull(::acceptsReenumeratedIphone)
+            if (device != null) {
+                availabilityPollGeneration.incrementAndGet()
+                connectionDiagnostic("USB reenumeration result=FOUND source=device-list")
+                requestIphonePermission(device)
+            } else {
+                onStatus(CarPlayStatus.WaitingForReenumeration, generation)
+                scheduleAvailabilityPoll(Phase.REENUMERATION, ::checkReenumerationAvailability)
+            }
+        } catch (error: RuntimeException) {
+            iphoneReenumeration.clear()
+            fail(error, generation)
         }
     }
 
     private fun onIphoneAttached(device: UsbDevice) {
         if (closed) return
         when (phase) {
-            Phase.REENUMERATION, Phase.IPHONE -> {
+            Phase.IPHONE -> {
                 availabilityPollGeneration.incrementAndGet()
                 requestIphonePermission(device)
             }
+            Phase.REENUMERATION -> if (acceptsReenumeratedIphone(device)) {
+                availabilityPollGeneration.incrementAndGet()
+                connectionDiagnostic("USB reenumeration result=FOUND source=attach-broadcast")
+                requestIphonePermission(device)
+            }
             else -> Unit
+        }
+    }
+
+    private fun onIphoneDetached(device: UsbDevice) {
+        if (closed || phase !in setOf(Phase.IPHONE, Phase.REENUMERATION)) return
+        if (currentIphoneDevice != device.deviceName && !iphoneReenumeration.isSource(device.deviceName)) return
+        try {
+            // 迟到的旧拔出广播不能清除已在同路径重新出现的设备授权。
+            if (usbManager.deviceList.containsKey(device.deviceName)) return
+            if (phase == Phase.REENUMERATION && iphoneReenumeration.detached(device.deviceName)) {
+                connectionDiagnostic("USB detach expected=true action=wait-reenumeration")
+                return
+            }
+            connectionDiagnostic("USB detach expected=false action=rediscover")
+            startIphone()
+        } catch (error: RuntimeException) {
+            invalidateIphonePermission()
+            availabilityPollGeneration.incrementAndGet()
+            fail(error, iphoneGeneration.get())
         }
     }
 
@@ -2264,7 +2354,7 @@ class CarPlayController(
     }
 
     private fun closeReceivers() {
-        listOfNotNull(permissionCloseable, attachCloseable, ch341PermissionCloseable).forEach {
+        listOfNotNull(permissionCloseable, attachCloseable, detachCloseable, ch341PermissionCloseable).forEach {
             try {
                 it.close()
             } catch (_: Exception) {
@@ -2273,6 +2363,7 @@ class CarPlayController(
         }
         permissionCloseable = null
         attachCloseable = null
+        detachCloseable = null
         ch341PermissionCloseable = null
     }
 
