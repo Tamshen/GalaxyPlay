@@ -21,7 +21,7 @@ internal class L7NavigationSession(
     private var attempted = false
     private var started = false
     private var publishedRoad: String? = null
-    private var connected = false
+    private var connectionToken: Any? = null
     private var failures = 0
     private var reportedAvailability: Boolean? = null
     private var pendingRoad: String? = null
@@ -42,20 +42,7 @@ internal class L7NavigationSession(
             initialized = call("initialize") { port.initialize() }
         }
         if (!initialized || closed || !current()) return
-        val available = try { port.ready() } catch (error: Exception) {
-            log("Navigation: stage=serviceReady exceptionType=${error.javaClass.simpleName}"); false
-        }
-        if (reportedAvailability != available) {
-            reportedAvailability = available
-            log("Navigation: stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
-        }
-        if (!available) {
-            if (connected) publishedRoad = null
-            connected = false
-            return
-        }
-        if (!connected) { publishedRoad = null; if (value.active) started = false; failures = 0 }
-        connected = true
+        if (!refreshConnection(value.active)) return
         if (!value.active) {
             if (failures < 3) stop()
             if (!started) { pendingRoad = null; failures = 0 }
@@ -74,6 +61,33 @@ internal class L7NavigationSession(
             if (call("road") { port.road(road) }) { publishedRoad = road; failures = 0 }
             else failures++
         }
+    }
+    private fun refreshConnection(active: Boolean): Boolean {
+        val token = try { port.connectionToken() } catch (error: Throwable) {
+            if (error !is Exception && error !is LinkageError) throw error
+            val cause = if (error is InvocationTargetException) error.targetException else error
+            log("Navigation: stage=serviceReady exceptionType=${cause.javaClass.simpleName}"); null
+        }
+        if (closed || !current()) return false
+        val available = token != null
+        if (reportedAvailability != available) {
+            reportedAvailability = available
+            log("Navigation: stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
+        }
+        if (!available) {
+            if (connectionToken != null) publishedRoad = null
+            connectionToken = null
+            return false
+        }
+        if (connectionToken != token) {
+            val result = if (connectionToken == null) "CONNECTED" else "REPLACED"
+            publishedRoad = null
+            if (active) started = false
+            failures = 0
+            log("Navigation: stage=serviceConnection result=$result replayLatest=$active display=NOT_VERIFIED")
+        }
+        connectionToken = token
+        return true
     }
     private fun stop() {
         if (call("stop") { port.stop() }) started = false else failures++

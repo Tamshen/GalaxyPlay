@@ -9,6 +9,8 @@ import java.lang.reflect.Proxy
 internal interface L7NavigationPort : Closeable {
     fun initialize()
     fun ready(): Boolean = true
+    /** 存活服务的身份；服务更换可能发生在两次检查之间，不能只检测布尔就绪状态。 */
+    fun connectionToken(): Any? = if (ready()) this else null
     fun start()
     fun road(value: String)
     fun stop()
@@ -58,10 +60,11 @@ internal class L7ReflectiveNavigation(context: Context) : L7NavigationPort {
         if (valid) register.invoke(api, callback)
         L7DebugLog.record("Navigation: sdk source=${sdk.source} callbackRegistration=RETURNED_NO_ACK serviceReady=${ready()} authorization=UNCONFIRMED target=UNKNOWN")
     }
-    override fun ready(): Boolean {
-        val service = serviceGetter?.invoke(serviceInstance) as? android.os.IInterface ?: return false
-        return service.asBinder().isBinderAlive
+    override fun connectionToken(): Any? {
+        val service = serviceGetter?.invoke(serviceInstance) as? android.os.IInterface ?: return null
+        return service.asBinder().takeIf { it.isBinderAlive }
     }
+    override fun ready(): Boolean = connectionToken() != null
     private fun requireReady() { check(ready()) { "SDK_SERVICE_NOT_READY" } }
     override fun start() { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("notifyTurnByTurnStarted").invoke(api) }
     override fun road(value: String) { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("updateNextGuidancePointName", String::class.java).invoke(api, value) }
