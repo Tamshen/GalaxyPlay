@@ -30,6 +30,10 @@ internal object L7WiredDiagnostics {
         journal(context).begin(Process.myPid(), context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty())
     }.getOrElse { "unavailable" }
 
+    /** 同进程重建沿用未结束尝试；进程重启另建记录，保留旧 PID 的退出和崩溃证据。 */
+    @Synchronized fun beginOrResume(context: Context, saved: String?): String =
+        runCatching { journal(context).resume(Process.myPid(), saved) }.getOrNull() ?: begin(context)
+
     @Synchronized fun event(context: Context, id: String?, phase: String, result: String,
                             error: Throwable? = null, outcome: String? = null) {
         if (id == null) return

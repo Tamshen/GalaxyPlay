@@ -51,6 +51,18 @@ class L7WiredJournalTest {
         assertTrue(journal().report().any { it.contains("outcome=INTERRUPTED") && it.contains("exitReason=-1") })
     }
 
+    @Test fun pendingAttemptCanResumeOnlyForItsCurrentLiveProcessAndLatestId() {
+        val id = journal().begin(10, "test")
+        assertEquals(id, journal().resume(10, id))
+        assertNull(journal().resume(20, id))
+        assertNull(journal().resume(10, null))
+        journal().event(id, "HOST", "CLOSED", outcome = "CANCELLED")
+        assertNull(journal().resume(10, id))
+        val next = journal().begin(10, "test")
+        assertNull(journal().resume(10, id))
+        assertEquals(next, journal().resume(10, next))
+    }
+
     @Test fun explicitCancellationAndKnownSystemReclaimDoNotBecomeCrashNotices() {
         val id = journal().begin(10, "test")
         journal().event(id, "STOP", "EXPLICIT", outcome = "CANCELLED")
