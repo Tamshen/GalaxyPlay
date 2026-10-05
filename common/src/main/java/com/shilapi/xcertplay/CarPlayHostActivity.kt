@@ -3123,6 +3123,8 @@ class CarPlayHostActivity : ComponentActivity() {
     ): AndroidMediaSink {
         // 固定当前会话文件，解码器的迟到回调不能写入新会话。
         val diagnosticLog = sessionLog
+        L7VoiceDiagnostics.initialize(applicationContext)
+        val voiceOwner = L7VoiceDiagnostics.store.session()
         return AndroidMediaSink(
             surface = null,
             videoWidth = videoWidth,
@@ -3145,6 +3147,7 @@ class CarPlayHostActivity : ComponentActivity() {
             },
             mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
             onAudioDiagnostic = { message ->
+                L7VoiceDiagnostics.store.observe(voiceOwner, message)
                 val line = formattedLogLine("g=$controllerGeneration $message", System.currentTimeMillis())
                 if (l7DebugLogs) L7DebugLog.buffer.append(line)
                 AsyncDiagnosticLog.append(diagnosticLog, "g=$controllerGeneration $message")

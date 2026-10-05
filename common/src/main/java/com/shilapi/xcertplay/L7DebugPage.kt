@@ -50,6 +50,7 @@ internal class L7DebugPage(
         }
         L7SettingsSection.add(parent, labels.text(R.string.l7_probe_modules), footer = labels.text(R.string.l7_probe_report_scope)) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_steering_title)) { onNavigate("settings-debug-steering") })
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_voice_title)) { onNavigate("settings-debug-voice") })
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_history)) { onNavigate("settings-debug-history") })
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_logs_and_reports)) { onNavigate("settings-debug-logs") })
         }
