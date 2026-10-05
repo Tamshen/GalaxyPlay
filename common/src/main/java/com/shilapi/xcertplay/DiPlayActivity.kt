@@ -91,6 +91,7 @@ class DiPlayActivity : ComponentActivity() {
     private var diagnosticSettings: L7DiagnosticSettings? = null
     private var debugPage: L7DebugPage? = null
     private var steeringDebugPage: L7SteeringDebugPage? = null
+    private var reportingTestPage: L7ReportingTestPage? = null
     private var voiceDebugPage: L7VoiceInputDebugPage? = null
     private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         voiceDebugPage?.permissionResult(granted)
@@ -275,6 +276,7 @@ class DiPlayActivity : ComponentActivity() {
     private var logView: L7LogView? = null
 
     override fun onPause() {
+        reportingTestPage?.background()
         voiceDebugPage?.background()
         channelDialog?.dismiss()
         channelDialog = null
@@ -292,6 +294,7 @@ class DiPlayActivity : ComponentActivity() {
     override fun onDestroy() {
         audioModelConfirmation.close()
         audioTemplateFiles.close()
+        reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
@@ -303,6 +306,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun render() {
         if (!L7Agreement.require(this)) return
+        reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null
         wiredSettings?.dispose(); wiredSettings = null
@@ -376,6 +380,8 @@ class DiPlayActivity : ComponentActivity() {
             "settings-debug-voice" -> voiceDebugPage = L7VoiceInputDebugPage(this, content,
                 grant = { voicePermission.launch(Manifest.permission.RECORD_AUDIO) },
                 onLogs = { page = "settings-logs"; render() })
+            "settings-debug-media", "settings-debug-navigation" -> reportingTestPage = L7ReportingTestPage(this, content,
+                if (page == "settings-debug-media") L7ReportingKind.MEDIA else L7ReportingKind.NAVIGATION) { page = "settings-logs"; render() }
             "settings-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
                 debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks) { destination ->
@@ -460,6 +466,8 @@ class DiPlayActivity : ComponentActivity() {
         "settings-debug-history" -> R.string.l7_probe_history
         "settings-debug-steering" -> R.string.l7_steering_title
         "settings-debug-voice" -> R.string.l7_voice_title
+        "settings-debug-media" -> R.string.l7_report_media_title
+        "settings-debug-navigation" -> R.string.l7_report_navigation_title
         "settings-logs" -> R.string.l7_logs_title
         "settings-about" -> R.string.about
         else -> R.string.carplay
@@ -1398,6 +1406,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun connect(wireless: Boolean, nativeHotspotPrepared: Boolean = false) {
         if (!L7Agreement.require(this)) return
+        L7ReportingTests.stop("CONNECT_REQUEST")
         if (l7Ui && audioModelConfirmation.ensure { connect(wireless, nativeHotspotPrepared) }) return
         if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
             !L7WirelessPrerequisites.ensure(this, ::choosePhone)) return
@@ -1542,6 +1551,7 @@ class DiPlayActivity : ComponentActivity() {
         diagnosticSettings?.update(exportInProgress)
         debugPage?.update()
         steeringDebugPage?.update()
+        reportingTestPage?.update()
         voiceDebugPage?.update()
         wiredSettings?.update(connectionRequestPending)
         val running = CarPlayBackgroundSession.hasSession()

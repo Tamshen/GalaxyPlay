@@ -299,3 +299,5 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 `python3 e2e/device/debug_logs_module_smoke.py` 检查独立调试／日志分类、中英文昼夜、返回父级、旧日志路由兼容、显式采集与逐项事实默认落盘；不点击上传，不清除原有报告，恢复中文和原昼夜。日志默认持久化、上传集合及清空报告保留证据由 `L7DebugLogPersistenceTest` 覆盖。
 
 车型三项回归使用 `CustomVehicleTemplatesTest`（API 29／30）核对系统初始值、三份文件隔离、已知车型自动适配、损坏与 AtomicFile 备份恢复、迟到保存拒绝和恢复默认保留。AVD 脚本 `l6_audio_model_smoke.py` 增补第三车型、中英文确认／取消、自动适配和自定义恢复；协议同意仅使用临时夹具，结束恢复原记录，不代替主动阅读／勾选契约测试。
+
+手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待及代次隔离；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用和后台关闭待确认窗口。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。

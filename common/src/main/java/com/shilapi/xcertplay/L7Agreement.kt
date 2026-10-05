@@ -46,6 +46,7 @@ internal object L7Agreement {
     fun revoke(context: Context): Boolean {
         // 先关闭内存闸门，阻止停止会话期间迟到的授权或重连回调。
         revoked = true
+        L7ReportingTests.stop("AGREEMENT_REVOKED")
         RemoteLogUpload.cancel()
         L7ProbeRunner.stop()
         return preferences(context).edit().clear().commit()

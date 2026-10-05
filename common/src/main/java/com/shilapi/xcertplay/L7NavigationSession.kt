@@ -34,6 +34,17 @@ internal class L7NavigationSession(
             if (!closed && current()) publish()
         }
     }
+    /** 仅显式调试动作使用；重新核对服务并重发已确认的当前字段，不创建自动重试循环。 */
+    fun refresh() {
+        if (closed || !current()) return
+        enqueue {
+            if (closed || !current()) return@enqueue
+            publishedRoad = null
+            pendingRoad = null
+            failures = 0
+            publish()
+        }
+    }
     private fun publish() {
         val value = latest
         if (!value.active && !started) return
