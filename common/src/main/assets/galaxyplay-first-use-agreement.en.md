@@ -8,9 +8,9 @@ Agreement version: 2026-10-06
 
 Last updated: 2026-10-06
 
-Source code: https://github.com/Tamshen/L7CarPlay
+Source code: https://github.com/Tamshen/GalaxyPlay
 
-Contact: https://github.com/Tamshen/L7CarPlay/issues
+Contact: https://github.com/Tamshen/GalaxyPlay/issues
 
 **Read this entire agreement while the vehicle is safely parked, especially the driving safety, warranty disclaimer and limitation of liability provisions. You may enter this version of the app only after reading and actively selecting the confirmation checkbox. If you do not accept, choose to exit.**
 

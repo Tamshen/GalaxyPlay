@@ -78,7 +78,7 @@ internal object L7ProbeEnvironment {
         "ENV-LIBRARIES" to { mapOf("visibleSharedLibraries" to
             context.packageManager.systemSharedLibraryNames.orEmpty().take(100).joinToString(",")) },
         "ENV-PACKAGES" to {
-            val catalog = JSONObject(context.assets.open("l7-permission-catalog.json").bufferedReader().use { it.readText() })
+            val catalog = JSONObject(context.assets.open("galaxyplay-permission-catalog.json").bufferedReader().use { it.readText() })
             val sources = catalog.getJSONArray("sources")
             val names = (0 until sources.length()).mapNotNull { index ->
                 sources.getJSONObject(index).let { if (it.isNull("package")) null else it.getString("package") }

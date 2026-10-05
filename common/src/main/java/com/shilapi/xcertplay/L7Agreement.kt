@@ -15,12 +15,12 @@ internal object L7Agreement {
     @Volatile private var revoked = false
 
     @Synchronized fun document(context: Context): String = cachedDocument ?: context.assets
-        .open("l7-first-use-agreement.md").bufferedReader().use { it.readText() }
+        .open("galaxyplay-first-use-agreement.md").bufferedReader().use { it.readText() }
         .also { cachedDocument = it }
 
     /** 英文仅切换展示译文，同意状态继续绑定同一份中文协议原文。 */
     fun displayDocument(context: Context): String = if (context.resources.configuration.locales[0].language == "en") {
-        context.assets.open("l7-first-use-agreement.en.md").bufferedReader().use { it.readText() }
+        context.assets.open("galaxyplay-first-use-agreement.en.md").bufferedReader().use { it.readText() }
     } else document(context)
 
     @Synchronized fun digest(context: Context): String = cachedDigest ?: MessageDigest.getInstance("SHA-256")

@@ -9,7 +9,7 @@ plugins {
 
 // 产品版本与上游核心来源分别维护，避免同步上游时改变 L7 的发布版本。
 val l7Version = Properties().apply {
-    load(providers.fileContents(rootProject.layout.projectDirectory.file("gradle/l7-version.properties"))
+    load(providers.fileContents(rootProject.layout.projectDirectory.file("gradle/galaxyplay-version.properties"))
         .asText.get().reader())
 }
 

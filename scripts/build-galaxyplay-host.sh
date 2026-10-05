@@ -10,13 +10,13 @@ preview=false
 preview_density=()
 usage() {
     cat <<'HELP'
-用法：bash scripts/build-l7-host.sh [--check] [--arm64|--amd64] [--preview|--restart-preview] [--density 数值]
+用法：bash scripts/build-galaxyplay-host.sh [--check] [--arm64|--amd64] [--preview|--restart-preview] [--density 数值]
   默认          仅打包；Apple Silicon 使用 ARM64，其余使用 amd64，结束后自动删除容器
   --build-only  默认模式的旧参数别名；不代表测试或 lint 通过
   --check       完整单测、lint、打包；默认使用已验证的 amd64 路径
   --arm64       原生 ARM64 JVM + 模拟 SDK 工具，复用磁盘缓存，容器用后即删
   --amd64       使用原有一次性 amd64 容器
-  --preview     复用已启动的 L7 AVD，覆盖安装并打开；不重启
+  --preview     复用已启动的 GalaxyPlay AVD，覆盖安装并打开；不重启
   --restart-preview  需要排查模拟器问题时，显式重启再预览
   --density     预览密度覆盖值（80～640）；默认 320 为预览档，非实车实测
   --help        显示帮助
@@ -59,8 +59,8 @@ if [[ "$build_arch" == auto ]]; then
 fi
 build_args=("$build_option")
 if [[ "$build_arch" == arm64 ]]; then build_args=(--arm64 "$build_option"); fi
-preview_script="$project_dir/../tools/scripts/preview-l7.sh"
-if [[ "$restart_preview" == true ]]; then preview_script="$project_dir/../tools/scripts/restart-l7.sh"; fi
+preview_script="$project_dir/../tools/scripts/preview-galaxyplay.sh"
+if [[ "$restart_preview" == true ]]; then preview_script="$project_dir/../tools/scripts/restart-galaxyplay.sh"; fi
 if [[ "$preview" == true && ! -f "$preview_script" ]]; then
     printf '错误：缺少工作区 AVD 预览脚本，无法打开 AVD。\n' >&2
     exit 1

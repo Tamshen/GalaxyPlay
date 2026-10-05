@@ -2,7 +2,7 @@
 
 GalaxyPlay 是面向银河车机的 CarPlay 接收端，当前以银河 L7 适配为主，并提供 L6 独立音频方案及车型选择，接收核心沿用 [DiPlay](https://github.com/shihabal3amri/DiPlay)。目标为 Flyme OS / Android 11、1440×1920 竖屏，最低 Android 10，包名 `com.ecarx.carplay`。
 
-支持车机原生热点无线连接与 USB 有线连接，认证来源包括应用内置、文字导入、USB CH341 和 Remote MFi。应用版本与核心基线分别维护于 [版本配置](gradle/l7-version.properties)。实车 HEVC、语音及蓝牙焦点仍有待验项，详见开发说明。
+支持车机原生热点无线连接与 USB 有线连接，认证来源包括应用内置、文字导入、USB CH341 和 Remote MFi。应用版本与核心基线分别维护于 [版本配置](gradle/galaxyplay-version.properties)。实车 HEVC、语音及蓝牙焦点仍有待验项，详见开发说明。
 
 **安装和使用前，请完整阅读下方的[首次使用须知与风险确认协议](#首次使用须知与风险确认协议)。应用内仍需主动阅读并确认，设置中可随时撤回。**
 
@@ -20,9 +20,11 @@ GalaxyPlay 由本项目维护者独立维护。包名和界面风格不代表官
 | [开发与验证](docs/开发与验证.md) | 范围、运行约束、Docker、签名、AVD、验收与上游同步 |
 | [第三方许可](docs/第三方许可.md) | 源码和资源出处、许可证 |
 
-UI 规范与离线示例位于工作区 `FlymeAutoOS/UI/l7carplay/组件示例.html`，由 FlymeAutoOS 统一维护。Android 原生组件继续位于本仓库 `common`，不依赖外部 HTML 构建。
+UI 规范与离线示例位于工作区 `衍生项目/FlymeAutoUI/galaxyplay/组件示例.html`，由 FlymeAutoUI 统一维护。Android 原生组件继续位于本仓库 `common`，不依赖外部 HTML 构建。
 
 项目开发遵循 [开发规范](AGENTS.md)，测试统一放在 [e2e](e2e/README.md)，凭据与报告处理见 [安全与隐私](SECURITY.md)，当前产品变化见 [更新记录](更新记录.md)。
+
+工作区目录为 `GalaxyPlay/`，其中 `GalaxyPlay/` 是源码仓库，`TODO/` 是独立待办仓库。源码远端为 [Tamshen/GalaxyPlay](https://github.com/Tamshen/GalaxyPlay)。
 
 ## 快速构建
 
@@ -30,11 +32,11 @@ UI 规范与离线示例位于工作区 `FlymeAutoOS/UI/l7carplay/组件示例.h
 
 ```bash
 # Apple Silicon 默认 ARM64，复用开发容器和缓存。
-bash scripts/build-l7-host.sh
+bash scripts/build-galaxyplay-host.sh
 # 打包成功后安装到 L7 AVD。
-bash scripts/build-l7-host.sh --preview
+bash scripts/build-galaxyplay-host.sh --preview
 # 完整测试、lint 与打包。
-bash scripts/build-l7-host.sh --check
+bash scripts/build-galaxyplay-host.sh --check
 ```
 
 远程日志仅手动上传至 OpenObserve，打包默认值可在根目录 `.env` 设置；配置方法见[开发说明](docs/开发与验证.md#openobserve-打包默认值)。
@@ -52,7 +54,7 @@ bash scripts/build-l7-host.sh --check
 
 感谢 carlito12345 开源分享车机适配实现；参考项目版本不代表 L7 核心升级或全部功能已合入。应用「关于」提供项目地址与参考说明；其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，也可在「关于 → 第三方许可」离线查看。
 
-<!-- 首次使用协议开始：正文同步自 common/src/main/assets/l7-first-use-agreement.md，仅调整 Markdown 排版。 -->
+<!-- 首次使用协议开始：正文同步自 common/src/main/assets/galaxyplay-first-use-agreement.md，仅调整 Markdown 排版。 -->
 
 ## 首次使用须知与风险确认协议
 
@@ -64,9 +66,9 @@ bash scripts/build-l7-host.sh --check
 
 更新日期：2026-10-06
 
-源代码地址：https://github.com/Tamshen/L7CarPlay
+源代码地址：https://github.com/Tamshen/GalaxyPlay
 
-联系方式：https://github.com/Tamshen/L7CarPlay/issues
+联系方式：https://github.com/Tamshen/GalaxyPlay/issues
 
 **请在车辆安全停稳后完整阅读本协议，特别是行车安全、无担保及责任限制条款。阅读完毕并主动勾选确认后，方可进入本版本的软件界面。如不接受，请选择退出。**
 

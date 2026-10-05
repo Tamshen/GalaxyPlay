@@ -20,7 +20,7 @@ out = root/'build/previews/openobserve'
 out.mkdir(parents=True, exist_ok=True)
 base = [args.adb, '-s', args.serial]
 prefs = 'shared_prefs/l7_remote_log.xml'
-url = 'https://logs.example/api/test/l7carplay/_json'
+url = 'https://logs.example/api/test/galaxyplay/_json'
 authorization = 'Basic ' + base64.b64encode(('test:' + str(uuid.uuid4())).encode()).decode()
 
 def adb(*parts, binary=False):

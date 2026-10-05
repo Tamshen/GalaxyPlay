@@ -1,6 +1,6 @@
 # ARM64 原生 JVM；官方 Linux SDK/NDK 工具仍通过宿主的 x86_64 模拟器执行。
 # sdk 来源由既有 amd64 Dockerfile 构建，基础镜像仍是用户指定的镜像。
-FROM --platform=linux/amd64 l7carplay-android:local AS sdk
+FROM --platform=linux/amd64 galaxyplay-android:local AS sdk
 FROM mobiledevops/android-sdk-image:latest
 
 USER root
@@ -9,7 +9,7 @@ COPY --from=sdk /opt/android-sdk-linux/ /opt/android-sdk-linux/
 COPY --from=sdk /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 COPY --from=sdk /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 
-ENV GRADLE_USER_HOME=/var/cache/l7carplay/gradle
+ENV GRADLE_USER_HOME=/var/cache/galaxyplay/gradle
 WORKDIR /workspace
 # 仅在此 Linux 混合镜像内将 NDK 的宿主工具选择映射到已有的 x86_64 预编译目录。
 # 不修改目标 ABI，也不改仓库中上游 NDK/业务源码。

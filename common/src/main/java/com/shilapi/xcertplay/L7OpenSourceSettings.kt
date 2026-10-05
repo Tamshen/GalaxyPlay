@@ -52,7 +52,7 @@ internal object L7OpenSourceSettings {
         val document = runCatching {
             fun read(path: String) = context.assets.open(path).bufferedReader().use { it.readText() }
             val noticePath = if (context.resources.configuration.locales[0].language == "en")
-                "l7-third-party-notices.en.txt" else "third-party/NOTICE.md"
+                "galaxyplay-third-party-notices.en.txt" else "third-party/NOTICE.md"
             val notice = read(noticePath)
                 .replace(Regex("(?m)^<a id=\"[^\"]+\"></a>\\s*$"), "")
                 .replace(Regex("(?m)^#+\\s+"), "")

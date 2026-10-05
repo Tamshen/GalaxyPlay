@@ -3,12 +3,12 @@ set -euo pipefail
 
 # 按脚本位置计算路径，所有 Gradle 操作只在 Docker 中执行。
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-build_image="l7carplay-android:local"
+build_image="galaxyplay-android:local"
 build_platform=linux/amd64
-cache_volume=l7carplay-gradle-amd64
+cache_volume=galaxyplay-gradle-amd64
 while [[ "${1:-}" == --arm64 || "${1:-}" == --warm ]]; do
     case "$1" in
-        --arm64) build_platform=linux/arm64; cache_volume=l7carplay-gradle-arm64 ;;
+        --arm64) build_platform=linux/arm64; cache_volume=galaxyplay-gradle-arm64 ;;
         --warm) printf '兼容 --warm：构建容器现已统一用后自动删除。\n' ;;
     esac
     shift
@@ -55,9 +55,9 @@ if [[ "$build_mode" != "image" && -f "$project_dir/local.properties" ]] &&
 fi
 
 docker_args=(--mount "type=bind,source=$project_dir,target=/workspace"
-    --mount "type=volume,source=$cache_volume,target=/var/cache/l7carplay/gradle"
+    --mount "type=volume,source=$cache_volume,target=/var/cache/galaxyplay/gradle"
     # 固定调试密钥，避免临时容器退出后重建密钥而无法覆盖安装。
-    --mount type=volume,source=l7carplay-debug-signing,target=/root/.android)
+    --mount type=volume,source=galaxyplay-debug-signing,target=/root/.android)
 needs_auth=false
 if [[ "$build_mode" == "standalone" || "$build_mode" == "check" || "$build_mode" == "release" ]]; then
     needs_auth=true
@@ -89,8 +89,8 @@ if [[ "$needs_signing" == true ]]; then
     fi
     signing_dir="$(cd "$(dirname "$ANDROID_KEYSTORE_PATH")" && pwd)"
     signing_path="$signing_dir/$(basename "$ANDROID_KEYSTORE_PATH")"
-    docker_args+=(--mount "type=bind,source=$signing_path,target=/run/l7-signing/release.jks,readonly")
-    docker_args+=(--env ANDROID_KEYSTORE_PATH=/run/l7-signing/release.jks
+    docker_args+=(--mount "type=bind,source=$signing_path,target=/run/galaxyplay-signing/release.jks,readonly")
+    docker_args+=(--env ANDROID_KEYSTORE_PATH=/run/galaxyplay-signing/release.jks
         --env ANDROID_KEYSTORE_PASSWORD --env ANDROID_KEY_ALIAS --env ANDROID_KEY_PASSWORD)
 fi
 if [[ "$needs_auth" == true ]]; then
@@ -106,27 +106,27 @@ if [[ "$needs_auth" == true ]]; then
             exit 2
         fi
     done
-    docker_args+=(--mount "type=bind,source=$auth_dir,target=/run/l7-auth,readonly")
-    docker_args+=(--env DIPLAY_AUTH_ASSETS_DIR=/run/l7-auth)
+    docker_args+=(--mount "type=bind,source=$auth_dir,target=/run/galaxyplay-auth,readonly")
+    docker_args+=(--env DIPLAY_AUTH_ASSETS_DIR=/run/galaxyplay-auth)
 fi
 
 # 镜像配方未变时复用工具链；容器生命周期与磁盘缓存分开。
 prepare_image() {
     local tag="$1" platform="$2" dockerfile="$3" recipe="$4"
     local existing
-    existing=$(docker image inspect "$tag" --format '{{index .Config.Labels "com.l7carplay.recipe"}}' 2>/dev/null || true)
+    existing=$(docker image inspect "$tag" --format '{{index .Config.Labels "com.galaxyplay.recipe"}}' 2>/dev/null || true)
     if [[ "$build_mode" == image || "$existing" != "$recipe" ]]; then
         docker build --platform "$platform" --progress plain --file "$dockerfile" \
-            --label "com.l7carplay.recipe=$recipe" --tag "$tag" "$project_dir/docker"
+            --label "com.galaxyplay.recipe=$recipe" --tag "$tag" "$project_dir/docker"
     else
         printf '复用构建镜像：%s\n' "$tag"
     fi
 }
-prepare_image l7carplay-android:local linux/amd64 "$project_dir/docker/Dockerfile" "$(cksum < "$project_dir/docker/Dockerfile")"
+prepare_image galaxyplay-android:local linux/amd64 "$project_dir/docker/Dockerfile" "$(cksum < "$project_dir/docker/Dockerfile")"
 if [[ "$build_platform" == linux/arm64 ]]; then
-    sdk_image_id=$(docker image inspect l7carplay-android:local --format '{{.Id}}')
+    sdk_image_id=$(docker image inspect galaxyplay-android:local --format '{{.Id}}')
     arm_recipe=$({ cat "$project_dir/docker/Dockerfile.arm64"; printf '%s' "$sdk_image_id"; } | cksum)
-    build_image=l7carplay-android:arm64
+    build_image=galaxyplay-android:arm64
     prepare_image "$build_image" "$build_platform" "$project_dir/docker/Dockerfile.arm64" "$arm_recipe"
 fi
 docker image inspect "$build_image" --format '构建镜像：{{.Id}}，平台：{{.Os}}/{{.Architecture}}'
@@ -159,7 +159,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 printf '使用一次性构建容器，结束后自动停止并删除。\n'
 set +e
-docker "${log_run_args[@]}" --cidfile "$cid_file" --label com.l7carplay.build=true \
+docker "${log_run_args[@]}" --cidfile "$cid_file" --label com.galaxyplay.build=true \
     "${docker_args[@]}" "$build_image" "${gradle_command[@]}"
 build_status=$?
 set -e

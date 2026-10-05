@@ -88,7 +88,7 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 `L7ReportingProbeTest` 检查专项候选权限与 SDK 查询不推断业务支持、未知定义与未声明分别保留、SDK 不初始化及依赖缺失处理、Android 媒体服务业务待验和证据导出；Runner 覆盖专项单项复查不启动全量扫描、不上传。
 
-在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、系统媒体显示待验提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
+在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、系统媒体显示待验提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/GalaxyPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
 `L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 隐藏细节、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
 
@@ -220,7 +220,7 @@ AVD 可验证界面、授权与生命周期；真实 iPhone、USB 模块、远�
 
 ```bash
 docker run --rm --platform linux/arm64 --mount "type=bind,source=$PWD,target=/workspace" \
-  l7carplay-android:arm64 sh -c '
+  galaxyplay-android:arm64 sh -c '
   mkdir -p /workspace/build/e2e/list-feedback/classes
   javac --release 8 -cp /opt/android-sdk-linux/platforms/android-37.0/android.jar \
     -d /workspace/build/e2e/list-feedback/classes /workspace/e2e/device/PointerInput.java

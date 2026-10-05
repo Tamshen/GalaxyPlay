@@ -4,8 +4,9 @@
 维护者：Tamshen  
 协议版本：2026-10-06
 更新日期：2026-10-06
-源代码地址：https://github.com/Tamshen/L7CarPlay  
-联系方式：https://github.com/Tamshen/L7CarPlay/issues
+源代码地址：https://github.com/Tamshen/GalaxyPlay
+
+联系方式：https://github.com/Tamshen/GalaxyPlay/issues
 
 **请在车辆安全停稳后完整阅读本协议，特别是行车安全、无担保及责任限制条款。阅读完毕并主动勾选确认后，方可进入本版本的软件界面。如不接受，请选择退出。**
 

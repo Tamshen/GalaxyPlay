@@ -55,9 +55,9 @@ class DiagnosticExportStoreTest {
     }
 
     @Test fun structuredReportUsesJsonMimeAndProductDirectory() {
-        DiagnosticExportStore.saveToDownloads(resolver, "test.json", "{\"schemaVersion\":1}", "application/json", "L7CarPlay")
+        DiagnosticExportStore.saveToDownloads(resolver, "test.json", "{\"schemaVersion\":1}", "application/json", "GalaxyPlay")
         assertEquals("application/json", provider.insertValues!!.getAsString(MediaStore.Downloads.MIME_TYPE))
-        assertEquals("Download/L7CarPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
+        assertEquals("Download/GalaxyPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
         assertEquals(provider.file.readText(), provider.contentAtPublish)
     }
 
