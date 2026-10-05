@@ -10,19 +10,29 @@ internal class L7SteeringDebugPage(private val activity: Activity, parent: Linea
     private val store = L7SteeringDiagnostics.store
     private val status: L7SettingRow
     private val states: L7SettingRow
+    private val vehicle: L7SettingRow
     private val records: L7SettingsCard
     private var revision = -1L
 
     init {
         lateinit var statusRow: L7SettingRow
         lateinit var statesRow: L7SettingRow
+        lateinit var vehicleRow: L7SettingRow
         L7SettingsSection.add(parent, text(R.string.l7_steering_status), footer = text(R.string.l7_steering_hint)) { card ->
             statusRow = L7SettingRow(activity, text(R.string.l7_steering_session)).also(card::addView)
             statesRow = L7SettingRow(activity, text(R.string.l7_steering_chain)).also(card::addView)
+            vehicleRow = L7SettingRow(activity, text(R.string.l7_steering_vehicle)).also(card::addView)
         }
         status = statusRow
         states = statesRow
+        vehicle = vehicleRow
         L7SettingsSection.add(parent, text(R.string.l7_steering_markers)) { card ->
+            card.addView(L7Components.actionRow(activity, text(R.string.l7_steering_test_key), text(R.string.l7_steering_test_key_hint)) {
+                L7Dialogs.builder(activity).setTitle(R.string.l7_steering_test_key)
+                    .setItems(activity.resources.getStringArray(R.array.l7_steering_test_keys)) { dialog, index ->
+                        mark("TEST_KEY_${TEST_KEYS[index]}"); dialog.dismiss()
+                    }.setNegativeButton(R.string.cancel, null).show()
+            })
             card.addView(L7Components.actionRow(activity, text(R.string.l7_steering_mark_failed)) { mark("USER_FAILURE") })
             card.addView(L7Components.actionRow(activity, text(R.string.l7_steering_mark_ok)) { mark("USER_SUCCESS") })
             card.addView(L7Components.actionRow(activity, text(R.string.l7_steering_logs)) { onLogs() })
@@ -37,6 +47,9 @@ internal class L7SteeringDebugPage(private val activity: Activity, parent: Linea
     private fun mark(reason: String) { L7SteeringDiagnostics.begin("manual-marker", -1).step("MARK", reason); update() }
 
     fun update() {
+        val model = L7AudioTemplates.model(activity)
+        vehicle.setValue(L7AudioModelConfirmation.name(activity, model) + "\n" + text(
+            if (model == L7AudioTemplates.Model.L7) R.string.l7_steering_l7_capture else R.string.l7_steering_other_capture))
         val snapshot = store.snapshot()
         status.setValue(activity.getString(if (snapshot.connected) R.string.l7_steering_connected else R.string.l7_steering_disconnected,
             snapshot.generation))
@@ -57,4 +70,8 @@ internal class L7SteeringDebugPage(private val activity: Activity, parent: Linea
     }
 
     private fun text(id: Int) = activity.getString(id)
+
+    companion object {
+        private val TEST_KEYS = listOf("LEFT", "RIGHT", "PLAY_PAUSE", "VOICE_SHORT", "VOICE_LONG", "VOLUME_UP", "VOLUME_DOWN", "OTHER")
+    }
 }
