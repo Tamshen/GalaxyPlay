@@ -15,9 +15,17 @@ class L7NavigationSessionTest {
         val calls = mutableListOf<String>()
         var failInitialize = false
         var available = true
+        var token: Any = android.os.Binder()
+        var duringConnection: () -> Unit = {}
+        var connectionFailure: Throwable? = null
         var failRoad = false
         var failStart = false
         override fun ready() = available
+        override fun connectionToken(): Any? {
+            duringConnection()
+            connectionFailure?.let { throw it }
+            return token.takeIf { available }
+        }
         var failStop = false
         var duringStart: () -> Unit = {}
         override fun initialize() { calls += "init"; if (failInitialize) throw ClassNotFoundException() }
@@ -51,6 +59,48 @@ class L7NavigationSessionTest {
         assertFalse(port.calls.contains("stop"))
         port.available = true; session.update(CarPlayNavigationSnapshot()); drain()
         assertEquals("stop", port.calls.last())
+    }
+    @Test fun liveBinderReplacementReplaysStartAndUnchangedRoadWithoutAnObservedOutage() {
+        session.update(route()); drain()
+        port.token = android.os.Binder()
+        session.update(route()); drain()
+        assertEquals(listOf("init", "start", "road:private-road", "start", "road:private-road"), port.calls)
+        session.update(route()); drain()
+        assertEquals(5, port.calls.size)
+        assertTrue(logs.any { "stage=serviceConnection result=REPLACED" in it })
+        assertFalse(logs.any { "private-road" in it || port.token.toString() in it })
+    }
+    @Test fun liveBinderReplacementResetsExhaustedRoadRetries() {
+        port.failRoad = true; repeat(5) { session.update(route()); drain() }
+        assertEquals(3, port.calls.count { it.startsWith("road:") })
+        port.token = android.os.Binder(); port.failRoad = false
+        session.update(route()); drain()
+        assertEquals(2, port.calls.count { it == "start" })
+        assertEquals(4, port.calls.count { it.startsWith("road:") })
+    }
+    @Test fun liveBinderReplacementStillStopsPendingCancellationWithoutStartingNavigation() {
+        session.update(route()); drain(); port.token = android.os.Binder()
+        session.update(CarPlayNavigationSnapshot()); drain()
+        assertEquals(listOf("init", "start", "road:private-road", "stop"), port.calls)
+    }
+    @Test fun binderReplacementPublishesLatestQueuedRouteOnly() {
+        session.update(route()); drain(); port.token = android.os.Binder()
+        session.update(route("discarded-road")); session.update(route("latest-road")); drain()
+        assertEquals("road:latest-road", port.calls.last())
+        assertFalse(port.calls.contains("road:discarded-road"))
+    }
+    @Test fun lostOwnerWhileReadingBinderCannotPublish() {
+        port.duringConnection = { current = false }
+        session.update(route()); drain()
+        assertEquals(listOf("init"), port.calls)
+    }
+    @Test fun linkageFailureWhileReadingBinderDoesNotKillRecovery() {
+        port.connectionFailure = NoClassDefFoundError()
+        session.update(route()); drain()
+        assertEquals(listOf("init"), port.calls)
+        port.connectionFailure = null; session.update(route()); drain()
+        assertEquals(listOf("init", "start", "road:private-road"), port.calls)
+        assertTrue(logs.any { "stage=serviceReady exceptionType=NoClassDefFoundError" in it })
     }
     @Test fun roadFailureDoesNotCacheNameAndRepeatedFailureIsBounded() {
         port.failRoad = true; repeat(10) { session.update(route()); drain() }
