@@ -59,6 +59,7 @@ class AndroidMediaSink(
     private val callProcessingEnabled: Boolean = true,
     enableL7AudioProfile: Boolean = false,
     private val wirelessAudio: Boolean = false,
+    private val audioRoutingTemplate: AudioRoutingTemplate? = null,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -80,7 +81,7 @@ class AndroidMediaSink(
     )
     private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
     private val audioRouting = if (appContext != null)
-        L7AudioRouting(appContext, enableL7AudioRouting, onAudioDiagnostic) else null
+        L7AudioRouting(appContext, audioRoutingTemplate?.preferBus ?: enableL7AudioRouting, audioRoutingTemplate, onAudioDiagnostic) else null
     private val screenStateLock = Any()
     private val videoLifecycleLock = Any()
     @Volatile private var closed = false
@@ -335,11 +336,11 @@ class AndroidMediaSink(
         existing?.close()
         return AudioRenderer(
             format,
-            advancedAudioChannelMapping,
+            if (audioRoutingTemplate != null) true else advancedAudioChannelMapping,
             audioFocusEnabled,
-            mediaChannel,
-            navigationChannel,
-            assistantChannel,
+            audioRoutingTemplate?.choice(AudioOutputRole.MEDIA) ?: mediaChannel,
+            audioRoutingTemplate?.choice(AudioOutputRole.NAVIGATION) ?: navigationChannel,
+            audioRoutingTemplate?.choice(AudioOutputRole.ASSISTANT) ?: assistantChannel,
             audioFocusCoordinator,
             audioRouting,
             factoryAudio,

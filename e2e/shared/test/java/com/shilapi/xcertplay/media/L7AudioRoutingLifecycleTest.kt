@@ -61,6 +61,17 @@ class L7AudioRoutingLifecycleTest {
         assertEquals(1, siri.removals)
     }
 
+    @Test fun explicitBusStillLeavesMicrophoneAndLegacyStreamsToSystem() {
+        val router = L7AudioRouting(null, preferBus = true) {}
+        val microphone = RouteProbe()
+        val legacy = RouteProbe()
+        router.bind(microphone.routing, AudioChannel.PHONE, true, 16_000, 1)
+        router.bind(legacy.routing, AudioChannel.NAVIGATION, false, 48_000, 1, useBus = false)
+        assertEquals(0, microphone.preferredCalls)
+        assertEquals(0, legacy.preferredCalls)
+        router.close()
+    }
+
     @Test fun sessionCloseReleasesAllListenersAndRejectsNewBindings() {
         val first = RouteProbe()
         val second = RouteProbe()

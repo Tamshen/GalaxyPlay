@@ -10,34 +10,16 @@ internal data class L7AudioDevice(
 )
 
 internal object L7AudioRoutePolicy {
-    fun candidate(channel: AudioChannel, input: Boolean, sampleRate: Int): String? = when (channel) {
-        AudioChannel.MEDIA -> if (input) null else "BUS00_MEDIA"
-        AudioChannel.ASSISTANT -> if (input) "BUS20_CARPLAY_SIRI_UL" else null
-        AudioChannel.PHONE -> {
-            val band = when (sampleRate) {
-                8_000 -> "NB"
-                16_000 -> "WB"
-                32_000 -> "SWB"
-                48_000 -> "FB"
-                // 不仅凭采样率猜测 FaceTime，未确认的格式交给系统策略。
-                else -> null
-            }
-            val prefix = when (band) {
-                "NB" -> if (input) "BUS07" else "BUS06"
-                "WB" -> if (input) "BUS11" else "BUS10"
-                "SWB" -> if (input) "BUS13" else "BUS12"
-                "FB" -> if (input) "BUS15" else "BUS14"
-                else -> null
-            }
-            if (prefix == null) null else "${prefix}_CARPLAY_TELE_${band}_${if (input) "UP" else "DL"}"
-        }
-        // 原厂集成分支没有给导航/Siri 输出填入通知 BUS，保持标准 usage 路由。
-        AudioChannel.NAVIGATION, AudioChannel.RINGTONE -> null
-    }
+    fun knownBus(address: String): Boolean = address in setOf(
+        "bus0_media_out", "bus1_navigation_out", "bus2_voice_command_out", "bus3_call_ring_out", "bus4_call_out",
+    )
+
+    fun candidate(channel: AudioChannel, input: Boolean, sampleRate: Int,
+                  template: AudioRoutingTemplate? = null): String? = template?.bus(channel, input)
 
     fun select(devices: List<L7AudioDevice>, channel: AudioChannel, input: Boolean,
-               sampleRate: Int, channels: Int): L7AudioDevice? {
-        val address = candidate(channel, input, sampleRate) ?: return null
+               sampleRate: Int, channels: Int, template: AudioRoutingTemplate? = null): L7AudioDevice? {
+        val address = candidate(channel, input, sampleRate, template) ?: return null
         val matches = devices.filter {
             it.input == input && it.id > 0 && it.address.trim().equals(address, ignoreCase = true) &&
                 (it.sampleRates.isEmpty() || sampleRate in it.sampleRates) &&

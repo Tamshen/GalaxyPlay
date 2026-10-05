@@ -84,7 +84,7 @@ e2e/
 
 在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、QNX 未确认提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
-`L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查升级后的导航 usage 12、电话 usage 2、焦点与高级映射默认值、试听及取消不保存；不连接手机、不上传，截图留在忽略目录。
+`L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 隐藏细节、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
 
 ## 启动崩溃保护
 
@@ -148,7 +148,7 @@ e2e/
 
 [L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例在 API 29/30 观察实际 AudioTrack 音量，核对博越助手和导航临时焦点及实际音量。
 
-设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖用途路由默认值、一次迁移后保留手动选择与恢复范围；`L7AudioSettingsTest` 检查恢复前确认、取消不保存及界面刷新。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
+设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖用途路由默认值、一次迁移后保留手动选择与恢复范围；`L7AudioSettingsTest` 检查内置方案收起技术参数、自定义展开、确认刷新及取消不保存；`L7AudioTemplatesTest` 与 shared 的 `AudioRoutingTemplateTest` 检查文件校验、旧配置迁移、模板隔离和损坏回退。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
 
 全部 Android 编译和测试在 `mobiledevops/android-sdk-image:latest` 的 Docker 工具链内执行；完整测试默认采用 `linux/amd64`。Apple Silicon 调试的 ARM64 混合构建入口见 [构建说明](../docs/开发与验证.md)，不将调试打包成功写成完整测试通过。在仓库根目录运行：
 

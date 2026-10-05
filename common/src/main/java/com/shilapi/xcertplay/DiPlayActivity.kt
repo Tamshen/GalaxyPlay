@@ -94,6 +94,9 @@ class DiPlayActivity : ComponentActivity() {
     private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         voiceDebugPage?.permissionResult(granted)
     }
+    private val audioTemplateFiles = L7AudioTemplateFiles(this) {
+        if (page == "settings-audio") render()
+    }
     private val probeState = L7ProbeUiState()
     private val debugTasks by lazy { L7DebugTasks(this) {
         probeState.showCurrent(); page = "settings-debug-results"; render()
@@ -157,6 +160,7 @@ class DiPlayActivity : ComponentActivity() {
         probeState.query = savedInstanceState?.getString("probe_query").orEmpty()
         probeState.selectedReport = savedInstanceState?.getString("probe_selected_report")
         probeExporter.pendingId = savedInstanceState?.getString("probe_export_id")
+        audioTemplateFiles.restore(savedInstanceState)
         if (l7Ui) L7DebugLog.record("L7CarPlay 打开 version=${version()} Android=${Build.VERSION.RELEASE}")
         languagePreferenceAtCreate = AppLocale.preference(this)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
@@ -208,6 +212,7 @@ class DiPlayActivity : ComponentActivity() {
         outState.putString("probe_query", probeState.query)
         outState.putString("probe_selected_report", probeState.selectedReport)
         outState.putString("probe_export_id", probeExporter.pendingId)
+        audioTemplateFiles.save(outState)
         super.onSaveInstanceState(outState)
     }
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -276,6 +281,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        audioTemplateFiles.close()
         voiceDebugPage?.close(); voiceDebugPage = null
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
@@ -623,7 +629,7 @@ class DiPlayActivity : ComponentActivity() {
             return
         }
         if (l7Ui && page == "settings-audio") {
-            L7AudioSettings.page(this, content) { title, current, role, save ->
+            L7AudioSettings.page(this, content, audioTemplateFiles::importFile, audioTemplateFiles::exportFile) { title, current, role, save ->
                 channelDialog?.dismiss()
                 channelDialog = L7AudioRouteDialog.show(this, title, current, role, save)
             }

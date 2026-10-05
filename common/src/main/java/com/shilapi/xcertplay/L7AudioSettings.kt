@@ -6,27 +6,64 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AudioOutputPolicy
 import com.shilapi.xcertplay.media.AudioOutputRole
 
-/** 三用途均独立保存；读取旧媒体/导航键，新增助手默认值不覆盖已有选择。 */
+/** 内置方案只显示日常设置；自定义方案才展开配置文件与三用途调试。 */
 internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
+             onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null,
              open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
         fun text(id: Int) = context.getString(id)
-        L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
+        val mode = L7AudioTemplates.mode(context)
+        val custom = mode == L7AudioTemplates.Mode.CUSTOM
+        fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, open) }
+        val names = listOf(text(R.string.l7_template_l7), text(R.string.l7_template_bus), text(R.string.l7_template_custom))
+        val summary = when (mode) {
+            L7AudioTemplates.Mode.L7 -> R.string.l7_template_l7_note
+            L7AudioTemplates.Mode.BUS -> R.string.l7_template_bus_note
+            L7AudioTemplates.Mode.CUSTOM -> if (L7AudioTemplates.customInvalid(context))
+                R.string.l7_template_recovery else R.string.l7_template_custom_note
+        }
+        L7SettingsSection.add(parent, text(R.string.l7_template_title),
+            description = text(summary), footer = text(R.string.l7_setting_apply_hint)) { card ->
+            card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[mode.ordinal]) {
+                L7Components.select(context, text(R.string.l7_template_select), names, mode.ordinal,
+                    text(R.string.l7_save_next_connection)) { selected ->
+                    change(context) { L7AudioTemplates.select(context, L7AudioTemplates.Mode.entries[selected]); refresh() }
+                }
+            })
+            if (custom) {
+                card.addView(L7Components.actionRow(context, text(R.string.l7_template_edit),
+                    text(R.string.l7_template_file_note)) { L7AudioTemplateEditor.show(context, ::refresh) })
+                onImport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_import),
+                    text(R.string.l7_template_import_note), click = it)) }
+                onExport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_export),
+                    text(R.string.l7_template_export_note), click = it)) }
+            }
+            card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
+                text(R.string.l7_template_restore_note)) {
+                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
+                    .setMessage(R.string.l7_template_restore_confirm)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
+                        change(context) {
+                            AirPlayPersistence.restoreUsageAudioDefaults(context)
+                            L7AudioTemplates.select(context, L7AudioTemplates.Mode.L7)
+                            refresh()
+                        }
+                    }.show()
+            })
+        }
+        if (custom) L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
             description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
-            add(context, card, open)
+            add(context, card, custom = true, open = open)
             card.addView(L7SettingRow(context, text(R.string.l7_audio_phone), text(R.string.l7_audio_phone_note)).apply {
                 setValue(text(R.string.l7_audio_phone_usage))
             })
-            card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
-                text(R.string.l7_audio_restore_hint)) {
-                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
-                    .setMessage(R.string.l7_audio_restore_confirm)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
-                        AirPlayPersistence.restoreUsageAudioDefaults(context)
-                        parent.removeAllViews()
-                        page(context, parent, open)
-                    }.show()
+            card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
+                text(R.string.l7_template_bus_custom_note), L7AudioTemplates.load(context).preferBus) {
+                change(context) {
+                    L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withBusEnabled(it))
+                }
+                refresh()
             })
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = text(R.string.l7_setting_apply_hint)) { card ->
@@ -44,23 +81,13 @@ internal object L7AudioSettings {
                 text(R.string.l7_call_processing_note), AirPlayPersistence.loadCallProcessingEnabled(context)) {
                 AirPlayPersistence.saveCallProcessingEnabled(context, it)
             })
-            card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
-                text(R.string.l7_audio_bus_note), AirPlayPersistence.loadL7AudioBusEnabled(context)) {
-                AirPlayPersistence.saveL7AudioBusEnabled(context, it)
-            })
-            if (context.resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)) {
-                card.addView(L7Components.switchRow(context, text(R.string.advanced_audio_channel_mapping),
-                    text(R.string.use_usage_content_type_routing_instead_of_stream_type),
-                    AirPlayPersistence.loadAdvancedAudioChannelMapping(context)) {
-                    AirPlayPersistence.saveAdvancedAudioChannelMapping(context, it)
-                })
-            }
+
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it) }
     }
 
     fun add(context: Context, parent: LinearLayout,
-            open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
+            custom: Boolean = false, open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
         listOf(AudioOutputRole.MEDIA, AudioOutputRole.NAVIGATION, AudioOutputRole.ASSISTANT).forEach { role ->
             val title = context.getString(when (role) {
                 AudioOutputRole.MEDIA -> R.string.l7_audio_media
@@ -68,10 +95,13 @@ internal object L7AudioSettings {
                 AudioOutputRole.NAVIGATION -> R.string.l7_audio_navigation
             })
             lateinit var row: L7SettingRow
-            row = L7Components.valueRow(context, title, label(context, load(context, role))) {
-                open(title, load(context, role), role) { value ->
-                    save(context, role, value)
-                    row.setValue(label(context, value))
+            row = L7Components.valueRow(context, title, label(context, load(context, role, custom))) {
+                open(title, load(context, role, custom), role) { value ->
+                    change(context) {
+                        if (custom) L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(role, value))
+                        else save(context, role, value)
+                        row.setValue(label(context, value))
+                    }
                 }
             }
             parent.addView(row)
@@ -81,10 +111,16 @@ internal object L7AudioSettings {
     fun label(context: Context, value: Int): String = context.resources.getStringArray(R.array.l7_audio_stream_names)
         .get(AudioOutputPolicy.choices.indexOf(value).coerceAtLeast(0))
 
-    private fun load(context: Context, role: AudioOutputRole): Int = when (role) {
+    private fun load(context: Context, role: AudioOutputRole, custom: Boolean): Int =
+        if (custom) L7AudioTemplates.load(context).choice(role) else when (role) {
         AudioOutputRole.MEDIA -> AirPlayPersistence.loadMediaAudioChannel(context)
         AudioOutputRole.ASSISTANT -> AirPlayPersistence.loadAssistantAudioChannel(context)
         AudioOutputRole.NAVIGATION -> AirPlayPersistence.loadNavigationAudioChannel(context)
+    }
+
+    private fun change(context: Context, action: () -> Unit) {
+        if (runCatching(action).isFailure)
+            android.widget.Toast.makeText(context, R.string.l7_template_save_failed, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private fun save(context: Context, role: AudioOutputRole, value: Int) = when (role) {
