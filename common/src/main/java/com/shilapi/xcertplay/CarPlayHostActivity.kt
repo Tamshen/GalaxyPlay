@@ -4068,6 +4068,7 @@ internal object CarPlayBackgroundSession {
     private var owner: Any? = null
     @Synchronized fun isOwner(candidate: Any): Boolean = owner === candidate
     @Synchronized fun hasSession(): Boolean = stopAction != null || stopping
+    @Synchronized fun isStopping(): Boolean = stopping
     private val stopWaiters = mutableListOf<() -> Unit>()
 
     fun stop(completion: () -> Unit = {}) {

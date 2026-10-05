@@ -5,6 +5,10 @@
     <string name="l7_connection_wireless_hint">3 steps: enable the native hotspot → check credentials → connect iPhone.</string>
     <string name="l7_connection_usb_hint">3 steps: use a USB data port → allow USB access → allow CarPlay on iPhone.</string>
     <string name="l7_connection_back">Back to connection methods</string>
+    <string name="l7_reconnect_current">Reconnect current connection</string>
+    <string name="l7_reconnect_current_hint">Restart the current wireless or USB connection when controls, audio or video stop responding.</string>
+    <string name="l7_reconnect_no_session">No session is available to reconnect. Choose a connection method first.</string>
+    <string name="l7_reconnect_ready">Uses the current connection method. Progress follows the actual session status.</string>
     <string name="l7_wireless_steps">Wireless connection · 3 steps</string>
     <string name="l7_wireless_step1">1 · Enable the Android native hotspot</string>
     <string name="l7_wireless_step2">2 · Check the hotspot name and password</string>

@@ -155,6 +155,9 @@ class CarPlayController(
     private val locationProvider: Iap2LocationProvider? = null,
     private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
 ) : Closeable {
+    /** 重连沿用当前控制器的实际传输方式，不使用可能已被修改的设置草稿。 */
+    val transport: CarPlayTransport get() = config.transport
+
     init {
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
