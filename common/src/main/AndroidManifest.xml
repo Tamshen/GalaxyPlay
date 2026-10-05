@@ -36,7 +36,7 @@
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <application>
-        <provider android:name="androidx.core.content.FileProvider"
+        <provider android:name="com.shilapi.xcertplay.L7MediaArtworkProvider"
             android:authorities="${applicationId}.media-artwork"
             android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"

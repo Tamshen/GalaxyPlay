@@ -51,7 +51,19 @@ internal object CarPlayMediaKeys {
             synchronized(this) { if (controller === next) { L7SteeringDiagnostics.store.state("phonePlayback", "playing=$playing"); bridge?.onIphonePlaying(playing) } }
         }
         next.nowPlayingListener = { update ->
-            synchronized(this) { if (controller === next) { if (update.playbackKnown) L7SteeringDiagnostics.store.state("phonePlayback", "playing=${update.playing}"); bridge?.onNowPlayingChanged(update); mediaInfo = update; if (update == com.shilapi.xcertplay.media.CarPlayNowPlaying()) pendingArtwork = null; mediaCenter?.update(update); covers?.select(update.artworkTransferId) } }
+            synchronized(this) {
+                if (controller === next) {
+                    if (update.playbackKnown) L7SteeringDiagnostics.store.state("phonePlayback", "playing=${update.playing}")
+                    bridge?.onNowPlayingChanged(update)
+                    mediaInfo = update
+                    if (update == com.shilapi.xcertplay.media.CarPlayNowPlaying()) {
+                        pendingArtwork = null
+                        covers?.reset()
+                    }
+                    // 选定封面后只发布一次快照，后台不能读到新曲目与旧 URI 的组合。
+                    covers?.select(update.artworkTransferId) ?: mediaCenter?.update(update, null)
+                }
+            }
         }
         next.artworkListener = { id, bytes ->
             synchronized(this) { if (controller === next) {
@@ -105,8 +117,10 @@ internal object CarPlayMediaKeys {
                 }
             }.also { handler.post(it) }
             lateinit var coverOwner: L7MediaArtwork
-            coverOwner = L7MediaArtwork(context) { uri -> synchronized(this) {
-                if (controller === next && covers === coverOwner) mediaCenter?.update(mediaInfo, uri)
+            coverOwner = L7MediaArtwork(context) { _ -> synchronized(this) {
+                // 解码通知等待宿主锁期间可能已经切歌，重新取当前选择，不能复用通知里的旧 URI。
+                if (controller === next && covers === coverOwner)
+                    mediaCenter?.update(mediaInfo, coverOwner.selectedUri(mediaInfo.artworkTransferId))
             } }
             covers = coverOwner
             pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
