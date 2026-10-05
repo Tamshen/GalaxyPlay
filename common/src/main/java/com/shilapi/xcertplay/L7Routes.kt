@@ -2,7 +2,7 @@ package com.shilapi.xcertplay
 
 /** 详细功能统一归属设置，旧入口仍可跳转到对应分类。 */
 internal object L7Routes {
-    val settings = setOf("settings", "settings-auth", "settings-connection", "settings-display",
+    val settings = setOf("settings", "settings-vehicle", "settings-auth", "settings-connection", "settings-display",
         "settings-audio", "settings-general", "settings-permissions",
         "settings-about", "settings-debug", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-steering", "settings-debug-voice",
         "settings-connection-wireless", "settings-connection-usb")

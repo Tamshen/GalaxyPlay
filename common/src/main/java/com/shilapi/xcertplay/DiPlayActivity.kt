@@ -251,7 +251,7 @@ class DiPlayActivity : ComponentActivity() {
             render()
         }
         if (!l7Ui || !audioModelConfirmation.ensure {
-            if (page == "settings-audio") render()
+            if (page == "settings-audio" || page == "settings-vehicle") render()
             startAutomaticallyIfNeeded()
         }) startAutomaticallyIfNeeded()
         L7StartupGuard.showNotice(this, ::showDebugLogs)
@@ -366,6 +366,7 @@ class DiPlayActivity : ComponentActivity() {
         }
         when (page) {
             "settings" -> settingsL7(content)
+            "settings-vehicle" -> L7VehicleSettings.page(this, content)
             "settings-connection" -> connectionChoicesL7(content)
             "settings-connection-wireless" -> connectionSettingsL7(content)
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
@@ -444,6 +445,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun pageTitle(): String = getString(when (page) {
         "connection" -> R.string.connection_setup
+        "settings-vehicle" -> R.string.l7_vehicle_settings
         "settings-auth" -> R.string.l7_auth_title
         "settings-connection" -> R.string.connection_setup
         "settings-connection-wireless" -> R.string.l7_start_wireless
@@ -465,6 +467,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun settingsL7(content: LinearLayout) {
         val entries = listOf(
+            Triple("settings-vehicle", R.string.l7_vehicle_settings, R.drawable.ic_l7_vehicle),
             Triple("settings-auth", R.string.l7_auth_title, R.drawable.ic_l7_lock),
             Triple("settings-connection", R.string.connection_setup, R.drawable.ic_l7_hotspot),
             Triple("settings-display", R.string.display_and_performance, R.drawable.ic_dp_display),
@@ -475,7 +478,7 @@ class DiPlayActivity : ComponentActivity() {
             Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
-        val hints = listOf(R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
+        val hints = listOf(R.string.l7_vehicle_row_hint, R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
             R.string.l7_display_row_hint, R.string.l7_audio_row_hint, R.string.l7_general_row_hint,
             R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_logs_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {

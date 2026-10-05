@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仅在 AVD 检查两车型音频页与取消契约，结束恢复原偏好／文件／昼夜；不连接手机。"""
+"""仅在 AVD 检查首页车型入口、独立车型页、两车型音频页与取消契约，结束恢复原偏好／文件／昼夜；不连接手机。"""
 import argparse
 from pathlib import Path
 import re
@@ -53,7 +53,7 @@ def tap(label):
         root = nodes()
         parents = {child: parent for parent in root.iter() for child in parent}
         for node in root.iter('node'):
-            if node.get('text') != label:
+            if node.get('text') != label and node.get('content-desc') != label:
                 continue
             while node.get('clickable') != 'true' and node.get('checkable') != 'true' and node in parents:
                 node = parents[node]
@@ -67,9 +67,9 @@ def tap(label):
     raise AssertionError('入口不可达：' + label)
 
 
-def launch():
+def launch(page="settings-vehicle"):
     adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity',
-        '--es', 'page', 'settings-audio')
+        '--es', 'page', page)
 
 
 def screenshot(name):
@@ -83,14 +83,14 @@ original = {path: read(path) for path in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
     'zh': ('车型', '银河 L6', '银河 L7', '当前方案', 'L6 配置', 'L7 配置',
-           '自定义模板', '保存，下次连接生效', '取消', '编辑配置文件', '自动识别车型'),
+           '自定义模板', '保存，下次连接生效', '取消', '编辑配置文件', '自动识别车型', '车型设置', 'CarPlay 认证', '返回设置'),
     'en': ('Vehicle model', 'Galaxy L6', 'Galaxy L7', 'Current profile', 'L6 profile', 'L7 profile',
-           'Custom template', 'Save for next connection', 'Cancel', 'Edit configuration file', 'Detect vehicle model'),
+           'Custom template', 'Save for next connection', 'Cancel', 'Edit configuration file', 'Detect vehicle model', 'Vehicle settings', 'CarPlay authentication', 'Back to settings'),
 }
 
 try:
     for language, names in labels.items():
-        model, l6, l7, profile, l6_profile, l7_profile, custom, save, cancel, edit, detect = names
+        model, l6, l7, profile, l6_profile, l7_profile, custom, save, cancel, edit, detect, category, auth, back = names
         adb('shell', 'am', 'force-stop', package)
         root = ET.fromstring(original['shared_prefs/diplay.xml'] or b'<map/>')
         for child in list(root):
@@ -101,15 +101,27 @@ try:
         write('shared_prefs/diplay.xml', ET.tostring(root, encoding='utf-8', xml_declaration=True))
         write('shared_prefs/l7_audio_templates.xml', b'<map><string name="model">l7</string><string name="mode">l7</string></map>')
         adb('shell', 'cmd', 'uimode', 'night', 'no')
-        launch()
-        assert l7_profile in visible() and detect in visible()
+        launch("settings")
+        entries = {n.get('text'): n for n in nodes().iter('node') if n.get('text') in (category, auth)}
+        assert len(entries) == 2, '首页首项或认证入口不可见'
+        assert int(re.findall(r'\d+', entries[category].get('bounds'))[1]) < int(re.findall(r'\d+', entries[auth].get('bounds'))[1]), '车型设置不是首项'
+        screenshot(language + '-settings-day.png')
+        tap(category)
+        assert model in visible() and detect in visible() and profile not in visible()
+        screenshot(language + '-vehicle-day.png')
+        tap(back)
+        assert category in visible()
+        tap(category)
         before = read('shared_prefs/l7_audio_templates.xml')
         tap(model); tap(l6); tap(cancel)
         assert before == read('shared_prefs/l7_audio_templates.xml')
         tap(model); tap(l6)
         screenshot(language + '-model-confirm.png')
         tap(save)
+        assert l6 in visible() and profile not in visible()
+        launch("settings-audio")
         assert l6_profile in visible() and edit not in visible()
+        assert model not in visible() and detect not in visible()
         screenshot(language + '-l6-day.png')
         tap(profile)
         choices = visible()
@@ -119,17 +131,25 @@ try:
         adb('shell', 'am', 'force-stop', package)
         launch()
         time.sleep(.5)
+        screenshot(language + '-vehicle-night.png')
+        tap(back)
+        screenshot(language + '-settings-night.png')
+        launch("settings-audio")
         screenshot(language + '-l6-night.png')
         tap(profile); tap(custom); tap(save)
         previous = read('files/audio-template-l6.json')
         tap(edit); tap(cancel)
         assert previous == read('files/audio-template-l6.json')
+        launch()
         tap(model); tap(l7); tap(save)
+        launch("settings-audio")
         assert l7_profile in visible()
+        launch()
         tap(model); tap(l6); tap(save)
+        launch("settings-audio")
         assert custom in visible()
         assert previous == read('files/audio-template-l6.json')
-    print('中英文车型确认／取消、L6 昼夜、自定义取消及切换保留通过；未建立手机会话')
+    print('中英文设置首页首项、独立车型页与返回、车型确认／取消、昼夜、自定义取消及切换保留通过；未建立手机会话')
 except Exception:
     screenshot('failure.png')
     (output / 'failure.xml').write_bytes(adb('shell', 'cat', '/sdcard/l6-audio-model.xml'))

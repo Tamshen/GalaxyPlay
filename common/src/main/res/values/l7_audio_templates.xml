@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="l7_vehicle_settings">车型设置</string>
+    <string name="l7_vehicle_row_hint">选择车型并确认自动识别结果</string>
+    <string name="l7_vehicle_settings_note">选择车型以应用对应的音频方案。确认保存后下次连接生效，当前连接及两车型的自定义文件保留。</string>
     <string name="l7_template_title">音频方案</string>
     <string name="l7_template_select">当前方案</string>
     <string name="l7_template_l7">L7 配置</string>

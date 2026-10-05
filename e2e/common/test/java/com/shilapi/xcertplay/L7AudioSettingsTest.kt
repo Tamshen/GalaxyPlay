@@ -37,26 +37,18 @@ class L7AudioSettingsTest {
                 R.string.l7_audio_phone, R.string.l7_audio_bus, R.string.l7_template_edit,
                 R.string.l7_template_import, R.string.l7_template_export))
                 assertEquals("mode=$mode id=$id", custom, row(parent, context.getString(id)) != null)
+            assertNull(row(parent, context.getString(R.string.l7_template_model)))
+            assertNull(row(parent, context.getString(R.string.l7_template_detect)))
             assertNotNull(row(parent, context.getString(R.string.music_buffer)))
             assertNotNull(row(parent, context.getString(R.string.l7_template_select)))
         }
     }
 
-    @Test fun modelSelectionRequiresConfirmationAndL6RestoreKeepsItsModel() {
+    @Test fun l6ProfileRestoreKeepsItsModelAndCustomFile() {
         val context = context()
         val parent = LinearLayout(context)
+        L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L6)
         L7AudioSettings.page(context, parent) { _, _, _, _ -> }
-        fun chooseL6() {
-            row(parent, context.getString(R.string.l7_template_model))!!.performClick()
-            shadowOf(Looper.getMainLooper()).idle()
-            val selector = ShadowAlertDialog.getLatestAlertDialog()
-            selector.listView.performItemClick(selector.listView.adapter.getView(1, null, selector.listView), 1, 1L)
-        }
-        chooseL6()
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
-        assertEquals(L7AudioTemplates.Model.L7, L7AudioTemplates.model(context))
-        chooseL6()
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
         assertEquals(context.getString(R.string.l7_template_l6),
             row(parent, context.getString(R.string.l7_template_select))!!.valueView.text.toString())
