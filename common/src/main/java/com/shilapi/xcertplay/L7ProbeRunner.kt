@@ -56,6 +56,13 @@ internal object L7ProbeRunner {
             try {
                 persist(app)
                 val permissions = L7PermissionProbe(app)
+                val reporting = L7ReportingProbe(permissions::inspect) { try { L7ReportingProbe.sdkVisibility(it, L7VendorSdk(app).load(it).loader) }
+                    catch (_: ClassNotFoundException) { "NOT_VISIBLE" }
+                    catch (error: LinkageError) { "UNAVAILABLE:${error.javaClass.simpleName}" }
+                    catch (error: Exception) { "QUERY_FAILED:${error.javaClass.simpleName}" } }
+                val hotspot = L7HotspotProbe(app)
+                val hotspotIds = L7HotspotProbe.methods.keys.filter { onlyId == null || it == onlyId }
+                val reportingIds = L7ReportingProbe.ids.filter { onlyId == null || it == onlyId }
                 val queries = L7ProbeEnvironment.queries(app, window).filter { onlyId == null || it.first == onlyId }
                 val names = permissions.names.filter { onlyId == null || "PERM:$it" == onlyId }
                 val generation = L7ProbeEnvironment.generation(app)
@@ -63,16 +70,37 @@ internal object L7ProbeRunner {
                 synchronized(this) {
                     if (accepts(id)) {
                         current = current!!.copy(environment = generation, version = version,
-                            expected = queries.size + names.size,
-                            items = queries.map { L7ProbeItem(it.first, it.first, "ENVIRONMENT", L7ProbeOutcome.SKIPPED, "NOT_RUN") } +
+                            expected = queries.size + names.size + reportingIds.size + hotspotIds.size,
+                            items = reportingIds.map { L7ProbeItem(it, it, "REPORTING", L7ProbeOutcome.SKIPPED, "NOT_RUN") } +
+                                hotspotIds.map { L7ProbeItem(it, it, "HOTSPOT", L7ProbeOutcome.SKIPPED, "NOT_RUN") } +
+                                queries.map { L7ProbeItem(it.first, it.first, "ENVIRONMENT", L7ProbeOutcome.SKIPPED, "NOT_RUN") } +
                                 names.map { L7ProbeItem("PERM:$it", it, "PERMISSION", L7ProbeOutcome.SKIPPED, "NOT_RUN") })
                         environment = generation
                     }
                 }
                 persist(app)
+                for (key in reportingIds) {
+                    if (!accepts(id)) break
+                    val item = runCatching { reporting.inspect(key) }.getOrElse {
+                        L7ProbeItem(key, key, "REPORTING", L7ProbeOutcome.UNKNOWN, "QUERY_FAILED",
+                            mapOf("exceptionType" to it.javaClass.simpleName, "effectiveCall" to "NOT_RUN"))
+                    }
+                    publish(id, item)
+                }
+                for (key in hotspotIds) {
+                    if (!accepts(id)) break
+                    val item = runCatching { hotspot.inspect(key) }.getOrElse {
+                        L7ProbeItem(key, key, "HOTSPOT", L7ProbeOutcome.UNKNOWN, "QUERY_FAILED",
+                            mapOf("method" to L7HotspotProbe.methods.getValue(key),
+                                "exceptionType" to it.javaClass.simpleName, "effectiveCall" to "QUERY_ONLY"))
+                    }
+                    publish(id, item)
+                }
                 for ((key, query) in queries) {
                     if (!accepts(id)) break
-                    val item = runCatching { L7ProbeItem(key, key, "ENVIRONMENT", L7ProbeOutcome.VERIFIED, "QUERY_ONLY", query()) }
+                    val item = runCatching { L7ProbeItem(key, key, "ENVIRONMENT",
+                        if (key == "ENV-SDK-CONTRACT") L7ProbeOutcome.UNKNOWN else L7ProbeOutcome.VERIFIED,
+                        if (key == "ENV-SDK-CONTRACT") "SDK_CONTRACT_CHECKED" else "QUERY_ONLY", query()) }
                         .getOrElse { L7ProbeItem(key, key, "ENVIRONMENT",
                             if (it is SecurityException) L7ProbeOutcome.DENIED else L7ProbeOutcome.UNKNOWN,
                             "QUERY_FAILED", mapOf("exceptionType" to it.javaClass.simpleName)) }

@@ -226,9 +226,13 @@ class AirPlaySession(
     fun sendKnobSelect(down: Boolean) =
         sendHidReport(AirPlayHid.KNOB_HID_UID, AirPlayHid.knobReport(AirPlayKnobState(select = down)))
 
-    fun sendMedia(index: Int) {
-        sendHidReport(AirPlayHid.MEDIA_HID_UID, AirPlayHid.mediaReport(index))
-        sendHidReport(AirPlayHid.MEDIA_HID_UID, AirPlayHid.mediaReport(0))
+    fun sendMedia(index: Int) { sendMediaChecked(index) }
+
+    /** 按下失败也尝试释放；结果仅说明协议通道写入，不代表手机执行。 */
+    fun sendMediaChecked(index: Int): Boolean {
+        val pressed = sendHidReport(AirPlayHid.MEDIA_HID_UID, AirPlayHid.mediaReport(index))
+        val released = sendHidReport(AirPlayHid.MEDIA_HID_UID, AirPlayHid.mediaReport(0))
+        return pressed && released
     }
 
     fun sendTelephony(index: Int) {

@@ -15,7 +15,10 @@ mockito = "5.20.0"
 bouncycastle = "1.79"
 jmdns = "3.6.3"
 
+dexmaker = "2.28.6"
+
 [libraries]
+dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

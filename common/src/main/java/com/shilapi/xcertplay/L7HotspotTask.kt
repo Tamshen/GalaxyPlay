@@ -26,7 +26,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
     }
     private class SystemAccess(context: Context) : Access {
         private val app = context.applicationContext
-        private val config = NativeHotspotConfiguration(app)
+        private val config = NativeHotspotConfiguration(app) { L7DebugLog.record(it) }
         override fun read() = config.read()
         override fun apply(credentials: NativeHotspotCredentials) = config.apply(credentials)
         override fun enabled() = CarHotspotStatus.isEnabled(app)

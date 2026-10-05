@@ -46,11 +46,18 @@ internal object L7ProbeEnvironment {
 
     fun generation(context: Context): String {
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+        val special = L7SpecialAccessProbe(context)
+        val access = listOf("WRITE_SETTINGS", "SYSTEM_ALERT_WINDOW", "PACKAGE_USAGE_STATS",
+            "REQUEST_INSTALL_PACKAGES", "MANAGE_EXTERNAL_STORAGE").map { suffix ->
+            val name = "android.permission.$suffix"
+            val granted = runCatching { context.checkSelfPermission(name) == PackageManager.PERMISSION_GRANTED }.getOrNull()
+            special.inspect(name, granted).toString()
+        }
         // 只用于识别历史环境变化；原始构建串不写入报告。
         val input = listOf(Build.FINGERPRINT, context.packageName, info.longVersionCode.toString(),
             context.applicationInfo.uid.toString(), info.requestedPermissionsFlags?.joinToString(),
             identity(context)["signerSha256"], File(context.applicationInfo.sourceDir).lastModified().toString(),
-            Settings.canDrawOverlays(context).toString(), Settings.System.canWrite(context).toString())
+            access.joinToString(), "permission-vendor-probe-v5")
         return hash(input.joinToString("\u0000").toByteArray())
     }
 
@@ -88,6 +95,14 @@ internal object L7ProbeEnvironment {
                 "selinuxContext" to runCatching { File("/proc/self/attr/current").readText().trim().trimEnd('\u0000') }.getOrNull(),
                 "selinuxEnforcing" to runCatching { File("/sys/fs/selinux/enforce").readText().trim() }.getOrNull(),
                 "shellSession" to "NOT_CONNECTED", "rootSession" to "NOT_CHECKED", "hookSession" to "NOT_CONNECTED")
+        },
+        "ENV-SDK-CONTRACT" to { L7SdkContractProbe.inspect(context) },
+        "ENV-MEDIA-SESSIONS" to {
+            val sessions = context.getSystemService(android.media.session.MediaSessionManager::class.java).getActiveSessions(null)
+            val own = sessions.filter { it.packageName == context.packageName }
+            mapOf("activeSessionCount" to sessions.size.toString(), "ownSessionCount" to own.size.toString(),
+                "ownPlaybackStates" to own.joinToString(",") { it.playbackState?.state?.toString() ?: "UNKNOWN" },
+                "effectiveCall" to "QUERY_ONLY")
         },
         "ENV-AUDIO" to {
             val devices = context.getSystemService(AudioManager::class.java).getDevices(AudioManager.GET_DEVICES_ALL)

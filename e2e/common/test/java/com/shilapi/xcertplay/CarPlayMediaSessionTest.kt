@@ -27,6 +27,18 @@ class CarPlayMediaSessionTest {
     private var resumes = 0
     private val bridge = CarPlayMediaSession(context, { resumes++ }) { _, _ -> }
 
+    @Test fun connectionEnablesControlBeforeAudioAndDisconnectRejectsLatePhoneState() {
+        bridge.onConnected(true); idle()
+        assertNotNull(bridge.session)
+        assertEquals(PlaybackState.STATE_NONE, publishedState().state)
+        assertNull(shadowOf(context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).lastAudioFocusRequest)
+        bridge.onConnected(false); idle()
+        bridge.onIphonePlaying(true); bridge.onMediaAudioChanged(true); idle()
+        assertNull(bridge.session)
+        assertEquals(0, resumes)
+        bridge.close()
+    }
+
     @Test fun keysNeverCreateTheirOwnAudioFocusAndPhonePauseWinsOverOpenStream() {
         try {
             bridge.onMediaAudioChanged(true); idle()

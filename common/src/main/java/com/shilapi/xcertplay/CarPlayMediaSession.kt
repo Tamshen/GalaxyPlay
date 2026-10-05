@@ -35,6 +35,8 @@ internal class CarPlayMediaSession(
         discard = Bitmap::recycle,
     )
     private var artworkOwner: Any? = artworkQueue.newSession()
+    private var connected = false
+    private var connectionKnown = false
     private var audioActive = false
     private var phonePlaying: Boolean? = null
     @Volatile private var closed = false
@@ -55,16 +57,35 @@ internal class CarPlayMediaSession(
     /** 当前 CarPlay 窗口收到标准媒体键时走同一命令路径，不交给残留蓝牙媒体会话。 */
     fun onHardwareKey(event: KeyEvent): Boolean {
         if (closed || event.keyCode !in MEDIA_KEYS) return false
-        return callback.onMediaButtonEvent(Intent(Intent.ACTION_MEDIA_BUTTON).putExtra(Intent.EXTRA_KEY_EVENT, event))
+        return callback.onKey(event, "window-key")
+    }
+
+    /** 已连接但尚未播放也可接收标准控制；不伪报手机播放，不另抢音频焦点。 */
+    fun onConnected(value: Boolean) = dispatch {
+        connectionKnown = true
+        connected = value
+        if (!value) {
+            session?.let { it.isActive = false; it.release() }
+            session = null
+            audioActive = false
+            phonePlaying = null
+            nowPlaying = CarPlayNowPlaying()
+            artworkOwner = artworkQueue.newSession()
+            artworkCache.clear()
+            artwork = null
+        } else publish()
+        emit("connection active=$value")
     }
 
     fun onMediaAudioChanged(active: Boolean) = dispatch {
+        if (connectionKnown && !connected) return@dispatch
         audioActive = active
         publish()
         emit("stream active=$active phonePlaying=$phonePlaying")
     }
 
     fun onIphonePlaying(playing: Boolean) = dispatch {
+        if (connectionKnown && !connected) return@dispatch
         val changed = phonePlaying != playing
         phonePlaying = playing
         if (changed && playing) onPlaybackStarted()
@@ -73,6 +94,7 @@ internal class CarPlayMediaSession(
     }
 
     fun onNowPlayingChanged(update: CarPlayNowPlaying) = dispatch {
+        if (connectionKnown && !connected) return@dispatch
         val previousArtwork = artwork
         if (update == CarPlayNowPlaying()) {
             artworkOwner = artworkQueue.newSession()
@@ -113,7 +135,7 @@ internal class CarPlayMediaSession(
 
     private fun publish() {
         val playing = phonePlaying ?: audioActive
-        if (session == null && (audioActive || playing)) {
+        if (session == null && (connected || audioActive || playing)) {
             session = MediaSession(context, "L7CarPlay").apply {
                 setCallback(callback, handler)
                 setMetadata(NowPlayingMetadata.androidMetadata(nowPlaying, artwork))
@@ -121,7 +143,7 @@ internal class CarPlayMediaSession(
             }
         }
         session?.setPlaybackState(PlaybackState.Builder().setActions(ACTIONS)
-            .setState(if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+            .setState(if (playing) PlaybackState.STATE_PLAYING else if (phonePlaying != null || audioActive) PlaybackState.STATE_PAUSED else PlaybackState.STATE_NONE,
                 nowPlaying.elapsedMillis ?: PlaybackState.PLAYBACK_POSITION_UNKNOWN,
                 if (playing) 1f else 0f, elapsedUpdatedAt).build())
     }

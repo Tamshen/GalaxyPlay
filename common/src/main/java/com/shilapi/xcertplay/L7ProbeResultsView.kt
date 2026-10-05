@@ -92,7 +92,12 @@ internal class L7ProbeResultsView(
     }
 
     private fun showItem(item: L7ProbeItem) {
-        val next = if (item.domain == "PERMISSION") R.string.l7_probe_next_permission else R.string.l7_probe_next_query
+        val next = when (item.domain) {
+            "PERMISSION" -> R.string.l7_probe_next_permission
+            "HOTSPOT" -> R.string.l7_probe_next_hotspot
+            "REPORTING" -> R.string.l7_probe_next_reporting
+            else -> R.string.l7_probe_next_query
+        }
         L7Dialogs.builder(activity).setTitle(labels.name(item)).setMessage(
             "${labels.reason(item)}\n\n${labels.time(item.time)}\n\n${labels.text(next)}\n\n" +
                 "${labels.text(R.string.l7_probe_facts)}\n${item.json().toString(2)}")

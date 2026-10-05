@@ -29,6 +29,14 @@ class L7ProbeStoreTest {
         assertEquals("L7_APP", restored.json().getString("executorContext"))
     }
 
+    @Test fun historicalProbeVersionIsPreservedOnExportAndNewReportsUseVersion4() {
+        val old = report().json().put("probeVersion", 1)
+        assertEquals(1, L7ProbeReport.read(old).json().getInt("probeVersion"))
+        old.remove("probeVersion")
+        assertEquals(1, L7ProbeReport.read(old).probeVersion)
+        assertEquals(5, report().json().getInt("probeVersion"))
+    }
+
     @Test fun unfinishedRunIsRecoveredAsInterruptedWithoutRestartingIt() {
         val store = L7ProbeStore(temporary.root)
         store.save(report(L7ProbePhase.RUNNING))

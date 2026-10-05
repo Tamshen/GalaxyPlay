@@ -18,9 +18,19 @@ internal object L7ProbeLog {
         "visibleSharedLibraries", "executorContext", "selinuxContext", "selinuxEnforcing", "shellSession", "rootSession", "hookSession",
         "visibleDeviceCount", "deviceTypes", "activeNetworkVisible", "wifi", "vpn", "usbHostFeature", "visibleDevices", "allowed",
         "declared", "definitionVisible", "definitionPackage", "protectionLevel", "granted", "appOp", "appOpMode", "effectiveCall",
+        "protectionBase", "protectionFlags", "protectionFlagsRaw", "appOpModeRaw", "minimumApi", "staticWarnings",
+        "definitionReason", "definitionExceptionType", "grantExceptionType", "appOpMappingExceptionType", "appOpExceptionType",
+        "specialAccess", "specialAccessMethod", "specialAccessReason", "specialAccessExceptionType", "specialAccessAppOpMode",
         "videoPreference", "fpsPreference", "displayScalePreference", "connectionPreference", "authenticationBackend",
         "bluetoothExclusivePreference", "bluetoothGuardState", "audioMode", "musicActive", "sessionPresent",
-    )
+        "permissionRequirement", "candidatePermissions", "declaredCount", "grantedCount", "permissionCount",
+        "definitionVisibleCount", "restrictedCount", "sdkVisibleCount", "sdkCount", "sdkChecks",
+        "activeSessionCount", "ownSessionCount", "ownPlaybackStates", "mediaSdkSource", "navigationSdkSource",
+        "mediaContract", "navigationContract", "mediaExceptionType", "navigationExceptionType",
+        "mediaCallbackKind", "mediaSourceEvidence", "navigationMapping",
+        "method", "apState", "hotspotEnabled", "ssidPresent", "passwordPresent", "security",
+        "configValid", "passwordMasked", "exceptionType", "serviceAuthorization", "reportingSupported", "qnxProtocol",
+    ) + L7ReportingProbe.permissionFactKeys + L7VendorServiceProbe.factKeys
 
     fun batch(report: L7ProbeReport) = report.id.replace("-", "").take(12)
 
@@ -29,26 +39,31 @@ internal object L7ProbeLog {
         val clock = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
         fun line(at: Long, body: String) = RemoteLogReport.redact("${clock.format(Date(at))}  $prefix $body")
         val output = mutableListOf<String>()
+        val details = mutableListOf<String>()
         line(report.started, "event=begin startedAt=${report.started} version=${report.version} expected=${report.expected}")?.let(output::add)
         report.items.forEachIndexed { index, item ->
             // 权限名属于技术证据；异常格式被拒绝时仍保留序号与结果。
             val entry = item.id.takeIf { RemoteLogReport.redact("entry=$it ") != null } ?: "ENTRY_$index"
             val head = "item=$index entry=$entry status=${L7ProbeStatus.of(item)} result=${item.result} reason=${item.reason} at=${item.time}"
-            var part = head
-            item.facts.filterKeys { it in factKeys }.forEach { (key, value) ->
-                val safe = value?.take(1200)?.replace(Regex("[\\r\\n\\t]"), " ") ?: "unknown"
+            line(item.time, head)?.let(output::add)
+            val detailHead = "item=$index entry=$entry detail"
+            var part = detailHead
+            item.facts.filter { (key, value) -> key in factKeys && value != null }.forEach { (key, value) ->
+                val safe = value!!.take(1200).replace(Regex("[\\r\\n\\t]"), " ")
                 for ((chunk, text) in safe.chunked(180).withIndex()) {
                     val fact = "$key${if (safe.length > 180) "[$chunk]" else ""}=$text"
                     if (RemoteLogReport.redact(fact) == null) continue
                     if (part.length + fact.length > 580) {
-                        line(item.time, part)?.let(output::add)
-                        part = "item=$index entry=$entry detail"
+                        line(item.time, part)?.let(details::add)
+                        part = detailHead
                     }
                     part += " $fact"
                 }
             }
-            line(item.time, part)?.let(output::add)
+            if (part != detailHead) line(item.time, part)?.let(details::add)
         }
+        // 先保留每项结论，再填充长证据；细节预算不足不能吞掉后面的权限结果。
+        output += details
         val end = line(report.finished ?: report.started,
             "event=end phase=${report.phase} collected=${report.items.count { it.reason != "NOT_RUN" }} expected=${report.expected}")!!
         var bytes = end.toByteArray(Charsets.UTF_8).size + 120

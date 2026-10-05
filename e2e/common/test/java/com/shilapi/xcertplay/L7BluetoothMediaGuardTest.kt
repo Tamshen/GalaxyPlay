@@ -149,6 +149,72 @@ class L7BluetoothMediaGuardTest {
         guard.close()
     }
 
+    @Test fun enablingDuringSessionHandlesExistingTargetWithoutInventingPlay() {
+        val guard = guard(automatic = false)
+        guard.start(); idle()
+        assertTrue(port.disconnected.isEmpty())
+        guard.setAutomatic(true); idle()
+        assertEquals(listOf(TARGET), port.disconnected)
+        assertEquals(BluetoothMediaStatus.DISCONNECTING, statuses.last())
+        port.connected = false; port.changed(); idle()
+        assertEquals(BluetoothMediaStatus.CLEAR, statuses.last())
+        guard.close()
+    }
+
+    @Test fun disablingReleasesOnlyExplicitPendingPlayAndInvalidatesOldConfirmation() {
+        val guard = guard()
+        guard.start(); idle()
+        var plays = 0
+        guard.beforePlay { plays++ }; idle()
+        assertEquals(0, plays)
+        guard.setAutomatic(false); idle()
+        assertEquals(1, plays)
+        assertEquals(BluetoothMediaStatus.CONFLICT, statuses.last())
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(4))
+        assertEquals(BluetoothMediaStatus.CONFLICT, statuses.last())
+        port.changed(); idle()
+        assertEquals(1, port.disconnected.size)
+        assertEquals(1, plays)
+        guard.close()
+    }
+
+    @Test fun quickTogglesKeepBudgetAndOldTimerCannotFailNewAttempt() {
+        val guard = guard()
+        guard.start(); idle()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        guard.setAutomatic(false); guard.setAutomatic(true); idle()
+        assertEquals(2, port.disconnected.size)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        assertEquals(BluetoothMediaStatus.DISCONNECTING, statuses.last())
+        guard.setAutomatic(false); guard.setAutomatic(true); idle()
+        assertEquals(BluetoothMediaStatus.LIMIT, statuses.last())
+        assertEquals(2, port.disconnected.size)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(4))
+        assertEquals(BluetoothMediaStatus.LIMIT, statuses.last())
+        guard.close()
+    }
+
+    @Test fun pauseBeforeDisablingDoesNotRestorePlayAndClosedOrFailedGuardCannotRestart() {
+        val guard = guard()
+        guard.start(); idle()
+        var plays = 0
+        guard.beforePlay { plays++ }; guard.cancelPendingPlay()
+        guard.setAutomatic(false); idle()
+        assertEquals(0, plays)
+        guard.close()
+        guard.setAutomatic(true); port.ready(); idle()
+        assertEquals(1, port.disconnected.size)
+        assertEquals(BluetoothMediaStatus.CLOSED, statuses.last())
+        port.accepted = false
+        val failed = guard()
+        failed.start(); idle()
+        val attempts = port.disconnected.size
+        failed.setAutomatic(false); failed.setAutomatic(true); idle()
+        assertEquals(attempts, port.disconnected.size)
+        assertEquals(BluetoothMediaStatus.BLOCKED, statuses.last())
+        failed.close()
+    }
+
     private fun guard(address: String? = TARGET, automatic: Boolean = true) =
         L7BluetoothMediaGuard(address, automatic, port, statuses::add)
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()

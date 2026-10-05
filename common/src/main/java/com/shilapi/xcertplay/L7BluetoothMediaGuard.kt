@@ -11,7 +11,7 @@ internal enum class BluetoothMediaStatus { IDLE, CHECKING, NO_TARGET, CLEAR, CON
 /** 会话接通后有限处理目标手机的蓝牙媒体；请求成功与实际断开分开确认。 */
 internal class L7BluetoothMediaGuard(
     private val address: String?,
-    private val automatic: Boolean,
+    private var automatic: Boolean,
     private val port: L7BluetoothMediaPort,
     private val status: (BluetoothMediaStatus) -> Unit,
 ) : Closeable {
@@ -22,6 +22,7 @@ internal class L7BluetoothMediaGuard(
     private var ready = false
     private var waiting = false
     private var attempts = 0
+    private var generation = 0
     private var lastStatus: BluetoothMediaStatus? = null
     private var pendingPlay: (() -> Unit)? = null
 
@@ -42,6 +43,17 @@ internal class L7BluetoothMediaGuard(
 
     private fun playDispatch(action: () -> Unit) {
         if (Looper.myLooper() == handler.looper) action() else handler.post { action() }
+    }
+
+    /** 当前会话即时响应设置；撤销等待不撤销已送出的系统请求，也不重置尝试预算。 */
+    fun setAutomatic(enabled: Boolean) = playDispatch {
+        if (closed || automatic == enabled) return@playDispatch
+        automatic = enabled
+        generation++
+        waiting = false
+        emit("automatic changed enabled=$enabled attempts=$attempts")
+        if (!failed && ready) inspect()
+        else if (!enabled) flushPlay()
     }
 
     fun start() = dispatch {
@@ -79,8 +91,8 @@ internal class L7BluetoothMediaGuard(
             val accepted = port.disconnect(address!!)
             emit("disconnect requested accepted=$accepted attempt=$attempts")
             if (!accepted) { unavailable("disconnect_rejected"); return }
-            val attempt = attempts
-            handler.postDelayed({ if (attempts == attempt) confirmDisconnect() }, 3000)
+            val epoch = ++generation
+            handler.postDelayed({ if (generation == epoch && automatic) confirmDisconnect() }, 3000)
         } catch (error: Exception) { unavailable(error.javaClass.simpleName) }
     }
 

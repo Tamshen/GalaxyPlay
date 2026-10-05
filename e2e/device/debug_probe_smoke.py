@@ -92,6 +92,8 @@ def english_table():
     tap('View check results')
     for heading in ('Item', 'Status', 'Reason', 'All'):
         find(heading)
+    for title in ('Media center reporting', 'HUD navigation reporting', 'Media QNX reporting'):
+        find(title)
     visible = [n.get(key, '') for n in nodes().iter('node') for key in ('text', 'content-desc')]
     assert not any(re.search(r'[\u3400-\u9fff]', text) for text in visible), '英文结果表存在中文界面文案'
     screenshot('debug-table-english-day')
@@ -122,11 +124,46 @@ try:
     screenshot('debug-idle-day')
     tap(collect_label())
     report = wait_report(before)
-    assert len(report['items']) >= 150
+    permissions = {item['name']: item for item in report['items'] if item['domain'] == 'PERMISSION'}
+    catalog = json.loads(Path('common/src/main/assets/l7-permission-catalog.json').read_text())
+    assert len(catalog['permissions']) == 163
+    assert {item['name'] for item in catalog['permissions']} <= permissions.keys()
+    assert report['probeVersion'] == 5
+    assert len(report['items']) == 184
+    contract = next(i for i in report['items'] if i['capabilityId'] == 'ENV-SDK-CONTRACT')
+    assert contract['result'] == 'UNKNOWN' and contract['reason'] == 'SDK_CONTRACT_CHECKED'
+    assert contract['facts']['effectiveCall'] == 'CLASS_SIGNATURE_AND_PACKAGE_QUERY_ONLY'
+    assert contract['facts']['mediaProviderQuery'] == 'NOT_VISIBLE_OR_UNINSTALLED'
+    assert contract['facts']['mediaServiceQuery'] == 'NOT_VISIBLE_OR_UNINSTALLED'
+    assert contract['facts']['mediaServiceAuthorization'] == 'UNTESTED_NO_BINDER_CALL'
+    assert contract['facts']['mediaContract'] == 'NOT_VISIBLE_OR_UNINSTALLED'
+    assert contract['facts']['navigationContract'] == 'NOT_VISIBLE_OR_UNINSTALLED'
+    sessions = next(i for i in report['items'] if i['capabilityId'] == 'ENV-MEDIA-SESSIONS')
+    assert sessions['result'] == 'DENIED' and sessions['facts']['exceptionType'] == 'SecurityException'
+    assert 'activeSessionCount' not in sessions['facts']
+    assert permissions['android.permission.MEDIA_CONTENT_CONTROL']['facts']['declared'] == 'true'
+    hotspot = [i for i in report['items'] if i['domain'] == 'HOTSPOT']
+    assert [i['capabilityId'] for i in hotspot] == ['HOTSPOT-STATE', 'HOTSPOT-CONFIG', 'HOTSPOT-LEGACY']
+    assert all(i['facts']['effectiveCall'] == 'QUERY_ONLY' for i in hotspot)
+    assert all('ssid' not in i['facts'] and 'password' not in i['facts'] for i in hotspot)
+    for name in ('NETWORK_SETTINGS', 'OVERRIDE_WIFI_CONFIG', 'TETHER_PRIVILEGED', 'NETWORK_STACK'):
+        assert permissions['android.permission.' + name]['facts']['declared'] == 'true'
+    for name, env in (('SYSTEM_ALERT_WINDOW', 'ENV-OVERLAY'), ('WRITE_SETTINGS', 'ENV-WRITE-SETTINGS')):
+        permission = permissions['android.permission.' + name]
+        environment = next(item for item in report['items'] if item['capabilityId'] == env)
+        allowed = environment['facts']['allowed'] == 'true'
+        assert permission['facts']['specialAccess'] == ('ALLOWED' if allowed else 'DENIED')
+        if allowed:
+            assert permission['reason'] == 'SPECIAL_ACCESS_ALLOWED' and permission['result'] == 'OBSERVED'
+    assert permissions['android.permission.PACKAGE_USAGE_STATS']['facts']['specialAccessMethod'] == 'AppOpsManager.OPSTR_GET_USAGE_STATS'
     assert all(i['reason'] != 'NOT_RUN' for i in report['items'])
     assert report['executorContext'] == 'L7_APP'
     assert 'device_id' not in json.dumps(report)
     assert all('sourceDir' not in i['facts'] and 'serial' not in i['facts'] for i in report['items'])
+    reporting = report['items'][:3]
+    assert [i['capabilityId'] for i in reporting] == ['REPORT-MEDIA', 'REPORT-HUD', 'REPORT-QNX']
+    assert all(i['result'] == 'UNKNOWN' and i['facts']['effectiveCall'] == 'NOT_RUN' for i in reporting)
+    assert reporting[2]['facts']['qnxProtocol'] == 'UNCONFIRMED_MEDIACENTER_DOWNSTREAM'
     (args.output_dir / 'basic-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
     find('检查完成')
     screenshot('debug-completed-day')
@@ -135,6 +172,12 @@ try:
     for heading in ('项目', '状态', '原因', '全部'):
         find(heading)
     screenshot('debug-table-all-day')
+    for title in ('媒体中心上报', 'HUD 导航上报', '媒体 QNX 上报'):
+        find(title)
+    tap('媒体 QNX 上报')
+    assert any('QNX 下游协议尚未确认' in n.get('text', '') for n in nodes().iter('node'))
+    screenshot('reporting-qnx-details-day')
+    tap('关闭')
     tap('结果筛选')
     tap('无权限')
     screenshot('debug-restricted-day')
@@ -154,6 +197,14 @@ try:
         time.sleep(.3)
     assert len(set(re.findall(r'item=(\d+) entry=', log))) == len(refreshed['items'])
     assert 'entry=ENV-RUNTIME' in log and 'entry=ENV-WINDOW' in log
+    assert 'entry=ENV-SDK-CONTRACT' in log and 'entry=ENV-MEDIA-SESSIONS' in log
+    assert 'mediaContract=NOT_VISIBLE_OR_UNINSTALLED' in log
+    assert 'mediaProviderQuery=NOT_VISIBLE_OR_UNINSTALLED' in log
+    assert 'mediaServiceQuery=NOT_VISIBLE_OR_UNINSTALLED' in log
+    assert 'mediaServiceAuthorization=UNTESTED_NO_BINDER_CALL' in log
+    assert 'entry=REPORT-HUD status=PENDING' in log
+    assert 'permission.ecarx.openapi.permission.NAVI_SERVICE=declared=' in log
+    assert 'qnxProtocol=UNCONFIRMED_MEDIACENTER_DOWNSTREAM' in log
     assert 'device_id' not in log
     previous_log = adb('shell', 'run-as', package, 'cat', 'files/logs/probe-previous.log')
     assert report['runId'].replace('-', '')[:12] in previous_log
