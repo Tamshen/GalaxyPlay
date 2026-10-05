@@ -118,7 +118,13 @@ class CarPlayHostActivity : ComponentActivity() {
                 setConnectionStage(wiredStartupFeedback!!)
             }
         },
-        ready = { wiredStartupFeedback = null; awaitingVpnConsent = false; vpnReady = true; maybeStartCarPlay() },
+        ready = {
+            wiredStartupFeedback = null
+            awaitingVpnConsent = false
+            vpnReady = true
+            if (locationReportingEnabled && !locationPermissionAvailable) requestLocationPermission()
+            else maybeStartCarPlay()
+        },
         failed = ::wiredStartupFailed,
     ) }
     private val l7DebugLogs by lazy { resources.getBoolean(R.bool.config_l7_product_ui) }
@@ -437,7 +443,9 @@ class CarPlayHostActivity : ComponentActivity() {
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
             AirPlayPersistence.saveWirelessEnabled(this, false)
         }
-        if (!AirPlayPersistence.loadWirelessEnabled(this)) wiredAttempt = L7WiredDiagnostics.begin(this)
+        val restoredVpnAttempt = L7VpnConsent.savedAttempt(savedInstanceState, AirPlayPersistence.loadWirelessEnabled(this))
+        if (!AirPlayPersistence.loadWirelessEnabled(this))
+            wiredAttempt = L7WiredDiagnostics.beginOrResume(this, restoredVpnAttempt)
         L7WiredDiagnostics.event(this, wiredAttempt, "AUTH_BOOTSTRAP", "BEGIN")
         val bootstrap = runCatching { DiPlayBootstrap.ensure(this) }
         if (bootstrap.isFailure) {
@@ -486,6 +494,12 @@ class CarPlayHostActivity : ComponentActivity() {
         if (reusedBackgroundSession) {
             L7WiredDiagnostics.event(this, wiredAttempt, "SESSION", "REUSED", outcome = "CONNECTED")
             updateDebugOverlays()
+        } else if (restoredVpnAttempt != null) {
+            // ActivityResultRegistry 会交付原授权页结果，不能重建时另开一轮申请。
+            // 到达 VPN 阶段前已处理过麦克风许可，先前拒绝也允许继续无麦克风连接。
+            microphonePermissionResolved = true
+            awaitingVpnConsent = true
+            vpnGate.restoreWaiting(restoredVpnAttempt)
         } else if (microphonePermissionResolved) {
             L7WiredDiagnostics.event(this, wiredAttempt, "MICROPHONE", "ALREADY_GRANTED")
             requestStartupPrerequisites()
@@ -840,6 +854,11 @@ class CarPlayHostActivity : ComponentActivity() {
         releaseVideoTouches()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
         super.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        vpnGate.saveWaiting(outState, if (wirelessEnabled) null else wiredAttempt)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

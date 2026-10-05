@@ -3,6 +3,7 @@ package com.shilapi.xcertplay
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Bundle
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,7 +17,8 @@ class L7VpnConsentTest {
     private val failures = mutableListOf<L7VpnConsent.Failure>()
     private var ready = 0
     private var launches = 0
-    private fun gate(prepare: () -> Intent? = { Intent("test.consent") },
+    private var granted = false
+    private fun gate(prepare: () -> Intent? = { if (granted) null else Intent("test.consent") },
                      launch: (Intent) -> Unit = { launches++ }) = L7VpnConsent(
         prepare, launch,
         { phase, result, error -> events += "$phase:$result:${error?.javaClass?.simpleName}" },
@@ -40,6 +42,7 @@ class L7VpnConsentTest {
         assertFalse(events.joinToString().contains("private"))
         missing = false
         gate.request()
+        granted = true
         gate.returned(Activity.RESULT_OK)
         assertEquals(1, ready)
         assertEquals(1, launches)
@@ -84,5 +87,60 @@ class L7VpnConsentTest {
         gate(prepare = { throw NoSuchMethodError("private detail") }).request()
         assertEquals(listOf(L7VpnConsent.Failure.PREPARE_FAILED), failures)
         assertEquals(0, ready)
+    }
+
+    @Test fun restoringPendingConsentKeepsTheAttemptAndConsumesResultWithoutRelaunching() {
+        val old = gate(); old.request()
+        val state = Bundle(); old.saveWaiting(state, "synthetic-attempt")
+        old.dispose()
+        val restored = gate()
+        val attempt = L7VpnConsent.savedAttempt(state, wireless = false)
+        assertEquals("synthetic-attempt", attempt)
+        restored.restoreWaiting(attempt); restored.request()
+        assertEquals(1, launches)
+        granted = true; restored.returned(Activity.RESULT_OK); restored.returned(Activity.RESULT_OK)
+        assertEquals(1, ready)
+        assertTrue(events.any { it.startsWith("VPN_RESTORE:WAITING") })
+        restored.saveWaiting(state, attempt)
+        assertNull(L7VpnConsent.savedAttempt(state, wireless = false))
+    }
+
+    @Test fun successfulResultWithRevokedAuthorizationDoesNotStartOrRelaunch() {
+        val gate = gate(); gate.request(); gate.returned(Activity.RESULT_OK)
+        assertEquals(0, ready)
+        assertEquals(1, launches)
+        assertEquals(listOf(L7VpnConsent.Failure.PREPARE_FAILED), failures)
+        assertTrue(events.any { it.startsWith("VPN_RECHECK:NOT_PREPARED") })
+    }
+
+    @Test fun restoringForWirelessOrWithoutAPendingAttemptDoesNotAcceptOldResult() {
+        val old = gate(); old.request()
+        val state = Bundle(); old.saveWaiting(state, "synthetic-attempt")
+        val restored = gate()
+        assertNull(L7VpnConsent.savedAttempt(state, wireless = true))
+        restored.restoreWaiting(L7VpnConsent.savedAttempt(state, wireless = true))
+        granted = true; restored.returned(Activity.RESULT_OK)
+        assertEquals(0, ready)
+        assertEquals(1, launches)
+        assertNull(L7VpnConsent.savedAttempt(Bundle(), wireless = false))
+    }
+
+    @Test fun restoredCancellationStopsAndDisposeRejectsFurtherRestoration() {
+        val restored = gate(); restored.restoreWaiting("synthetic-attempt")
+        restored.returned(Activity.RESULT_CANCELED)
+        assertEquals(listOf(L7VpnConsent.Failure.DECLINED), failures)
+        restored.dispose(); restored.restoreWaiting("another-attempt")
+        granted = true; restored.returned(Activity.RESULT_OK); restored.request()
+        assertEquals(0, ready)
+        assertEquals(0, launches)
+    }
+
+    @Test fun restoredGrantWithPrepareRejectionFailsInsteadOfContinuing() {
+        val restored = gate(prepare = { throw SecurityException("private") })
+        restored.restoreWaiting("synthetic-attempt"); restored.returned(Activity.RESULT_OK)
+        assertEquals(listOf(L7VpnConsent.Failure.SYSTEM_DENIED), failures)
+        assertEquals(0, ready)
+        assertEquals(0, launches)
+        assertFalse(events.joinToString().contains("private"))
     }
 }

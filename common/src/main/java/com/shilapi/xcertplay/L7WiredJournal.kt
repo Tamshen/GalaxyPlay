@@ -78,6 +78,9 @@ internal class L7WiredJournal(
     }
 
     fun current(pid: Int): String? = attempts.lastOrNull()?.takeIf { it.optInt("pid") == pid }?.optString("attempt")
+    fun resume(pid: Int, id: String?): String? = attempts.lastOrNull()?.takeIf {
+        it.optInt("pid") == pid && it.optString("attempt") == id && it.optString("outcome") == "RUNNING"
+    }?.optString("attempt")
     fun notice() = prefs.getBoolean("notice", false)
     fun acknowledge() { prefs.edit().putBoolean("notice", false).apply() }
     fun clear() { attempts.clear(); prefs.edit().clear().commit() }
