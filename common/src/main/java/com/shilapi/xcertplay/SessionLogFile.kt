@@ -20,6 +20,7 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
         val bytes = (safe + "\n").toByteArray(Charsets.UTF_8)
         runCatching {
+            file.parentFile?.mkdirs()
             if (file.length() + bytes.size > MAX_BYTES) {
                 rotate()
                 file.writeText("")
@@ -43,6 +44,7 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
         const val MAX_BYTES = 512 * 1024L
         private val ARCHIVE_NAMES = listOf("previous.log") + (2..7).map { "previous-$it.log" }
         val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log" + listOf("steering-previous-2.log", "steering-previous.log", "steering.log",
-            "voice-input-previous-2.log", "voice-input-previous.log", "voice-input.log")
+            "voice-input-previous-2.log", "voice-input-previous.log", "voice-input.log",
+            "debug-previous-2.log", "debug-previous.log", "debug.log")
     }
 }

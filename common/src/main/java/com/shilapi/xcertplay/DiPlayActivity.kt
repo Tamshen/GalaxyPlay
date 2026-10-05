@@ -355,13 +355,13 @@ class DiPlayActivity : ComponentActivity() {
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
                 { if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(false) }, ::stopFromHome)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
-            "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-debug-logs"; render() }
+            "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-voice" -> voiceDebugPage = L7VoiceInputDebugPage(this, content,
                 grant = { voicePermission.launch(Manifest.permission.RECORD_AUDIO) },
-                onLogs = { page = "settings-debug-logs"; render() })
-            "settings-debug-logs" -> diagnostics(content)
+                onLogs = { page = "settings-logs"; render() })
+            "settings-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
-                debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks, ::showDebugLogs) { destination ->
+                debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks) { destination ->
                     page = destination; render()
                 }
             }
@@ -442,7 +442,7 @@ class DiPlayActivity : ComponentActivity() {
         "settings-debug-history" -> R.string.l7_probe_history
         "settings-debug-steering" -> R.string.l7_steering_title
         "settings-debug-voice" -> R.string.l7_voice_title
-        "settings-debug-logs" -> R.string.l7_probe_logs
+        "settings-logs" -> R.string.l7_logs_title
         "settings-about" -> R.string.about
         else -> R.string.carplay
     })
@@ -456,11 +456,12 @@ class DiPlayActivity : ComponentActivity() {
             Triple("settings-general", R.string.l7_general_settings, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
             Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
+            Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
         val hints = listOf(R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
             R.string.l7_display_row_hint, R.string.l7_audio_row_hint, R.string.l7_general_row_hint,
-            R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_about_row_hint)
+            R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_logs_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))
         })

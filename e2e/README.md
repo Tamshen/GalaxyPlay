@@ -82,7 +82,7 @@ e2e/
 
 `L7ReportingProbeTest` 检查专项候选权限与 SDK 查询不推断业务支持、未知定义与未声明分别保留、SDK 不初始化及依赖缺失处理、QNX 下游未确认和证据导出；Runner 覆盖专项单项复查不启动全量扫描、不上传。
 
-在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试与日志」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、QNX 未确认提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
+在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、QNX 未确认提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
 `L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查升级后的导航 usage 12、电话 usage 2、焦点与高级映射默认值、试听及取消不保存；不连接手机、不上传，截图留在忽略目录。
 
@@ -241,7 +241,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 仅修改弹窗主题时，可在上述命令追加 `--theme-only`，只检查切换主题后的待选值、确认按钮状态以及取消恢复；此模式不执行其余设置与连接流程。
 
-仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、八类导航及设置首页的「调试与日志」入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
+仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、九类导航及设置首页的「调试」和「日志」入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
 
 仅检查声道交互时追加 `--audio-only`：媒体/语音助手/导航两秒试听、立即停止、选流与保存分离、主题切换保留状态和取消恢复。不保存音频设置，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。
 
@@ -289,3 +289,5 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 媒体与 HUD 软件回归使用合成数据和隔离端口，检查首次暂停控制、API 就绪／失败、源拒绝、有限重注册、状态与进度独立、焦点交接、旧回调、图片读取／清理及导航变化／过期，不把替身结果写成 OEM 服务准入或实车显示通过。
 
 真实 Android VM 薄子类验证：Docker 内 `:common:assembleDebugAndroidTest` 后在 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，执行 `adb shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，预期 `SDK_SUBCLASS_OK`。仅检查代码生成、装箱和实例隔离，不调用原厂服务。
+
+`python3 e2e/device/debug_logs_module_smoke.py` 检查独立调试／日志分类、中英文昼夜、返回父级、旧日志路由兼容、显式采集与逐项事实默认落盘；不点击上传，不清除原有报告，恢复中文和原昼夜。日志默认持久化、上传集合及清空报告保留证据由 `L7DebugLogPersistenceTest` 覆盖。

@@ -291,18 +291,22 @@ try:
     tap('设置')
     require_menu(expected_menu, '从投屏进入设置时菜单位置变化')
     print('跨页面坐标检查通过：首页、投屏等待页与设置的四个按钮坐标完全一致。', flush=True)
-    for label in ('关于', '调试与日志', '连接设置'):
+    for label in ('关于', '调试', '日志', '连接设置'):
         tap(label)
         assert find('返回设置') is not None, '详细功能未归入设置：' + label
-        if label == '调试与日志':
-            tap('日志与报告')
-            labels = {n.attrib.get('text') for n in nodes()}
-            assert {'日志与报告', '悬浮日志', '查看当前日志', '保存诊断报告', '管理悬浮窗权限'} <= labels
+        if label == '日志':
+            required = {'日志与报告', '悬浮日志', '查看当前日志', '保存诊断报告', '管理悬浮窗权限'}
+            labels = set()
+            for _ in range(6):
+                labels.update(n.attrib.get('text') for n in nodes())
+                if required <= labels:
+                    break
+                adb('shell', 'input', 'swipe', '1000', '1500', '1000', '600', '300')
+            assert required <= labels
             screenshot('diagnostics-night')
             tap('查看当前日志')
             tap('刷新')
             tap('关闭')
-            tap('返回调试与日志')
         adb('shell', 'input', 'keyevent', '4')
     labels = {n.attrib.get('text') for n in nodes()}
     assert '悬浮日志' not in labels and '诊断' not in labels, '设置中仍有重复诊断入口'

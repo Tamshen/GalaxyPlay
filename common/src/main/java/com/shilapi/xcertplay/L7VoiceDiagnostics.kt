@@ -56,7 +56,7 @@ internal class L7VoiceTraceStore(private val log: (String) -> Unit = {}) {
 
 internal object L7VoiceDiagnostics {
     @Volatile private var target: SessionLogFile? = null
-    val store = L7VoiceTraceStore { line -> L7DebugLog.record(line); AsyncDiagnosticLog.append(target, line) }
+    val store = L7VoiceTraceStore { line -> L7DebugLog.record(line, target) }
     @Synchronized fun initialize(context: Context) {
         if (target == null) target = SessionLogFile(File(context.filesDir, "logs/voice-input.log"),
             listOf("voice-input-previous.log", "voice-input-previous-2.log"))

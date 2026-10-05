@@ -72,7 +72,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         }
     }
 
-    private fun configure() {
+    fun configure() {
         val config = RemoteLogConfig.load(context)
         val editor = RemoteLogEditor(config, context.getString(R.string.l7_log_default_url))
         val body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }

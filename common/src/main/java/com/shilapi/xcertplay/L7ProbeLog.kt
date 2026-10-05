@@ -9,7 +9,7 @@ import java.util.Locale
 
 /** 手动采集生成有界脱敏日志；独立文件避免与正在写入的连接日志争用及轮转冲突。 */
 internal object L7ProbeLog {
-    const val MAX_BYTES = 80 * 1024
+    const val MAX_BYTES = 512 * 1024
     val files = listOf("probe-previous.log", "probe-latest.log")
     private val factKeys = setOf(
         "manufacturer", "model", "android", "api", "abi", "securityPatch", "appVersion", "versionCode",
@@ -83,7 +83,8 @@ internal object L7ProbeLog {
         val latest = File(folder, files.last())
         if (latest.isFile) save(File(folder, files.first()), latest.readBytes().take(MAX_BYTES).toByteArray())
         save(latest, entries.joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8))
-        entries.forEach(L7DebugLog.buffer::append)
+        L7DebugLog.initialize(context)
+        entries.forEach { L7DebugLog.record(it) }
     }
 
     @Synchronized fun read(context: Context): List<String> = files.flatMap { name ->

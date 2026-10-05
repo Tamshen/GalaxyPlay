@@ -7,11 +7,11 @@
     <string name="l7_probe_reporting_details">候选权限 %1$s 项：已声明 %2$s，已授权 %3$s，定义可见 %4$s，AppOps 限制 %5$s。当前应用可见 SDK 类 %6$s/%7$s。实际上报尚未验证，不能据此判定支持或不支持。</string>
     <string name="l7_probe_qnx_unconfirmed">QNX 下游协议尚未确认；此项复查媒体中心入口，不代表 QNX 已收到数据。</string>
     <string name="l7_probe_next_reporting">下一步：查看下方每项候选权限的声明、授权、定义和 AppOps，结合厂商服务的实际拒绝原因核对要求。候选权限不等于必需权限，应用自身广播权限不代表厂商授权，SDK 类不可见不等于车机不支持。采集不会注册媒体源、抢占焦点或发送上报。</string>
-    <string name="l7_probe_back_debug">返回调试与日志</string>
+    <string name="l7_probe_back_debug">返回调试</string>
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
     <string name="l7_probe_executor">当前执行身份与辅助连接</string>
-    <string name="l7_probe_title">调试与日志</string>
-    <string name="l7_probe_entry_hint">检查运行环境、权限与接口，查看日志和报告</string>
+    <string name="l7_probe_title">调试</string>
+    <string name="l7_probe_entry_hint">环境与权限检测、方控及语音测试；明细默认写入日志</string>
     <string name="l7_probe_environment">环境与权限</string>
     <string name="l7_probe_modules">调试模块</string>
     <string name="l7_probe_logs">日志与报告</string>

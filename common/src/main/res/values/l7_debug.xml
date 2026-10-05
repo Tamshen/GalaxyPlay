@@ -36,4 +36,6 @@
     <string name="l7_debug_summary">%1$s · %2$s · 已淘汰 %3$d 条</string>
     <string name="l7_debug_live">实时</string>
     <string name="l7_debug_paused">显示暂停，仍在记录</string>
+    <string name="l7_logs_title">日志</string>
+    <string name="l7_logs_entry_hint">查看、导出与上传运行及调试日志</string>
 </resources>

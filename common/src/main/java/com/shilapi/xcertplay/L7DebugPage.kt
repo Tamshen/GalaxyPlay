@@ -12,12 +12,10 @@ internal class L7DebugPage(
     private val state: L7ProbeUiState,
     exporter: L7ProbeExporter,
     private val tasks: L7DebugTasks,
-    private val onLogs: () -> Unit,
     private val onNavigate: (String) -> Unit,
 ) {
     private val labels = L7ProbeLabels(activity)
     private var results: L7ProbeResultsView? = null
-    private var quickLogs: L7QuickLogActions? = null
     private var summary: L7SettingRow? = null
     private var start: L7SettingRow? = null
     private var view: L7SettingRow? = null
@@ -34,7 +32,6 @@ internal class L7DebugPage(
     }
 
     private fun home() {
-        quickLogs = L7QuickLogActions(activity, parent, onLogs, tasks::upload) { onNavigate("settings-debug-logs") }
         L7SettingsSection.add(parent, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
@@ -52,12 +49,10 @@ internal class L7DebugPage(
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_steering_title)) { onNavigate("settings-debug-steering") })
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_voice_title)) { onNavigate("settings-debug-voice") })
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_history)) { onNavigate("settings-debug-history") })
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_logs_and_reports)) { onNavigate("settings-debug-logs") })
         }
     }
 
     fun update() {
-        quickLogs?.update()
         results?.update()
         if (page == "settings-debug-history" && revision != L7ProbeRunner.revision) history()
         revision = L7ProbeRunner.revision

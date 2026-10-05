@@ -7,11 +7,11 @@
     <string name="l7_probe_reporting_details">%1$s candidate permissions: %2$s declared, %3$s granted, %4$s definitions visible, %5$s restricted by AppOps. SDK classes visible to this app: %6$s/%7$s. Actual reporting is untested; these checks cannot establish support or lack of support.</string>
     <string name="l7_probe_qnx_unconfirmed">The downstream QNX protocol is unconfirmed. This check examines the media center entry point; it does not confirm QNX reception.</string>
     <string name="l7_probe_next_reporting">Next: inspect each candidate permission declaration, grant, definition and AppOps below, then confirm requirements against actual service rejection evidence. Candidates are not confirmed requirements; app-owned broadcast permissions do not grant vendor access. Invisible SDK classes do not establish lack of vehicle support. Collection does not register media sources, take focus or send reports.</string>
-    <string name="l7_probe_back_debug">Back to Debug and logs</string>
+    <string name="l7_probe_back_debug">Back to Debug</string>
     <string name="l7_probe_packages">Visibility of reference packages</string>
     <string name="l7_probe_executor">Execution identity and auxiliary connections</string>
-    <string name="l7_probe_title">Debug and logs</string>
-    <string name="l7_probe_entry_hint">Check the environment, permissions and interfaces; view logs and reports</string>
+    <string name="l7_probe_title">Debug</string>
+    <string name="l7_probe_entry_hint">Environment, permission, steering and voice tests; details are logged by default</string>
     <string name="l7_probe_environment">Environment and permissions</string>
     <string name="l7_probe_modules">Debug modules</string>
     <string name="l7_probe_logs">Logs and reports</string>
