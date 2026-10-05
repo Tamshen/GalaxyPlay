@@ -141,6 +141,10 @@ def navigation_smoke():
     assert not any(n.get(key) in ('返回设置', '返回画面') for n in current
                    for key in ('text', 'content-desc')), '设置首页不应显示返回按钮'
     screenshot('hierarchy-categories-day')
+    tap('车型设置')
+    require_labels(['返回设置', '车型', '自动识别车型'])
+    screenshot('hierarchy-vehicle-day')
+    tap('返回设置')
     tap('显示与性能')
     settings_selected()
     assert not any(n.attrib.get('text') in ('L7CarPlay', 'L7 CarPlay') for n in nodes()), '子页重复显示应用标题栏'
