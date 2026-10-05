@@ -74,6 +74,7 @@ class DiPlayActivity : ComponentActivity() {
     private var status: TextView? = null
     private var connectButton: Button? = null
     private var disconnectButton: Button? = null
+    private var reconnectRow: L7SettingRow? = null
     private var lastRunning: Boolean? = null
     private var phoneDialog: AlertDialog? = null
     private var pendingWireless = false
@@ -285,6 +286,7 @@ class DiPlayActivity : ComponentActivity() {
         if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
         contentScroll = null; desktopPermissionHint = null; homePanel = null; usbButton = null
+        reconnectRow = null
         status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null; debugPage = null; steeringDebugPage = null
         if (l7Ui) {
             renderL7()
@@ -469,6 +471,9 @@ class DiPlayActivity : ComponentActivity() {
                 getString(R.string.l7_connection_usb_hint), R.drawable.ic_l7_usb) {
                 page = "settings-connection-usb"; render()
             })
+            reconnectRow = L7Components.actionRow(this, getString(R.string.l7_reconnect_current),
+                getString(R.string.l7_reconnect_current_hint), R.drawable.ic_l7_refresh, ::reconnectCurrent)
+                .also { card.addView(it) }
         }
     }
 
@@ -1346,6 +1351,19 @@ class DiPlayActivity : ComponentActivity() {
             .setPositiveButton(R.string.close, null).show()
     }
 
+    private fun reconnectCurrent() {
+        if (connectionRequestPending || CarPlayBackgroundSession.isStopping()) return
+        val current = CarPlayBackgroundSession.snapshot()?.controller
+        if (current == null || current.isClosed()) {
+            refreshStatus()
+            connectionProblem(getString(R.string.l7_reconnect_no_session))
+            return
+        }
+        L7DebugLog.record("手动重连当前会话 transport=${current.transport}")
+        // 沿用已有停止完成回调，旧控制器和媒体资源释放后才创建新会话。
+        connect(current.transport == com.shilapi.xcertplay.orchestration.CarPlayTransport.WIRELESS)
+    }
+
     private fun connect(wireless: Boolean, nativeHotspotPrepared: Boolean = false) {
         if (!L7Agreement.require(this)) return
         if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
@@ -1493,6 +1511,17 @@ class DiPlayActivity : ComponentActivity() {
         steeringDebugPage?.update()
         wiredSettings?.update(connectionRequestPending)
         val running = CarPlayBackgroundSession.hasSession()
+        val reconnectable = CarPlayBackgroundSession.snapshot()?.controller?.let { !it.isClosed() } == true
+        val restarting = connectionRequestPending || CarPlayBackgroundSession.isStopping()
+        reconnectRow?.apply {
+            isEnabled = reconnectable && !restarting && setupError == null
+            setFeedback(when {
+                restarting -> getString(R.string.reconnecting_to_your_iphone)
+                setupError != null -> setupError!!
+                !reconnectable -> getString(R.string.l7_reconnect_no_session)
+                else -> getString(R.string.l7_reconnect_ready)
+            })
+        }
         homePanel?.update(L7HomePanel.configured(this), running, CarPlayBackgroundSession.active,
             connectionRequestPending, setupError)
         status?.updateText(when {

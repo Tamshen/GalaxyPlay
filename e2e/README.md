@@ -92,6 +92,10 @@ e2e/
 
 ## 连接分步引导与失败提示
 
+`L7VoiceInputTestTest`／`L7VoiceInputDebugPageTest`／`L7VoiceTraceStoreTest` 覆盖显式授权、十秒限时、重复启动、后台／关闭、迟到创建、通话接管、错误释放、技术摘要与旧会话隔离。`python3 e2e/device/voice_input_smoke.py` 仅在 AVD 检查权限拒绝、授权后不自动采集、手动停止、后台停止、限时完成、中英文昼夜与返回；本地生成摘要日志，不连接手机或上传。真实 Siri 识别与听感另行验收。
+
+`L7ConnectionReconnectTest` 模拟旧会话延迟释放，检查连接设置第三项沿用当前无线／USB 传输方式、释放完成前不拉起宿主、重复点击和其他停止任务互斥、无会话／已关闭控制器禁用，以及页面结束或退出期间拒绝迟到重连。`python3 e2e/device/reconnect_settings_smoke.py` 检查第三项顺序、禁用原因、中英文昼夜和返回；仅允许未连接手机且已同意协议的 AVD，不建立连接或上传。真实手机重连结果另行验收。
+
 `L7WirelessPrerequisitesTest` 验证蓝牙关闭与失效配对不能通过、确认前不继续连接或申请权限；`L7HotspotActionsTest` 在 API 29/30 验证自动读取不弹窗、显式操作错误保留、权限拒绝不写入/开启、配置保存但超时不报成功、真实开启确认；配合 `L7HotspotTaskTest`、`L7WirelessHotspotGateTest` 和通用任务弹窗回归。`L7WiredSettingsTest` 检查进入仅检测、缺设备明确确认、已有设备沿用核心授权、能力不足阻止连接、后台丢弃迟到结果；`L7RoutesTest` 验证两个子页返回连接方式。
 
 中文、已同意协议的 AVD 运行 `python3 e2e/device/connection_guide_smoke.py`，检查首页/设置独立入口、三步引导、Header/系统返回、热点权限拒绝和读取失败强提示、USB 未就绪提示及中英文昼夜截图。脚本临时拒绝修改设置权限，结束恢复权限、语言与昼夜，不开启热点、不上传、不建立手机连接。`--english-only` 可只复核英文引导与失败弹窗。当前 AVD 未声明 USB Host，只验收能力不足分支；USB 等待/取消和浮动菜单等待页脚本需要支持 USB Host 的设备，不把未执行的等待场景记为通过。

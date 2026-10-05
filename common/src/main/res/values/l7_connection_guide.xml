@@ -5,6 +5,10 @@
     <string name="l7_connection_wireless_hint">3 步：开启原生热点 → 核对名称密码 → 连接 iPhone。</string>
     <string name="l7_connection_usb_hint">3 步：接入 USB 数据口 → 允许 USB 访问 → 在 iPhone 上允许 CarPlay。</string>
     <string name="l7_connection_back">返回连接方式</string>
+    <string name="l7_reconnect_current">重新连接当前连接</string>
+    <string name="l7_reconnect_current_hint">遇到无响应、声音或画面异常时，点击重新建立当前无线或 USB 连接。</string>
+    <string name="l7_reconnect_no_session">当前没有可重连的会话，请先选择连接方式。</string>
+    <string name="l7_reconnect_ready">沿用当前连接方式，重连进度以实际会话状态为准。</string>
     <string name="l7_wireless_steps">无线连接 · 3 步</string>
     <string name="l7_wireless_step1">1 · 开启 Android 原生热点</string>
     <string name="l7_wireless_step2">2 · 核对热点名称与密码</string>
