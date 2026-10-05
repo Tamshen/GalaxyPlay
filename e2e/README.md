@@ -80,9 +80,9 @@ e2e/
 
 `L7PermissionProbeTest` 检查授权与有效调用分离、特殊访问覆盖普通查询、未声明待验证、保护级别解析、查询异常脱敏、版本不适用与厂商回移定义，以及目录来源关系与异常原名保留。`L7SpecialAccessProbeTest` 在 API 29/30 覆盖五项特殊访问、使用情况访问默认模式与未知模式、所有文件访问版本门槛和异常类型；测试使用系统替身，不代表实车授权。日志回归额外覆盖大证据预算下仍保留 163 项结论；`L7ProbeStoreTest` 覆盖未知值、身份/schema 隔离、进程中断恢复、保存上限及定向删除。`L7ProbeRunnerTest` 检查进入页面不扫描、不上传，显式单项检查、协议门禁、取消/超时拒收迟到结果以及单工作线程约束。`L7ProbeExporterTest` 检查 Activity 创建阶段可注册导出组件，JSON 实际写入另由 AVD 检查。`L7ProbeStatusTest` 检查颜色状态的证据边界与默认全量；`L7ProbeLogTest` 检查逐项脱敏、两批落盘、字节预算，以及缓冲清空或大量会话日志下手动上传仍保留环境和权限结果、不自动发送。测试不证明厂商接口或实车权限可用。
 
-`L7ReportingProbeTest` 检查专项候选权限与 SDK 查询不推断业务支持、未知定义与未声明分别保留、SDK 不初始化及依赖缺失处理、QNX 下游未确认和证据导出；Runner 覆盖专项单项复查不启动全量扫描、不上传。
+`L7ReportingProbeTest` 检查专项候选权限与 SDK 查询不推断业务支持、未知定义与未声明分别保留、SDK 不初始化及依赖缺失处理、Android 媒体服务业务待验和证据导出；Runner 覆盖专项单项复查不启动全量扫描、不上传。
 
-在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、QNX 未确认提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
+在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、系统媒体显示待验提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/L7CarPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
 `L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 隐藏细节、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
 
@@ -91,8 +91,6 @@ e2e/
 `L7StartupRecoveryTest` 在 API 29/30 验证连续三次异常熔断、Java 异常落盘、native 退出分类、正常停止排除、稳定运行复位、手动重新启用与原配置保留。运行 `python3 e2e/device/startup_recovery_smoke.py`，仅允许 AVD，模拟三次进程崩溃并检查设置可访问、USB 直达被拦截；原偏好仅在内存备份，结束恢复，不清空认证、日志或报告，不上传。此测试验证启动保护，不代表已定位实车 USB 闪退原因。
 
 ## 连接分步引导与失败提示
-
-`L7VoiceInputTestTest`／`L7VoiceInputDebugPageTest`／`L7VoiceTraceStoreTest` 覆盖显式授权、十秒限时、重复启动、后台／关闭、迟到创建、通话接管、错误释放、技术摘要与旧会话隔离。`python3 e2e/device/voice_input_smoke.py` 仅在 AVD 检查权限拒绝、授权后不自动采集、手动停止、后台停止、限时完成、中英文昼夜与返回；本地生成摘要日志，不连接手机或上传。真实 Siri 识别与听感另行验收。
 
 `L7VoiceInputTestTest`／`L7VoiceInputDebugPageTest`／`L7VoiceTraceStoreTest` 覆盖显式授权、十秒限时、重复启动、后台／关闭、迟到创建、通话接管、错误释放、技术摘要与旧会话隔离。`python3 e2e/device/voice_input_smoke.py` 仅在 AVD 检查权限拒绝、授权后不自动采集、手动停止、后台停止、限时完成、中英文昼夜与返回；本地生成摘要日志，不连接手机或上传。真实 Siri 识别与听感另行验收。
 
@@ -130,7 +128,7 @@ e2e/
 
 ## 厂商 APK 离线定位
 
-`python3 e2e/checks/inspect_vendor_apks.py ../FlymeAutoOS/apk` 仅读取样本，报告默认写入忽略目录 `build/vendor-reference/apk-evidence.json`。检查多 DEX、最多两层嵌套 JAR／AAR／ZIP、目标 SDK 类定义与外部类型／字符串引用，以及原生库限定关键词计数；不解压到工作区、不执行 APK、不输出任意二进制字符串。DEX 表按 [AOSP 格式](https://source.android.com/docs/core/runtime/dex-format) 读取；只支持 035、037～040 的小端单 DEX 格式。损坏、超限或不支持的条目记录扫描缺口并返回非零，不能据此判断目标不存在；JAR 类路径只记未验证目录证据。`mediacenter` 名称且以 Service 结尾的类只列候选，不认定提供者或服务准入；原生库关键词命中也不证明 QNX 协议。
+`python3 e2e/checks/inspect_vendor_apks.py ../FlymeAutoOS/apk` 仅读取样本，报告默认写入忽略目录 `build/vendor-reference/apk-evidence.json`。检查多 DEX、最多两层嵌套 JAR／AAR／ZIP、目标 SDK 类定义与外部类型／字符串引用，以及原生库限定关键词计数；不解压到工作区、不执行 APK、不输出任意二进制字符串。DEX 表按 [AOSP 格式](https://source.android.com/docs/core/runtime/dex-format) 读取；只支持 035、037～040 的小端单 DEX 格式。损坏、超限或不支持的条目记录扫描缺口并返回非零，不能据此判断目标不存在；JAR 类路径只记未验证目录证据。`mediacenter` 名称且以 Service 结尾的类只列候选，不认定提供者或服务准入；原生库关键词命中也不证明原生服务接入契约。
 
 运行 `python3 -m unittest discover -s e2e/checks -p test_inspect_vendor_apks.py -v` 验证定义／引用隔离、完整性、截断、嵌套扫描和假阳性边界。`L7VendorServiceProbeTest` 在 API 29／30 验证媒体提供包和 SDK 旧路径候选组件独立查询、缺失／错误元数据、未声明组件权限、拒绝和异常脱敏；Context 只读取 PackageManager，不绑定服务或调用 Binder。实际安装后的组件证据随 `ENV-SDK-CONTRACT` 和 JSON／日志保留，准入仍待验证。
 

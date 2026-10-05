@@ -92,7 +92,7 @@ def english_table():
     tap('View check results')
     for heading in ('Item', 'Status', 'Reason', 'All'):
         find(heading)
-    for title in ('Media center reporting', 'HUD navigation reporting', 'Media QNX reporting'):
+    for title in ('Media center reporting', 'HUD navigation reporting', 'System media display'):
         find(title)
     visible = [n.get(key, '') for n in nodes().iter('node') for key in ('text', 'content-desc')]
     assert not any(re.search(r'[\u3400-\u9fff]', text) for text in visible), '英文结果表存在中文界面文案'
@@ -129,7 +129,8 @@ try:
     assert len(catalog['permissions']) == 163
     assert {item['name'] for item in catalog['permissions']} <= permissions.keys()
     assert report['probeVersion'] == 5
-    assert len(report['items']) == 184
+    assert len(report['items']) == report['expectedItems']
+    assert permissions['android.permission.CONTROL_VPN']['facts']['declared'] == 'true'
     contract = next(i for i in report['items'] if i['capabilityId'] == 'ENV-SDK-CONTRACT')
     assert contract['result'] == 'UNKNOWN' and contract['reason'] == 'SDK_CONTRACT_CHECKED'
     assert contract['facts']['effectiveCall'] == 'CLASS_SIGNATURE_AND_PACKAGE_QUERY_ONLY'
@@ -172,11 +173,11 @@ try:
     for heading in ('项目', '状态', '原因', '全部'):
         find(heading)
     screenshot('debug-table-all-day')
-    for title in ('媒体中心上报', 'HUD 导航上报', '媒体 QNX 上报'):
+    for title in ('媒体中心上报', 'HUD 导航上报', '系统媒体显示'):
         find(title)
-    tap('媒体 QNX 上报')
-    assert any('QNX 下游协议尚未确认' in n.get('text', '') for n in nodes().iter('node'))
-    screenshot('reporting-qnx-details-day')
+    tap('系统媒体显示')
+    assert any('此项复查 Android 媒体服务入口' in n.get('text', '') for n in nodes().iter('node'))
+    screenshot('reporting-system-media-details-day')
     tap('关闭')
     tap('结果筛选')
     tap('无权限')

@@ -2,10 +2,10 @@
 <resources>
     <string name="l7_probe_reporting_media">Media center reporting</string>
     <string name="l7_probe_reporting_hud">HUD navigation reporting</string>
-    <string name="l7_probe_reporting_qnx">Media QNX reporting</string>
+    <string name="l7_probe_reporting_qnx">System media display</string>
     <string name="l7_probe_reporting_short">Granted %1$s/%2$s · SDK %3$s/%4$s</string>
     <string name="l7_probe_reporting_details">%1$s candidate permissions: %2$s declared, %3$s granted, %4$s definitions visible, %5$s restricted by AppOps. SDK classes visible to this app: %6$s/%7$s. Actual reporting is untested; these checks cannot establish support or lack of support.</string>
-    <string name="l7_probe_qnx_unconfirmed">The downstream QNX protocol is unconfirmed. This check examines the media center entry point; it does not confirm QNX reception.</string>
+    <string name="l7_probe_qnx_unconfirmed">This check examines the Android media service entry point. Registration, field updates and actual system display require separate verification.</string>
     <string name="l7_probe_next_reporting">Next: inspect each candidate permission declaration, grant, definition and AppOps below, then confirm requirements against actual service rejection evidence. Candidates are not confirmed requirements; app-owned broadcast permissions do not grant vendor access. Invisible SDK classes do not establish lack of vehicle support. Collection does not register media sources, take focus or send reports.</string>
     <string name="l7_probe_back_debug">Back to Debug</string>
     <string name="l7_probe_packages">Visibility of reference packages</string>
