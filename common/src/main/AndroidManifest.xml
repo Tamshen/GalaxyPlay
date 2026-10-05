@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- VPN 控制候选权限需由系统授予；声明不能替代 ACTIVATE_VPN 的 AppOps 授权。 -->
+    <uses-permission android:name="android.permission.CONTROL_VPN" tools:ignore="ProtectedPermissions" />
     <!-- 用户主动授予，用于尝试开启 Android 原生热点；不代表获得配置写入权限。 -->
     <!-- 原生热点候选权限；声明不代表获得系统签名或特权授权，以实车调用为准。 -->
     <!-- 仅用于只读系统媒体会话查询；普通 APK 声明后仍可能被系统拒绝。 -->

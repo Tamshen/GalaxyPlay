@@ -61,4 +61,5 @@
     <string name="l7_wireless_bt_settings_missing">Bluetooth settings could not be opened. Open them from the head unit system settings, enable Bluetooth and pair iPhone.</string>
     <string name="l7_wireless_join_iphone">On your iPhone</string>
     <string name="l7_usb_permission_no_device">Pending: USB access can be checked after an Apple USB device is detected.</string>
+    <string name="l7_usb_vpn_adb_hint">With ADB connected to the head unit from a computer, try:\nadb shell appops set com.ecarx.carplay ACTIVATE_VPN allow\n\nCheck the result:\nadb shell appops get com.ecarx.carplay ACTIVATE_VPN\n\nReturn to the app and tap “Check and request consent again”. An allowed operation does not confirm a successful wired connection.</string>
 </resources>
