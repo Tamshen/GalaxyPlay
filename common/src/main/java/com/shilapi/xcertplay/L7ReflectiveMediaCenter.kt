@@ -99,12 +99,14 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
             try {
                 app.packageManager.getApplicationInfo(name, 0)
                 app.grantUriPermission(name, artwork, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                L7DebugLog.record("MediaCenter: artworkGrant transferId=${value.artworkTransferId ?: "none"} coverKey=${L7MediaArtworkProvider.diagnosticKey(artwork)} result=GRANTED target=$name")
             } catch (error: Exception) {
-                L7DebugLog.record("MediaCenter: artworkGrant exceptionType=${error.javaClass.simpleName}")
+                L7DebugLog.record("MediaCenter: artworkGrant transferId=${value.artworkTransferId ?: "none"} result=FAILED target=$name exceptionType=${error.javaClass.simpleName}")
             }
         }
         val cls = requireNotNull(infoClass)
         val snapshotTrack = "$trackSession:$track"
+        val artworkGetterReported = java.util.concurrent.atomic.AtomicBoolean()
         val getters = setOf("getTitle", "getArtist", "getAlbum", "getDuration", "getArtwork", "getSourceType",
             "getPlaybackStatus", "getPackageName", "getAppName", "getUuid", "isSupportCollect", "isSupportDownload", "isSupportLoopModeSwitch")
         info = SdkSubclass.create(cls, cls.methods.filter { it.name in getters }.toTypedArray(), InvocationHandler { _, method, _ ->
@@ -120,10 +122,21 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                 "getAlbum" -> value.album
                 "getDuration" -> value.durationMillis ?: 0L
                 "getArtwork" -> synchronized(this) {
-                    if (!valid || artwork == null) null else {
+                    if (!valid) null else {
                         val caller = android.os.Binder.getCallingUid()
-                        app.packageManager.getPackagesForUid(caller)?.forEach { name ->
-                            if (name != app.packageName) app.grantUriPermission(name, artwork, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        var failures = 0
+                        try {
+                            if (artwork != null) app.packageManager.getPackagesForUid(caller)?.forEach { name ->
+                                if (name != app.packageName) try {
+                                    app.grantUriPermission(name, artwork, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                } catch (_: Exception) { failures++ }
+                            }
+                        } catch (_: Exception) { failures++ }
+                        // 每个快照只记一次 getter；授权失败不抛出 Binder 回调，读取结果由 provider 记录。
+                        if (artworkGetterReported.compareAndSet(false, true)) {
+                            L7DebugLog.record("MediaCenter: artworkGetter transferId=${value.artworkTransferId ?: "none"} " +
+                                "coverKey=${artwork?.let(L7MediaArtworkProvider::diagnosticKey) ?: "none"} " +
+                                "available=${artwork != null} callerOwn=${caller == android.os.Process.myUid()} grantFailures=$failures")
                         }
                         artwork
                     }

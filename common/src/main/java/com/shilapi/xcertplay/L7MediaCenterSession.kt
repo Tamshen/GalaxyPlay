@@ -105,7 +105,9 @@ internal class L7MediaCenterSession(
         }
     }
 
-    fun update(value: CarPlayNowPlaying, uri: Uri? = snapshot.artwork) {
+    fun update(value: CarPlayNowPlaying, uri: Uri? = snapshot.let {
+        if (it.value.artworkTransferId == value.artworkTransferId) it.artwork else null
+    }) {
         if (closed) return
         snapshot = Snapshot(value, uri)
         if (scheduled.compareAndSet(false, true)) enqueue {
@@ -136,7 +138,8 @@ internal class L7MediaCenterSession(
         if (closed || !current()) return
         if (changed && value.playbackKnown && !foreignFocus && updateAttempts < 3) {
             updateAttempts++
-            event("updateState attempt=$updateAttempts artworkAvailable=${uri != null}")
+            event("updateState attempt=$updateAttempts artworkTransferId=${value.artworkTransferId ?: "none"} " +
+                "artworkAvailable=${uri != null} coverKey=${uri?.let(L7MediaArtworkProvider::diagnosticKey) ?: "none"}")
             if (safely("updateState") { port.update(value, uri) }) {
                 published = value
                 publishedArtwork = uri

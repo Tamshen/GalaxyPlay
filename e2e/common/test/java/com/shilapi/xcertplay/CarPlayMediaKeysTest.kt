@@ -10,6 +10,7 @@ import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.*
@@ -22,6 +23,47 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class CarPlayMediaKeysTest {
+    @Before fun resetProviderPathCache() {
+        org.robolectric.util.ReflectionHelpers.getStaticField<MutableMap<String, Any>>(
+            androidx.core.content.FileProvider::class.java, "sCache").clear()
+    }
+    @Test fun metadataListenerPublishesOneSnapshotWithSelectedCoverRatherThanPreviousUri() {
+        val app = RuntimeEnvironment.getApplication()
+        val controller = mock(CarPlayController::class.java)
+        var metadata: ((CarPlayNowPlaying) -> Unit)? = null
+        doAnswer { metadata = it.getArgument(0); null }.`when`(controller).nowPlayingListener = any()
+        val center = mock(L7MediaCenterSession::class.java)
+        val direct = java.util.concurrent.Executor { it.run() }
+        CarPlayMediaKeys.attach(app, controller, {})
+        val covers = L7MediaArtwork(app, direct, direct) { uri ->
+            val value: CarPlayNowPlaying = ReflectionHelpers.getField(CarPlayMediaKeys, "mediaInfo")
+            center.update(value, uri)
+        }
+        ReflectionHelpers.setField(CarPlayMediaKeys, "covers", covers)
+        ReflectionHelpers.setField(CarPlayMediaKeys, "mediaCenter", center)
+        try {
+            val bytes = java.io.ByteArrayOutputStream().also { output ->
+                android.graphics.Bitmap.createBitmap(10, 10, android.graphics.Bitmap.Config.ARGB_8888).let {
+                    it.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output); it.recycle()
+                }
+            }.toByteArray()
+            covers.submit(1, bytes)
+            val first = CarPlayNowPlaying(title = "first", artworkTransferId = 1, playbackKnown = true)
+            metadata!!(first)
+            val firstCalls = mockingDetails(center).invocations.filter { it.method.name == "update" }
+            assertEquals(1, firstCalls.size)
+            assertEquals(first, firstCalls.single().getArgument<CarPlayNowPlaying>(0))
+            assertNotNull(firstCalls.single().getArgument<android.net.Uri?>(1))
+            clearInvocations(center)
+            val next = first.copy(title = "second", artworkTransferId = 2)
+            metadata!!(next)
+            val nextCalls = mockingDetails(center).invocations.filter { it.method.name == "update" }
+            assertEquals(1, nextCalls.size)
+            assertEquals(next, nextCalls.single().getArgument<CarPlayNowPlaying>(0))
+            assertNull(nextCalls.single().getArgument<android.net.Uri?>(1))
+        } finally { CarPlayMediaKeys.detach(controller) }
+    }
+
     @Test fun metadataBeforeAirPlayActivationIsHeldUntilRealSessionThenReplayed() {
         val app = RuntimeEnvironment.getApplication()
         val resources = spy(app.resources)

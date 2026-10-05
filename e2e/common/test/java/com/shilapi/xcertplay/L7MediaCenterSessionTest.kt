@@ -26,6 +26,7 @@ class L7MediaCenterSessionTest {
         override var source = L7MediaCenterPort.CARPLAY_SOURCE
         val calls = mutableListOf<String>()
         val updates = mutableListOf<CarPlayNowPlaying>()
+        val artworks = mutableListOf<Uri?>()
         var token = true
         var acceptSource = true
         var failState = false
@@ -43,7 +44,7 @@ class L7MediaCenterSessionTest {
         override fun requestPlay(): Boolean { calls += "request"; return true }
         override fun focusClient() = currentFocus
         override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
-            calls += "state"; updates += value
+            calls += "state"; updates += value; artworks += artwork
             if (failState) throw SecurityException("private-error")
             return acceptState
         }
@@ -78,6 +79,18 @@ class L7MediaCenterSessionTest {
 
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
+
+    @Test fun aNewTransferDoesNotReusePreviousArtworkWhileProgressKeepsCurrentArtwork() {
+        connect()
+        val cover = Uri.parse("content://own/first.jpg")
+        session.update(playing().copy(artworkTransferId = 1), cover); worker.drain()
+        session.update(playing(100).copy(artworkTransferId = 1)); worker.drain()
+        assertEquals(cover, port.artworks.last())
+        session.update(playing().copy(title = "next", artworkTransferId = 2)); worker.drain()
+        assertNull(port.artworks.last())
+        session.update(playing().copy(title = "next", artworkTransferId = null)); worker.drain()
+        assertNull(port.artworks.last())
+    }
 
     @Test fun delayedRetryRecoversPausedMetadataWithoutAnotherPhoneEvent() {
         connect(); port.acceptState = false
