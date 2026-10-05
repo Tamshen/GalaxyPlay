@@ -42,11 +42,15 @@ internal object L7StartupGuard {
     }
 
     @Synchronized fun install(context: Context) {
+        L7WiredDiagnostics.recover(context)
         val state = state(context)
         if (handlerInstalled) return
         handlerInstalled = true
         val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler(L7CrashRecorder(previous) { state.recordCrash(it) })
+        Thread.setDefaultUncaughtExceptionHandler(L7CrashRecorder(previous) {
+            L7WiredDiagnostics.crash(context.applicationContext, it)
+            state.recordCrash(it)
+        })
     }
 
     private fun previousExit(context: Context, state: L7StartupRecovery): L7StartupRecovery.Exit {
@@ -111,6 +115,7 @@ internal object L7StartupGuard {
     }
 
     fun showNotice(activity: Activity, onLogs: () -> Unit) {
+        if (L7WiredDiagnostics.showNotice(activity, onLogs)) return
         val state = state(activity)
         if (noticeShown || !state.notice && !writeFailed) return
         noticeShown = true

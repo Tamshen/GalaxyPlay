@@ -21,7 +21,10 @@ internal class CarPlayMediaSession(
     private val context: Context,
     private val onPlaybackStarted: () -> Unit,
     private val send: (Int, String) -> Unit,
+    private val traceSend: ((Int, String, L7SteeringTrace) -> Unit)?,
 ) : Closeable {
+    constructor(context: Context, onPlaybackStarted: () -> Unit, send: (Int, String) -> Unit) :
+        this(context, onPlaybackStarted, send, null)
     private val handler = Handler(Looper.getMainLooper())
     private var nowPlaying = CarPlayNowPlaying()
     private var elapsedUpdatedAt = 0L
@@ -43,15 +46,19 @@ internal class CarPlayMediaSession(
     internal var session: MediaSession? = null
         private set
 
-    private val callback = CarPlayMediaCallback(explicitHardwareActions = true) { index, source ->
-        if (!closed) {
-            // 已知手机状态时将切换键转成明确命令，延迟播放不能反向切成暂停。
-            val command = if (index == CarPlayMediaButton.PLAY_PAUSE && phonePlaying != null) {
-                if (phonePlaying == true) CarPlayMediaButton.PAUSE else CarPlayMediaButton.PLAY
-            } else index
-            emit("command source=$source index=$command phonePlaying=$phonePlaying streamActive=$audioActive")
-            send(command, source)
-        }
+    private val callback = CarPlayMediaCallback(explicitHardwareActions = true,
+        tracedSend = traceSend?.let { { index, source, trace -> command(index, source, trace) } }) { index, source ->
+        command(index, source, null)
+    }
+
+    private fun command(index: Int, source: String, trace: L7SteeringTrace?) {
+        if (closed) { trace?.step("DROP", "MEDIA_SESSION_CLOSED"); return }
+        val command = if (index == CarPlayMediaButton.PLAY_PAUSE && phonePlaying != null) {
+            if (phonePlaying == true) CarPlayMediaButton.PAUSE else CarPlayMediaButton.PLAY
+        } else index
+        trace?.step("MAPPED", "index=$command phonePlaying=$phonePlaying streamActive=$audioActive connected=$connected")
+        emit("command source=$source index=$command phonePlaying=$phonePlaying streamActive=$audioActive")
+        if (trace != null && traceSend != null) traceSend.invoke(command, source, trace) else send(command, source)
     }
 
     /** 当前 CarPlay 窗口收到标准媒体键时走同一命令路径，不交给残留蓝牙媒体会话。 */

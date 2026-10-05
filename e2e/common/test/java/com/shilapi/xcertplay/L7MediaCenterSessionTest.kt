@@ -55,6 +55,22 @@ class L7MediaCenterSessionTest {
     private val sent = mutableListOf<Int>()
     private val logs = mutableListOf<String>()
     private val session = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index }, worker, main, logs::add)
+    @Test fun diagnosticTraceStartsBeforeOemFilteringAndRejectsLateMainDelivery() {
+        val store = L7SteeringDiagnostics.store
+        store.clear()
+        var delivered = 0
+        val traced = L7MediaCenterSession(port, "own", { current }, { _, _ -> delivered++ }, worker, main, logs::add,
+            traceSend = { _, _, _ -> delivered++ })
+        traced.start(); worker.drain(); port.ready(true); worker.drain()
+        assertTrue(port.command(CarPlayMediaButton.NEXT))
+        val ticket = store.snapshot().events.last { it.stage == "OEM_MAIN_QUEUED" }.id
+        traced.close()
+        main.drain()
+        assertEquals(0, delivered)
+        assertEquals("LATE_OEM_CALLBACK", store.snapshot().events.last { it.id == ticket }.detail)
+        worker.drain()
+    }
+
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
 

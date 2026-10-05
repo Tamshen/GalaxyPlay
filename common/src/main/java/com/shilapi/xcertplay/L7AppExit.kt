@@ -50,6 +50,7 @@ internal object L7AppExit {
     private fun stop(context: Context, completion: () -> Unit) {
         if (exiting) return
         exiting = true
+        L7WiredDiagnostics.stopped(context)
         L7StartupGuard.stopped()
         RemoteLogUpload.cancel()
         L7ProbeRunner.stop()

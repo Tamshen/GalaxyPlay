@@ -49,6 +49,10 @@ e2e/
 
 ## 上游核心回归
 
+有线启动专项：`L7VpnConsentTest` 覆盖 VPN 已准备、缺少授权页面、服务／启动拒绝、其他调用异常、用户拒绝／取消、重复请求和销毁后的迟到回调；`L7WiredJournalTest` 覆盖关闭自动连接时的崩溃摘要、两次尝试、退出分类、旧尝试隔离、容量淘汰、主动结束及清空；`L7WiredUploadTest` 验证媒体／探测记录挤满预算时仍保留两次失败摘要与退出诊断，不包含异常消息。
+
+`python3 e2e/device/wired_vpn_smoke.py` 仅允许已同意协议的中文 AVD 和内置认证测试 APK。临时禁用模拟器 VPN 授权页面并恢复，核对原因提示、三个操作入口、进程存活、手动重试、两次失败记录和返回设置；自动连接、无线偏好、独立诊断、VPN AppOp 与相关运行时权限在结束时恢复。不上传或导出真实认证材料，不连接真实手机。截图位于忽略目录 `build/previews/wired-vpn/`。
+
 | 范围 | 主要用例与检阅点 |
 | --- | --- |
 | 会话 / 输入 | `AirPlayControlDiagnosticsTest`、`AirPlayHidInputSemanticsTest`、`CarPlayTouchMapperTest` 检查控制诊断、旋钮语义与触控映射；共享核心按官方 0.2.11 迁入，产品仍使用 L7 单路显示 |
@@ -65,6 +69,12 @@ e2e/
 `L7HotspotProbeTest` 覆盖独立读取、API 29 门槛、拒绝／服务缺失／隐藏接口、空配置／掩码／有效配置以及 JSON 脱敏；`L7ProbeRunnerTest` 另验证单项热点复查不上传、不覆盖凭据。`NativeHotspotConfigurationTest` 用 API 30 系统替身覆盖 setter 返回、不可回读、回读不一致、异常类型脱敏和已开热点不重配；`CarHotspotTetheringTest` 区分已有热点、启动请求、回调与实际状态确认。现有热点任务和无线门禁回归继续覆盖读取失败保留配置、拒绝／取消和设置恢复。
 
 `L7BluetoothMediaGuardTest` 追加当前会话启用、等待中关闭、快速切换预算、旧确认超时、暂停与已关闭／失败保护器的回归。测试只模拟目标 A2DP，不证明 L7 蓝牙交接或厂商热点授权可用。
+
+## 方控锚点与调试页面
+
+`L7SteeringDiagnosticsTest` 检查同一输入关联、蓝牙与队列耗时、过滤与旧会话原因、取消和有界记录；媒体回调测试覆盖重复 DOWN、UP、未知键和迟到 OEM 主线程回调。`L7BluetoothMediaGuardTest` 检查替换、暂停和关闭取消通知不重放命令；`L7SteeringLogTest` 检查方控轮转不覆盖连接日志、清除后可继续记录。
+
+`python3 e2e/device/steering_debug_smoke.py --adb ../tools/scripts/adb.sh` 仅在已同意协议的中文 AVD 检查入口、问题标记实际落盘、清屏保留日志、昼夜与两级返回。不建立连接或上传，不证明物理方控修复；截图留在忽略目录。
 
 ## 基础调试回归
 

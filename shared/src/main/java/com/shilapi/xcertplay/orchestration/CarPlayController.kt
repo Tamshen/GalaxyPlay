@@ -478,22 +478,32 @@ class CarPlayController(
 
     fun sendMediaButton(index: Int): Boolean = sendMediaButton(index, activeSession)
 
-    fun sendMediaButton(index: Int, expectedOwner: Any?): Boolean {
-        if (closed) return false
-        val session = activeSession ?: return false
-        if (session !== expectedOwner) return false
+    fun sendMediaButton(index: Int, expectedOwner: Any?, diagnostic: ((String, String) -> Unit)? = null): Boolean {
+        // 诊断回调不应阻断控制链路，不向宿主暴露会话身份或载荷。
+        fun anchor(stage: String, reason: String = "") { try { diagnostic?.invoke(stage, reason) } catch (_: Exception) {} }
+        if (closed) { anchor("DROP", "CLOSED"); return false }
+        val session = activeSession ?: run { anchor("DROP", "NO_SESSION"); return false }
+        if (session !== expectedOwner) { anchor("DROP", "STALE_SESSION"); return false }
         return try {
+            anchor("QUEUE_SUBMIT")
             touchExecutor.execute {
+                anchor("QUEUE_EXECUTE")
                 if (closed || activeSession !== session) {
+                    anchor("DROP", "STALE_SESSION")
                     debugLog("Audio: media execute index=$index drop=STALE_SESSION")
                 } else try {
-                    debugLog("Audio: media execute index=$index channelWritten=${session.sendMediaChecked(index)}")
+                    anchor("CHANNEL_WRITE_BEGIN")
+                    val written = session.sendMediaChecked(index)
+                    anchor(if (written) "CHANNEL_WRITTEN" else "CHANNEL_FAILED")
+                    debugLog("Audio: media execute index=$index channelWritten=$written")
                 } catch (error: Exception) {
+                    anchor("CHANNEL_FAILED", error.javaClass.simpleName)
                     debugLog("Audio: media execute index=$index exceptionType=${error.javaClass.simpleName}")
                 }
             }
             true
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            anchor("DROP", "QUEUE_REJECTED:${error.javaClass.simpleName}")
             false
         }
     }

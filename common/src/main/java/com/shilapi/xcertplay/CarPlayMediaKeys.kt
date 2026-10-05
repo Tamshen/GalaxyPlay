@@ -36,19 +36,22 @@ internal object CarPlayMediaKeys {
         covers = null
         mediaCenter = null
         steeringWheel?.close()
+        L7SteeringDiagnostics.store.connection(false)
         controller = next
         mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
         pendingArtwork = null
         commandGate = L7MediaCommandGate()
-        val dispatch = dispatcher(next, onPlaybackStarted)
-        bridge = CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch)
-        next.sessionStateListener = { active -> onConnection(context, next, active, dispatch) }
+        val commands = dispatcher(next, onPlaybackStarted)
+        val dispatch: (Int, String) -> Unit = { index, source -> commands.dispatch(index, source, L7SteeringDiagnostics.begin(source, index)) }
+        val traced: (Int, String, L7SteeringTrace) -> Unit = commands::dispatch
+        bridge = CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch, traced)
+        next.sessionStateListener = { active -> onConnection(context, next, active, dispatch, traced) }
         next.navigationListener = { value -> synchronized(this) { if (controller === next) navigation?.update(value) } }
         next.playbackListener = { playing ->
-            synchronized(this) { if (controller === next) bridge?.onIphonePlaying(playing) }
+            synchronized(this) { if (controller === next) { L7SteeringDiagnostics.store.state("phonePlayback", "playing=$playing"); bridge?.onIphonePlaying(playing) } }
         }
         next.nowPlayingListener = { update ->
-            synchronized(this) { if (controller === next) { bridge?.onNowPlayingChanged(update); mediaInfo = update; if (update == com.shilapi.xcertplay.media.CarPlayNowPlaying()) pendingArtwork = null; mediaCenter?.update(update); covers?.select(update.artworkTransferId) } }
+            synchronized(this) { if (controller === next) { if (update.playbackKnown) L7SteeringDiagnostics.store.state("phonePlayback", "playing=${update.playing}"); bridge?.onNowPlayingChanged(update); mediaInfo = update; if (update == com.shilapi.xcertplay.media.CarPlayNowPlaying()) pendingArtwork = null; mediaCenter?.update(update); covers?.select(update.artworkTransferId) } }
         }
         next.artworkListener = { id, bytes ->
             synchronized(this) { if (controller === next) {
@@ -63,19 +66,22 @@ internal object CarPlayMediaKeys {
                 synchronized(this) { controller === next && next.requestSiri() }
             }.also { it.start() }
         }
-        onConnection(context, next, next.hasActiveSession(), dispatch)
+        onConnection(context, next, next.hasActiveSession(), dispatch, traced)
     }
 
-    private fun dispatcher(next: CarPlayController, onPlaybackStarted: () -> Unit): (Int, String) -> Unit =
+    private fun dispatcher(next: CarPlayController, onPlaybackStarted: () -> Unit): L7MediaCommandDispatcher =
         L7MediaCommandDispatcher(next::activeMediaSessionOwner,
             { synchronized(this) { controller === next } },
             { index, source -> synchronized(this) { commandGate.accept(index, source) } },
             { index, action -> CarPlayBackgroundSession.beforeMediaCommand(next, index, action) },
-            CarPlayVideo::onMediaKey, { index, owner -> next.sendMediaButton(index, owner) }, onPlaybackStarted)::dispatch
+            CarPlayVideo::onMediaKey, { index, owner -> next.sendMediaButton(index, owner) }, onPlaybackStarted,
+            traceSend = { index, owner, trace -> next.sendMediaButton(index, owner, trace::step) },
+            traceBefore = { index, action, dropped -> CarPlayBackgroundSession.beforeMediaCommand(next, index, action, dropped) })
 
     @Synchronized private fun onConnection(context: Context, next: CarPlayController, active: Boolean,
-                                          dispatch: (Int, String) -> Unit) {
+                                          dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit) {
         if (controller !== next) return
+        L7SteeringDiagnostics.store.connection(active)
         bridge?.onConnected(active)
         if (!active) {
             commandGate = L7MediaCommandGate()
@@ -106,7 +112,7 @@ internal object CarPlayMediaKeys {
             pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
             pendingArtwork = null
             mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext), context.packageName,
-                { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch).also { it.start(); it.update(mediaInfo) }
+                { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced).also { it.start(); it.update(mediaInfo) }
             coverOwner.select(mediaInfo.artworkTransferId)
         }
         if (active) bridge?.onNowPlayingChanged(mediaInfo)
@@ -131,6 +137,7 @@ internal object CarPlayMediaKeys {
         pendingArtwork = null
         mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
         controller = null
+        L7SteeringDiagnostics.store.connection(false)
     }
 
     private fun stopNavigation() {
@@ -141,11 +148,18 @@ internal object CarPlayMediaKeys {
     }
 
     @Synchronized fun onMediaAudioChanged(expected: CarPlayController, active: Boolean) {
-        if (controller === expected) bridge?.onMediaAudioChanged(active)
+        if (controller === expected) { L7SteeringDiagnostics.store.state("audioStream", "active=$active"); bridge?.onMediaAudioChanged(active) }
     }
 
-    @Synchronized fun onHardwareKey(expected: CarPlayController?, event: KeyEvent): Boolean =
-        expected != null && controller === expected && expected.hasActiveSession() && bridge?.onHardwareKey(event) == true
+    @Synchronized fun onHardwareKey(expected: CarPlayController?, event: KeyEvent): Boolean {
+        if (CarPlayMediaButton.forKeyCode(event.keyCode) == null) return false
+        if (expected == null || controller !== expected || !expected.hasActiveSession()) {
+            L7SteeringDiagnostics.begin("window-key", -1, "code=${event.keyCode} action=${event.action} repeat=${event.repeatCount}")
+                .step("DROP", if (expected == null || !expected.hasActiveSession()) "NO_SESSION" else "STALE_CONTROLLER")
+            return false
+        }
+        return bridge?.onHardwareKey(event) == true
+    }
 
     @Synchronized fun onVoiceKey(expected: CarPlayController?): Boolean =
         expected != null && controller === expected && steeringWheel?.onVoiceKey() == true
@@ -154,6 +168,7 @@ internal object CarPlayMediaKeys {
 /** 系统媒体控制用明确播放/暂停，硬件键保持上游切换语义；长按重复事件不转发。 */
 internal class CarPlayMediaCallback(
     private val explicitHardwareActions: Boolean = false,
+    private val tracedSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
     private val send: (index: Int, source: String) -> Unit,
 ) : MediaSession.Callback() {
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
@@ -166,15 +181,25 @@ internal class CarPlayMediaCallback(
         L7DebugLog.record("Audio: media key source=$source action=${event.action} repeat=${event.repeatCount} code=${event.keyCode}")
         val index = if (explicitHardwareActions && event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) CarPlayMediaButton.PLAY
             else if (explicitHardwareActions && event.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) CarPlayMediaButton.PAUSE
-            else CarPlayMediaButton.forKeyCode(event.keyCode) ?: return false
+            else CarPlayMediaButton.forKeyCode(event.keyCode) ?: run {
+                if (tracedSend != null) L7SteeringDiagnostics.begin(source, -1, "code=${event.keyCode} action=${event.action}").step("DROP", "UNSUPPORTED_KEY")
+                return false
+            }
+        val origin = "$source:${KeyEvent.keyCodeToString(event.keyCode)}"
+        val trace = if (tracedSend != null) L7SteeringDiagnostics.begin(origin, index,
+            "code=${event.keyCode} action=${event.action} repeat=${event.repeatCount}") else null
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            send(index, "$source:${KeyEvent.keyCodeToString(event.keyCode)}")
-        }
+            if (trace != null) tracedSend?.invoke(index, origin, trace) else send(index, origin)
+        } else trace?.step("FILTER", if (event.repeatCount != 0) "REPEAT" else "KEY_UP_OR_OTHER_ACTION")
         return true
     }
 
-    override fun onPlay() = send(CarPlayMediaButton.PLAY, "controller-play")
-    override fun onPause() = send(CarPlayMediaButton.PAUSE, "controller-pause")
-    override fun onSkipToNext() = send(CarPlayMediaButton.NEXT, "next")
-    override fun onSkipToPrevious() = send(CarPlayMediaButton.PREVIOUS, "previous")
+    private fun command(index: Int, source: String) {
+        if (tracedSend != null) tracedSend.invoke(index, source, L7SteeringDiagnostics.begin(source, index)) else send(index, source)
+    }
+
+    override fun onPlay() = command(CarPlayMediaButton.PLAY, "controller-play")
+    override fun onPause() = command(CarPlayMediaButton.PAUSE, "controller-pause")
+    override fun onSkipToNext() = command(CarPlayMediaButton.NEXT, "next")
+    override fun onSkipToPrevious() = command(CarPlayMediaButton.PREVIOUS, "previous")
 }

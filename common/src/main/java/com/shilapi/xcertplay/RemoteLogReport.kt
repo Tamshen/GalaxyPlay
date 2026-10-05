@@ -67,6 +67,12 @@ internal data class RemoteLogReport(
                     }
                     for (line in result.getOrThrow().lineSequence()) yield(name to line)
                 }
+                // 位于采集尾部，连续两次失败摘要不会被大量媒体／探测记录挤掉。
+                val wired = L7WiredDiagnostics.report(context)
+                if (wired.isNotEmpty()) {
+                    wired.forEach { yield("wired-startup" to it) }
+                    ProcessExitDiagnostics.report(context).lineSequence().forEach { yield("process-exits" to it) }
+                }
             }
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
             return build(lines, version, context.getString(R.string.l7_core_source_info),

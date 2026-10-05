@@ -24,6 +24,7 @@ internal class L7MediaCenterSession(
     private val worker: Executor = workers,
     private val main: Executor = Executor { Handler(Looper.getMainLooper()).post(it) },
     private val log: (String) -> Unit = L7DebugLog::record,
+    private val traceSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val events = AtomicLong()
@@ -126,12 +127,24 @@ internal class L7MediaCenterSession(
     }
 
     private fun command(index: Int): Boolean {
+        val trace = traceSend?.let { L7SteeringDiagnostics.begin("mediacenter", index,
+            "registered=$registered foreignFocus=$foreignFocus closed=$closed") }
         event("callback index=$index registered=$registered phoneKnown=${latest.playbackKnown} playing=${latest.playing}")
-        if (closed || !current() || !registered || foreignFocus) { event("drop reason=SESSION_OR_CONTROL_UNAVAILABLE"); return false }
-        main.execute {
-            if (!closed && current() && registered && !foreignFocus) send(index, "mediacenter")
-            else event("drop reason=LATE_CALLBACK")
+        val reason = when {
+            closed -> "OEM_CLOSED"
+            !current() -> "STALE_SESSION"
+            !registered -> "OEM_NOT_REGISTERED"
+            foreignFocus -> "FOREIGN_FOCUS"
+            else -> null
         }
+        if (reason != null) { trace?.step("DROP", reason); event("drop reason=SESSION_OR_CONTROL_UNAVAILABLE"); return false }
+        trace?.step("OEM_MAIN_QUEUED")
+        try { main.execute {
+            if (!closed && current() && registered && !foreignFocus) {
+                trace?.step("OEM_MAIN_EXECUTE")
+                if (trace != null) traceSend?.invoke(index, "mediacenter", trace) else send(index, "mediacenter")
+            } else { trace?.step("DROP", "LATE_OEM_CALLBACK"); event("drop reason=LATE_CALLBACK") }
+        } } catch (error: RuntimeException) { trace?.step("DROP", "OEM_MAIN_REJECTED"); failure("commandQueue", error); return false }
         return true
     }
 
@@ -168,6 +181,10 @@ internal class L7MediaCenterSession(
         event("$stage exceptionType=${cause.javaClass.simpleName}")
     }
     private fun event(body: String) {
+        if (traceSend != null && !closed && current() && !body.startsWith("updateProgress")) {
+            L7SteeringDiagnostics.store.state("oemRegistration", "registered=$registered foreignFocus=$foreignFocus ready=$ready")
+            L7SteeringDiagnostics.store.state("mediaCenter", "generation=$generation $body")
+        }
         log("MediaCenter: generation=$generation event=${events.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body")
     }
     @Synchronized override fun close() {

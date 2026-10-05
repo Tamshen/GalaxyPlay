@@ -178,6 +178,7 @@ internal object L7ProbeRunner {
                     AsyncDiagnosticLog.clear(File(app.filesDir, "logs"))
                     L7ProbeLog.clear(app)
                     L7DebugLog.buffer.clear()
+                    L7WiredDiagnostics.clear(app)
                 } else {
                     store(app).clear()
                     history = emptyList()

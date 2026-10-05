@@ -12,6 +12,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30], manifest = Config.NONE)
 class L7BluetoothMediaGuardTest {
+    @Test fun diagnosticWaitsIdentifySupersessionPauseAndCloseWithoutReplaying() {
+        val guard = guard()
+        guard.start(); idle()
+        val drops = mutableListOf<String>()
+        var sent = 0
+        guard.beforePlay({ sent++ }, drops::add); idle()
+        guard.beforePlay({ sent++ }, drops::add); idle()
+        guard.cancelPendingPlay(); idle()
+        guard.beforePlay({ sent++ }, drops::add); idle()
+        guard.close(); idle()
+        assertEquals(listOf("SUPERSEDED_PLAY", "CANCELLED_BY_PAUSE", "BLUETOOTH_CLOSED"), drops)
+        assertEquals(0, sent)
+    }
+
     private val statuses = mutableListOf<BluetoothMediaStatus>()
     private val port = Port()
 
