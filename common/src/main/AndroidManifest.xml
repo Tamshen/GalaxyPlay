@@ -23,6 +23,7 @@
         <package android:name="com.huawei.nearby" />
         <package android:name="com.lge.car" />
         <package android:name="ecarx.xsf.mediacenter" />
+        <package android:name="com.ecarx.sdk.openapi" />
     </queries>
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

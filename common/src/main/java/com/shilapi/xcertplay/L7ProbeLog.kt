@@ -27,7 +27,7 @@ internal object L7ProbeLog {
         "definitionVisibleCount", "restrictedCount", "sdkVisibleCount", "sdkCount", "sdkChecks",
         "activeSessionCount", "ownSessionCount", "ownPlaybackStates", "mediaSdkSource", "navigationSdkSource",
         "mediaContract", "navigationContract", "mediaExceptionType", "navigationExceptionType",
-        "mediaCallbackKind", "mediaSourceEvidence", "navigationMapping",
+        "mediaCallbackKind", "mediaSourceEvidence", "mediaRegistration", "navigationMapping",
         "method", "apState", "hotspotEnabled", "ssidPresent", "passwordPresent", "security",
         "configValid", "passwordMasked", "exceptionType", "serviceAuthorization", "reportingSupported", "qnxProtocol",
     ) + L7ReportingProbe.permissionFactKeys + L7VendorServiceProbe.factKeys
