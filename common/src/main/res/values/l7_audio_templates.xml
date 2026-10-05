@@ -5,6 +5,11 @@
     <string name="l7_template_l7">L7 配置</string>
     <string name="l7_template_l6">L6 配置</string>
     <string name="l7_template_model">车型</string>
+    <string name="l7_template_detect">自动识别车型</string>
+    <string name="l7_template_detect_unknown">未能确认车型，请手动选择。</string>
+    <string name="l7_template_detect_title">确认识别车型</string>
+    <string name="l7_template_detect_confirm">识别到%1$s。请核对实际车型，确认后使用对应音频方案；两车型的自定义文件保留，当前连接不变。下次连接生效。</string>
+    <string name="l7_template_detect_retain">保留当前车型</string>
     <string name="l7_template_model_l7">银河 L7</string>
     <string name="l7_template_model_l6">银河 L6</string>
     <string name="l7_template_l6_note">适用于银河 L6，采用原厂手车互联的音频用途与焦点。播放位置由车机安排。下次连接生效。</string>

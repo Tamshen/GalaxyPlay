@@ -31,8 +31,19 @@ internal object L7AudioSettings {
             card.addView(L7Components.valueRow(context, text(R.string.l7_template_model), modelNames[model.ordinal]) {
                 L7Components.select(context, text(R.string.l7_template_model), modelNames, model.ordinal,
                     text(R.string.l7_save_next_connection)) { selected ->
-                    change(context) { L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.entries[selected]); refresh() }
+                    change(context) {
+                        L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.entries[selected])
+                        L7AudioModelConfirmation.markReviewed(context)
+                        refresh()
+                    }
                 }
+            })
+            val detected = L7AudioModelDetector.detect()
+            card.addView(L7Components.valueRow(context, text(R.string.l7_template_detect),
+                detected?.let { L7AudioModelConfirmation.name(context, it) } ?: text(R.string.l7_template_detect_unknown)) {
+                if (detected == null) android.widget.Toast.makeText(context,
+                    R.string.l7_template_detect_unknown, android.widget.Toast.LENGTH_LONG).show()
+                else L7AudioModelConfirmation.confirm(context, detected, ::refresh)
             })
             card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[modes.indexOf(mode)]) {
                 L7Components.select(context, text(R.string.l7_template_select), names, modes.indexOf(mode),

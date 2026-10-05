@@ -86,6 +86,8 @@ e2e/
 
 `L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 隐藏细节、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
 
+`L7AudioModelDetectionTest` 在 API 29／30 核对 g636／g733、完整标识／大小写、未知／冲突、二次确认、保留当前车型、重复恢复和旧回调失效；`L6AudioTemplatesTest` 核对车型文件与方案隔离、旧 L7 迁移、损坏回退和备份恢复。已同意协议的 AVD 运行 `python3 e2e/device/l6_audio_model_smoke.py`，检查中英文车型选择／取消、L6 昼夜、自定义编辑取消及切换保留，结束恢复原偏好、两份模板和昼夜；不连接手机或上传。模拟器没有车型标识时只验证手动路径，自动识别结果不冒充实车通过。
+
 ## 启动崩溃保护
 
 `L7StartupRecoveryTest` 在 API 29/30 验证连续三次异常熔断、Java 异常落盘、native 退出分类、正常停止排除、稳定运行复位、手动重新启用与原配置保留。运行 `python3 e2e/device/startup_recovery_smoke.py`，仅允许 AVD，模拟三次进程崩溃并检查设置可访问、USB 直达被拦截；原偏好仅在内存备份，结束恢复，不清空认证、日志或报告，不上传。此测试验证启动保护，不代表已定位实车 USB 闪退原因。

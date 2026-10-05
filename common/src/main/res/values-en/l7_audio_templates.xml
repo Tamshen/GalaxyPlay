@@ -5,6 +5,11 @@
     <string name="l7_template_l7">L7 profile</string>
     <string name="l7_template_l6">L6 profile</string>
     <string name="l7_template_model">Vehicle model</string>
+    <string name="l7_template_detect">Detect vehicle model</string>
+    <string name="l7_template_detect_unknown">Model could not be confirmed. Select it manually.</string>
+    <string name="l7_template_detect_title">Confirm detected model</string>
+    <string name="l7_template_detect_confirm">Detected %1$s. Check the actual model before applying its audio profile. Custom files for both models are kept. The current connection stays unchanged. Applies on the next connection.</string>
+    <string name="l7_template_detect_retain">Keep current model</string>
     <string name="l7_template_model_l7">Galaxy L7</string>
     <string name="l7_template_model_l6">Galaxy L6</string>
     <string name="l7_template_l6_note">For Galaxy L6, using audio roles and focus from the factory phone link app. The vehicle handles output routing. Applies on the next connection.</string>
