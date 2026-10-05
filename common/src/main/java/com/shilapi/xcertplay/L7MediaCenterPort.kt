@@ -7,6 +7,9 @@ import java.io.Closeable
 /** 客户端 token 仅留在适配器；注册、源接受、焦点和显示结果独立。 */
 internal interface L7MediaCenterPort : Closeable {
     fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean, focus: (String?) -> Unit, selected: (Int) -> Boolean)
+    val source: Int get() = CARPLAY_SOURCE
+    /** 先准备回调快照，再请求控制权；此阶段不发状态 IPC。 */
+    fun prepare(value: CarPlayNowPlaying, artwork: Uri?) {}
     fun register(): Boolean
     fun sources(values: IntArray): Boolean
     fun currentSource()

@@ -6,7 +6,6 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.vendor.SdkSubclass
 import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 
 /** 使用已安装 SDK，所有服务调用保留本应用包名和 UID，不使用旧的空实现重载。 */
@@ -20,7 +19,10 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
     private var infoClass: Class<*>? = null
     @Volatile private var latest = CarPlayNowPlaying()
     @Volatile private var info: Any? = null
+    private val trackSession = java.util.UUID.randomUUID().toString()
     private var track = 0L
+    override var source = L7MediaCenterPort.CARPLAY_SOURCE
+        private set
     @Volatile private var valid = true
 
     override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean,
@@ -32,6 +34,8 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
         apiType = apiClass
         val clientClass = Class.forName(CLIENT, false, sdk.loader)
         infoClass = Class.forName(INFO, false, sdk.loader)
+        source = L7MediaSourcePolicy.resolve(
+            L7VendorServiceProbe.inspect(app)["mediaProviderEasSupport"]?.toIntOrNull(), requireNotNull(infoClass))
         val callbackClass = Class.forName("com.ecarx.eas.sdk.ECarXApiClient\$Callback", false, sdk.loader)
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
@@ -45,8 +49,8 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                 "onPrevious" -> valid && command(CarPlayMediaButton.PREVIOUS)
                 "onMediaCenterFocusChanged" -> { if (valid) focus(args?.firstOrNull() as? String); null }
                 "onSourceSelected" -> valid && selected(args?.firstOrNull() as? Int ?: -1)
-                "getCurrentSourceType" -> if (valid) L7MediaCenterPort.CARPLAY_SOURCE else -1
-                "getMediaSourceTypeList" -> if (valid) intArrayOf(L7MediaCenterPort.CARPLAY_SOURCE) else intArrayOf()
+                "getCurrentSourceType" -> if (valid) source else -1
+                "getMediaSourceTypeList" -> if (valid) intArrayOf(source) else intArrayOf()
                 "getCurrentProgress" -> if (valid) latest.elapsedMillis ?: 0L else 0L
                 "getMusicPlaybackInfo" -> if (valid) info else null
                 else -> null
@@ -68,23 +72,39 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
     override fun register(): Boolean {
         if (!valid) return false
         val client = client ?: return false
-        token = requireNotNull(apiType).getMethod("registerMusic", String::class.java, client.javaClass.superclass)
-            .invoke(api, app.packageName, client)
+        val type = requireNotNull(apiType)
+        val linked = type.methods.singleOrNull { it.name == "registerMusic" &&
+            it.parameterTypes.contentEquals(arrayOf(String::class.java, client.javaClass.superclass, String::class.java)) }
+        token = if (linked != null) linked.invoke(api, app.packageName, client, app.packageName)
+            else type.getMethod("registerMusic", String::class.java, client.javaClass.superclass)
+                .invoke(api, app.packageName, client)
+        L7DebugLog.record("MediaCenter: registration mediaSessionLinked=${linked != null} source=$source tokenValid=${token != null}")
         return token != null
     }
     override fun sources(values: IntArray) = call("updateMediaSourceTypeList", arrayOf(Any::class.java, IntArray::class.java), token, values) == true
-    override fun currentSource() { call("updateCurrentSourceType", arrayOf(Any::class.java, Int::class.javaPrimitiveType!!), token, L7MediaCenterPort.CARPLAY_SOURCE) }
+    override fun currentSource() { call("updateCurrentSourceType", arrayOf(Any::class.java, Int::class.javaPrimitiveType!!), token, source) }
     override fun focusClient() = call("queryCurrentFocusClient", arrayOf(Any::class.java), token) as? String
     override fun requestPlay() = call("requestPlay", arrayOf(Any::class.java), token) == true
     override fun progress(milliseconds: Long) { latest = latest.copy(elapsedMillis = milliseconds); call("updateCurrentProgress", arrayOf(Any::class.java, Long::class.javaPrimitiveType!!), token, milliseconds) }
 
-    override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
-        if (!valid) return false
+    override fun prepare(value: CarPlayNowPlaying, artwork: Uri?) {
+        if (!valid) return
         if (latest.title != value.title || latest.artist != value.artist || latest.album != value.album ||
             latest.artworkTransferId != value.artworkTransferId || latest.durationMillis != value.durationMillis) track++
         latest = value
+        // 初始化时手机播放状态可能尚未回传，不能让 SDK getter 把它解释成暂停。
+        if (!value.playbackKnown) { info = null; return }
+        // 封面会由 EAS 转交媒体中心读取；只给已确认的链路包读取权，不开放 provider。
+        if (artwork != null) for (name in listOf(L7VendorServiceProbe.PACKAGE, "com.ecarx.sdk.openapi")) {
+            try {
+                app.packageManager.getApplicationInfo(name, 0)
+                app.grantUriPermission(name, artwork, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (error: Exception) {
+                L7DebugLog.record("MediaCenter: artworkGrant exceptionType=${error.javaClass.simpleName}")
+            }
+        }
         val cls = requireNotNull(infoClass)
-        val snapshotTrack = track.toString()
+        val snapshotTrack = "$trackSession:$track"
         val getters = setOf("getTitle", "getArtist", "getAlbum", "getDuration", "getArtwork", "getSourceType",
             "getPlaybackStatus", "getPackageName", "getAppName", "getUuid", "isSupportCollect", "isSupportDownload", "isSupportLoopModeSwitch")
         info = SdkSubclass.create(cls, cls.methods.filter { it.name in getters }.toTypedArray(), InvocationHandler { _, method, _ ->
@@ -108,7 +128,7 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                         artwork
                     }
                 }
-                "getSourceType" -> L7MediaCenterPort.CARPLAY_SOURCE
+                "getSourceType" -> source
                 "getPlaybackStatus" -> if (value.playing) 1 else 0
                 "getPackageName" -> app.packageName
                 "getAppName" -> "L7 CarPlay"
@@ -116,7 +136,11 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                 else -> false
             }
         })
-        return call("updateMusicPlaybackState", arrayOf(Any::class.java, cls), token, info) == true
+    }
+
+    override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
+        if (!valid) return false
+        return call("updateMusicPlaybackState", arrayOf(Any::class.java, requireNotNull(infoClass)), token, info) == true
     }
 
     private fun call(name: String, parameters: Array<Class<*>>, vararg args: Any?): Any? =

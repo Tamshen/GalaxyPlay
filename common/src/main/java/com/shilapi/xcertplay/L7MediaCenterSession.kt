@@ -25,6 +25,7 @@ internal class L7MediaCenterSession(
     private val main: Executor = Executor { Handler(Looper.getMainLooper()).post(it) },
     private val log: (String) -> Unit = L7DebugLog::record,
     private val traceSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
+    private val retry: (Runnable) -> Unit = { Handler(Looper.getMainLooper()).postDelayed(it, 1000) },
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val events = AtomicLong()
@@ -33,13 +34,20 @@ internal class L7MediaCenterSession(
     @Volatile private var registered = false
     @Volatile private var foreignFocus = false
     private var ownFocus = false
-    @Volatile private var latest = CarPlayNowPlaying()
-    @Volatile private var artwork: Uri? = null
+    private data class Snapshot(val value: CarPlayNowPlaying, val artwork: Uri?)
+    @Volatile private var snapshot = Snapshot(CarPlayNowPlaying(), null)
+    private val latest get() = snapshot.value
     private var started = false
     private var ready = false
     private var attempts = 0
     private var published: CarPlayNowPlaying? = null
     private var publishedArtwork: Uri? = null
+    private var publishedProgress: Long? = null
+    private var playRequested = false
+    private var pending: Snapshot? = null
+    private var updateAttempts = 0
+    private var registrationRetryScheduled = false
+    private var stateRetryScheduled = false
 
     fun start() = synchronized(this) {
         if (started || closed) return
@@ -57,32 +65,38 @@ internal class L7MediaCenterSession(
 
     private fun apiReady(value: Boolean) = enqueue {
         event("apiReady value=$value")
-        if (ready == value) return@enqueue
+        if (ready == value && (!value || registered)) return@enqueue
         ready = value
         if (!value) {
             registered = false
             published = null
+            publishedProgress = null
+            playRequested = false
             safely("unregisterDisconnected") { port.unregister() }
             return@enqueue
         }
         if (attempts >= 3) { event("registerLimit"); return@enqueue }
         attempts++
         try {
+            snapshot.let { port.prepare(it.value, it.artwork) }
             val valid = port.register()
             if (closed || !current()) return@enqueue
             registered = valid
             event("register tokenValid=$registered attempt=$attempts")
-            if (!registered) return@enqueue
-            val accepted = port.sources(intArrayOf(L7MediaCenterPort.CARPLAY_SOURCE))
-            event("sourceList accepted=$accepted source=${L7MediaCenterPort.CARPLAY_SOURCE} origin=CARPLAY_REFERENCE")
+            if (!registered) { retryRegistration(); return@enqueue }
+            val accepted = port.sources(intArrayOf(port.source))
+            event("sourceList accepted=$accepted source=${port.source} origin=L7_SDK_POLICY")
             if (closed || !current()) return@enqueue
             if (!accepted) {
                 registered = false
                 safely("unregisterRejectedSource") { port.unregister() }
+                retryRegistration()
                 return@enqueue
             }
             safely("queryFocus") { applyFocus(port.focusClient()); "RETURNED" }
             published = null
+            pending = null
+            playRequested = false
             publishLatest()
         } catch (error: Exception) {
             registered = false
@@ -91,10 +105,9 @@ internal class L7MediaCenterSession(
         }
     }
 
-    fun update(value: CarPlayNowPlaying, uri: Uri? = artwork) {
+    fun update(value: CarPlayNowPlaying, uri: Uri? = snapshot.artwork) {
         if (closed) return
-        latest = value
-        artwork = uri
+        snapshot = Snapshot(value, uri)
         if (scheduled.compareAndSet(false, true)) enqueue {
             scheduled.set(false)
             if (registered) publishLatest()
@@ -103,11 +116,17 @@ internal class L7MediaCenterSession(
 
     private fun publishLatest() {
         if (closed || !current() || !registered) return
-        val value = latest
-        val uri = artwork
-        if (published == value && publishedArtwork == uri) return
-        // 只有手机明确进入播放状态时请求一次控制权，进度更新不循环抢源。
-        if (value.playbackKnown && value.playing && published?.let { it.playbackKnown && it.playing } != true && !foreignFocus) {
+        val next = snapshot
+        val value = next.value
+        val uri = next.artwork
+        val metadata = next.copy(value = value.copy(elapsedMillis = null))
+        if (pending != metadata) { pending = metadata; updateAttempts = 0 }
+        val changed = published?.copy(elapsedMillis = null) != metadata.value || publishedArtwork != uri
+        if (changed && !safely("prepare") { port.prepare(value, uri); true }) return
+        // 控制权请求与状态缓存分开，失败重发不会因未发布反复抢源。
+        if (!value.playbackKnown || !value.playing) playRequested = false
+        if (value.playbackKnown && value.playing && !playRequested && !foreignFocus) {
+            playRequested = true
             safely("requestPlay") {
                 val accepted = port.requestPlay()
                 if (accepted && !closed && current()) { port.currentSource(); event("currentSource returned") }
@@ -115,15 +134,36 @@ internal class L7MediaCenterSession(
             }
         }
         if (closed || !current()) return
-        if (published?.copy(elapsedMillis = null) != value.copy(elapsedMillis = null) || publishedArtwork != uri) {
-            if (value.playbackKnown) safely("updateState") { port.update(value, uri) }
-            else event("updateState skipped=PHONE_STATE_UNKNOWN")
+        if (changed && value.playbackKnown && !foreignFocus && updateAttempts < 3) {
+            updateAttempts++
+            event("updateState attempt=$updateAttempts artworkAvailable=${uri != null}")
+            if (safely("updateState") { port.update(value, uri) }) {
+                published = value
+                publishedArtwork = uri
+            } else retryState()
+            if (updateAttempts == 3 && published?.copy(elapsedMillis = null) != metadata.value)
+                event("updateState retryLimit=3 pending=true")
         }
         val elapsed = value.elapsedMillis
-        if (!closed && current() && elapsed != null && elapsed != published?.elapsedMillis)
-            safely("updateProgress") { port.progress(elapsed); "RETURNED_MS" }
-        published = value
-        publishedArtwork = uri
+        if (!closed && current() && elapsed != null && elapsed != publishedProgress && !foreignFocus &&
+            safely("updateProgress") { port.progress(elapsed); "RETURNED_MS" }) publishedProgress = elapsed
+    }
+
+    private fun retryRegistration() {
+        if (!ready || registered || attempts >= 3 || registrationRetryScheduled) return
+        registrationRetryScheduled = true
+        retry(Runnable { enqueue {
+            registrationRetryScheduled = false
+            if (ready && !registered) apiReady(true)
+        } })
+    }
+    private fun retryState() {
+        if (updateAttempts >= 3 || stateRetryScheduled) return
+        stateRetryScheduled = true
+        retry(Runnable { enqueue {
+            stateRetryScheduled = false
+            publishLatest()
+        } })
     }
 
     private fun command(index: Int): Boolean {
@@ -149,8 +189,13 @@ internal class L7MediaCenterSession(
     }
 
     private fun selected(source: Int): Boolean {
-        if (closed || !current() || !registered || source != L7MediaCenterPort.CARPLAY_SOURCE) return false
-        enqueue { foreignFocus = false; ownFocus = true; safely("selectSource") { port.currentSource(); "RETURNED" } }
+        if (closed || !current() || !registered || source != port.source) return false
+        enqueue {
+            foreignFocus = false; ownFocus = true
+            published = null; publishedProgress = null; pending = null
+            safely("selectSource") { port.currentSource(); "RETURNED" }
+            publishLatest()
+        }
         return true
     }
 
@@ -161,8 +206,13 @@ internal class L7MediaCenterSession(
         val foreign = value != packageName
         event("focus own=${!foreign}")
         val changed = foreign && ownFocus
+        val regained = !foreign && foreignFocus
         ownFocus = !foreign
         foreignFocus = foreign
+        if (regained) {
+            published = null; publishedProgress = null; pending = null
+            publishLatest()
+        }
         if (changed && latest.playbackKnown && latest.playing) main.execute {
             if (!closed && current() && foreignFocus) send(CarPlayMediaButton.PAUSE, "mediacenter-focus")
         }
@@ -170,12 +220,14 @@ internal class L7MediaCenterSession(
 
     private fun enqueue(action: () -> Unit) {
         try { worker.execute { if (!closed && current()) action() } }
-        catch (error: RuntimeException) { failure("queue", error) }
+        catch (error: RuntimeException) { scheduled.set(false); failure("queue", error) }
     }
-    private fun safely(stage: String, action: () -> Any?) {
-        try { event("$stage result=${action()}") }
-        catch (error: Exception) { failure(stage, error) }
-    }
+    private fun safely(stage: String, action: () -> Any?): Boolean = try {
+        val result = action()
+        event("$stage result=$result")
+        result != false
+    } catch (error: Exception) { failure(stage, error); false }
+      catch (error: LinkageError) { failure(stage, error); false }
     private fun failure(stage: String, error: Throwable) {
         val cause = if (error is InvocationTargetException) error.targetException else error
         event("$stage exceptionType=${cause.javaClass.simpleName}")
@@ -192,8 +244,7 @@ internal class L7MediaCenterSession(
         closed = true
         registered = false
         port.invalidate()
-        latest = CarPlayNowPlaying()
-        artwork = null
+        snapshot = Snapshot(CarPlayNowPlaying(), null)
         try { worker.execute {
             safely("clearSources") { port.sources(intArrayOf()) }
             safely("unregister") { port.unregister() }

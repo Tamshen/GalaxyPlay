@@ -22,17 +22,21 @@ class L7MediaCenterSessionTest {
         lateinit var ready: (Boolean) -> Unit
         lateinit var command: (Int) -> Boolean
         lateinit var focus: (String?) -> Unit
+        lateinit var selected: (Int) -> Boolean
+        override var source = L7MediaCenterPort.CARPLAY_SOURCE
         val calls = mutableListOf<String>()
         val updates = mutableListOf<CarPlayNowPlaying>()
         var token = true
         var acceptSource = true
         var failState = false
+        var acceptState = true
         var failUnregister = false
         var currentFocus: String? = null
         var duringRegister: () -> Unit = {}
         override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean, focus: (String?) -> Unit, selected: (Int) -> Boolean) {
-            this.ready = ready; this.command = command; this.focus = focus; calls += "init"
+            this.ready = ready; this.command = command; this.focus = focus; this.selected = selected; calls += "init"
         }
+        override fun prepare(value: CarPlayNowPlaying, artwork: Uri?) { calls += "prepare" }
         override fun register(): Boolean { calls += "register"; duringRegister(); return token }
         override fun sources(values: IntArray): Boolean { calls += "sources:${values.joinToString()}"; return acceptSource }
         override fun currentSource() { calls += "current" }
@@ -41,7 +45,7 @@ class L7MediaCenterSessionTest {
         override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
             calls += "state"; updates += value
             if (failState) throw SecurityException("private-error")
-            return true
+            return acceptState
         }
         override fun progress(milliseconds: Long) { calls += "progress:$milliseconds" }
         override fun invalidate() { calls += "invalidate" }
@@ -54,7 +58,8 @@ class L7MediaCenterSessionTest {
     private var current = true
     private val sent = mutableListOf<Int>()
     private val logs = mutableListOf<String>()
-    private val session = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index }, worker, main, logs::add)
+    private val retries = java.util.ArrayDeque<Runnable>()
+    private val session = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index }, worker, main, logs::add, retry = { retries.add(it) })
     @Test fun diagnosticTraceStartsBeforeOemFilteringAndRejectsLateMainDelivery() {
         val store = L7SteeringDiagnostics.store
         store.clear()
@@ -73,6 +78,73 @@ class L7MediaCenterSessionTest {
 
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
+
+    @Test fun delayedRetryRecoversPausedMetadataWithoutAnotherPhoneEvent() {
+        connect(); port.acceptState = false
+        session.update(playing().copy(playing = false)); worker.drain()
+        port.acceptState = true; retries.removeFirst().run(); worker.drain()
+        assertEquals(2, port.calls.count { it == "state" })
+        assertFalse(port.calls.contains("request"))
+    }
+    @Test fun delayedRegistrationAndStateRetriesAreBoundedAndClosedSessionIgnoresThem() {
+        port.token = false; connect()
+        repeat(2) { retries.removeFirst().run(); worker.drain() }
+        assertTrue(retries.isEmpty())
+        assertEquals(3, port.calls.count { it == "register" })
+        session.close(); worker.drain()
+        port.ready(true); worker.drain()
+        assertEquals(3, port.calls.count { it == "register" })
+    }
+    @Test fun pendingRetryPublishesLatestPauseAndCannotReplayAfterClose() {
+        connect(); port.acceptState = false; session.update(playing()); worker.drain()
+        session.update(playing().copy(playing = false)); worker.drain()
+        port.acceptState = true; retries.removeFirst().run(); worker.drain()
+        assertFalse(port.updates.last().playing)
+        port.acceptState = false; session.update(playing().copy(title = "next")); worker.drain()
+        val count = port.updates.size; session.close(); worker.drain()
+        retries.removeFirst().run(); worker.drain(); assertEquals(count, port.updates.size)
+    }
+
+    @Test fun snapshotExistsBeforeRequestAndRejectedUpdateRetriesWithoutRequestLoop() {
+        connect(); port.acceptState = false
+        session.update(playing()); worker.drain()
+        assertTrue(port.calls.lastIndexOf("prepare") < port.calls.indexOf("request"))
+        port.acceptState = true
+        session.update(playing()); worker.drain(); session.update(playing()); worker.drain()
+        assertEquals(2, port.calls.count { it == "state" })
+        assertEquals(1, port.calls.count { it == "request" })
+    }
+    @Test fun unchangedRejectedStateHasBoundedRetriesButNewSongCanPublish() {
+        connect(); port.acceptState = false
+        repeat(10) { session.update(playing(it.toLong())); worker.drain() }
+        assertEquals(3, port.calls.count { it == "state" })
+        port.acceptState = true
+        session.update(playing().copy(title = "next-song")); worker.drain()
+        assertEquals("next-song", port.updates.last().title)
+        assertEquals(4, port.calls.count { it == "state" })
+        assertEquals(1, port.calls.count { it == "request" })
+    }
+    @Test fun failedReadyCanRetryAndRuntimeSourceDrivesRegistrationAndSelection() {
+        port.source = 6; port.token = false; connect()
+        port.token = true; port.ready(true); worker.drain()
+        assertEquals(2, port.calls.count { it == "register" })
+        assertTrue(port.calls.contains("sources:6"))
+        assertFalse(port.selected(13)); assertTrue(port.selected(6)); worker.drain()
+    }
+    @Test fun stateExceptionDoesNotCacheSongOrLoseLatestArtworkRetry() {
+        connect(); port.failState = true
+        session.update(playing(), Uri.parse("content://test/cover")); worker.drain()
+        port.failState = false; session.update(playing(), Uri.parse("content://test/cover")); worker.drain()
+        assertEquals(2, port.calls.count { it == "state" })
+        session.update(playing().copy(title = "next-song")); worker.drain()
+        assertEquals("next-song", port.updates.last().title)
+    }
+    @Test fun foreignFocusDefersStateAndRegainingItPublishesPendingSong() {
+        port.currentFocus = "other"; connect(); session.update(playing()); worker.drain()
+        assertFalse(port.calls.contains("state"))
+        port.focus("own"); worker.drain()
+        assertEquals(1, port.calls.count { it == "state" })
+    }
 
     @Test fun registrationDoesNotWaitForAudioAndDuplicateReadyDoesNotRegisterAgain() {
         connect(); session.start(); port.ready(true); worker.drain()

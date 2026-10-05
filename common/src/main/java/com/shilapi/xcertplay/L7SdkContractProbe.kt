@@ -14,6 +14,10 @@ internal object L7SdkContractProbe {
             type.getMethod("get", Context::class.java)
             type.getMethod("init", Context::class.java, callback)
             type.getMethod("registerMusic", String::class.java, client)
+            result["mediaRegistration"] = if (type.methods.any { it.name == "registerMusic" &&
+                it.parameterTypes.contentEquals(arrayOf(String::class.java, client, String::class.java)) })
+                "OWN_PACKAGE_MEDIASESSION_LINK_AVAILABLE" else "OWN_PACKAGE_ONLY"
+            if (result["mediaProviderEasSupport"] == "1") info.getField("SOURCE_TYPE_ONLINE")
             type.getMethod("requestPlay", Any::class.java)
             type.getMethod("updateCurrentSourceType", Any::class.java, Int::class.javaPrimitiveType)
             client.getConstructor()
@@ -31,7 +35,9 @@ internal object L7SdkContractProbe {
             type.getMethod("queryCurrentFocusClient", Any::class.java)
             type.getMethod("unregister", Any::class.java)
             result["mediaCallbackKind"] = if (client.isInterface) "INTERFACE" else "CLASS"
-            result["mediaSourceEvidence"] = "CARPLAY_REFERENCE_13_L7_ACCEPTANCE_UNTESTED"
+            result["mediaSourceEvidence"] = if (result["mediaProviderEasSupport"] == "1")
+                "L7_EAS_ONLINE_6_CACHE_COMPATIBILITY_DISPLAY_UNTESTED"
+                else "CARPLAY_REFERENCE_13_L7_ACCEPTANCE_UNTESTED"
         }
         check(context, L7ReflectiveNavigation.API, "navigation", result) { type, loader ->
             Class.forName("ecarx.fw.api.ECarXAPI", false, loader).getMethod("creator", Class::class.java)
