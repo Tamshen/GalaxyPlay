@@ -102,6 +102,25 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Apple devices are discovered by vendor ID; CH341 uses the configured VID/PID below.
  */
 class CarPlayHostActivity : ComponentActivity() {
+    private var wiredAttempt: String? = null
+    private var wiredStartupFeedback: String? = null
+    private var wiredStartupWait: String? = null
+    private var wiredFailureDialog: android.app.AlertDialog? = null
+    private val vpnGate: L7VpnConsent by lazy { L7VpnConsent(
+        prepare = { CarPlayVpnService.prepare(this) },
+        launch = { awaitingVpnConsent = true; vpnConsent.launch(it) },
+        trace = { phase, result, error ->
+            L7WiredDiagnostics.event(this, wiredAttempt, phase, result, error,
+                if (error != null) "FAILED" else null)
+            appendLog("USB VPN phase=$phase result=$result" + (error?.let { " exception=${it.javaClass.simpleName}" } ?: ""))
+            if (result == "WAITING") {
+                wiredStartupFeedback = getString(R.string.l7_usb_vpn_waiting)
+                setConnectionStage(wiredStartupFeedback!!)
+            }
+        },
+        ready = { wiredStartupFeedback = null; awaitingVpnConsent = false; vpnReady = true; maybeStartCarPlay() },
+        failed = ::wiredStartupFailed,
+    ) }
     private val l7DebugLogs by lazy { resources.getBoolean(R.bool.config_l7_product_ui) }
     private data class SettingsBaseline(
         val safeAreaSize: DisplaySize?,
@@ -169,12 +188,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private val vpnConsent =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             awaitingVpnConsent = false
-            if (result.resultCode == RESULT_OK) {
-                vpnReady = true
-                maybeStartCarPlay()
-            } else {
-                setStatus(getString(R.string.vpn_consent_was_denied))
-            }
+            vpnGate.returned(result.resultCode)
         }
     private val wirelessPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -194,6 +208,7 @@ class CarPlayHostActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             microphoneAvailable = granted
             microphonePermissionResolved = true
+            L7WiredDiagnostics.event(this, wiredAttempt, "MICROPHONE", if (granted) "GRANTED" else "DENIED")
             appendLog(if (granted) "Microphone permission granted" else "Microphone permission denied")
             requestStartupPrerequisites()
         }
@@ -201,6 +216,7 @@ class CarPlayHostActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             awaitingLocationPermission = false
             locationPermissionAvailable = hasFineLocationPermission()
+            L7WiredDiagnostics.event(this, wiredAttempt, "LOCATION", if (locationPermissionAvailable) "GRANTED" else "DENIED")
             if (locationPermissionAvailable) {
                 appendLog("Location permission granted")
             } else if (locationReportingEnabled) {
@@ -421,12 +437,18 @@ class CarPlayHostActivity : ComponentActivity() {
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
             AirPlayPersistence.saveWirelessEnabled(this, false)
         }
-        if (runCatching { DiPlayBootstrap.ensure(this) }.isFailure) {
+        if (!AirPlayPersistence.loadWirelessEnabled(this)) wiredAttempt = L7WiredDiagnostics.begin(this)
+        L7WiredDiagnostics.event(this, wiredAttempt, "AUTH_BOOTSTRAP", "BEGIN")
+        val bootstrap = runCatching { DiPlayBootstrap.ensure(this) }
+        if (bootstrap.isFailure) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "AUTH_BOOTSTRAP", "FAILED", bootstrap.exceptionOrNull(), "FAILED")
             startActivity(Intent(this, DiPlayActivity::class.java))
             finish(); return
         }
+        L7WiredDiagnostics.event(this, wiredAttempt, "HOST_UI", "BEGIN")
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         initializeSessionLog()
+        L7SteeringDiagnostics.initialize(applicationContext)
         darkMode = isDarkMode(resources.configuration.uiMode)
         advancedAudioChannelMappingSupported =
             resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)
@@ -456,15 +478,19 @@ class CarPlayHostActivity : ComponentActivity() {
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                 "transport=${if (wirelessEnabled) "wireless" else "wired"}",
         )
+        L7WiredDiagnostics.event(this, wiredAttempt, "HOST_UI", "READY")
         val reusedBackgroundSession = adoptBackgroundSession()
         microphoneAvailable =
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         microphonePermissionResolved = microphoneAvailable
         if (reusedBackgroundSession) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "SESSION", "REUSED", outcome = "CONNECTED")
             updateDebugOverlays()
         } else if (microphonePermissionResolved) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "MICROPHONE", "ALREADY_GRANTED")
             requestStartupPrerequisites()
         } else {
+            L7WiredDiagnostics.event(this, wiredAttempt, "MICROPHONE", "BEGIN")
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -514,6 +540,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestStartupPrerequisites() {
+        L7WiredDiagnostics.event(this, wiredAttempt, "PREREQUISITES", "BEGIN")
         if (locationReportingEnabled && !locationPermissionAvailable) {
             requestLocationPermission()
             return
@@ -528,6 +555,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun requestLocationPermission() {
         if (locationPermissionAvailable || awaitingLocationPermission) return
         awaitingLocationPermission = true
+        L7WiredDiagnostics.event(this, wiredAttempt, "LOCATION", "BEGIN")
         locationPermission.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -541,14 +569,32 @@ class CarPlayHostActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     private fun requestVpnConsent() {
-        val consent = CarPlayVpnService.prepare(this)
-        if (consent == null) {
-            vpnReady = true
-            maybeStartCarPlay()
-        } else {
-            awaitingVpnConsent = true
-            vpnConsent.launch(consent)
-        }
+        vpnGate.request()
+    }
+
+    private fun wiredStartupFailed(failure: L7VpnConsent.Failure) {
+        awaitingVpnConsent = false
+        vpnReady = false
+        L7WiredDiagnostics.event(this, wiredAttempt, "VPN", failure.name, outcome = "FAILED")
+        val message = getString(when (failure) {
+            L7VpnConsent.Failure.PAGE_MISSING -> R.string.l7_usb_vpn_missing
+            L7VpnConsent.Failure.SYSTEM_DENIED -> R.string.l7_usb_vpn_system_denied
+            L7VpnConsent.Failure.DECLINED -> R.string.l7_usb_vpn_declined
+            else -> R.string.l7_usb_vpn_failed
+        })
+        wiredStartupFeedback = message
+        setConnectionStage(message)
+        if (isFinishing || isDestroyed) return
+        wiredFailureDialog?.dismiss()
+        wiredFailureDialog = L7Dialogs.builder(this).setTitle(R.string.l7_usb_start_failed).setMessage(message)
+            .setPositiveButton(R.string.l7_usb_retry) { _, _ ->
+                wiredStartupFeedback = null
+                wiredAttempt = L7WiredDiagnostics.begin(this)
+                requestStartupPrerequisites()
+            }
+            .setNegativeButton(R.string.l7_usb_back_settings) { _, _ -> showDiPlayHome("settings-connection-usb"); finish() }
+            .setNeutralButton(R.string.l7_log_view_short) { _, _ -> showDiPlayHome("settings-debug-logs"); finish() }
+            .show()
     }
 
     private fun requestWirelessPermissions() {
@@ -816,6 +862,12 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        vpnGate.dispose()
+        wiredFailureDialog?.dismiss()
+        wiredFailureDialog = null
+        if (isFinishing && controller == null) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "HOST", "CLOSED", outcome = "CANCELLED")
+        }
         videoFailureDialog?.dismiss()
         videoFailureDialog = null
         releaseVideoTouches()
@@ -3151,6 +3203,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         return@runOnUiThread
                     }
                     activeAirPlaySession = session
+                    L7WiredDiagnostics.event(this@CarPlayHostActivity, wiredAttempt, "SESSION", "ACTIVE", outcome = "CONNECTED")
                     CarPlayBackgroundSession.active = true
                     L7StartupGuard.connected(this@CarPlayHostActivity) {
                         activeAirPlaySession === session && controllerGeneration == restartGeneration &&
@@ -3204,6 +3257,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         return@runOnUiThread
                     }
                     if (message == "Video: first frame rendered") {
+                        L7WiredDiagnostics.event(this@CarPlayHostActivity, wiredAttempt, "VIDEO", "FIRST_FRAME", outcome = "CONNECTED")
                         pendingHevcFailure = null
                         videoFailureDialog?.dismiss()
                     }
@@ -3217,6 +3271,10 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun createStatusReporter(
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = { status ->
+        if (controllerGeneration == restartGeneration) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "TRANSPORT", status.javaClass.simpleName,
+                outcome = if (status is CarPlayStatus.Failed) "FAILED" else null)
+        }
         if (!menuOpen && controllerGeneration == restartGeneration) {
             updateHotspotStatus(status)
             val description = status.describe()
@@ -3288,6 +3346,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
         val controllerGeneration = restartGeneration
+        L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "BEGIN")
         val config = createRuntimeConfig()
         val airPlayConfig = createAirPlayConfig(size)
         val locationProvider: Iap2LocationProvider? =
@@ -3373,9 +3432,12 @@ class CarPlayHostActivity : ComponentActivity() {
         val audioContext = applicationContext
         next.audioConnectionListener = { active -> CarPlayBackgroundSession.setBluetoothMediaActive(next, audioContext, active) }
         try {
+            L7WiredDiagnostics.event(this, wiredAttempt, "SERVICE", "BEGIN")
             startForegroundService(Intent(this, DiPlaySessionService::class.java))
             next.start()
+            L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "STARTED")
         } catch (error: RuntimeException) {
+            L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "FAILED", error, "FAILED")
             appendLog("Connection could not start: ${error.javaClass.simpleName}")
             shutdown(false, "foreground service could not start")
             setConnectionStage(getString(R.string.could_not_start_carplay_return_to_diplay_and_check_app_per))
@@ -3429,6 +3491,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         val previous = activeDisplaySize
         activeDisplaySize = size
+        L7WiredDiagnostics.event(this, wiredAttempt, "DISPLAY", "READY")
         recordDetectedMaximum(size)
         updateResolutionMenu()
         if (previous == null) {
@@ -3486,7 +3549,7 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         if (controller == null && adoptBackgroundSession()) return
-        val size = activeDisplaySize ?: return
+        val size = activeDisplaySize ?: run { recordWiredWait("DISPLAY"); return }
         val transportReady = if (wirelessEnabled) wirelessPermissionsReady else vpnReady
         val locationReady = !locationReportingEnabled || locationPermissionAvailable
         if (
@@ -3499,9 +3562,24 @@ class CarPlayHostActivity : ComponentActivity() {
             pendingDisplaySize != null ||
             controller != null
         ) {
+            recordWiredWait(when {
+                !transportReady -> "VPN"
+                !locationReady -> "LOCATION"
+                !microphonePermissionResolved -> "MICROPHONE"
+                pendingDisplaySize != null -> "DISPLAY_SETTLE"
+                controller != null -> "EXISTING_CONTROLLER"
+                else -> "LIFECYCLE"
+            })
             return
         }
+        wiredStartupWait = null
         startCarPlay(size)
+    }
+
+    private fun recordWiredWait(reason: String) {
+        if (wiredAttempt == null || reason == wiredStartupWait) return
+        wiredStartupWait = reason
+        L7WiredDiagnostics.event(this, wiredAttempt, "STARTUP_WAIT", reason)
     }
 
     private fun reconnectAfterLoss(reason: String) {
@@ -3621,6 +3699,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
+        L7WiredDiagnostics.event(this, wiredAttempt, "STOP", "BEGIN", outcome = "CANCELLED")
         if (terminateProcess) L7StartupGuard.stopped()
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
         restartGeneration += 1
@@ -3818,7 +3897,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun setConnectionStage(message: String) {
         latestStage = message
-        stageStatusView?.text = friendlyStage(message)
+        stageStatusView?.text = if (message == wiredStartupFeedback) message else friendlyStage(message)
         updateDebugOverlays()
     }
 
@@ -4084,12 +4163,12 @@ internal object CarPlayBackgroundSession {
     }
 
     /** 手机播放命令与 A2DP 断开确认协调；暂停取消等待，旧控制器不能恢复播放。 */
-    fun beforeMediaCommand(expected: CarPlayController, index: Int, action: () -> Unit) {
+    fun beforeMediaCommand(expected: CarPlayController, index: Int, action: () -> Unit, dropped: (String) -> Unit = {}) {
         val guard = synchronized(this) {
-            if (controller !== expected || expected.isClosed()) return
+            if (controller !== expected || expected.isClosed()) { dropped("STALE_CONTROLLER"); return }
             bluetoothMediaGuard
         }
-        if (index == CarPlayMediaButton.PLAY && guard != null) guard.beforePlay(action)
+        if (index == CarPlayMediaButton.PLAY && guard != null) guard.beforePlay(action, dropped)
         else {
             if (index == CarPlayMediaButton.PAUSE || index == CarPlayMediaButton.PLAY_PAUSE) guard?.cancelPendingPlay()
             action()

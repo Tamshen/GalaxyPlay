@@ -88,6 +88,7 @@ class DiPlayActivity : ComponentActivity() {
     private var adbCheckGeneration = 0
     private var diagnosticSettings: L7DiagnosticSettings? = null
     private var debugPage: L7DebugPage? = null
+    private var steeringDebugPage: L7SteeringDebugPage? = null
     private val probeState = L7ProbeUiState()
     private val debugTasks by lazy { L7DebugTasks(this) {
         probeState.showCurrent(); page = "settings-debug-results"; render()
@@ -141,6 +142,7 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        L7SteeringDiagnostics.initialize(applicationContext)
         if (L7AppExit.exiting) { finish(); return }
         if (!L7Agreement.require(this)) return
         L7DesktopNavigation.attach(this)
@@ -283,7 +285,7 @@ class DiPlayActivity : ComponentActivity() {
         if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
         contentScroll = null; desktopPermissionHint = null; homePanel = null; usbButton = null
-        status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null; debugPage = null
+        status = null; connectButton = null; disconnectButton = null; lastRunning = null; diagnosticSettings = null; exportButton = null; debugPage = null; steeringDebugPage = null
         if (l7Ui) {
             renderL7()
             return
@@ -343,6 +345,7 @@ class DiPlayActivity : ComponentActivity() {
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
                 { if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(false) }, ::stopFromHome)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
+            "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-debug-logs"; render() }
             "settings-debug-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
                 debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks, ::showDebugLogs) { destination ->
@@ -424,6 +427,7 @@ class DiPlayActivity : ComponentActivity() {
         "settings-debug" -> R.string.l7_probe_title
         "settings-debug-results" -> R.string.l7_probe_environment
         "settings-debug-history" -> R.string.l7_probe_history
+        "settings-debug-steering" -> R.string.l7_steering_title
         "settings-debug-logs" -> R.string.l7_probe_logs
         "settings-about" -> R.string.about
         else -> R.string.carplay
@@ -1486,6 +1490,7 @@ class DiPlayActivity : ComponentActivity() {
     private fun refreshStatus() {
         diagnosticSettings?.update(exportInProgress)
         debugPage?.update()
+        steeringDebugPage?.update()
         wiredSettings?.update(connectionRequestPending)
         val running = CarPlayBackgroundSession.hasSession()
         homePanel?.update(L7HomePanel.configured(this), running, CarPlayBackgroundSession.active,
@@ -1585,6 +1590,9 @@ class DiPlayActivity : ComponentActivity() {
                     }
                     appendLine("--- Process exit history ---")
                     appendLine(ProcessExitDiagnostics.report(appContext))
+                    appendLine()
+                    appendLine("--- USB startup attempts ---")
+                    L7WiredDiagnostics.report(appContext).forEach { appendLine(it) }
                     appendLine()
                     for (name in SessionLogFile.REPORT_NAMES + L7ProbeLog.files) {
                         val file = File(appContext.filesDir, "logs/$name")

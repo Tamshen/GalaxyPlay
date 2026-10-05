@@ -53,6 +53,21 @@ class CarPlayMediaCallbackTest {
         assertEquals(listOf(CarPlayMediaButton.PLAY, CarPlayMediaButton.PAUSE, CarPlayMediaButton.PLAY_PAUSE), sent)
     }
 
+    @Test fun tracedKeyDistinguishesRepeatReleaseAndUnsupportedWithoutForwarding() {
+        val store = L7SteeringDiagnostics.store
+        store.clear()
+        val received = mutableListOf<L7SteeringTrace>()
+        val traced = CarPlayMediaCallback(explicitHardwareActions = true,
+            tracedSend = { _, _, ticket -> received += ticket }) { _, _ -> error("不得绕过诊断入口") }
+        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0), "window-key")
+        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 1), "window-key")
+        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0), "window-key")
+        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP, 0), "media-session-key")
+        assertEquals(1, received.size)
+        assertEquals(listOf("REPEAT", "KEY_UP_OR_OTHER_ACTION", "UNSUPPORTED_KEY"),
+            store.snapshot().events.filter { it.stage in listOf("FILTER", "DROP") }.map { it.detail })
+    }
+
     private fun press(keyCode: Int, repeat: Int = 0) {
         for (count in 0..repeat) {
             callback.onMediaButtonEvent(button(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, count)))
