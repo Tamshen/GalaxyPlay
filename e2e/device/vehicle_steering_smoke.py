@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仅在 AVD 检查三车型方控输入判断、按键标记与落盘；恢复偏好，不连接手机或上传。"""
+"""仅在 AVD 检查三车型监听、收到输入后标注与落盘；恢复偏好，不连接手机或上传。"""
 import argparse
 import hashlib
 from pathlib import Path
@@ -11,10 +11,13 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
+parser.add_argument('--models', nargs='+', choices=('l7','l6','custom'), default=['l7','l6','custom'])
+parser.add_argument('--languages', nargs='+', choices=('zh','en'), default=['zh','en'])
+parser.add_argument('--output-dir', type=Path, default=Path('build/previews/vehicle-steering'))
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 package = 'com.ecarx.carplay'
-output = Path('build/previews/vehicle-steering')
+output = args.output_dir
 output.mkdir(parents=True, exist_ok=True)
 
 
@@ -79,16 +82,16 @@ paths = ('shared_prefs/diplay.xml', 'shared_prefs/l7_audio_templates.xml', 'shar
 original = {path: read(path) for path in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
-    'zh': ('车型与输入采集', '清空本页记录', '标记准备测试的按键', '右键／下一曲', '标记刚才方控失效', '取消', '未连接'),
-    'en': ('Vehicle and input capture', 'Clear this page', 'Mark the key to test', 'Right / Next', 'Mark a missed control', 'Cancel', 'Disconnected'),
+    'zh': ('当前状态', '启用监听日志', '停止监听', '右键', '忽略这组输入', '已收到按键信号', '正在监听，请按一个方控键'),
+    'en': ('Current status', 'Start input logging', 'Stop listening', 'Right key', 'Ignore this input group', 'Control input received', 'Listening — press one steering control'),
 }
 try:
     # 合成协议与车型记录仅供 AVD 界面回归，结束逐字节恢复。
     digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
     write('shared_prefs/l7_agreement.xml', f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
-    for language, names in labels.items():
-        vehicle, clear, marker, right, failed, cancel, disconnected = names
-        for model in ('l7', 'l6', 'custom'):
+    for language in args.languages:
+        status, start, stop, right, skip, received, waiting = labels[language]
+        for model in args.models:
             adb('shell', 'am', 'force-stop', package)
             prefs = ET.fromstring(original['shared_prefs/diplay.xml'] or b'<map/>')
             for child in list(prefs):
@@ -101,26 +104,37 @@ try:
             adb('shell', 'cmd', 'uimode', 'night', 'yes' if language == 'en' else 'no')
             launch()
             screen = visible()
-            assert vehicle in screen and disconnected in screen
+            assert status in screen and start in screen
             assert ('L7' in screen if model == 'l7' else 'L6' in screen if model == 'l6' else ('自定义' if language == 'zh' else 'Custom') in screen)
             if language == 'en':
                 assert not re.search(r'[\u3400-\u9fff]', screen), '英文页面存在中文'
-            tap(clear)
-            tap(marker); tap(cancel)
-            tap(marker); tap(right)
-            adb('shell', 'input', 'keyevent', '131')  # F1，仅作为未知控制键输入。
+            tap(start)
+            assert waiting in visible() and received not in visible(), '尚无输入不能询问按键'
             adb('shell', 'am', 'broadcast', '-a', 'action_steering_wheel_controller_event', '-p', package, '--ei', 'type', '2')
-            time.sleep(.5)
-            tap(failed)
+            time.sleep(.6)
+            assert received in visible(), '收到事件后应询问按键'
+            (output / f'{language}-{model}-question.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+            tap(right)
+            assert waiting in visible(), '标注后应该继续监听'
             log = (read('files/logs/steering.log') or b'').decode()
             tail = '\n'.join(log.splitlines()[-30:])
-            assert f'model={model}' in tail and 'TEST_KEY_RIGHT' in tail and 'USER_FAILURE' in tail
-            if model != 'l7':
-                assert 'vehicle-settings-key' in tail and 'UNMAPPED_KEY' in tail
-                assert 'vehicle-broadcast' in tail and 'UNMAPPED_TYPE' in tail
-                assert 'OBSERVE_ONLY' in tail
+            assert f'model={model}' in tail and 'USER_LABEL' in tail and 'key=RIGHT' in tail
+            assert 'vehicle-broadcast' in tail and 'OBSERVE_ONLY' in tail
+            # 标注应附在 INPUT 的同一个 trace，而不是先写一个独立预期标记。
+            annotated = [line for line in tail.splitlines() if 'stage=USER_LABEL' in line]
+            assert annotated
+            trace = re.search(r'trace=(\d+)', annotated[-1]).group(1)
+            assert any(f'trace={trace} ' in line and 'stage=INPUT' in line for line in tail.splitlines())
+            adb('shell', 'input', 'keyevent', '131')
+            time.sleep(.6)
+            assert received in visible()
+            tap(skip)
+            tap(stop)
+            adb('shell', 'am', 'broadcast', '-a', 'action_steering_wheel_controller_event', '-p', package, '--ei', 'type', '2')
+            time.sleep(.6)
+            assert received not in visible() and start in visible(), '停止后不能再询问按键'
             (output / f'{language}-{model}.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-    print('AVD 三车型中英文、昼夜、取消／按键标记、未知键与广播被动观察及默认落盘通过；没有建立手机连接或上传')
+    print('AVD 三车型中英文、昼夜、启用监听后收到输入再标注、同 trace 绑定、忽略／停止与日志落盘通过；没有建立手机连接或上传')
 finally:
     adb('shell', 'am', 'force-stop', package)
     for path, data in original.items():

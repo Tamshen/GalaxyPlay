@@ -78,8 +78,9 @@ internal object L7SteeringDiagnostics {
             listOf("steering-previous.log", "steering-previous-2.log"))
     }
 
-    private fun record(line: String) {
+    internal fun record(line: String) {
         L7DebugLog.record(line, target)
     }
-    fun begin(source: String, index: Int, detail: String = "") = store.begin(source, index, detail)
+    fun begin(source: String, index: Int, detail: String = ""): L7SteeringTrace =
+        store.begin(source, index, detail).also { SteeringListening.input(it, detail) }
 }

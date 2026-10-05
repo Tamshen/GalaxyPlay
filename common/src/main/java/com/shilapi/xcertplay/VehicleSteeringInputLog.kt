@@ -16,6 +16,7 @@ internal class VehicleSteeringCapture(
     private val connected: () -> Boolean,
     private val begin: (String, Int, String) -> L7SteeringTrace,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
+    private val enabled: () -> Boolean = { model() != L7AudioTemplates.Model.L7 },
 ) {
     private var windowAt = Long.MIN_VALUE
     private var count = 0
@@ -45,7 +46,7 @@ internal class VehicleSteeringCapture(
     } catch (_: Exception) { "unreadable" }
 
     @Synchronized private fun observe(source: String, detail: String, classification: String) {
-        if (model() == L7AudioTemplates.Model.L7) return
+        if (!enabled()) return
         val now = clock()
         if (windowAt == Long.MIN_VALUE || now - windowAt >= 1000) {
             windowAt = now
@@ -71,7 +72,8 @@ internal object VehicleSteeringInputLog {
         val owner = context.applicationContext
         app = owner
         capture = VehicleSteeringCapture({ L7AudioTemplates.model(owner) },
-            { L7SteeringDiagnostics.store.snapshot().connected }, L7SteeringDiagnostics::begin)
+            { L7SteeringDiagnostics.store.snapshot().connected }, L7SteeringDiagnostics::begin,
+            enabled = SteeringListening::active)
         runCatching {
             ContextCompat.registerReceiver(owner, receiver, IntentFilter(L7SteeringWheel.ACTION), ContextCompat.RECEIVER_EXPORTED)
             registered = true
@@ -83,6 +85,7 @@ internal object VehicleSteeringInputLog {
     fun customAction(bundle: Bundle?) { if (allowed()) capture?.customAction(bundle) }
 
     @Synchronized fun close() {
+        SteeringListening.stop("OBSERVER_CLOSED")
         capture = null
         if (registered) runCatching { app?.unregisterReceiver(receiver) }
         registered = false

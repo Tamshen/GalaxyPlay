@@ -233,6 +233,7 @@ class DiPlayActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
+        steeringDebugPage?.resume()
         if (!L7Agreement.require(this)) return
         if (l7Ui && resources.configuration.densityDpi != L7UiDensity.value(this)) {
             recreate()
@@ -276,6 +277,7 @@ class DiPlayActivity : ComponentActivity() {
     private var logView: L7LogView? = null
 
     override fun onPause() {
+        steeringDebugPage?.background()
         reportingTestPage?.background()
         voiceDebugPage?.background()
         channelDialog?.dismiss()
@@ -297,6 +299,7 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        steeringDebugPage?.close(); steeringDebugPage = null
         audioModelConfirmation.close()
         audioTemplateFiles.close()
         reportingTestPage?.close(); reportingTestPage = null
@@ -311,6 +314,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun render() {
         if (!L7Agreement.require(this)) return
+        steeringDebugPage?.close(); steeringDebugPage = null
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null

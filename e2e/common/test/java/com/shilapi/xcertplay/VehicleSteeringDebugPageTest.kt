@@ -1,12 +1,12 @@
 package com.shilapi.xcertplay
 
 import android.app.AlertDialog
-import android.view.View
-import android.view.ViewGroup
+import android.os.Looper
 import android.widget.LinearLayout
-import android.widget.TextView
 import com.shilapi.xcertplay.host.R
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -14,54 +14,65 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowAlertDialog
+import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30])
 class VehicleSteeringDebugPageTest {
     private val activity = Robolectric.buildActivity(DiPlayActivity::class.java).get().apply { setTheme(R.style.Theme_Xcertplay) }
-    private val parent = LinearLayout(activity)
-    private fun views(view: View): List<View> = listOf(view) +
-        if (view is ViewGroup) (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
-    private fun text(): String = views(parent).filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
-    private fun markerButton(): View {
-        var view: View = views(parent).filterIsInstance<TextView>().first { it.text == activity.getString(R.string.l7_steering_test_key) }
-        while (!view.isClickable) view = view.parent as View
-        return view
-    }
-
-    @Test fun captureStatusFollowsConfirmedModelAndPageEntryDoesNotSendCommands() {
-        L7AudioTemplates.selectModel(activity, L7AudioTemplates.Model.L7)
-        L7SteeringDiagnostics.store.clear()
-        val page = L7SteeringDebugPage(activity, parent) {}
-        assertTrue(text().contains(activity.getString(R.string.l7_steering_l7_capture)))
+    private lateinit var page: L7SteeringDebugPage
+    @Before fun setup() {
+        SteeringListening.stop("TEST_RESET")
         L7AudioTemplates.selectModel(activity, L7AudioTemplates.Model.L6)
-        page.update()
-        assertTrue(text().contains(activity.getString(R.string.l7_steering_other_capture)))
-        L7AudioTemplates.selectModel(activity, L7AudioTemplates.Model.CUSTOM)
-        page.update()
-        assertTrue(text().contains(L7AudioModelConfirmation.name(activity, L7AudioTemplates.Model.CUSTOM)))
-        assertTrue(L7SteeringDiagnostics.store.snapshot().events.isEmpty())
+        L7Agreement.accept(activity)
+        page = L7SteeringDebugPage(activity, LinearLayout(activity)) {}
     }
-
-    @Test fun cancellingKeySelectionDoesNotCreateMarker() {
-        L7SteeringDiagnostics.store.clear()
-        L7SteeringDebugPage(activity, parent) {}
-        markerButton().performClick()
-        val dialog = ShadowAlertDialog.getLatestAlertDialog()
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
-        assertTrue(L7SteeringDiagnostics.store.snapshot().events.isEmpty())
+    @After fun cleanup() { page.close(); shadowOf(Looper.getMainLooper()).idle() }
+    private fun row(name: String): L7SettingRow = ReflectionHelpers.getField(page, name)
+    private fun receive(): L7SteeringTrace {
+        val trace = L7SteeringDiagnostics.begin("vehicle-broadcast", -1, "type=2")
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(400))
+        page.update()
+        return trace
     }
-
-    @Test fun selectedPhysicalKeyAddsOnlyAManualMarker() {
+    @Test fun openingPageDoesNotListenAndStartingWithoutInputDoesNotPrompt() {
+        assertFalse(SteeringListening.active())
+        row("toggle").performClick()
+        assertTrue(SteeringListening.active())
+        page.update()
+        assertNull(SteeringListening.controller.snapshot().pending)
+        assertEquals(activity.getString(R.string.l7_listen_waiting), row("status").valueView.text.toString())
+    }
+    @Test fun noInputReportDoesNotInventAnInputAndClosedPageCannotRestartListener() {
+        row("toggle").performClick()
         L7SteeringDiagnostics.store.clear()
-        L7SteeringDebugPage(activity, parent) {}
-        markerButton().performClick()
+        row("noInput").performClick()
+        assertTrue(L7SteeringDiagnostics.store.snapshot().events.isEmpty())
+        assertNull(SteeringListening.controller.snapshot().pending)
+        page.close()
+        row("toggle").performClick()
+        assertFalse(SteeringListening.active())
+    }
+    @Test fun receivedInputPromptsThenLabelsThatExactTrace() {
+        row("toggle").performClick()
+        val trace = receive()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        assertTrue(dialog.isShowing)
         shadowOf(dialog.listView).performItemClick(1)
         assertFalse(dialog.isShowing)
-        val events = L7SteeringDiagnostics.store.snapshot().events
-        assertEquals(listOf("INPUT", "MARK"), events.map { it.stage })
-        assertEquals("TEST_KEY_RIGHT", events.last().detail)
-        assertTrue(events.all { it.source == "manual-marker" })
+        assertTrue(L7SteeringDiagnostics.store.snapshot().events.any { it.id == trace.id && it.stage == "USER_LABEL" && "key=RIGHT" in it.detail })
+        assertTrue(SteeringListening.active())
+    }
+    @Test fun ignoringAndBackgroundNeverMislabelAnInputOrResumeListening() {
+        row("toggle").performClick()
+        val trace = receive()
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        page.background()
+        assertFalse(dialog.isShowing)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertFalse(SteeringListening.active())
+        assertTrue(L7SteeringDiagnostics.store.snapshot().events.none { it.id == trace.id && it.stage == "USER_LABEL" })
+        page.resume(); page.update()
+        assertFalse(SteeringListening.active())
     }
 }
