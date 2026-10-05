@@ -27,6 +27,7 @@ internal class MicrophoneUplink(
     private val report: (String) -> Unit = {},
     private val callProcessingEnabled: Boolean = true,
     private val factorySource: Int? = null,
+    private val onStopRequested: () -> Unit = {},
     private val onEnded: () -> Unit = {},
 ) : Closeable {
     @Volatile private var routeBinding: L7AudioRouting.Binding? = null
@@ -270,6 +271,7 @@ internal class MicrophoneUplink(
     }
 
     override fun close() {
+        runCatching { onStopRequested() }
         if (!running.compareAndSet(true, false)) {
             release()
             return

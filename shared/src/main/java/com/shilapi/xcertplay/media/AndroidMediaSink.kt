@@ -80,6 +80,12 @@ class AndroidMediaSink(
         factoryRouting = factoryAudio != null,
     )
     private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
+    private val callTimeline = CallAudioTimeline(onAudioDiagnostic, ::audioRecoveryState)
+
+    private fun audioRecoveryState(): String {
+        val mode = runCatching { appContext?.getSystemService(AudioManager::class.java)?.mode }.getOrNull()
+        return "audioMode=${mode ?: "unknown"} ${audioFocusCoordinator.diagnosticState()}"
+    }
     private val audioRouting = if (appContext != null)
         L7AudioRouting(appContext, audioRoutingTemplate?.preferBus ?: enableL7AudioRouting, audioRoutingTemplate, onAudioDiagnostic) else null
     private val screenStateLock = Any()
@@ -245,8 +251,12 @@ class AndroidMediaSink(
             if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) callMode.acquire(id)
             if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
+                val ticket = if (config.audioType.equals("telephony", true)) callTimeline.start(CallAudioTimeline.Leg.UPLINK) else null
                 MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled,
-                    factorySource = factoryAudio?.microphoneSource(config.audioType, config.sampleRate, wirelessAudio)) { callMode.release(id) }
+                    factorySource = factoryAudio?.microphoneSource(config.audioType, config.sampleRate, wirelessAudio),
+                    onStopRequested = { callTimeline.stopRequested(ticket) }) {
+                    try { callMode.release(id) } finally { callTimeline.released(ticket) }
+                }
             }
             if (!uplink.start()) onMicrophoneStopped(id)
         } catch (error: Exception) {
@@ -284,6 +294,7 @@ class AndroidMediaSink(
         videoDiagnosticHandlers.clear()
         recoveryExecutor.shutdownNow()
         synchronized(this) {
+            callTimeline.close()
             audioFocusCoordinator.close()
             audioRouting?.close()
             audioRenderers.values.forEach(AudioRenderer::close)
@@ -348,6 +359,8 @@ class AndroidMediaSink(
             mediaBufferMillis,
             onAudioDiagnostic,
             wirelessAudio,
+            callTimeline,
+            ::audioRecoveryState,
         ).also { audioRenderers[id] = it }
     }
 }
@@ -878,6 +891,8 @@ private class AudioRenderer(
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
     private val wirelessAudio: Boolean,
+    private val callTimeline: CallAudioTimeline,
+    private val audioRecoveryState: () -> String,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
 
@@ -933,10 +948,12 @@ private class AudioRenderer(
     private var lastDecoderOutputMetadata: String? = null
     private var decoderOutputReports = 0
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
+    private var callTicket: CallAudioTimeline.Ticket? = null
 
     fun start() {
         if (started) return
         started = true
+        if (format.audioType.equals("telephony", true)) callTicket = callTimeline.start(CallAudioTimeline.Leg.DOWNLINK)
         thread.start()
     }
 
@@ -958,6 +975,7 @@ private class AudioRenderer(
     }
 
     override fun close() {
+        callTimeline.stopRequested(callTicket)
         running = false
         thread.interrupt()
     }
@@ -1001,7 +1019,7 @@ private class AudioRenderer(
             throw error
         } finally {
             runCatching { logStatsIfDue(force = true) }
-            release()
+            try { release() } finally { callTimeline.released(callTicket) }
         }
     }
 
@@ -1528,6 +1546,11 @@ private class AudioRenderer(
             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
         Log.i(STATS_TAG, line)
         report(line)
+        if (mappedChannel == AudioChannel.MEDIA) {
+            // 单独一行避免原有音频统计被截断；沿既有五秒窗口记录，不增加采样线程。
+            runCatching { report("Audio: mediaRecovery monoMs=${android.os.SystemClock.elapsedRealtime()} " +
+                "${callTimeline.snapshot()} ${audioRecoveryState()} ended=$force") }
+        }
         if (format.codec != AudioCodecKind.LPCM) {
             // 单独输出解码计数，避免被诊断记录的单行长度限制截断。
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +

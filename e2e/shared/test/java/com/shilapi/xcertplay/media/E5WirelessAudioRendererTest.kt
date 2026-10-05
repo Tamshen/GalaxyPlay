@@ -23,6 +23,27 @@ class E5WirelessAudioRendererTest {
         assertTrue("音频 worker 未达到预期状态", condition())
     }
 
+    @Test fun stoppedCallRendererIsReleasedBeforeMusicRecoveryStatistics() {
+        val logs = CopyOnWriteArrayList<String>()
+        val sink = AndroidMediaSink(wirelessAudio = true, audioFocusEnabled = false, onAudioDiagnostic = logs::add)
+        try {
+            val media = AudioStreamId(102, "media")
+            val phone = AudioStreamId(100, "telephony")
+            sink.onAudioStarted(media, AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 102, "media"), 0)
+            sink.onAudioStarted(phone, AudioFormat(AudioCodecKind.LPCM, 16_000, 1, 100, "telephony"), 0)
+            await { logs.count { it.startsWith("Audio: ready") } == 2 }
+            sink.onAudioStopped(phone)
+            await { logs.any { it.contains("callLifecycle") && it.contains("stage=RELEASED") } }
+            sink.onAudioStopped(media)
+            await { logs.any { it.contains("mediaRecovery") && it.contains("ended=true") } }
+            val recovery = logs.last { it.contains("mediaRecovery") }
+            assertTrue(recovery.contains("callPhase=AFTER_RELEASE"))
+            assertTrue(recovery.contains("callDownlinks=0 callUplinks=0"))
+            assertTrue(recovery.contains("focusEnabled=false"))
+            assertFalse(logs.any { it.contains("renderer failed") })
+        } finally { sink.close() }
+    }
+
     @Test fun aSingleVoiceSampleCanStartTheWirelessTrackWithoutTheFourKilobyteFloor() {
         val logs = CopyOnWriteArrayList<String>()
         val sink = AndroidMediaSink(wirelessAudio = true, audioFocusEnabled = false, onAudioDiagnostic = logs::add)
