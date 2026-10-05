@@ -166,6 +166,7 @@ internal object CarPlayMediaKeys {
     }
 
     @Synchronized fun onHardwareKey(expected: CarPlayController?, event: KeyEvent): Boolean {
+        VehicleSteeringInputLog.key(event, "vehicle-window-key")
         if (CarPlayMediaButton.forKeyCode(event.keyCode) == null) return false
         if (expected == null || controller !== expected || !expected.hasActiveSession()) {
             L7SteeringDiagnostics.begin("window-key", -1, "code=${event.keyCode} action=${event.action} repeat=${event.repeatCount}")
@@ -183,6 +184,7 @@ internal object CarPlayMediaKeys {
 internal class CarPlayMediaCallback(
     private val explicitHardwareActions: Boolean = false,
     private val tracedSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
+    private val observeKey: ((KeyEvent, String) -> Unit)? = null,
     private val send: (index: Int, source: String) -> Unit,
 ) : MediaSession.Callback() {
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
@@ -192,6 +194,7 @@ internal class CarPlayMediaCallback(
     }
 
     fun onKey(event: KeyEvent, source: String): Boolean {
+        observeKey?.invoke(event, "vehicle-$source")
         L7DebugLog.record("Audio: media key source=$source action=${event.action} repeat=${event.repeatCount} code=${event.keyCode}")
         val index = if (explicitHardwareActions && event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) CarPlayMediaButton.PLAY
             else if (explicitHardwareActions && event.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) CarPlayMediaButton.PAUSE

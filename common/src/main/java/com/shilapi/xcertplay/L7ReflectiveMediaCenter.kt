@@ -41,9 +41,16 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
         val names = setOf("onPlay", "onPause", "onNext", "onPrevious", "onMediaCenterFocusChanged",
-            "onSourceSelected", "getCurrentSourceType", "getMediaSourceTypeList", "getCurrentProgress", "getMusicPlaybackInfo")
-        client = SdkSubclass.create(clientClass, clientClass.methods.filter { it.name in names }.toTypedArray(), InvocationHandler { _, method, args ->
+            "onSourceSelected", "getCurrentSourceType", "getMediaSourceTypeList", "getCurrentProgress", "getMusicPlaybackInfo") +
+            if (L7AudioTemplates.model(app) != L7AudioTemplates.Model.L7) setOf("onCustomAction") else emptySet()
+        val methods = clientClass.methods.filter { it.name in names && (it.name != "onCustomAction" ||
+            (it.returnType == Void.TYPE && it.parameterTypes.contentEquals(arrayOf(android.os.Bundle::class.java)) &&
+                !java.lang.reflect.Modifier.isFinal(it.modifiers) && !java.lang.reflect.Modifier.isStatic(it.modifiers))) }
+        if (L7AudioTemplates.model(app) != L7AudioTemplates.Model.L7)
+            L7SteeringDiagnostics.store.state("customActionObserver", "available=${methods.any { it.name == "onCustomAction" }}")
+        client = SdkSubclass.create(clientClass, methods.toTypedArray(), InvocationHandler { _, method, args ->
             when (method.name) {
+                "onCustomAction" -> { if (valid) VehicleSteeringInputLog.customAction(args?.firstOrNull() as? android.os.Bundle); null }
                 "onPlay" -> valid && command(CarPlayMediaButton.PLAY)
                 "onPause" -> valid && command(CarPlayMediaButton.PAUSE)
                 "onNext" -> valid && command(CarPlayMediaButton.NEXT)

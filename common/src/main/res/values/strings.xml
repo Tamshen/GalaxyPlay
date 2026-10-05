@@ -485,4 +485,13 @@
     <string name="l7_usb_back_settings">返回有线设置</string>
     <string name="l7_usb_previous_title">上次有线连接异常结束</string>
     <string name="l7_usb_previous_hint">上次有线连接未正常结束，或启动未完成。已保留最近两次连接的阶段与可用退出原因；可在日志页查看、上传或导出诊断，再手动重试。</string>
+    <string name="l7_steering_vehicle">车型与输入采集</string>
+    <string name="l7_steering_l7_capture">L7 方控沿用现有实现</string>
+    <string name="l7_steering_other_capture">额外输入判断日志默认开启；未知输入仅记录，不映射。厂商回调观察在下次连接时应用。</string>
+    <string name="l7_steering_test_key">标记准备测试的按键</string>
+    <string name="l7_steering_test_key_hint">先选按键，再按实物键，最后标记正常或失效；记录默认进入日志，上传由你发起。</string>
+    <string-array name="l7_steering_test_keys">
+        <item>左键／上一曲</item><item>右键／下一曲</item><item>播放／暂停</item>
+        <item>语音短按</item><item>语音长按</item><item>音量加</item><item>音量减</item><item>其他按键</item>
+    </string-array>
 </resources>

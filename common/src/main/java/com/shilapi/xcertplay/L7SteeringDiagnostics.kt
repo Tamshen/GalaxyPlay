@@ -8,6 +8,7 @@ internal class L7SteeringTraceStore(
     private val clock: () -> Long,
     private val log: (String) -> Unit,
     private val capacity: Int = 256,
+    private val model: () -> String = { "unknown" },
 ) {
     data class Event(val id: Long, val generation: Long, val source: String, val command: Int,
                      val stage: String, val detail: String, val elapsedMs: Long, val atMs: Long)
@@ -22,7 +23,7 @@ internal class L7SteeringTraceStore(
     private val run = clock()
 
     @Synchronized fun begin(source: String, command: Int, detail: String = ""): L7SteeringTrace {
-        val trace = L7SteeringTrace(++serial, generation, safe(source), command, clock(), this)
+        val trace = L7SteeringTrace(++serial, generation, safe(source), command, clock(), this, safe(model()))
         trace.step("INPUT", detail)
         return trace
     }
@@ -48,7 +49,7 @@ internal class L7SteeringTraceStore(
         events.addLast(event)
         while (events.size > capacity) events.removeFirst()
         revision++
-        log("STEERING_TRACE run=$run trace=${event.id} generation=${event.generation} source=${event.source} index=${event.command} stage=${event.stage} elapsedMs=${event.elapsedMs} monoMs=$now detail=${event.detail} thread=${safe(Thread.currentThread().name)}")
+        log("STEERING_TRACE run=$run trace=${event.id} generation=${event.generation} model=${trace.model} source=${event.source} index=${event.command} stage=${event.stage} elapsedMs=${event.elapsedMs} monoMs=$now detail=${event.detail} thread=${safe(Thread.currentThread().name)}")
     }
 
     @Synchronized fun snapshot() = Snapshot(revision, connected, generation, events.toList(), states.toMap())
@@ -59,15 +60,20 @@ internal class L7SteeringTraceStore(
 internal class L7SteeringTrace internal constructor(
     val id: Long, val generation: Long, val source: String, val command: Int,
     internal val started: Long, private val store: L7SteeringTraceStore,
+    val model: String,
 ) {
     fun step(stage: String, detail: String = "") = store.append(this, stage, detail)
 }
 
 internal object L7SteeringDiagnostics {
     @Volatile private var target: SessionLogFile? = null
-    val store = L7SteeringTraceStore(SystemClock::elapsedRealtime, ::record)
+    @Volatile private var app: android.content.Context? = null
+    val store = L7SteeringTraceStore(SystemClock::elapsedRealtime, ::record,
+        model = { app?.let { L7AudioTemplates.model(it).id } ?: "unknown" })
 
     @Synchronized fun initialize(context: android.content.Context) {
+        app = context.applicationContext
+        VehicleSteeringInputLog.initialize(context)
         if (target == null) target = SessionLogFile(java.io.File(context.filesDir, "logs/steering.log"),
             listOf("steering-previous.log", "steering-previous-2.log"))
     }

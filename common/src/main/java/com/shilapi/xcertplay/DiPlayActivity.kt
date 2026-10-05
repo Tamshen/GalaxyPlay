@@ -284,6 +284,11 @@ class DiPlayActivity : ComponentActivity() {
         super.onPause()
     }
 
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (l7Ui) VehicleSteeringInputLog.key(event, "vehicle-settings-key")
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onStop() {
         wirelessHotspotGate.cancel()
         hotspotActions.background(); wiredSettings?.background()

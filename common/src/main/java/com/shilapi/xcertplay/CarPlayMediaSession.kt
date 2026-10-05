@@ -47,6 +47,7 @@ internal class CarPlayMediaSession(
         private set
 
     private val callback = CarPlayMediaCallback(explicitHardwareActions = true,
+        observeKey = { event, source -> if ("window-key" !in source) VehicleSteeringInputLog.key(event, source) },
         tracedSend = traceSend?.let { { index, source, trace -> command(index, source, trace) } }) { index, source ->
         command(index, source, null)
     }

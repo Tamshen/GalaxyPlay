@@ -30,4 +30,13 @@
     <string name="l7_usb_back_settings">Return to wired settings</string>
     <string name="l7_usb_previous_title">Previous wired connection ended unexpectedly</string>
     <string name="l7_usb_previous_hint">The previous wired connection did not end normally or did not finish starting. Stages and available exit reasons for the last two attempts were kept. View, upload or export diagnostics from the log page, then retry manually.</string>
+    <string name="l7_steering_vehicle">Vehicle and input capture</string>
+    <string name="l7_steering_l7_capture">L7 keeps the existing steering implementation</string>
+    <string name="l7_steering_other_capture">Extra input diagnostics are enabled by default. Unknown inputs are recorded without mapping. Vendor callback observation applies on the next connection.</string>
+    <string name="l7_steering_test_key">Mark the key to test</string>
+    <string name="l7_steering_test_key_hint">Select a key, press the physical control, then mark success or failure. Records enter the logs by default; you initiate uploads.</string>
+    <string-array name="l7_steering_test_keys">
+        <item>Left / Previous</item><item>Right / Next</item><item>Play / Pause</item>
+        <item>Voice short press</item><item>Voice long press</item><item>Volume up</item><item>Volume down</item><item>Other key</item>
+    </string-array>
 </resources>
