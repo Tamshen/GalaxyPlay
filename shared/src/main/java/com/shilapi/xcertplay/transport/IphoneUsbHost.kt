@@ -13,6 +13,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.hardware.usb.UsbRequest
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import java.io.Closeable
@@ -77,8 +78,8 @@ class IphoneUsbHost(
     }
 
     sealed class PermissionResult {
-        data class Granted(val device: UsbDevice) : PermissionResult()
-        data class Denied(val device: UsbDevice) : PermissionResult()
+        data class Granted(val device: UsbDevice, val requestId: Long = 0) : PermissionResult()
+        data class Denied(val device: UsbDevice, val requestId: Long = 0) : PermissionResult()
     }
 
     sealed class TransitionResult {
@@ -97,11 +98,11 @@ class IphoneUsbHost(
         usbManager.deviceList.values.filter { matcher.matches(it.vendorId, it.productId) }
 
     @Throws(IphoneUsbException::class)
-    fun requestPermission(device: UsbDevice): PermissionRequest {
+    fun requestPermission(device: UsbDevice, requestId: Long = 0): PermissionRequest {
         requireConfiguredDevice(device)
         if (usbManager.hasPermission(device)) return PermissionRequest.AlreadyGranted(device)
 
-        usbManager.requestPermission(device, permissionPendingIntent())
+        usbManager.requestPermission(device, permissionPendingIntent(requestId))
         return PermissionRequest.Requested(device)
     }
 
@@ -110,10 +111,11 @@ class IphoneUsbHost(
         if (intent.action != permissionAction) return null
         val device = intent.usbDevice() ?: return null
         if (!matcher.matches(device.vendorId, device.productId)) return null
+        val requestId = intent.getLongExtra(PERMISSION_REQUEST_ID, 0)
         return if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-            PermissionResult.Granted(device)
+            PermissionResult.Granted(device, requestId)
         } else {
-            PermissionResult.Denied(device)
+            PermissionResult.Denied(device, requestId)
         }
     }
 
@@ -126,7 +128,9 @@ class IphoneUsbHost(
 
     /** Register once for this host instance and close the returned handle to unregister it. */
     fun registerPermissionReceiver(onResult: (PermissionResult) -> Unit): Closeable =
-        registerReceiver(IntentFilter(permissionAction)) { parsePermissionResult(it)?.let(onResult) }
+        registerReceiver(IntentFilter(permissionAction).apply { addDataScheme("l7carplay") }) {
+            parsePermissionResult(it)?.let(onResult)
+        }
 
     /** Register once for this host instance and close the returned handle to unregister it. */
     fun registerAttachReceiver(onAttached: (UsbDevice) -> Unit): Closeable =
@@ -279,13 +283,18 @@ class IphoneUsbHost(
         }
     }
 
-    private fun permissionPendingIntent(): PendingIntent {
+    private fun permissionPendingIntent(requestId: Long): PendingIntent {
+        // PendingIntent 身份不比较 extras；独立 data 防止新请求覆盖旧回调的编号。
         val intent = Intent(permissionAction).setPackage(appContext.packageName)
+            .setData(Uri.parse("l7carplay://usb-permission/$requestId"))
+            .putExtra(PERMISSION_REQUEST_ID, requestId)
         return PendingIntent.getBroadcast(
             appContext,
             0,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            // USB 服务通过 send(fillInIntent) 填入设备和授权结果，不能使用 IMMUTABLE。
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0,
         )
     }
 
@@ -312,6 +321,7 @@ class IphoneUsbHost(
     }
 
     companion object {
+        internal const val PERMISSION_REQUEST_ID = "l7.usb.permissionRequest"
         private const val USB_VENDOR_DEVICE_IN = 0xc0
         private const val CARPLAY_CONFIGURATION_REQUEST = 0x52
         private const val CARPLAY_CONFIGURATION_INDEX = 0x0004
