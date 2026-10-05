@@ -61,4 +61,5 @@
     <string name="l7_wireless_bt_settings_missing">无法打开蓝牙设置，请从车机系统设置进入蓝牙，开启并配对 iPhone。</string>
     <string name="l7_wireless_join_iphone">在 iPhone 上操作</string>
     <string name="l7_usb_permission_no_device">待检测：识别到 Apple USB 设备后才能检查访问权限。</string>
+    <string name="l7_usb_vpn_adb_hint">若已通过电脑连接车机 ADB，可尝试执行：\nadb shell appops set com.ecarx.carplay ACTIVATE_VPN allow\n\n检查授权结果：\nadb shell appops get com.ecarx.carplay ACTIVATE_VPN\n\n返回应用点击“重新检查并授权”。命令获准不代表有线连接已成功。</string>
 </resources>

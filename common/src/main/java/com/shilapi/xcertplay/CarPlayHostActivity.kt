@@ -586,7 +586,9 @@ class CarPlayHostActivity : ComponentActivity() {
         setConnectionStage(message)
         if (isFinishing || isDestroyed) return
         wiredFailureDialog?.dismiss()
-        wiredFailureDialog = L7Dialogs.builder(this).setTitle(R.string.l7_usb_start_failed).setMessage(message)
+        val guidance = if (failure in setOf(L7VpnConsent.Failure.PAGE_MISSING, L7VpnConsent.Failure.SYSTEM_DENIED))
+            message + "\n\n" + getString(R.string.l7_usb_vpn_adb_hint) else message
+        wiredFailureDialog = L7Dialogs.builder(this).setTitle(R.string.l7_usb_start_failed).setMessage(guidance)
             .setPositiveButton(R.string.l7_usb_retry) { _, _ ->
                 wiredStartupFeedback = null
                 wiredAttempt = L7WiredDiagnostics.begin(this)
