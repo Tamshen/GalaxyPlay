@@ -23,6 +23,27 @@ class AudioFocusCoordinatorTest {
     private val audio = context.getSystemService(AudioManager::class.java)
     private val shadow = shadowOf(audio)
 
+    @Test fun l6NavigationUsesMayDuckAndReleaseRestoresMediaWithoutChangingL7Defaults() {
+        val json = org.json.JSONObject(AudioRoutingTemplate.system().toJson())
+            .put("focusGains", org.json.JSONObject().put("navigation", 3).put("ringtone", 3).put("phone", 2))
+        val media = track(); val navigation = track(); val phone = track()
+        val focus = AudioFocusCoordinator(context, true, factoryRouting = true,
+            template = AudioRoutingTemplate.parse(json.toString()))
+        try {
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            focus.acquire(media, AudioChannel.MEDIA, attributes())
+            assertEquals(AudioManager.AUDIOFOCUS_GAIN, shadow.lastAudioFocusRequest.durationHint)
+            focus.acquire(navigation, AudioChannel.NAVIGATION, attributes(12))
+            assertEquals(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK, shadow.lastAudioFocusRequest.durationHint)
+            assertEquals(0.2f, volume(media), 0f)
+            focus.acquire(phone, AudioChannel.PHONE, attributes(2))
+            assertEquals(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT, shadow.lastAudioFocusRequest.durationHint)
+            focus.release(phone); focus.release(navigation)
+            assertEquals(AudioManager.AUDIOFOCUS_GAIN, shadow.lastAudioFocusRequest.durationHint)
+            assertEquals(1f, volume(media), 0f)
+        } finally { focus.close(); media.release(); navigation.release(); phone.release() }
+    }
+
     @Test fun diagnosticSnapshotObservesPhoneReleaseWithoutRequestingFocusOrChangingVolumes() {
         val media = track(); val phone = track()
         val focus = AudioFocusCoordinator(context, true, factoryRouting = true)

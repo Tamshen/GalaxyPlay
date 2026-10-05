@@ -13,6 +13,25 @@ class AudioRoutingTemplateTest {
     private fun base() = JSONObject(AudioRoutingTemplate.system().toJson())
     private fun rejected(obj: JSONObject) = assertTrue(runCatching { AudioRoutingTemplate.parse(obj.toString()) }.isFailure)
 
+    @Test fun focusOverridesRoundTripWithChoiceEditsAndLeaveOldTemplatesUnchanged() {
+        assertNull(AudioRoutingTemplate.system().focusGain(AudioChannel.NAVIGATION))
+        val obj = base().put("focusGains", JSONObject().put("navigation", 3).put("phone", 2))
+        val template = AudioRoutingTemplate.parse(obj.toString()).withChoice(AudioOutputRole.MEDIA, 20)
+        val restored = AudioRoutingTemplate.parse(template.toJson())
+        assertEquals(3, restored.focusGain(AudioChannel.NAVIGATION))
+        assertEquals(2, restored.focusGain(AudioChannel.PHONE))
+        assertEquals(20, restored.choice(AudioOutputRole.MEDIA))
+        assertFalse(AudioRoutingTemplate.system().toJson().contains("focusGains"))
+    }
+
+    @Test fun invalidFocusGainsAndPermanentCallFocusAreRejected() {
+        for (value in listOf(0, 5, "3", 3.5, JSONObject.NULL))
+            rejected(base().put("focusGains", JSONObject().put("navigation", value)))
+        rejected(base().put("focusGains", JSONObject().put("unknown", 2)))
+        rejected(base().put("focusGains", JSONObject().put("phone", 1)))
+        rejected(base().put("focusGains", JSONObject.NULL))
+    }
+
     @Test fun allTwentyStreamsAndFactoryStrategyRoundTripIndependently() {
         for (choice in listOf(0) + (1..20) + listOf(101, 102, 103)) {
             val old = AudioRoutingTemplate.system()
