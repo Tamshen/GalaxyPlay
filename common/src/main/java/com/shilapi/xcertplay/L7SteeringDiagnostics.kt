@@ -73,8 +73,7 @@ internal object L7SteeringDiagnostics {
     }
 
     private fun record(line: String) {
-        L7DebugLog.record(line)
-        AsyncDiagnosticLog.append(target, line)
+        L7DebugLog.record(line, target)
     }
     fun begin(source: String, index: Int, detail: String = "") = store.begin(source, index, detail)
 }

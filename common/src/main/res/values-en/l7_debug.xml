@@ -37,4 +37,6 @@
     <string name="l7_debug_summary">%1$s · %2$s · %3$d older entries removed</string>
     <string name="l7_debug_live">Live</string>
     <string name="l7_debug_paused">Display paused; recording continues</string>
+    <string name="l7_logs_title">Logs</string>
+    <string name="l7_logs_entry_hint">View, export and upload runtime and debug logs</string>
 </resources>

@@ -168,7 +168,8 @@ def navigation_smoke():
     for category, labels, name in (
         ('连接设置', ['无线连接', '有线连接', '选择连接方式'], 'connection'),
         ('关于', ['应用版本', '使用协议'], 'about'),
-        ('调试与日志', ['返回设置', '环境与权限', '日志与报告'], 'debug'),
+        ('调试', ['返回设置', '环境与权限', '调试模块'], 'debug'),
+        ('日志', ['返回设置', '查看日志', '上传日志'], 'logs'),
     ):
         tap(category)
         settings_selected()
@@ -177,10 +178,8 @@ def navigation_smoke():
         screenshot('hierarchy-' + name + '-bottom-day')
         if name == 'about':
             assert not any(n.attrib.get('text') == '调试与日志' for n in nodes()), '关于页仍保留重复调试入口'
-        if name == 'debug':
-            tap('日志与报告')
+        if name == 'logs':
             require_labels(['查看当前日志', '保存诊断报告', '选择保存位置', '管理悬浮窗权限'])
-            tap('返回调试与日志')
         tap('返回设置')
     tap('权限与连接帮助')
     require_labels(['返回设置', '应用权限', '蓝牙设置', '无线连接帮助'])

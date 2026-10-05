@@ -20,9 +20,11 @@ internal class L7DiagnosticSettings(
         context.getString(R.string.reports_save_to_downloads_diplay), click = onExport)
     private val state = L7SettingRow(context, context.getString(R.string.l7_debug_state_title), "")
     private var overlay: L7SettingRow? = null
-    private val remote: L7RemoteLogSettings
+    private lateinit var remote: L7RemoteLogSettings
+    private val quick: L7QuickLogActions
 
     init {
+        quick = L7QuickLogActions(context, parent, onLogs, onUpload) { remote.configure() }
         L7SettingsSection.add(parent, context.getString(R.string.l7_logs_and_reports),
             footer = context.getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden).trim()) { card ->
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_debug_view),
@@ -46,6 +48,7 @@ internal class L7DiagnosticSettings(
     }
 
     fun update(exporting: Boolean) {
+        quick.update()
         remote.update()
         if (exporting) exportFailed = false
         export.setFeedback(when {

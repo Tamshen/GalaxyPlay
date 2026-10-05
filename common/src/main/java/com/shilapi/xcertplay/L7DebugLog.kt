@@ -31,9 +31,19 @@ internal class DebugLogBuffer(private val capacity: Int = 1000) {
 
 internal object L7DebugLog {
     val buffer = DebugLogBuffer()
-    fun record(message: String) {
+    @Volatile private var persistent: SessionLogFile? = null
+    @Synchronized fun initialize(context: android.content.Context) {
+        if (persistent == null) persistent = SessionLogFile(java.io.File(context.filesDir, "logs/debug.log"),
+            listOf("debug-previous.log", "debug-previous-2.log"))
+    }
+
+    /** 所有调试入口默认落盘；展示窗口和 JSON 报告不承担日志留存。 */
+    fun record(message: String) = record(message, persistent)
+
+    fun record(message: String, target: SessionLogFile?) {
         val safe = DiagnosticRedactor.redact(message) ?: return
         buffer.append("${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())}  $safe")
+        AsyncDiagnosticLog.append(target, safe)
     }
 }
 

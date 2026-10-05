@@ -15,6 +15,7 @@ import com.shilapi.xcertplay.host.R
 class L7Application : Application() {
     override fun onCreate() {
         super.onCreate()
+        L7DebugLog.initialize(this)
         if (Application.getProcessName() == packageName) L7StartupGuard.install(this)
     }
 }

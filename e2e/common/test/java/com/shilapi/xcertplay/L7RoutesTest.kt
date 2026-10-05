@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class L7RoutesTest {
@@ -36,10 +37,19 @@ class L7RoutesTest {
         assertEquals("settings", L7Routes.navigation("settings-debug"))
         assertEquals("settings", L7Routes.back("settings-debug"))
         assertEquals("settings-debug", L7Routes.destination("home", "settings", "settings-diagnostics"))
-        listOf("settings-debug-results", "settings-debug-history", "settings-debug-logs", "settings-debug-steering", "settings-debug-voice").forEach {
+        listOf("settings-debug-results", "settings-debug-history", "settings-debug-steering", "settings-debug-voice").forEach {
             assertEquals("settings-debug", L7Routes.back(it))
             assertEquals("settings", L7Routes.navigation(it))
         }
+    }
+
+    @Test fun logsAreAnIndependentSettingsCategoryAndOldLogRoutesRemainReachable() {
+        assertEquals("settings-logs", L7Routes.normalize("settings-debug-logs"))
+        assertEquals("settings-logs", L7Routes.normalize("settings-logs"))
+        assertEquals("settings", L7Routes.back("settings-logs"))
+        assertEquals("settings", L7Routes.back("settings-debug-logs"))
+        assertFalse(L7Routes.isDebug("settings-logs"))
+        assertFalse(L7Routes.isDebug("settings-debug-logs"))
     }
 
     @Test fun tappingSettingsInsideItsChildReturnsToCategoriesAndOutsideRestoresChild() {
