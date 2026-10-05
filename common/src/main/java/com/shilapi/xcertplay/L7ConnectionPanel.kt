@@ -6,6 +6,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ImageView
 import android.widget.ScrollView
 import com.shilapi.xcertplay.host.R
 
@@ -43,6 +44,11 @@ internal class L7ConnectionPanel(
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, dp(24), 0, dp(24))
         }
+        card.addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_carplay)
+            contentDescription = context.getString(R.string.carplay_icon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(80), dp(80)).apply { bottomMargin = dp(24) })
         card.addView(L7Components.text(context, context.getString(R.string.l7_entry_title)).apply {
             textSize = 36f; gravity = Gravity.CENTER
         }, row())

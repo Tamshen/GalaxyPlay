@@ -334,8 +334,8 @@ class DiPlayActivity : ComponentActivity() {
         if (page != "home" && page !in L7Routes.settings) {
             val header = row().apply { gravity = Gravity.CENTER_VERTICAL }
             header.addView(ImageView(this).apply {
-                setImageResource(R.drawable.ic_l7_projection)
-                imageTintList = ColorStateList.valueOf(ACCENT)
+                setImageResource(R.drawable.ic_carplay)
+                scaleType = ImageView.ScaleType.FIT_CENTER
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
             header.addView(label(getString(R.string.app_name), 24, TEXT, true).apply {
