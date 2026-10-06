@@ -50,7 +50,7 @@ object AirPlayInfoPlist {
         )
         if (!config.disableAudioOutput) {
             info["audioLatencies"] = audioLatencies()
-            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.mainBufferedAudio)
+            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.mainBufferedAudio, config.supportsOpusOutput)
         }
         info["extendedFeatures"] = listOf("vocoderInfo", "enhancedRequestCarUI")
         info["displays"] = displays
@@ -122,6 +122,7 @@ object AirPlayInfoPlist {
         entertainmentRate: Int,
         microphone: Boolean,
         mainBuffered: Boolean = false,
+        supportsOpusOutput: Boolean = true,
     ): List<Map<String, Any?>> {
         fun format(type: Int, audioType: String, outputFormats: Int, inputFormats: Int? = null): Map<String, Any?> {
             val entry = linkedMapOf<String, Any?>(
@@ -141,16 +142,17 @@ object AirPlayInfoPlist {
         val aacLc = if (is48) 0x800000 else 0x400000
         val pcmInput = if (microphone) pcmMono else null
         val wirelessInput = if (microphone) pcmMono or opus else null
+        val outputOpus = if (supportsOpusOutput) opus else 0
 
         return listOf(
             format(100, "compatibility", pcm, pcmInput),
             format(101, "compatibility", pcm),
-            format(100, "default", pcm or opus, wirelessInput),
-            format(100, "alert", pcm or opus),
+            format(100, "default", pcm or outputOpus, wirelessInput),
+            format(100, "alert", pcm or outputOpus),
             format(100, "media", pcm),
-            format(100, "telephony", pcmMono or opus, wirelessInput),
-            format(100, "speechRecognition", pcmMono or opus, wirelessInput),
-            format(101, "default", pcm or opus),
+            format(100, "telephony", pcmMono or outputOpus, wirelessInput),
+            format(100, "speechRecognition", pcmMono or outputOpus, wirelessInput),
+            format(101, "default", pcm or outputOpus),
             format(102, "media", aacLc),
         ) + if (mainBuffered) {
             // The buffered music stream; the iPhone (iOS 27) opened it only with AAC-LC, not PCM or ALAC.

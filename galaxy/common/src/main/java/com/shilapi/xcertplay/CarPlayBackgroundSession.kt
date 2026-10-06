@@ -90,7 +90,7 @@ internal object CarPlayBackgroundSession {
     /** 与后台控制器共存，切换设置或重建窗口不重复断开；结束会话才释放监听。 */
     @Synchronized fun setBluetoothMediaActive(expected: CarPlayController, context: Context, active: Boolean) {
         if (controller !== expected) return
-        if (active && expected.isClosed()) return
+        if (active && (expected.isClosed() || !expected.localMediaAudioEnabled)) return
         if (!active) {
             bluetoothMediaGuard?.close()
             bluetoothMediaGuard = null

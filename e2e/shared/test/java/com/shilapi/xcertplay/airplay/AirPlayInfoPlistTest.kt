@@ -7,6 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AirPlayInfoPlistTest {
+    @Test fun wiredPcmOfferKeepsVoiceAndMicrophoneButRemovesOutputOpusOnly() {
+        val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
+            AirPlayDisplayConfig(1280, 720), microphone = true)
+        fun formats(c: AirPlayConfig) = AirPlayInfoPlist.build(c)["audioFormats"] as List<Map<String, Any?>>
+        val wireless = formats(config)
+        val wired = formats(config.copy(supportsOpusOutput = false))
+        assertEquals(wireless.size, wired.size)
+        for ((a, b) in wireless.zip(wired)) {
+            assertEquals((a["audioOutputFormats"] as Int) and 0x70000000.inv(), b["audioOutputFormats"])
+            assertEquals(a["audioInputFormats"], b["audioInputFormats"])
+            assertEquals(a["audioType"], b["audioType"])
+        }
+    }
+
     @Test
     fun defaultDisplayIncludesFullViewAndSafeAreas() {
         val info = AirPlayInfoPlist.build(

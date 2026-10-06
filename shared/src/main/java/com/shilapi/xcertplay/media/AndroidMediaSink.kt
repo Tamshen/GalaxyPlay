@@ -43,6 +43,7 @@ class AndroidMediaSink(
     private val preferSoftwareHevcDecoder: Boolean = false,
     private val advancedAudioChannelMapping: Boolean = false,
     private val audioFocusEnabled: Boolean = false,
+    private val localMediaAudioEnabled: Boolean = true,
     private val mediaChannel: Int = 0,
     private val navigationChannel: Int = 0,
     context: Context? = null,
@@ -231,7 +232,7 @@ class AndroidMediaSink(
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
         if (closed) return
         audioRenderer(id, format)?.start()
-        if (format.audioType == "media") updateMediaAudio(id, true)
+        if (localMediaAudioEnabled && LocalMediaAudioPolicy.isMusic(id, format)) updateMediaAudio(id, true)
         if (format.audioType.equals("speechrecognition", ignoreCase = true)) assistantAudioTypes.add(id)
     }
 
@@ -361,7 +362,10 @@ class AndroidMediaSink(
 
     @Synchronized
     private fun audioRenderer(id: AudioStreamId, format: AudioFormat): AudioRenderer? {
-        if (closed) return null
+        if (closed || !LocalMediaAudioPolicy.shouldRender(localMediaAudioEnabled, id, format)) {
+            audioRenderers.remove(id)?.close()
+            return null
+        }
         val existing = audioRenderers[id]
         if (existing?.format == format) return existing
         existing?.close()

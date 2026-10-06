@@ -86,6 +86,43 @@ class L7MediaCenterSessionTest {
         worker.drain()
     }
 
+    @Test fun bluetoothReportsOwnMetadataWithoutRequestingSourceOrForwardingControls() {
+        val passive = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index },
+            worker, main, logs::add, localPlayback = false, retry = { retries.add(it) })
+        passive.start(); worker.drain(); port.ready(true); worker.drain()
+        passive.update(playing(300)); worker.drain()
+        assertTrue(port.calls.contains("state"))
+        assertTrue(port.calls.contains("progress:300"))
+        for (index in listOf(CarPlayMediaButton.PLAY, CarPlayMediaButton.PAUSE, CarPlayMediaButton.NEXT))
+            assertFalse(port.command(index))
+        assertFalse(port.selected(port.source))
+        port.focus("own"); worker.drain()
+        port.focus("vehicle-bluetooth"); worker.drain(); main.drain()
+        assertTrue(sent.isEmpty())
+        assertFalse(port.calls.contains("request"))
+        assertFalse(port.calls.contains("current"))
+        port.ready(false); worker.drain(); port.ready(true); worker.drain()
+        assertEquals(2, port.calls.count { it == "register" })
+        passive.close(); worker.drain()
+        assertFalse(port.command(CarPlayMediaButton.PLAY))
+        assertTrue(port.calls.contains("unregister"))
+    }
+
+    @Test fun bluetoothTokenAndSourceRejectionNeverRequestsPlay() {
+        val passive = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index },
+            worker, main, logs::add, localPlayback = false, retry = { retries.add(it) })
+        port.token = false
+        passive.start(); worker.drain(); port.ready(true); worker.drain()
+        passive.update(playing()); worker.drain()
+        assertFalse(port.command(CarPlayMediaButton.PLAY))
+        port.token = true; port.acceptSource = false
+        retries.removeFirst().run(); worker.drain()
+        assertTrue(port.calls.contains("unregister"))
+        assertFalse(port.calls.contains("request"))
+        assertFalse(port.calls.contains("state"))
+        passive.close(); worker.drain()
+    }
+
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
 

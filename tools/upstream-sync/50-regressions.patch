@@ -499,6 +499,29 @@
          assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
          assertEquals(View.VISIBLE, retry.visibility)
          report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
+@@ -7,6 +7,20 @@
+ import org.junit.Test
+ 
+ class AirPlayInfoPlistTest {
++    @Test fun wiredPcmOfferKeepsVoiceAndMicrophoneButRemovesOutputOpusOnly() {
++        val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
++            AirPlayDisplayConfig(1280, 720), microphone = true)
++        fun formats(c: AirPlayConfig) = AirPlayInfoPlist.build(c)["audioFormats"] as List<Map<String, Any?>>
++        val wireless = formats(config)
++        val wired = formats(config.copy(supportsOpusOutput = false))
++        assertEquals(wireless.size, wired.size)
++        for ((a, b) in wireless.zip(wired)) {
++            assertEquals((a["audioOutputFormats"] as Int) and 0x70000000.inv(), b["audioOutputFormats"])
++            assertEquals(a["audioInputFormats"], b["audioInputFormats"])
++            assertEquals(a["audioType"], b["audioType"])
++        }
++    }
++
+     @Test
+     fun defaultDisplayIncludesFullViewAndSafeAreas() {
+         val info = AirPlayInfoPlist.build(
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
 @@ -159,7 +159,7 @@
@@ -1112,6 +1135,44 @@
          diagnostics.controlProgress("iap2 tx=0x4301 carplay-start-session")
          assertTrue(diagnostics.summary().contains("startRequestAgeMs=20000 firstTcpAfterStartMs=none"))
          diagnostics.connectionAccepted()
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
+@@ -22,6 +22,35 @@
+     }, { failures++ }, { now * 1_000_000 })
+     private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
+         AirPlayTcpAccepted(owner, internal, now * 1_000_000)
++
++    @Test fun protocolDeadlineStartsOnceAndLateFirstTcpTimerCannotFailIt() {
++        val watch = FirstTcpWatchdog(identity, { delay, action ->
++            deadline = now + delay; timer = action
++            val cancel: () -> Unit = { deadline = null }; cancel
++        }, { failures++ }, { now * 1_000_000 }, protocolTimeoutMillis = 5000)
++        watch.startSessionSent(0)
++        val firstTimer = timer!!
++        now = 1000; assertTrue(watch.accepted(event()))
++        val protocolTimer = timer!!
++        assertEquals(6000L, deadline)
++        now = 2000; watch.accepted(event()); firstTimer()
++        assertEquals(6000L, deadline)
++        assertEquals(0, failures)
++        protocolTimer(); protocolTimer()
++        assertTrue(watch.protocolTimedOut)
++        assertEquals(1, failures)
++    }
++    @Test fun protocolSuccessAndTerminationRejectLateDeadline() {
++        for (success in listOf(true, false)) {
++            val watch = FirstTcpWatchdog(identity, { _, action -> timer = action; {} },
++                { failures++ }, protocolTimeoutMillis = 5000)
++            watch.accepted(event()); val old = timer!!
++            if (success) watch.sessionEstablished() else watch.terminate()
++            old()
++            assertFalse(watch.protocolTimedOut)
++        }
++        assertEquals(0, failures)
++    }
+ 
+     @Test fun noSuccessfulStartSessionDoesNotArmTimer() {
+         watchdog()
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
 @@ -24,7 +24,7 @@
