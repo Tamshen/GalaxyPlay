@@ -541,6 +541,16 @@
  internal object WirelessInterfaceDiagnostics {
      fun snapshot(interfaceName: String?): String {
          if (interfaceName == null) return "interfaceState=unknown"
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/WirelessStartupPolicy.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/WirelessStartupPolicy.kt
+@@ -11,6 +11,6 @@
+     const val STABLE_SESSION_MILLIS = 60_000L
+ }
+ 
+-enum class WirelessStartupFailure { HOTSPOT_NOT_READY, FIRST_TCP_TIMEOUT, HOTSPOT_CONFIGURATION }
++enum class WirelessStartupFailure { HOTSPOT_NOT_READY, FIRST_TCP_TIMEOUT, AIRPLAY_PROTOCOL_TIMEOUT, HOTSPOT_CONFIGURATION }
+ 
+ class WirelessStartupException(val reason: WirelessStartupFailure, message: String) : IOException(message)
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayController.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayController.kt
 @@ -1,6 +1,7 @@
@@ -615,15 +625,16 @@
      private val usbManager: UsbManager? = context.getSystemService(UsbManager::class.java)
      private val bluetoothAdapter =
          appContext.getSystemService(BluetoothManager::class.java)?.adapter
-@@ -190,6 +199,7 @@
+@@ -190,6 +199,8 @@
              } else {
                  IphoneUsbMatcher.appleVendor()
              },
 +            permissionAction = "${appContext.packageName}.IPHONE_USB_PERMISSION.${UUID.randomUUID()}",
++            onDiagnostic = ::connectionDiagnostic,
          )
      }
      private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-@@ -201,11 +211,16 @@
+@@ -201,11 +212,16 @@
      private val lifecycleLock = Any()
      @Volatile private var uiListener: AirPlaySessionListener? = listener
      @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
@@ -640,7 +651,7 @@
      private var mfiResetLogged = false
  
      @Volatile private var closed = false
-@@ -226,13 +241,21 @@
+@@ -226,13 +242,21 @@
      private val playbackStatus = com.shilapi.xcertplay.media.CarPlayPlaybackStatus()
  
      /** Told when the iPhone starts or stops playing media; may run on any thread. */
@@ -665,7 +676,7 @@
  
      /** Video in car; set before [start] to offer it to the iPhone (with AirPlayConfig.videoInCar). */
      @Volatile var videoListener: CarPlayVideoListener? = null
-@@ -267,6 +290,7 @@
+@@ -267,6 +291,7 @@
  
      private var permissionCloseable: Closeable? = null
      private var attachCloseable: Closeable? = null
@@ -673,7 +684,7 @@
      private var ch341PermissionCloseable: Closeable? = null
      private var vpnLatch = CountDownLatch(1)
      private val teardownComplete = CountDownLatch(1)
-@@ -287,6 +311,10 @@
+@@ -287,6 +312,10 @@
          override fun onSessionActive(session: AirPlaySession) {
              val replacement = activeSession !== session
              if (replacement) {
@@ -684,7 +695,7 @@
                  BydNavigationOutputs.start(appContext)
                  com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                  // The gear may have changed since /info.
-@@ -296,6 +324,8 @@
+@@ -296,6 +325,8 @@
                  }
              }
              activeSession = session
@@ -693,7 +704,7 @@
              if (replacement) restoreDashboardContent(session)
              debugLog(
                  "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
-@@ -307,16 +337,17 @@
+@@ -307,16 +338,17 @@
          override fun onSessionEnded(session: AirPlaySession) {
              if (activeSession === session) {
                  activeSession = null
@@ -718,7 +729,7 @@
              }
              debugLog("AirPlay session ended peer=${session.host}")
              uiListener?.onSessionEnded(session)
-@@ -413,6 +444,9 @@
+@@ -413,6 +445,9 @@
              if (closed) return
          }
          connectionDiagnostic("start transport=${config.transport}")
@@ -728,7 +739,7 @@
          if (!hasRequiredUsbService()) return
          videoListener?.let { listener ->
              videoGate = VideoInCarGate(
-@@ -431,6 +465,7 @@
+@@ -431,6 +466,7 @@
          if (config.transport == CarPlayTransport.WIRED) {
              permissionCloseable = iphoneHost.registerPermissionReceiver(::onIphonePermission)
              attachCloseable = iphoneHost.registerAttachReceiver(::onIphoneAttached)
@@ -736,7 +747,7 @@
          }
          startMfi()
      }
-@@ -465,6 +500,8 @@
+@@ -465,6 +501,8 @@
          }
      }
  
@@ -745,7 +756,7 @@
      /** Moves CarPlay on the main screen to its declared view area [index], for example another dock edge. */
      fun showViewArea(index: Int): Boolean {
          if (closed) return false
-@@ -571,13 +608,37 @@
+@@ -571,13 +609,37 @@
          }
      }
  
@@ -788,7 +799,7 @@
              false
          }
      }
-@@ -588,6 +649,13 @@
+@@ -588,6 +650,13 @@
              closed = true
              dashboardMapOutputVisible = false
          }
@@ -802,7 +813,7 @@
          firstTcpWatchdog?.terminate()
          startupTimer.shutdownNow()
          (hotspot as? ManualHotspotManager)?.close()
-@@ -601,6 +669,7 @@
+@@ -601,6 +670,7 @@
          availabilityPollGeneration.incrementAndGet()
          wirelessGeneration.incrementAndGet()
          permissionPollGeneration += 1
@@ -810,7 +821,7 @@
          touchExecutor.shutdownNow()
          tunnelExecutor.shutdownNow()
          val service = vpnService
-@@ -626,6 +695,8 @@
+@@ -626,6 +696,8 @@
                      wirelessRuntimeIdentification = null
                      wirelessAirPlayEndpoint = null
                      closeBestEffort("location provider") { locationProvider?.close() }
@@ -819,7 +830,7 @@
                  } finally {
                      executor.shutdownNow()
                      var executorTerminated = false
-@@ -638,6 +709,11 @@
+@@ -638,6 +710,11 @@
                          "teardown end elapsedMs=${elapsedMillis(teardownStarted)} " +
                              "executorTerminated=$executorTerminated",
                      )
@@ -831,7 +842,7 @@
                      teardownComplete.countDown()
                  }
              },
-@@ -736,28 +812,41 @@
+@@ -736,28 +813,41 @@
  
      // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
      private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
@@ -884,7 +895,27 @@
          when (config.mfiTarget) {
              MfiTarget.LOCAL -> openLocalMfi(offlineDirectory)
              MfiTarget.USB_CH341 -> {
-@@ -1210,6 +1299,7 @@
+@@ -1137,13 +1227,17 @@
+                 },
+                 onTimeout = {
+                     if (!closed && generation == wirelessGeneration.get()) {
+-                        fail(WirelessStartupException(WirelessStartupFailure.FIRST_TCP_TIMEOUT,
+-                            "No AirPlay TCP after CarPlay StartSession"), generation)
++                        val protocolTimeout = firstTcpWatchdog?.protocolTimedOut == true
++                        fail(WirelessStartupException(
++                            if (protocolTimeout) WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT else WirelessStartupFailure.FIRST_TCP_TIMEOUT,
++                            if (protocolTimeout) "AirPlay protocol did not become ready after TCP connected"
++                            else "No AirPlay TCP after CarPlay StartSession"), generation)
+                         Thread({ closeWirelessStack(generation = generation) }, "diplay-startup-cleanup")
+                             .apply { isDaemon = true; start() }
+                     }
+                 },
+                 log = { debugLog("wireless startup generation=$generation listener=${listenerIdentity.id} $it") },
++                protocolTimeoutMillis = WirelessStartupPolicy.FIRST_TCP_MILLIS,
+             )
+             firstTcpWatchdog = watchdog
+             val mfi = mfiSession?.client
+@@ -1210,6 +1304,7 @@
                  ?: throw IOException("Bluetooth adapter is unavailable")
              if (!adapter.isEnabled) throw IOException("Bluetooth is not enabled")
              val device = selectWirelessBluetoothDevice(adapter)
@@ -892,7 +923,7 @@
              val hostBluetoothMac = accessoryBluetoothMac(adapter)
              debugLog(
                  "wireless selected Bluetooth target name=${device.name ?: "unknown"} " +
-@@ -1246,13 +1336,10 @@
+@@ -1246,13 +1341,10 @@
                          throw IOException(result.message)
                  }
              }
@@ -909,7 +940,19 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1317,7 +1404,7 @@
+@@ -1311,13 +1403,18 @@
+             }
+             val stream = synchronized(wirelessResourceLock) {
+                 if (isStaleWirelessRun(generation)) return
+-                BluetoothRfcommDuplexStream(socket).also { bluetoothStream = it }
++                try {
++                    BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
++                } finally {
++                    // 流接管 socket；获取流失败也由流关闭，不留第二个所有者。
++                    if (bluetoothSocket === socket) bluetoothSocket = null
++                }
+             }
+             val channel = Iap2Session.openWireless(
                  stream,
                  traceContext = "wireless-rfcomm",
                  onTrace = ::debugLog,
@@ -918,7 +961,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) {
-@@ -1330,14 +1417,12 @@
+@@ -1330,14 +1427,12 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
@@ -936,7 +979,7 @@
              )
              val endpoint = Iap2WirelessCarPlayEndpoint(
                  ssid = hotspotInfo.ssid,
-@@ -1375,7 +1460,7 @@
+@@ -1375,7 +1470,7 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  beforeStartSession = { startedHotspot?.validateReady() },
                  onStartSessionSent = { watchdog.startSessionSent(it.sentAtNanos) },
@@ -945,7 +988,7 @@
                  onProgress = { message ->
                      diagnostics.controlProgress(message)
                      debugLog(message)
-@@ -1444,7 +1529,7 @@
+@@ -1444,7 +1539,7 @@
                  stream,
                  traceContext = "wireless-tunnel",
                  onTrace = ::debugLog,
@@ -954,7 +997,7 @@
              )
          } catch (error: Throwable) {
              debugLog("Could not open the tunneled iAP2 link", error)
-@@ -1452,11 +1537,8 @@
+@@ -1452,11 +1547,8 @@
          }
          wirelessTunnelChannel = channel
          val generation = wirelessGeneration.get()
@@ -968,7 +1011,7 @@
          return try {
              tunnelExecutor.execute {
                  try {
-@@ -1472,7 +1554,7 @@
+@@ -1472,7 +1564,7 @@
                          onReady = {
                              onWirelessTunnelReady(generation)
                          },
@@ -977,7 +1020,7 @@
                          onProgress = { message -> debugLog("iAP tunnel $message") },
                      )
                      if (closed || generation != wirelessGeneration.get()) return@execute
-@@ -1541,6 +1623,7 @@
+@@ -1541,6 +1633,7 @@
                  if (isStaleWirelessRun(generation) || activeSession !== session) return
                  if (!watchdog.sessionEstablished()) return
                  wirelessConnectionProof.rendered(generation, session)
@@ -985,7 +1028,7 @@
                  val firstFrame = synchronized(this) {
                      if (reportedFrameSession === session) false else {
                          reportedFrameSession = session
-@@ -1595,6 +1678,7 @@
+@@ -1595,6 +1688,7 @@
                  }
                  debugLog("wireless handoff ready; closing Bluetooth bootstrap transport")
                  closeBluetoothBootstrapTransport()
@@ -993,7 +1036,7 @@
                  onStatus(CarPlayStatus.WirelessActive)
              },
              "xcertplay-wireless-handoff",
-@@ -1662,146 +1746,247 @@
+@@ -1662,146 +1756,247 @@
          if (activeSocket != null) closeBestEffort("wireless Bluetooth socket") { activeSocket.close() }
      }
  
@@ -1325,7 +1368,7 @@
          }
      }
  
-@@ -1826,7 +2011,12 @@
+@@ -1826,7 +2021,12 @@
          debugLog("wired opening iPhone USB data paths")
          onStatus(CarPlayStatus.SelectingConfiguration)
          onStatus(CarPlayStatus.OpeningDataPaths)
@@ -1338,7 +1381,7 @@
              when (result) {
                  is IphoneUsbHost.Iap2SessionResult.Connected -> {
                      try {
-@@ -1834,10 +2024,10 @@
+@@ -1834,10 +2034,10 @@
                          runStack(result.session, ncm)
                      } catch (error: Throwable) {
                          result.session.close()
@@ -1351,7 +1394,16 @@
              }
          }
      }
-@@ -1939,7 +2129,7 @@
+@@ -1857,7 +2057,7 @@
+         )
+         val connection = requireUsbManager().openDevice(device)
+             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
+-        return NcmUsbBridge.open(connection, function)
++        return NcmUsbBridge.open(connection, function, onDiagnostic = ::connectionDiagnostic)
+     }
+ 
+     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
+@@ -1939,7 +2139,7 @@
                      var result = ConnectionIoDiagnostics.Result.FAILED
                      try {
                          debugLog("wired link TX begin ${wireSummary(data)}")
@@ -1360,7 +1412,7 @@
                          for (offset in data.indices step 256) {
                              carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
                          }
-@@ -1973,7 +2163,7 @@
+@@ -1973,7 +2173,7 @@
                  tracedCarkit,
                  traceContext = "wired",
                  onTrace = ::debugLog,
@@ -1369,7 +1421,7 @@
              )
              this.csm = csm
              debugLog("wired iAP2 CSM channel opened")
-@@ -1994,7 +2184,7 @@
+@@ -1994,7 +2194,7 @@
                  ?: throw IphoneUsbException.DeviceUnavailable("MFi coprocessor client is unavailable")
              val endpoint = Iap2WiredCarPlayEndpoint(
                  ipv6Addresses = listOf(config.linkLocal),
@@ -1378,7 +1430,7 @@
                  publicKey = identity.publicKeyHex,
                  sourceVersion = airPlayConfig.sourceVersion,
                  deviceIdentifier = ncmHostMac.macString(),
-@@ -2012,7 +2202,7 @@
+@@ -2012,7 +2212,7 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  locationProvider = locationProvider,
                  vehicleStatusProvider = vehicleStatusProvider,
@@ -1387,7 +1439,7 @@
                  onProgress = { message -> debugLog("wired $message") },
              )
              onStatus(
-@@ -2139,6 +2329,7 @@
+@@ -2139,6 +2339,7 @@
      // Kept across reconnects within this controller: resuming between attempts would start a scan.
      private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
          if (closed || !WifiScanPause.eligible(backend)) return@synchronized
@@ -1395,7 +1447,7 @@
          (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
      }
  
-@@ -2227,7 +2418,6 @@
+@@ -2227,7 +2428,6 @@
          }
      }
  
@@ -1403,7 +1455,7 @@
      private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
          try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-@@ -2256,6 +2446,8 @@
+@@ -2256,6 +2456,8 @@
              val diagnostics = wirelessDiagnostics
              wirelessDiagnostics = null
              diagnostics?.close()
@@ -1412,7 +1464,7 @@
              wirelessConnectionProof.clear()
              media.setIapTunnelHandler(null)
              val activeTunnel = wirelessTunnelChannel
-@@ -2363,6 +2555,7 @@
+@@ -2363,6 +2565,7 @@
              close()
              completed = true
          } catch (error: Throwable) {
@@ -1420,7 +1472,7 @@
              debugLog("$name teardown failed", error)
          } finally {
              connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
-@@ -2460,7 +2653,7 @@
+@@ -2460,7 +2663,7 @@
      }
  
      private fun closeReceivers() {
@@ -1429,7 +1481,7 @@
              try {
                  it.close()
              } catch (_: Exception) {
-@@ -2469,6 +2662,7 @@
+@@ -2469,6 +2672,7 @@
          }
          permissionCloseable = null
          attachCloseable = null
@@ -1437,7 +1489,7 @@
          ch341PermissionCloseable = null
      }
  
-@@ -2486,6 +2680,9 @@
+@@ -2486,6 +2690,9 @@
          }
      }
  
@@ -1447,7 +1499,7 @@
      private fun requireUsbManager(): UsbManager =
          usbManager ?: throw IOException("USB service is unavailable on this device")
  
-@@ -2498,7 +2695,7 @@
+@@ -2498,7 +2705,7 @@
  
      private fun fail(error: Throwable, generation: Int? = null) {
          synchronized(wirelessResourceLock) {
@@ -1456,7 +1508,7 @@
              val wireless = config.transport == CarPlayTransport.WIRELESS
              if (wireless) {
                  if (!wirelessFailureReported.compareAndSet(false, true)) return
-@@ -2523,11 +2720,11 @@
+@@ -2523,11 +2730,11 @@
  
      private fun connectionDiagnostic(message: String) {
          try {
@@ -1470,7 +1522,7 @@
          }
      }
  
-@@ -2551,9 +2748,18 @@
+@@ -2551,9 +2758,18 @@
      private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
          if (closed) return
          mainHandler.post {
@@ -1519,6 +1571,278 @@
          }
      }
  
+--- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdog.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdog.kt
+@@ -11,12 +11,16 @@
+     private val nowNanos: () -> Long = System::nanoTime,
+     private val timeoutMillis: Long = WirelessStartupPolicy.FIRST_TCP_MILLIS,
+     private val log: (String) -> Unit = {},
++    // 首个 TCP 和协议就绪独立计时；未显式配置时保留原契约。
++    private val protocolTimeoutMillis: Long? = null,
+ ) {
+     @Volatile var terminated = false
+         private set
+     private var firstStartNanos: Long? = null
+     private var firstAcceptNanos: Long? = null
+     private var success = false
++    @Volatile var protocolTimedOut = false
++        private set
+     private var cancelTimer: (() -> Unit)? = null
+ 
+     @Synchronized fun startSessionSent(sentAtNanos: Long) {
+@@ -33,8 +37,10 @@
+         if (firstAcceptNanos == null) {
+             firstAcceptNanos = event.acceptedAtNanos
+             log("first TCP atNs=${event.acceptedAtNanos}")
++            // 只在首次外部接入启动协议计时，重复接入不能延长预算。
++            cancel()
++            if (!success) protocolTimeoutMillis?.let { cancelTimer = schedule(it, ::expireProtocol) }
+         }
+-        cancel()
+         return true
+     }
+ 
+@@ -64,4 +70,15 @@
+     }
+ 
+     private fun cancel() { cancelTimer?.invoke(); cancelTimer = null }
++
++    private fun expireProtocol() {
++        synchronized(this) {
++            if (terminated || success || firstAcceptNanos == null) return
++            terminated = true
++            protocolTimedOut = true
++            cancelTimer = null
++            log("AirPlay protocol timeout atNs=${nowNanos()} firstTcpNs=$firstAcceptNanos")
++        }
++        onTimeout()
++    }
+ }
+--- a/shared/src/main/java/com/shilapi/xcertplay/transport/BluetoothRfcommDuplexStream.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/transport/BluetoothRfcommDuplexStream.kt
+@@ -2,8 +2,26 @@
+ 
+ import android.bluetooth.BluetoothSocket
+ import java.io.IOException
++import java.io.InputStream
++import java.io.OutputStream
+ import java.util.ArrayDeque
+ import kotlin.math.min
++
++/** Nullable platform getters matter on head units that expose a socket without usable streams. */
++internal interface BluetoothRfcommSocketAccess {
++    fun inputStream(): InputStream?
++    fun outputStream(): OutputStream?
++    fun close()
++}
++
++class BluetoothRfcommStreamException internal constructor(
++    val operation: Operation,
++    val reason: Reason,
++    cause: Throwable? = null,
++) : IOException("Bluetooth RFCOMM ${operation.name.lowercase()} failed: ${reason.name.lowercase()}", cause) {
++    enum class Operation { INPUT_STREAM, OUTPUT_STREAM, READ, WRITE }
++    enum class Reason { STREAM_UNAVAILABLE, STREAM_ACCESS_FAILED, READ_FAILED, WRITE_FAILED }
++}
+ 
+ /**
+  * A bounded [BlockingDuplexByteStream] over an already-open RFCOMM socket.
+@@ -11,25 +29,41 @@
+  * Android's RFCOMM input has no per-read timeout, so one daemon reader performs the blocking
+  * reads. [close] closes the owned socket, which unblocks that reader.
+  */
+-class BluetoothRfcommDuplexStream(
+-    private val socket: BluetoothSocket,
++class BluetoothRfcommDuplexStream internal constructor(
++    private val socket: BluetoothRfcommSocketAccess,
++    private val onDiagnostic: (String) -> Unit = {},
+ ) : BlockingDuplexByteStream {
++    constructor(socket: BluetoothSocket, onDiagnostic: (String) -> Unit = {}) : this(
++        object : BluetoothRfcommSocketAccess {
++            override fun inputStream(): InputStream? = socket.inputStream
++            override fun outputStream(): OutputStream? = socket.outputStream
++            override fun close() = socket.close()
++        },
++        onDiagnostic,
++    )
++
+     private val lock = Object()
+     private val sendLock = Object()
+-    private val input = socket.inputStream
+-    private val output = socket.outputStream
+     private val pending = ArrayDeque<ByteArray>()
+     private var pendingBytes = 0
+     private var peerEnded = false
+     private var closed = false
+     private var socketCloseStarted = false
+     private var failure: IOException? = null
++    private var readCalls = 0L
++    private var receivedBytes = 0L
++
++    // Acquire both streams before starting any reader or iAP2 protocol thread. Android getters
++    // have platform-nullability, and some vendor sockets return null after connect() succeeds.
++    private val input = acquireStream(BluetoothRfcommStreamException.Operation.INPUT_STREAM, socket::inputStream)
++    private val output = acquireStream(BluetoothRfcommStreamException.Operation.OUTPUT_STREAM, socket::outputStream)
+ 
+     private val reader = Thread(::readLoop, "xcertplay-bluetooth-rfcomm-reader").apply {
+         isDaemon = true
+     }
+ 
+     init {
++        report("Bluetooth RFCOMM streams ready input=true output=true")
+         reader.start()
+     }
+ 
+@@ -42,9 +76,13 @@
+             try {
+                 output.write(data)
+                 output.flush()
+-            } catch (io: IOException) {
+-                fail(io)
+-                throw io
++            } catch (error: Exception) {
++                val io = BluetoothRfcommStreamException(
++                    BluetoothRfcommStreamException.Operation.WRITE,
++                    BluetoothRfcommStreamException.Reason.WRITE_FAILED,
++                    error,
++                )
++                throw fail(io)
+             }
+         }
+     }
+@@ -122,8 +160,10 @@
+                 }
+ 
+                 val buffer = ByteArray(readSize)
++                readCalls++
+                 when (val count = input.read(buffer)) {
+                     -1 -> {
++                        if (!isStopping()) reportReadTerminal("ENDED")
+                         synchronized(lock) {
+                             peerEnded = true
+                             lock.notifyAll()
+@@ -134,6 +174,7 @@
+                     0 -> Unit
+                     else -> synchronized(lock) {
+                         if (closed) return
++                        receivedBytes += count
+                         pending.addLast(if (count == buffer.size) buffer else buffer.copyOf(count))
+                         pendingBytes += count
+                         lock.notifyAll()
+@@ -142,16 +183,27 @@
+             }
+         } catch (interrupted: InterruptedException) {
+             Thread.currentThread().interrupt()
+-            if (!isClosed()) {
++            if (!isStopping()) {
+                 readFailure = IOException("Bluetooth RFCOMM reader was interrupted", interrupted)
+             }
+         } catch (io: IOException) {
+-            if (!isClosed()) readFailure = io
++            if (!isStopping()) readFailure = BluetoothRfcommStreamException(
++                BluetoothRfcommStreamException.Operation.READ,
++                BluetoothRfcommStreamException.Reason.READ_FAILED,
++                io,
++            )
+         } catch (failure: Throwable) {
+-            readFailure = IOException("Bluetooth RFCOMM reader failed", failure)
++            if (!isStopping()) readFailure = BluetoothRfcommStreamException(
++                BluetoothRfcommStreamException.Operation.READ,
++                BluetoothRfcommStreamException.Reason.READ_FAILED,
++                failure,
++            )
+             if (failure is Error) throw failure
+         } finally {
+-            readFailure?.let(::fail)
++            readFailure?.let {
++                reportReadTerminal("FAILED")
++                fail(it)
++            }
+             val closeFailure = closeSocketOnce()
+             if (readFailure == null && closeFailure != null && !isClosed() && !endedCleanly()) {
+                 fail(closeFailure)
+@@ -162,21 +214,68 @@
+     private fun takePendingLocked(maxBytes: Int): ByteArray? {
+         val chunk = pending.pollFirst() ?: return null
+         pendingBytes -= chunk.size
+-        if (chunk.size <= maxBytes) return chunk
++        if (chunk.size <= maxBytes) {
++            lock.notifyAll()
++            return chunk
++        }
+ 
+         val head = chunk.copyOf(maxBytes)
+         val tail = chunk.copyOfRange(maxBytes, chunk.size)
+         pending.addFirst(tail)
+         pendingBytes += tail.size
++        lock.notifyAll()
+         return head
+     }
+ 
+-    private fun fail(io: IOException) {
++    private fun fail(io: IOException): IOException {
+         synchronized(lock) {
+-            if (failure == null) failure = io
++            failure?.let { return it }
++            // Closing a socket intentionally unblocks both read and write/flush. Such a write
++            // exception during bootstrap handoff is cancellation, not a new transport failure.
++            if (closed) return IOException("Bluetooth RFCOMM stream is closed")
++            failure = io
+             lock.notifyAll()
+         }
+-        closeSocketOnce()
++        reportFailure(io)
++        closeSocketOnce()?.let { if (it !== io) io.addSuppressed(it) }
++        return io
++    }
++
++    private fun <T : Any> acquireStream(
++        operation: BluetoothRfcommStreamException.Operation,
++        acquire: () -> T?,
++    ): T {
++        try {
++            return acquire() ?: throw BluetoothRfcommStreamException(
++                operation, BluetoothRfcommStreamException.Reason.STREAM_UNAVAILABLE,
++            )
++        } catch (error: Throwable) {
++            val failure = if (error is BluetoothRfcommStreamException) error else
++                BluetoothRfcommStreamException(operation, BluetoothRfcommStreamException.Reason.STREAM_ACCESS_FAILED, error)
++            reportFailure(failure)
++            closeSocketOnce()?.let(failure::addSuppressed)
++            if (error is Error) throw error
++            throw failure
++        }
++    }
++
++    private fun reportFailure(error: IOException) {
++        val streamFailure = error as? BluetoothRfcommStreamException
++        report("Bluetooth RFCOMM stream result=FAILED operation=${streamFailure?.operation ?: "UNKNOWN"} " +
++            "reason=${streamFailure?.reason ?: "UNKNOWN"} failureClass=${error.javaClass.simpleName} " +
++            "causeClass=${error.cause?.javaClass?.simpleName ?: "none"} " +
++            "nestedCauseClass=${error.cause?.cause?.javaClass?.simpleName ?: "none"}")
++    }
++
++    private fun reportReadTerminal(result: String) {
++        report("Bluetooth RFCOMM reader result=$result beforeFirstByte=${receivedBytes == 0L} " +
++            "readCalls=$readCalls receivedBytes=$receivedBytes")
++    }
++
++    private fun report(message: String) {
++        try { onDiagnostic(message) } catch (_: Exception) {
++            // A diagnostic callback cannot prevent transport setup or owned-socket cleanup.
++        }
+     }
+ 
+     private fun closeSocketOnce(): IOException? {
+@@ -195,6 +294,8 @@
+ 
+     private fun isClosed(): Boolean = synchronized(lock) { closed }
+ 
++    private fun isStopping(): Boolean = synchronized(lock) { closed || failure != null }
++
+     private fun endedCleanly(): Boolean = synchronized(lock) { closed || peerEnded }
+ 
+     private fun deadlineAfter(timeoutMillis: Long): Long {
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/Ch341UsbHost.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/Ch341UsbHost.kt
 @@ -125,7 +125,9 @@
@@ -1698,7 +2022,15 @@
  import android.os.Build
  import android.util.Log
  import java.io.Closeable
-@@ -77,8 +78,8 @@
+@@ -68,6 +69,7 @@
+     private val usbManager: UsbManager,
+     private val matcher: IphoneUsbMatcher,
+     private val permissionAction: String = "${context.packageName}.IPHONE_USB_PERMISSION",
++    private val onDiagnostic: (String) -> Unit = {},
+ ) {
+     private val appContext = context.applicationContext
+ 
+@@ -77,8 +79,8 @@
      }
  
      sealed class PermissionResult {
@@ -1709,7 +2041,7 @@
      }
  
      sealed class TransitionResult {
-@@ -97,11 +98,11 @@
+@@ -97,11 +99,11 @@
          usbManager.deviceList.values.filter { matcher.matches(it.vendorId, it.productId) }
  
      @Throws(IphoneUsbException::class)
@@ -1723,7 +2055,7 @@
          return PermissionRequest.Requested(device)
      }
  
-@@ -110,28 +111,45 @@
+@@ -110,28 +112,45 @@
          if (intent.action != permissionAction) return null
          val device = intent.usbDevice() ?: return null
          if (!matcher.matches(device.vendorId, device.productId)) return null
@@ -1773,7 +2105,16 @@
          }
  
      /**
-@@ -279,13 +297,18 @@
+@@ -265,7 +284,7 @@
+                 throw IphoneUsbException.DeviceUnavailable("Android could not claim USBMUX interface 1")
+             }
+             claimedInterface = usbMux
+-            return Iap2UsbSession(connection, endpoints.first, endpoints.second)
++            return Iap2UsbSession(connection, endpoints.first, endpoints.second, onDiagnostic)
+         } catch (error: Throwable) {
+             if (claimedInterface != null) connection.releaseInterface(claimedInterface)
+             connection.close()
+@@ -279,13 +298,18 @@
          }
      }
  
@@ -1794,7 +2135,7 @@
          )
      }
  
-@@ -312,6 +335,7 @@
+@@ -312,6 +336,7 @@
      }
  
      companion object {
@@ -1802,6 +2143,160 @@
          private const val USB_VENDOR_DEVICE_IN = 0xc0
          private const val CARPLAY_CONFIGURATION_REQUEST = 0x52
          private const val CARPLAY_CONFIGURATION_INDEX = 0x0004
+@@ -330,6 +355,7 @@
+     private val connection: UsbDeviceConnection,
+     private val outEndpoint: UsbEndpoint,
+     private val inEndpoint: UsbEndpoint,
++    private val onDiagnostic: (String) -> Unit = {},
+ ) : Closeable {
+     private val stateLock = Any()
+     private val readLock = Any()
+@@ -337,6 +363,7 @@
+     private var closed = false
+     private var failure: IphoneUsbException? = null
+     private var pendingRead: UsbRequest? = null
++    private val readQueuePolicy = UsbReadQueuePolicy()
+ 
+     fun write(data: ByteArray, timeoutMillis: Int) = synchronized(writeLock) {
+         checkOpen()
+@@ -363,14 +390,24 @@
+                 )
+             }
+             initialized = true
+-            synchronized(stateLock) {
++            val buffer = ByteBuffer.allocateDirect(USBMUX_READ_CHUNK_BYTES)
++            val queueResult = synchronized(stateLock) {
+                 checkOpenLocked()
+                 pendingRead = request
+-            }
+-            val buffer = ByteBuffer.allocateDirect(USBMUX_READ_CHUNK_BYTES)
+-            if (!request.queue(buffer)) {
++                readQueuePolicy.queue(buffer, ::checkOpenLocked, request::queue)
++            }
++            if (!queueResult.queued) {
+                 throw IphoneUsbException.DeviceUnavailable(
+-                    "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis, buffer.capacity())})",
++                    "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis)} " +
++                        "firstBytes=${queueResult.firstBytes} fallbackBytes=${queueResult.fallbackBytes ?: "not_attempted"})",
++                )
++            }
++            // The policy remembers an accepted fallback, so this event occurs once per pipe.
++            if (queueResult.fallbackBytes != null) runCatching {
++                onDiagnostic(
++                    "USBMUX read queue compatibility fallback api=${Build.VERSION.SDK_INT} " +
++                        "endpoint=${describeUsbEndpoint(inEndpoint)} firstBytes=${queueResult.firstBytes} " +
++                        "fallbackBytes=${queueResult.fallbackBytes}",
+                 )
+             }
+             val completed = try {
+@@ -443,11 +480,10 @@
+         return error
+     }
+ 
+-    private fun requestDiagnostics(timeoutMillis: Long, bufferBytes: Int? = null): String = buildString {
++    private fun requestDiagnostics(timeoutMillis: Long): String = buildString {
+         append("api=").append(Build.VERSION.SDK_INT)
+         append(" endpoint=").append(describeUsbEndpoint(inEndpoint))
+         append(" timeoutMs=").append(timeoutMillis)
+-        if (bufferBytes != null) append(" bufferBytes=").append(bufferBytes)
+     }
+ 
+     private companion object {
+@@ -456,7 +492,7 @@
+     }
+ }
+ 
+-private fun describeUsbEndpoint(endpoint: UsbEndpoint): String =
++internal fun describeUsbEndpoint(endpoint: UsbEndpoint): String =
+     "0x${endpoint.address.toString(16)}(direction=${endpoint.direction}," +
+         "type=${endpoint.type},maxPacket=${endpoint.maxPacketSize})"
+ 
+--- a/shared/src/main/java/com/shilapi/xcertplay/transport/NcmUsbBridge.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/transport/NcmUsbBridge.kt
+@@ -5,6 +5,7 @@
+ import android.hardware.usb.UsbInterface
+ import android.hardware.usb.UsbConstants
+ import android.hardware.usb.UsbRequest
++import android.os.Build
+ import android.util.Log
+ import java.io.Closeable
+ import java.nio.ByteBuffer
+@@ -26,6 +27,7 @@
+     private val statusEndpoint: UsbEndpoint?,
+     private val claimedInterfaces: List<UsbInterface>,
+     descriptorHostMac: ByteArray?,
++    private val onDiagnostic: (String) -> Unit = {},
+ ) : Closeable {
+     private val descriptorMac = descriptorHostMac?.copyOf()
+     val hostMac: ByteArray? get() = descriptorMac?.copyOf()
+@@ -48,6 +50,7 @@
+     private val directReadBuffer = ByteBuffer.allocateDirect(READ_CHUNK_BYTES)
+     private var readRequest: UsbRequest? = null
+     private var readQueued = false
++    private val readQueuePolicy = UsbReadQueuePolicy()
+     private val statusRunning = AtomicBoolean(statusEndpoint != null)
+     private val statusThread = statusEndpoint?.let { endpoint ->
+         Thread({ drainStatus(endpoint) }, "ncm-status-in").apply {
+@@ -219,6 +222,7 @@
+ 
+     private fun readChunk(timeoutMillis: Long): Int? {
+         checkOpen()
++        var acceptedFallback: UsbReadQueueResult? = null
+         val request = try {
+             // Publish and queue atomically with close(), so detach cannot miss a new request.
+             synchronized(stateLock) {
+@@ -232,13 +236,29 @@
+                 }
+                 if (!readQueued) {
+                     directReadBuffer.clear()
+-                    if (!current.queue(directReadBuffer)) throw failSession("Android could not queue the NCM read request")
++                    val queued = readQueuePolicy.queue(directReadBuffer, ::checkOpenLocked, current::queue)
++                    if (!queued.queued) throw failSession(
++                        "Android could not queue the NCM read request (api=${Build.VERSION.SDK_INT} " +
++                            "endpoint=${describeUsbEndpoint(inEndpoint)} firstBytes=${queued.firstBytes} " +
++                            "fallbackBytes=${queued.fallbackBytes ?: "not_attempted"})",
++                    )
+                     readQueued = true
++                    if (queued.fallbackBytes != null) acceptedFallback = queued
+                 }
+                 current
+             }
+         } catch (error: RuntimeException) {
+             throw failSession("NCM read failed", error)
++        }
++        // Emit outside stateLock; diagnostic callbacks must not affect queue or close behavior.
++        acceptedFallback?.let { queued ->
++            runCatching {
++                onDiagnostic(
++                    "NCM read queue compatibility fallback api=${Build.VERSION.SDK_INT} " +
++                        "endpoint=${describeUsbEndpoint(inEndpoint)} firstBytes=${queued.firstBytes} " +
++                        "fallbackBytes=${queued.fallbackBytes}",
++                )
++            }
+         }
+         try {
+             val completed = try {
+@@ -298,7 +318,11 @@
+         private const val NANOS_PER_MILLISECOND = 1_000_000L
+ 
+         /** Claims and activates the NCM control/data interfaces; owns the connection on success. */
+-        fun open(connection: UsbDeviceConnection, function: NcmFunctionDiscovery.NcmFunction): NcmUsbBridge {
++        fun open(
++            connection: UsbDeviceConnection,
++            function: NcmFunctionDiscovery.NcmFunction,
++            onDiagnostic: (String) -> Unit = {},
++        ): NcmUsbBridge {
+             val claimed = ArrayList<UsbInterface>(2)
+             try {
+                 val descriptorHostMac = readNcmHostMac(connection, function.control.id)
+@@ -357,6 +381,7 @@
+                     function.statusIn,
+                     claimed,
+                     descriptorHostMac,
++                    onDiagnostic,
+                 )
+             } catch (error: Throwable) {
+                 for (usbInterface in claimed.asReversed()) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/UsbMuxFrameBuffer.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/UsbMuxFrameBuffer.kt
 @@ -8,7 +8,7 @@
@@ -1813,3 +2308,135 @@
  internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) {
      private var bytes = ByteArray(0)
      private var optionalReplyPadding: UsbMuxFrame? = null
+@@ -28,30 +28,43 @@
+             val previous = optionalReplyPadding
+             // The captured iOS 27 VERSION and valid RX TCP replies, including payload-bearing
+             // replies, have four extra bytes. Do not scan or discard a USB completion:
+-            // only this single four-byte boundary is eligible, and only before a TCP frame.
++            // only this single four-byte boundary is eligible, before validated TCP or the
++            // captured protocol-1 diagnostic shape.
+             // A normal or split next header at offset zero is always preserved.
+-            // Wait for the complete candidate MUX header and base TCP header. A timeout
++            // Wait for the candidate MUX/TCP headers or complete diagnostic payload. A timeout
+             // leaves these bytes in place; a legitimate split frame must never be lost.
+             if (previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
+                 bytes.size < PADDING_BYTES + HEADER_BYTES) return null
++            val followingProtocol = readU32(bytes, PADDING_BYTES)
+             val followingLength = readU32(bytes, PADDING_BYTES + 4)
+             val candidateHeader = previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
+-                readU32(bytes, PADDING_BYTES) == PROTOCOL_TCP &&
+-                followingLength in (HEADER_BYTES + TCP_HEADER_BYTES)..MAX_FRAME_BYTES &&
+                 readU32(bytes, PADDING_BYTES + 8) == CAPTURED_REPLY_MAGIC
+-            if (candidateHeader && bytes.size < PADDING_BYTES + HEADER_BYTES + TCP_HEADER_BYTES) return null
+-            val followingTcpHeaderBytes = if (candidateHeader) {
+-                ((bytes[PADDING_BYTES + HEADER_BYTES + 12].toInt() ushr 4) and 0x0f) * 4
+-            } else 0
+-            if (candidateHeader && followingTcpHeaderBytes in TCP_HEADER_BYTES..(followingLength - HEADER_BYTES) &&
+-                readU16(bytes, PADDING_BYTES + HEADER_BYTES) != 0 &&
+-                readU16(bytes, PADDING_BYTES + HEADER_BYTES + 2) != 0) {
++            val validTarget = when {
++                candidateHeader && followingProtocol == PROTOCOL_TCP &&
++                    followingLength in (HEADER_BYTES + TCP_HEADER_BYTES)..MAX_FRAME_BYTES -> {
++                    if (bytes.size < PADDING_BYTES + HEADER_BYTES + TCP_HEADER_BYTES) return null
++                    val tcpHeaderBytes = ((bytes[PADDING_BYTES + HEADER_BYTES + 12].toInt() ushr 4) and 0x0f) * 4
++                    tcpHeaderBytes in TCP_HEADER_BYTES..(followingLength - HEADER_BYTES) &&
++                        readU16(bytes, PADDING_BYTES + HEADER_BYTES) != 0 &&
++                        readU16(bytes, PADDING_BYTES + HEADER_BYTES + 2) != 0
++                }
++                candidateHeader && followingProtocol == PROTOCOL_DIAGNOSTIC &&
++                    followingLength in (HEADER_BYTES + 2)..(HEADER_BYTES + MAX_DIAGNOSTIC_PAYLOAD_BYTES) -> {
++                    // Issue #100 also captures four extra bytes before/after protocol 1.
++                    // Validate its entire bounded subtype/text payload before recovering.
++                    // A timeout leaves the trailer and incomplete frame untouched.
++                    if (bytes.size < PADDING_BYTES + followingLength) return null
++                    isCapturedDiagnosticPayload(bytes, PADDING_BYTES + HEADER_BYTES, followingLength - HEADER_BYTES)
++                }
++                else -> false
++            }
++            if (previous != null && validTarget) {
+                 bytes = bytes.copyOfRange(PADDING_BYTES, bytes.size)
+                 optionalReplyPadding = null
+                 if (paddingReports++ < MAX_PADDING_REPORTS) report(
+                     "USBMUX optional reply padding skipped bytes=$PADDING_BYTES " +
+                         "previousProtocol=${previous.protocol} previousLength=${previous.length} " +
+-                        "nextProtocol=$PROTOCOL_TCP nextLength=$followingLength " +
++                        "nextProtocol=$followingProtocol nextLength=$followingLength " +
+                         "lastUsbReadBytes=$lastUsbReadBytes bufferedBytes=${bytes.size}")
+                 if (bytes.size < HEADER_BYTES) return null
+                 length = readU32(bytes, 4)
+@@ -74,12 +87,20 @@
+ 
+     private fun canHaveOptionalReplyPadding(frame: UsbMuxFrame): Boolean {
+         if (frame.protocol == PROTOCOL_VERSION && frame.length == VERSION_BYTES && frame.word8 == 2) return true
++        if (frame.protocol == PROTOCOL_DIAGNOSTIC && frame.word8 == CAPTURED_REPLY_MAGIC) {
++            return isCapturedDiagnosticPayload(frame.payload, 0, frame.payload.size)
++        }
+         if (frame.protocol != PROTOCOL_TCP || frame.word8 != CAPTURED_REPLY_MAGIC ||
+             frame.payload.size < TCP_HEADER_BYTES) return false
+         val tcpHeaderBytes = ((frame.payload[12].toInt() ushr 4) and 0x0f) * 4
+         return tcpHeaderBytes in TCP_HEADER_BYTES..frame.payload.size &&
+             readU16(frame.payload, 0) != 0 && readU16(frame.payload, 2) != 0
+     }
++
++    /** Only the captured diagnostic subtype followed by bounded printable ASCII qualifies. */
++    private fun isCapturedDiagnosticPayload(source: ByteArray, offset: Int, length: Int): Boolean =
++        length in 2..MAX_DIAGNOSTIC_PAYLOAD_BYTES && source[offset].toInt() == DIAGNOSTIC_TEXT_SUBTYPE &&
++            (offset + 1 until offset + length).all { source[it].toInt() in 0x20..0x7e }
+ 
+     private fun report(line: String) { runCatching { diagnostic(line) } }
+ 
+@@ -100,7 +121,10 @@
+         const val PADDING_BYTES = 4
+         const val MAX_PADDING_REPORTS = 4
+         const val PROTOCOL_VERSION = 0
++        const val PROTOCOL_DIAGNOSTIC = 1
+         const val PROTOCOL_TCP = 6
++        const val DIAGNOSTIC_TEXT_SUBTYPE = 4
++        const val MAX_DIAGNOSTIC_PAYLOAD_BYTES = 1_024
+         val CAPTURED_REPLY_MAGIC = 0xfaceface.toInt()
+     }
+ }
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/transport/UsbReadQueuePolicy.kt
+@@ -0,0 +1,41 @@
++package com.shilapi.xcertplay.transport
++
++import java.nio.ByteBuffer
++
++internal data class UsbReadQueueResult(val queued: Boolean, val firstBytes: Int, val fallbackBytes: Int? = null)
++
++/**
++ * A size-compatibility hypothesis for explicit vendor queue rejection, not an API 28 size limit.
++ * Android 9 UsbRequest.queue(ByteBuffer) accepts any size and clears its queued state on false:
++ * https://android.googlesource.com/platform/frameworks/base/+/android-9.0.0_r1/core/java/android/hardware/usb/UsbRequest.java
++ * Call under the pipe's state lock, including publication, queueing and the open-state checks.
++ */
++internal class UsbReadQueuePolicy {
++    private var successfulLimit: Int? = null
++
++    fun queue(buffer: ByteBuffer, checkOpen: () -> Unit, submit: (ByteBuffer) -> Boolean): UsbReadQueueResult {
++        require(buffer.isDirect && !buffer.isReadOnly) { "USB read requires a writable direct buffer" }
++        checkOpen()
++        val position = buffer.position()
++        val originalLimit = buffer.limit()
++        val firstBytes = minOf(buffer.remaining(), successfulLimit ?: buffer.remaining())
++        buffer.limit(position + firstBytes)
++        if (submit(buffer)) return UsbReadQueueResult(true, firstBytes)
++        // AOSP guarantees an unchanged buffer on explicit false. Do not retry an ambiguous
++        // request that threw or unexpectedly changed its buffer state.
++        check(buffer.position() == position && buffer.limit() == position + firstBytes) {
++            "Rejected USB queue changed its buffer state"
++        }
++        if (firstBytes <= COMPATIBILITY_BYTES) {
++            buffer.limit(originalLimit)
++            return UsbReadQueueResult(false, firstBytes)
++        }
++        checkOpen()
++        buffer.limit(position + COMPATIBILITY_BYTES)
++        val queued = submit(buffer)
++        if (queued) successfulLimit = COMPATIBILITY_BYTES else buffer.limit(originalLimit)
++        return UsbReadQueueResult(queued, firstBytes, COMPATIBILITY_BYTES)
++    }
++
++    private companion object { const val COMPATIBILITY_BYTES = 16 * 1024 }
++}

@@ -11,12 +11,16 @@ internal class FirstTcpWatchdog(
     private val nowNanos: () -> Long = System::nanoTime,
     private val timeoutMillis: Long = WirelessStartupPolicy.FIRST_TCP_MILLIS,
     private val log: (String) -> Unit = {},
+    // 首个 TCP 和协议就绪独立计时；未显式配置时保留原契约。
+    private val protocolTimeoutMillis: Long? = null,
 ) {
     @Volatile var terminated = false
         private set
     private var firstStartNanos: Long? = null
     private var firstAcceptNanos: Long? = null
     private var success = false
+    @Volatile var protocolTimedOut = false
+        private set
     private var cancelTimer: (() -> Unit)? = null
 
     @Synchronized fun startSessionSent(sentAtNanos: Long) {
@@ -33,8 +37,10 @@ internal class FirstTcpWatchdog(
         if (firstAcceptNanos == null) {
             firstAcceptNanos = event.acceptedAtNanos
             log("first TCP atNs=${event.acceptedAtNanos}")
+            // 只在首次外部接入启动协议计时，重复接入不能延长预算。
+            cancel()
+            if (!success) protocolTimeoutMillis?.let { cancelTimer = schedule(it, ::expireProtocol) }
         }
-        cancel()
         return true
     }
 
@@ -64,4 +70,15 @@ internal class FirstTcpWatchdog(
     }
 
     private fun cancel() { cancelTimer?.invoke(); cancelTimer = null }
+
+    private fun expireProtocol() {
+        synchronized(this) {
+            if (terminated || success || firstAcceptNanos == null) return
+            terminated = true
+            protocolTimedOut = true
+            cancelTimer = null
+            log("AirPlay protocol timeout atNs=${nowNanos()} firstTcpNs=$firstAcceptNanos")
+        }
+        onTimeout()
+    }
 }

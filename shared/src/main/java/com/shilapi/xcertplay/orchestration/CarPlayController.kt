@@ -200,6 +200,7 @@ class CarPlayController(
                 IphoneUsbMatcher.appleVendor()
             },
             permissionAction = "${appContext.packageName}.IPHONE_USB_PERMISSION.${UUID.randomUUID()}",
+            onDiagnostic = ::connectionDiagnostic,
         )
     }
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -1226,13 +1227,17 @@ class CarPlayController(
                 },
                 onTimeout = {
                     if (!closed && generation == wirelessGeneration.get()) {
-                        fail(WirelessStartupException(WirelessStartupFailure.FIRST_TCP_TIMEOUT,
-                            "No AirPlay TCP after CarPlay StartSession"), generation)
+                        val protocolTimeout = firstTcpWatchdog?.protocolTimedOut == true
+                        fail(WirelessStartupException(
+                            if (protocolTimeout) WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT else WirelessStartupFailure.FIRST_TCP_TIMEOUT,
+                            if (protocolTimeout) "AirPlay protocol did not become ready after TCP connected"
+                            else "No AirPlay TCP after CarPlay StartSession"), generation)
                         Thread({ closeWirelessStack(generation = generation) }, "diplay-startup-cleanup")
                             .apply { isDaemon = true; start() }
                     }
                 },
                 log = { debugLog("wireless startup generation=$generation listener=${listenerIdentity.id} $it") },
+                protocolTimeoutMillis = WirelessStartupPolicy.FIRST_TCP_MILLIS,
             )
             firstTcpWatchdog = watchdog
             val mfi = mfiSession?.client
@@ -1398,7 +1403,12 @@ class CarPlayController(
             }
             val stream = synchronized(wirelessResourceLock) {
                 if (isStaleWirelessRun(generation)) return
-                BluetoothRfcommDuplexStream(socket).also { bluetoothStream = it }
+                try {
+                    BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
+                } finally {
+                    // 流接管 socket；获取流失败也由流关闭，不留第二个所有者。
+                    if (bluetoothSocket === socket) bluetoothSocket = null
+                }
             }
             val channel = Iap2Session.openWireless(
                 stream,
@@ -2047,7 +2057,7 @@ class CarPlayController(
         )
         val connection = requireUsbManager().openDevice(device)
             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
-        return NcmUsbBridge.open(connection, function)
+        return NcmUsbBridge.open(connection, function, onDiagnostic = ::connectionDiagnostic)
     }
 
     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
