@@ -296,7 +296,7 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 ## 原厂媒体与导航适配验证
 
-媒体与 HUD 软件回归使用合成数据和隔离端口，检查首次暂停控制、API 就绪／失败、源拒绝、有限重注册、状态与进度独立、焦点交接、旧回调、图片读取／清理及导航变化／过期，不把替身结果写成 OEM 服务准入或实车显示通过。
+媒体与 HUD 软件回归使用合成数据和隔离端口，检查首次暂停控制、API 就绪／失败、源拒绝、有限重注册、状态与进度独立、焦点交接、旧回调、图片读取／清理及导航变化／过期，不把替身结果写成 OEM 服务准入或实车显示通过。 `L7MediaCenterSessionTest` 另覆盖初始其他来源焦点下的播放申请／选源／状态与进度、被拒后有限重试、播放确认不重复申请、真实焦点丢失不抢回、暂停或旧会话取消迟到申请及显式选源／播放；按调用顺序与实际发布参数断言，不把有效 token 或本地 prepare 当作持续上报成功。
 
 真实 Android VM 薄子类验证：Docker 内 `:common:assembleDebugAndroidTest` 后在 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，执行 `adb shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，预期 `SDK_SUBCLASS_OK`。仅检查代码生成、装箱和实例隔离，不调用原厂服务。
 

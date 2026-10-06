@@ -43,7 +43,8 @@ internal class L7MediaCenterSession(
     private var published: CarPlayNowPlaying? = null
     private var publishedArtwork: Uri? = null
     private var publishedProgress: Long? = null
-    private var playRequested = false
+    private val playRequest = L7MediaPlayRequest()
+    private var playRetryRevision: Long? = null
     private var pending: Snapshot? = null
     private var updateAttempts = 0
     private var registrationRetryScheduled = false
@@ -71,7 +72,9 @@ internal class L7MediaCenterSession(
             registered = false
             published = null
             publishedProgress = null
-            playRequested = false
+            playRequest.reset()
+            foreignFocus = false
+            ownFocus = false
             safely("unregisterDisconnected") { port.unregister() }
             return@enqueue
         }
@@ -96,7 +99,7 @@ internal class L7MediaCenterSession(
             safely("queryFocus") { applyFocus(port.focusClient()); "RETURNED" }
             published = null
             pending = null
-            playRequested = false
+            playRequest.reset()
             publishLatest()
         } catch (error: Exception) {
             registered = false
@@ -116,27 +119,23 @@ internal class L7MediaCenterSession(
         }
     }
 
-    private fun publishLatest() {
+    private fun publishLatest(explicitPlay: Boolean = false) {
         if (closed || !current() || !registered) return
         val next = snapshot
         val value = next.value
         val uri = next.artwork
+        playRequest.observe(value)
+        if (explicitPlay) playRequest.select()
         val metadata = next.copy(value = value.copy(elapsedMillis = null))
         if (pending != metadata) { pending = metadata; updateAttempts = 0 }
         val changed = published?.copy(elapsedMillis = null) != metadata.value || publishedArtwork != uri
         if (changed && !safely("prepare") { port.prepare(value, uri); true }) return
-        // 控制权请求与状态缓存分开，失败重发不会因未发布反复抢源。
-        if (!value.playbackKnown || !value.playing) playRequested = false
-        if (value.playbackKnown && value.playing && !playRequested && !foreignFocus) {
-            playRequested = true
-            safely("requestPlay") {
-                val accepted = port.requestPlay()
-                if (accepted && !closed && current()) { port.currentSource(); event("currentSource returned") }
-                accepted
-            }
-        }
-        if (closed || !current()) return
-        if (changed && value.playbackKnown && !foreignFocus && updateAttempts < 3) {
+        if (closed || !current() || snapshot !== next) return
+        requestPlayback()
+        if (closed || !current() || snapshot !== next) return
+        val needsUpdate = published?.copy(elapsedMillis = null) != metadata.value || publishedArtwork != uri
+        // 原厂独立缓存各客户端状态；初始焦点属于其他来源不能阻断歌曲与进度上报。
+        if (needsUpdate && value.playbackKnown && updateAttempts < 3) {
             updateAttempts++
             event("updateState attempt=$updateAttempts artworkTransferId=${value.artworkTransferId ?: "none"} " +
                 "artworkAvailable=${uri != null} coverKey=${uri?.let(L7MediaArtworkProvider::diagnosticKey) ?: "none"}")
@@ -148,8 +147,31 @@ internal class L7MediaCenterSession(
                 event("updateState retryLimit=3 pending=true")
         }
         val elapsed = value.elapsedMillis
-        if (!closed && current() && elapsed != null && elapsed != publishedProgress && !foreignFocus &&
+        if (!closed && current() && elapsed != null && elapsed != publishedProgress &&
             safely("updateProgress") { port.progress(elapsed); "RETURNED_MS" }) publishedProgress = elapsed
+    }
+
+    private fun requestPlayback() {
+        if (playRetryRevision == playRequest.revision || !playRequest.begin()) return
+        val revision = playRequest.revision
+        event("requestPlay attempt=${playRequest.attempts}")
+        val accepted = safely("requestPlay") { port.requestPlay() }
+        if (closed || !current()) return
+        // 阻塞 IPC 返回时手机可能已暂停，旧申请不得继续选源或重试。
+        playRequest.observe(snapshot.value)
+        if (revision != playRequest.revision) return
+        playRequest.complete(revision, accepted)
+        if (accepted) {
+            safely("currentSource") { port.currentSource(); "RETURNED" }
+            if (closed || !current()) return
+            safely("queryFocusAfterRequest") { applyFocus(port.focusClient(), publish = false); "RETURNED" }
+        } else if (playRequest.canRequest && playRetryRevision != revision) {
+            playRetryRevision = revision
+            retry(Runnable { enqueue {
+                if (playRetryRevision == revision) playRetryRevision = null
+                if (playRequest.revision == revision && playRequest.canRequest) publishLatest()
+            } })
+        } else if (!playRequest.canRequest) event("requestPlay retryLimit=3")
     }
 
     private fun retryRegistration() {
@@ -177,14 +199,15 @@ internal class L7MediaCenterSession(
             closed -> "OEM_CLOSED"
             !current() -> "STALE_SESSION"
             !registered -> "OEM_NOT_REGISTERED"
-            foreignFocus -> "FOREIGN_FOCUS"
+            foreignFocus && index != CarPlayMediaButton.PLAY -> "FOREIGN_FOCUS"
             else -> null
         }
         if (reason != null) { trace?.step("DROP", reason); event("drop reason=SESSION_OR_CONTROL_UNAVAILABLE"); return false }
         trace?.step("OEM_MAIN_QUEUED")
         try { main.execute {
-            if (!closed && current() && registered && !foreignFocus) {
+            if (!closed && current() && registered && (!foreignFocus || index == CarPlayMediaButton.PLAY)) {
                 trace?.step("OEM_MAIN_EXECUTE")
+                if (index == CarPlayMediaButton.PLAY) enqueue { publishLatest(explicitPlay = true) }
                 if (trace != null) traceSend?.invoke(index, "mediacenter", trace) else send(index, "mediacenter")
             } else { trace?.step("DROP", "LATE_OEM_CALLBACK"); event("drop reason=LATE_CALLBACK") }
         } } catch (error: RuntimeException) { trace?.step("DROP", "OEM_MAIN_REJECTED"); failure("commandQueue", error); return false }
@@ -194,17 +217,20 @@ internal class L7MediaCenterSession(
     private fun selected(source: Int): Boolean {
         if (closed || !current() || !registered || source != port.source) return false
         enqueue {
-            foreignFocus = false; ownFocus = true
+            event("sourceSelected source=$source")
             published = null; publishedProgress = null; pending = null
-            safely("selectSource") { port.currentSource(); "RETURNED" }
-            publishLatest()
+            publishLatest(explicitPlay = true)
+            // 选源是显式播放操作；只向手机发命令，不伪造手机播放状态或焦点归属。
+            if (!latest.playing) main.execute {
+                if (!closed && current() && registered && !latest.playing) send(CarPlayMediaButton.PLAY, "mediacenter-source")
+            }
         }
         return true
     }
 
     private fun focus(value: String?) = enqueue { applyFocus(value) }
 
-    private fun applyFocus(value: String?) {
+    private fun applyFocus(value: String?, publish: Boolean = true) {
         if (value.isNullOrBlank()) { event("focus known=false"); return }
         val foreign = value != packageName
         event("focus own=${!foreign}")
@@ -212,9 +238,11 @@ internal class L7MediaCenterSession(
         val regained = !foreign && foreignFocus
         ownFocus = !foreign
         foreignFocus = foreign
+        if (!foreign) playRequest.confirm()
+        if (changed) playRequest.yield()
         if (regained) {
             published = null; publishedProgress = null; pending = null
-            publishLatest()
+            if (publish) publishLatest()
         }
         if (changed && latest.playbackKnown && latest.playing) main.execute {
             if (!closed && current() && foreignFocus) send(CarPlayMediaButton.PAUSE, "mediacenter-focus")
