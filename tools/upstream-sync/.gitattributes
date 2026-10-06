@@ -1,0 +1,2 @@
+# 空上下文行必须保留统一补丁的空格标记；实际源码由常规 diff --check 检查。
+*.patch -whitespace

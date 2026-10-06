@@ -1,0 +1,314 @@
+--- a/common/build.gradle.kts
++++ b/common/build.gradle.kts
+@@ -1,6 +1,20 @@
+ plugins {
+     id("com.android.library")
+     alias(libs.plugins.kotlin.compose)
++}
++
++// 离线许可直接从现有文档生成，限定输入范围，不复制整个工作区或认证目录。
++val prepareGalaxyPlayLicenses by tasks.registering(Sync::class) {
++    into(layout.buildDirectory.dir("generated/galaxyplay-license-assets/third-party"))
++    from(rootProject.file("docs/第三方许可.md")) { rename { "NOTICE.md" } }
++    from(rootProject.file("docs/licenses")) {
++        include("**/*.txt")
++        into("licenses")
++        eachFile { relativePath = RelativePath(true, "licenses", name) }
++        includeEmptyDirs = false
++    }
++    from(rootProject.file("LICENSE")) { into("licenses"); rename { "GPL-3.0.txt" } }
++    from(rootProject.file("shared/src/main/assets/byd-hud-icons/LICENSE-BYDMate.txt")) { into("licenses") }
+ }
+ 
+ android {
+@@ -11,6 +25,7 @@
+ 
+     defaultConfig {
+         minSdk = 28
++        testInstrumentationRunner = "com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation"
+     }
+ 
+     compileOptions {
+@@ -21,13 +36,24 @@
+     buildFeatures {
+         compose = true
+     }
+-
+-    testOptions {
+-        unitTests.isIncludeAndroidResources = true
+-        // The UI suite covers several SDKs and locale-specific resource sandboxes.
+-        unitTests.all { it.maxHeapSize = "1g" }
++    // 原生组件回归使用实际合并资源，不能用单测占位 R 代替主题。
++    testOptions { unitTests.isIncludeAndroidResources = true }
++    // 测试集中存放，源集映射保留模块依赖与 internal 可见性。
++    sourceSets {
++        getByName("main").kotlin.directories.add(rootProject.file("galaxy/common/src/main/java").path)
++        getByName("main").java.directories.add(rootProject.file("galaxy/common/src/main/java").path)
++        getByName("main").res.directories.apply { clear(); add(project.file("src/main/res").path) }
++        getByName("debug").res.directories.add(rootProject.file("galaxy/common/src/main/res").path)
++        getByName("release").res.directories.add(rootProject.file("galaxy/common/src/main/res").path)
++        getByName("main").assets.directories.apply { clear(); add(rootProject.file("galaxy/common/src/main/assets").path) }
++        getByName("main").manifest.srcFile(rootProject.file("galaxy/common/src/main/AndroidManifest.xml"))
++        getByName("main").assets.directories.add(layout.buildDirectory.dir("generated/galaxyplay-license-assets").get().asFile.path)
++        getByName("test").setRoot(rootProject.file("e2e/common/test").path)
++        getByName("androidTest").setRoot(rootProject.file("e2e/common/androidTest").path)
+     }
+ }
++
++tasks.named("preBuild") { dependsOn(prepareGalaxyPlayLicenses) }
+ 
+ dependencies {
+     api(project(":shared"))
+@@ -38,12 +64,13 @@
+     implementation(libs.androidx.compose.ui.graphics)
+     implementation(libs.androidx.compose.ui.tooling.preview)
+     implementation(libs.androidx.core.ktx)
++    implementation(libs.androidx.media3.exoplayer)
++    implementation(libs.androidx.media3.ui)
++    implementation(libs.androidx.media3.exoplayer.hls)
++    implementation(libs.dexmaker)
+     implementation(libs.androidx.lifecycle.runtime.ktx)
+-    implementation(libs.androidx.media3.exoplayer)
+-    implementation(libs.androidx.media3.exoplayer.hls)
+-    implementation(libs.androidx.media3.ui)
++    testImplementation(libs.jmdns)
+     testImplementation(libs.junit)
+-    testImplementation("org.robolectric:robolectric:4.17")
+-    testImplementation("org.mockito:mockito-core:5.20.0")
+-    testImplementation(libs.jmdns)
++    testImplementation(libs.robolectric)
++    testImplementation(libs.mockito)
+ }
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -10,15 +10,20 @@
+ appAutomotive = "1.7.0"
+ app = "1.4.0"
+ junit = "4.13.2"
++robolectric = "4.17"
++mockito = "5.20.0"
+ bouncycastle = "1.79"
+ jmdns = "3.6.3"
++
++dexmaker = "2.28.6"
++
+ media3 = "1.11.1"
+ 
+ [libraries]
++dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
+ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+ androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+-androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activityCompose" }
+ androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+ androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+@@ -30,8 +35,12 @@
+ androidx-app-automotive = { group = "androidx.car.app", name = "app-automotive", version.ref = "appAutomotive" }
+ androidx-app = { group = "androidx.car.app", name = "app", version.ref = "app" }
+ junit = { group = "junit", name = "junit", version.ref = "junit" }
++robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+ bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+ jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
++
++mockito = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
++
+ androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+ androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
+ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+--- a/mobile/build.gradle.kts
++++ b/mobile/build.gradle.kts
+@@ -1,29 +1,84 @@
++import java.util.Properties
++import java.net.URI
++import java.util.Base64
++
+ plugins {
+     alias(libs.plugins.android.application)
+     alias(libs.plugins.kotlin.compose)
+ }
+ 
+-// Optional local-only input. CI and ordinary source builds contain no accessory identity.
++// 产品版本与上游核心来源分别维护，避免同步上游时改变 L7 的发布版本。
++val l7Version = Properties().apply {
++    load(providers.fileContents(rootProject.layout.projectDirectory.file("gradle/galaxyplay-version.properties"))
++        .asText.get().reader())
++}
++
++val diplayDisplayVersion = l7Version.getProperty("diplayCoreVersion")
++
++// .env 只按字面量读取，不执行 shell 展开；环境变量可覆盖文件中的打包默认值。
++val logDefaults = providers.fileContents(rootProject.layout.projectDirectory.file(".env"))
++    .asText.orElse("").get().lineSequence().map(String::trim)
++    .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains('=') }
++    .associate { line ->
++        val key = line.substringBefore('=').trim()
++        val raw = line.substringAfter('=').trim()
++        key to if (raw.length >= 2 && raw.first() == raw.last() && raw.first() in "\"'") raw.substring(1, raw.length - 1) else raw
++    }
++val logServerUrl = providers.environmentVariable("L7_LOG_SERVER_URL").getOrElse(logDefaults["L7_LOG_SERVER_URL"].orEmpty())
++val logAuthorization = providers.environmentVariable("L7_LOG_AUTHORIZATION").getOrElse(logDefaults["L7_LOG_AUTHORIZATION"].orEmpty())
++check(logServerUrl.isEmpty() || runCatching {
++    val slot = logServerUrl.substringBeforeLast('/').substringAfterLast('/')
++    val prefix = logServerUrl.substringBeforeLast('/').substringBeforeLast('/')
++    val templateValid = if ('{' in logServerUrl || '}' in logServerUrl) {
++        slot in setOf("{HeadUnit}-{DeviceID}", "{DeviceID}") && '{' !in prefix && '}' !in prefix
++    } else true
++    val uri = URI(logServerUrl.replace("{HeadUnit}", "head_unit").replace("{DeviceID}", "device_id"))
++    templateValid && logServerUrl.length <= 2048 && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() &&
++        uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
++        (uri.port == -1 || uri.port in 1..65535) &&
++        Regex("(?:/[^/]+)*/api/[^/]+/[^/]+/_json").matches(uri.path)
++}.getOrDefault(false)) { "L7_LOG_SERVER_URL 格式无效" }
++check(logAuthorization.isEmpty() || runCatching {
++    check(logAuthorization.length <= 4096 && logAuthorization.matches(Regex("Basic [A-Za-z0-9+/]+={0,2}")))
++    val decoded = Base64.getDecoder().decode(logAuthorization.removePrefix("Basic ")).toString(Charsets.UTF_8)
++    val colon = decoded.indexOf(':')
++    colon > 0 && colon < decoded.lastIndex && decoded.none { it.code < 32 || it.code == 127 }
++}.getOrDefault(false)) { "L7_LOG_AUTHORIZATION 格式无效" }
++fun logResource(value: String): String = "\"" + value.replace("&", "&amp;").replace("<", "&lt;")
++    .replace(">", "&gt;").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
++
++// 认证材料由 Docker 脚本显式挂载；未提供环境变量的源码构建不包含身份。
+ val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
+     .orNull?.let { file(it).canonicalFile }
+ 
+ android {
+     namespace = "com.shilapi.xcertplay"
++    androidResources {
++        // 同时过滤依赖自带的其他语言，APK 仅保留中英文资源。
++        localeFilters += listOf("en", "zh-rCN")
++    }
+     compileSdk {
+         version = release(37)
+     }
+ 
+     defaultConfig {
+-        applicationId = "com.shihab.diplay"
+-        minSdk = 28
++        applicationId = "com.ecarx.carplay"
++        // L7 专用应用最低支持 Android 10，实车验证以 Flyme OS / Android 11 为准。
++        minSdk = 29
+         targetSdk = 37
+-        versionCode = 32
+-        versionName = "0.2.13"
++        versionCode = l7Version.getProperty("versionCode").toInt()
++        versionName = l7Version.getProperty("versionName")
++        manifestPlaceholders["diplayCoreVersion"] = l7Version.getProperty("diplayCoreVersion")
++        manifestPlaceholders["diplayCoreCommit"] = l7Version.getProperty("diplayCoreCommit")
++        resValue("string", "l7_core_source_info",
++            "DiPlay $diplayDisplayVersion · ${l7Version.getProperty("diplayCoreCommit").take(7)}")
++        // 核心版本只来源于官方发布基线。
++        resValue("string", "l7_source_version_diplay", diplayDisplayVersion)
++        resValue("string", "l7_log_default_url", logResource(logServerUrl))
++        resValue("string", "l7_log_default_authorization", logResource(logAuthorization))
+ 
+     }
+ 
+-
+-    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }
+ 
+     signingConfigs {
+         create("release") {
+@@ -39,8 +94,7 @@
+ 
+     buildTypes {
+         debug {
+-            applicationIdSuffix = ".hudtest"
+-            versionNameSuffix = "-hud-test"
++            // 调试与实车构建使用相同包名，便于核对 L7 的包名权限策略。
+         }
+         release {
+             optimization {
+@@ -55,11 +109,21 @@
+     }
+     buildFeatures {
+         compose = true
++        resValues = true
+     }
++    // 新增 L7 入口测试时统一放入 e2e，不在模块 src 下重新分散存放。
++    sourceSets {
++        getByName("main").setRoot(rootProject.file("galaxy/mobile/src/main").path)
++        getByName("test").setRoot(rootProject.file("e2e/mobile/test").path)
++        getByName("androidTest").setRoot(rootProject.file("e2e/mobile/androidTest").path)
++    }
++    // 产品源集设置完成后再添加只读外部认证，避免 setRoot 覆盖输入目录。
++    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.directories.add(it.path) }
+ }
+ 
+ dependencies {
+     implementation(platform(libs.androidx.compose.bom))
++    // DiPlay 核心源码依赖；L7 的入口、品牌和发布版本由 mobile 单独维护。
+     implementation(project(":common"))
+     implementation(project(":shared"))
+     implementation(libs.androidx.activity.compose)
+@@ -73,7 +137,7 @@
+     debugImplementation(libs.androidx.compose.ui.tooling)
+ }
+ 
+-// No implicit import. Only the two explicitly selected local runtime assets are allowed.
++// 仅允许指定目录中的配套私钥和证书，禁止其他凭据混入 APK 资产。
+ val credentialAssets = files(android.sourceSets.flatMap { source ->
+     source.assets.directories.map { directory ->
+         fileTree(directory) {
+@@ -98,7 +162,7 @@
+ }
+ tasks.named("preBuild") { dependsOn(rejectBundledCredentials) }
+ 
+-// Car-test packages must be standalone. Keep ordinary source/CI builds identity-free.
++// 实车打包要求预置认证；显式源码构建可省略认证材料。
+ val verifyStandaloneAuthentication by tasks.registering {
+     group = "verification"
+     description = "Require the explicit runtime authentication input for a standalone car-test APK."
+@@ -118,3 +182,9 @@
+     description = "Build a standalone car-test APK with explicitly provisioned authentication."
+     dependsOn(verifyStandaloneAuthentication, "assembleDebug")
+ }
++
++tasks.register("assembleStandaloneRelease") {
++    group = "build"
++    description = "使用外部认证材料和外部 Android 签名构建 L7 发布包。"
++    dependsOn(verifyStandaloneAuthentication, "assembleRelease")
++}
+--- a/settings.gradle.kts
++++ b/settings.gradle.kts
+@@ -22,12 +22,8 @@
+     }
+ }
+ 
+-rootProject.name = "xcertplay"
++rootProject.name = "GalaxyPlay"
+ include(":common")
+ include(":mobile")
+ include(":automotive")
+ include(":shared")
+-include(":maphost")
+-project(":maphost").projectDir = file("samples/maphost")
+-include(":home")
+-project(":home").projectDir = file("samples/home")
+--- a/shared/build.gradle
++++ b/shared/build.gradle
+@@ -31,11 +31,22 @@
+         sourceCompatibility = JavaVersion.VERSION_11
+         targetCompatibility = JavaVersion.VERSION_11
+     }
++    // 测试统一集中在根目录 e2e，保留各模块与测试类型的独立编译范围。
++    sourceSets {
++        main.kotlin.directories.add(rootProject.file('galaxy/shared/src/main/java').path)
++        main.java.directories.add(rootProject.file('galaxy/shared/src/main/java').path)
++        test.setRoot(rootProject.file('e2e/shared/test').path)
++        androidTest.setRoot(rootProject.file('e2e/shared/androidTest').path)
++        // 加密验证工具只随调试包提供，应用内音频自检样本保留运行时打包。
++        debug.setRoot(rootProject.file('e2e/shared/debug').path)
++        main.assets.srcDir(rootProject.file('e2e/shared/runtime/assets'))
++    }
+ }
+ dependencies {
+     implementation libs.androidx.app
+     implementation libs.bouncycastle
+     implementation libs.jmdns
+     testImplementation libs.junit
+-    testImplementation 'org.robolectric:robolectric:4.17'
++    testImplementation libs.robolectric
++    testImplementation libs.mockito
+ }

@@ -2,9 +2,13 @@
 
 [项目入口](../README.md) · [开发与验证](../docs/开发与验证.md)
 
-全部自动化测试代码集中到本目录，按所属模块和测试类型分类；原包名、断言和依赖保留，通过模块 Gradle 的 sourceSets 映射执行。目录名采用 e2e，现有用例的类型仍是 JUnit/Robolectric 单元及组件回归，不将它们表述为真实 iPhone 的端到端验收。
+全部自动化测试代码集中到本目录，按所属模块和测试类型分类；包名、适用断言和依赖保留，通过模块 Gradle 的 sourceSets 映射执行。目录名采用 e2e，现有用例的类型仍是 JUnit/Robolectric 单元及组件回归，不将它们表述为真实 iPhone 的端到端验收。
 
 设备脚本按 `--serial` 固定 AVD，多个交互脚本依次执行，并与其他会话约定独占该模拟器；并发 ADB 启动其他应用会改变前台与节点树，不能据此判断产品失败。UI 定位只点击启用的动作行，不点击同名 Header；分类页先滚动查找离屏入口。自动化失败保留原断言及本地日志，补充截图／节点树失败不覆盖原异常。当前验收结论维护于开发说明，运行输出放在忽略的 `build/e2e/` 或 `build/previews/`。
+
+官方源码快照的测试映射与未开放入口范围固定在 [test-scope.json](../tools/upstream-sync/test-scope.json)。`upstream-reference/common/test/` 完整保留原版界面、BYD／仪表／多显示／同网等测试，不在本产品 sourceSets 中执行，也不计入通过数；对应有效协议、热点、USB、窗口、有限重试和导出回退回归仍在 `shared/test/`、`common/test/`。少量用例按产品中英文、MANUAL、唯一权限动作和三个 USB 接收器调整接口断言。原测试没有删除，不能以参考目录文件数宣称产品回归通过。
+
+[sync-upstream-core.py](../scripts/sync-upstream-core.py) 的覆盖、冲突、漂移和目录隔离由 `checks/test_upstream_sync.py` 使用临时 Git 仓库验证；不读取或复制认证、签名、日志和构建产物。
 
 ## 目录与检阅顺序
 
