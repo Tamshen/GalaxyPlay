@@ -37,7 +37,7 @@ class L7RoutesTest {
         assertEquals("settings", L7Routes.navigation("settings-debug"))
         assertEquals("settings", L7Routes.back("settings-debug"))
         assertEquals("settings-debug", L7Routes.destination("home", "settings", "settings-diagnostics"))
-        listOf("settings-debug-results", "settings-debug-history", "settings-debug-steering", "settings-debug-voice", "settings-debug-media", "settings-debug-navigation").forEach {
+        listOf("settings-debug-results", "settings-debug-history", "settings-debug-steering", "settings-debug-voice", "settings-debug-codec", "settings-debug-media", "settings-debug-navigation").forEach {
             assertEquals("settings-debug", L7Routes.back(it))
             assertEquals("settings", L7Routes.navigation(it))
         }

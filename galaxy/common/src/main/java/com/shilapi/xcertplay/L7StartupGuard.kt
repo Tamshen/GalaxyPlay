@@ -15,6 +15,8 @@ import com.shilapi.xcertplay.host.R
 class L7Application : Application() {
     override fun onCreate() {
         super.onCreate()
+        // 测试子进程只回传 Binder 摘要，由主进程写入既有日志队列。
+        if (Application.getProcessName() == "$packageName:codec_probe") return
         L7DebugLog.initialize(this)
         if (Application.getProcessName() == packageName) L7StartupGuard.install(this)
     }
