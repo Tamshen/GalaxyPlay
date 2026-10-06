@@ -23,6 +23,35 @@ class FirstTcpWatchdogTest {
     private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
         AirPlayTcpAccepted(owner, internal, now * 1_000_000)
 
+    @Test fun protocolDeadlineStartsOnceAndLateFirstTcpTimerCannotFailIt() {
+        val watch = FirstTcpWatchdog(identity, { delay, action ->
+            deadline = now + delay; timer = action
+            val cancel: () -> Unit = { deadline = null }; cancel
+        }, { failures++ }, { now * 1_000_000 }, protocolTimeoutMillis = 5000)
+        watch.startSessionSent(0)
+        val firstTimer = timer!!
+        now = 1000; assertTrue(watch.accepted(event()))
+        val protocolTimer = timer!!
+        assertEquals(6000L, deadline)
+        now = 2000; watch.accepted(event()); firstTimer()
+        assertEquals(6000L, deadline)
+        assertEquals(0, failures)
+        protocolTimer(); protocolTimer()
+        assertTrue(watch.protocolTimedOut)
+        assertEquals(1, failures)
+    }
+    @Test fun protocolSuccessAndTerminationRejectLateDeadline() {
+        for (success in listOf(true, false)) {
+            val watch = FirstTcpWatchdog(identity, { _, action -> timer = action; {} },
+                { failures++ }, protocolTimeoutMillis = 5000)
+            watch.accepted(event()); val old = timer!!
+            if (success) watch.sessionEstablished() else watch.terminate()
+            old()
+            assertFalse(watch.protocolTimedOut)
+        }
+        assertEquals(0, failures)
+    }
+
     @Test fun noSuccessfulStartSessionDoesNotArmTimer() {
         watchdog()
         now = 60_000

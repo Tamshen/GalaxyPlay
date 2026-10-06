@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_music_owner">Music output</string>
+    <string name="galaxy_music_bluetooth">Vehicle Bluetooth (recommended)</string>
+    <string name="galaxy_music_local">Local CarPlay music</string>
+    <string name="galaxy_music_guide">USB and wireless music setup</string>
+    <string name="galaxy_music_guide_body">Pair your iPhone with vehicle Bluetooth, select it as the music output on your phone, and select Bluetooth music on the head unit. The vehicle handles music controls; navigation, Siri and calls remain available. Use local music if Bluetooth output is unavailable. Reconnect after saving. Automatic media disconnect applies only to local music.</string>
+</resources>

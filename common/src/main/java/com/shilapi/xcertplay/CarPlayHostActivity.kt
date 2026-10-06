@@ -2981,6 +2981,7 @@ class CarPlayHostActivity : ComponentActivity() {
             cluster = clusterDisplayConfig(),
             rightHandDrive = rightHandDrive,
             hevc = hevcEnabled,
+            supportsOpusOutput = wirelessEnabled,
             microphone = microphoneAvailable,
             manufacturer = normalizedManufacturer(),
             model = normalizedModel(),
@@ -3141,6 +3142,7 @@ class CarPlayHostActivity : ComponentActivity() {
         videoWidth: Int,
         videoHeight: Int,
         controllerGeneration: Int,
+        localMusic: Boolean,
     ): AndroidMediaSink {
         // 固定当前会话文件，解码器的迟到回调不能写入新会话。
         val diagnosticLog = sessionLog
@@ -3153,6 +3155,7 @@ class CarPlayHostActivity : ComponentActivity() {
             preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
             advancedAudioChannelMapping = if (audioTemplate != null) true else advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
+            localMediaAudioEnabled = localMusic,
             mediaChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA)
                 ?: AirPlayPersistence.loadMediaAudioChannel(this),
             navigationChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION)
@@ -3436,10 +3439,12 @@ class CarPlayHostActivity : ComponentActivity() {
                 "location=${config.locationReportingEnabled} " +
                 "mfi=${config.mfiTarget}",
         )
+        val localMusic = !l7DebugLogs || GalaxyMusicPlayback.localEnabled(this)
         val renderer = createMediaSink(
             videoWidth = airPlayConfig.main.widthPixels,
             videoHeight = airPlayConfig.main.heightPixels,
             controllerGeneration = controllerGeneration,
+            localMusic = localMusic,
         )
         sink = renderer
         updateVideoCanvas(controllerGeneration, airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels)
@@ -3459,6 +3464,7 @@ class CarPlayHostActivity : ComponentActivity() {
             media = media,
             reportStatus = createStatusReporter(controllerGeneration),
             diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
+            localMediaAudioEnabled = localMusic,
             loadPairRecord = { AirPlayPersistence.loadLockdownRecord(this) },
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },

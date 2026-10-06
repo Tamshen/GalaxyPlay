@@ -76,6 +76,7 @@ data class AirPlayConfig(
      * ahead of time over TCP, so short Wi-Fi gaps do not interrupt it.
      */
     val mainBufferedAudio: Boolean = false,
+    val supportsOpusOutput: Boolean = true,
 )
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */

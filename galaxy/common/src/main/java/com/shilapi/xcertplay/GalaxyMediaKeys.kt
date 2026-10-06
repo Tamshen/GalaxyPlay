@@ -45,7 +45,7 @@ internal object GalaxyMediaKeys {
         val commands = dispatcher(next, onPlaybackStarted)
         val dispatch: (Int, String) -> Unit = { index, source -> commands.dispatch(index, source, L7SteeringDiagnostics.begin(source, index)) }
         val traced: (Int, String, L7SteeringTrace) -> Unit = commands::dispatch
-        bridge = CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch, traced)
+        bridge = if (next.localMediaAudioEnabled) CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch, traced) else null
         next.sessionStateListener = { active -> onConnection(context, next, active, dispatch, traced) }
         next.navigationListener = { value -> synchronized(this) { if (controller === next) navigation?.update(value) } }
         next.playbackListener = { playing ->
@@ -127,7 +127,7 @@ internal object GalaxyMediaKeys {
             pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
             pendingArtwork = null
             mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext), context.packageName,
-                { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced).also { it.start(); it.update(mediaInfo) }
+                { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced, localPlayback = next.localMediaAudioEnabled).also { it.start(); it.update(mediaInfo) }
             coverOwner.select(mediaInfo.artworkTransferId)
         }
         if (active) bridge?.onNowPlayingChanged(mediaInfo)

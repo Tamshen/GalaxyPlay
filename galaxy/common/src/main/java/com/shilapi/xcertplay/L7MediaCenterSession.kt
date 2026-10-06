@@ -25,6 +25,7 @@ internal class L7MediaCenterSession(
     private val main: Executor = Executor { Handler(Looper.getMainLooper()).post(it) },
     private val log: (String) -> Unit = L7DebugLog::record,
     private val traceSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
+    private val localPlayback: Boolean = true,
     private val retry: (Runnable) -> Unit = { Handler(Looper.getMainLooper()).postDelayed(it, 1000) },
 ) : Closeable {
     private val generation = generations.incrementAndGet()
@@ -72,6 +73,8 @@ internal class L7MediaCenterSession(
             registered = false
             published = null
             publishedProgress = null
+            publishedArtwork = null
+            pending = null
             playRequest.reset()
             foreignFocus = false
             ownFocus = false
@@ -152,7 +155,7 @@ internal class L7MediaCenterSession(
     }
 
     private fun requestPlayback() {
-        if (playRetryRevision == playRequest.revision || !playRequest.begin()) return
+        if (!localPlayback || playRetryRevision == playRequest.revision || !playRequest.begin()) return
         val revision = playRequest.revision
         event("requestPlay attempt=${playRequest.attempts}")
         val accepted = safely("requestPlay") { port.requestPlay() }
@@ -196,6 +199,7 @@ internal class L7MediaCenterSession(
             "registered=$registered foreignFocus=$foreignFocus closed=$closed") }
         event("callback index=$index registered=$registered phoneKnown=${latest.playbackKnown} playing=${latest.playing}")
         val reason = when {
+            !localPlayback -> "OEM_CONTROL_OWNED_BY_BLUETOOTH"
             closed -> "OEM_CLOSED"
             !current() -> "STALE_SESSION"
             !registered -> "OEM_NOT_REGISTERED"
@@ -215,7 +219,7 @@ internal class L7MediaCenterSession(
     }
 
     private fun selected(source: Int): Boolean {
-        if (closed || !current() || !registered || source != port.source) return false
+        if (!localPlayback || closed || !current() || !registered || source != port.source) return false
         enqueue {
             event("sourceSelected source=$source")
             published = null; publishedProgress = null; pending = null
@@ -244,7 +248,7 @@ internal class L7MediaCenterSession(
             published = null; publishedProgress = null; pending = null
             if (publish) publishLatest()
         }
-        if (changed && latest.playbackKnown && latest.playing) main.execute {
+        if (localPlayback && changed && latest.playbackKnown && latest.playing) main.execute {
             if (!closed && current() && foreignFocus) send(CarPlayMediaButton.PAUSE, "mediacenter-focus")
         }
     }
