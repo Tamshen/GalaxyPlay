@@ -115,6 +115,8 @@ class GalaxyMediaKeysTest {
         `when`(controller.hasActiveSession()).thenAnswer { active }
         `when`(controller.navigationSnapshot()).thenReturn(com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot())
         `when`(controller.activeMediaSessionOwner()).thenReturn(Any())
+        // 本用例验证显式本地音乐模式；默认原车蓝牙不创建本应用媒体会话。
+        `when`(controller.localMediaAudioEnabled).thenReturn(true)
         var resumed = 0
         val construction = mockConstruction(MediaSession::class.java)
         GalaxyMediaKeys.attach(context, controller, { resumed++ })
@@ -140,5 +142,26 @@ class GalaxyMediaKeysTest {
             shadowOf(Looper.getMainLooper()).idle()
             assertNull(bridge.session)
         } finally { GalaxyMediaKeys.detach(controller); construction.close() }
+    }
+    @Test fun stockBluetoothMetadataDoesNotCreateLocalSessionOrResumePhone() {
+        val app = RuntimeEnvironment.getApplication()
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.localMediaAudioEnabled).thenReturn(false)
+        `when`(controller.hasActiveSession()).thenReturn(true)
+        `when`(controller.navigationSnapshot()).thenReturn(com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot())
+        var metadata: ((CarPlayNowPlaying) -> Unit)? = null
+        doAnswer { metadata = it.getArgument(0); null }.`when`(controller).nowPlayingListener = any()
+        var resumed = 0
+        mockConstruction(MediaSession::class.java).use { construction ->
+            GalaxyMediaKeys.attach(app, controller, { resumed++ })
+            try {
+                metadata!!(CarPlayNowPlaying(title = "stock song", playing = true, playbackKnown = true))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertNull(ReflectionHelpers.getField<Any?>(GalaxyMediaKeys, "bridge"))
+                assertEquals(0, construction.constructed().size)
+                assertEquals(0, resumed)
+                assertEquals("stock song", ReflectionHelpers.getField<CarPlayNowPlaying>(GalaxyMediaKeys, "mediaInfo").title)
+            } finally { GalaxyMediaKeys.detach(controller) }
+        }
     }
 }
