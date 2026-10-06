@@ -44,6 +44,7 @@ class AndroidMediaSink(
     private val advancedAudioChannelMapping: Boolean = false,
     private val audioFocusEnabled: Boolean = false,
     private val localMediaAudioEnabled: Boolean = true,
+    private val videoFps: Int = 30,
     private val mediaChannel: Int = 0,
     private val navigationChannel: Int = 0,
     context: Context? = null,
@@ -329,6 +330,7 @@ class AndroidMediaSink(
                 videoWidth,
                 videoHeight,
                 preferSoftwareHevcDecoder,
+                videoFps,
                 requestKeyFrame = { requestVideoRecovery(type) },
                 report = {
                     videoDiagnosticHandlers[type]?.invoke(it)
@@ -396,6 +398,7 @@ private class VideoDecoder(
     private val width: Int,
     private val height: Int,
     private val preferSoftwareHevcDecoder: Boolean,
+    private val fps: Int,
     private val requestKeyFrame: () -> Unit,
     private val report: (String) -> Unit,
     private val onFailure: (VideoDecoder, VideoCodec, String) -> Unit,
@@ -697,7 +700,7 @@ private class VideoDecoder(
     }
 
     private fun decoderCandidates(mime: String): List<VideoDecoderCandidate> = decoderCandidateCache.getOrPut(mime) {
-        val candidates = VideoDecoderCapabilities.query(mime, width, height, report = report)
+        val candidates = VideoDecoderCapabilities.query(mime, width, height, fps.toDouble(), report = report)
         if (candidates.isEmpty()) report("no usable decoder mime=$mime size=${width}x$height reason=capability_filter")
         VideoDecoderSelection.ordered(candidates,
             preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC)

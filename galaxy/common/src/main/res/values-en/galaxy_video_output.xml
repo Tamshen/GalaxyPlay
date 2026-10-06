@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_software_video_note">This window uses SurfaceView output. Picture adjustments are unavailable; saved values are preserved.</string>
+</resources>

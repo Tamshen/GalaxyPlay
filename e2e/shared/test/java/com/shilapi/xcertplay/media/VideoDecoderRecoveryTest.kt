@@ -146,8 +146,8 @@ class VideoDecoderRecoveryTest {
             val closedCallback: (Any) -> Unit = { closed.countDown() }
             val size: (Int, Int) -> Unit = { _, _ -> }
             val create: (String) -> MediaCodec = { creations.incrementAndGet(); codec }
-            worker = type.declaredConstructors.single { it.parameterCount == 12 }.apply { isAccessible = true }
-                .newInstance(110, surface, 1280, 720, false, {}, report, failure,
+            worker = type.declaredConstructors.single { it.parameterCount == 13 }.apply { isAccessible = true }
+                .newInstance(110, surface, 1280, 720, false, 30, {}, report, failure,
                     recoveredCallback, closedCallback, size, create)
             @Suppress("UNCHECKED_CAST")
             val candidates = field("decoderCandidateCache").get(worker) as MutableMap<String, List<VideoDecoderCandidate>>
