@@ -11,11 +11,13 @@ internal class L7DebugDetails(context: Context, parent: LinearLayout) {
     private var expanded = false
     init {
         lateinit var row: L7SettingRow
+        lateinit var toggle: L7SettingRow
         L7SettingsSection.add(parent) { card ->
-            card.addView(L7Components.actionRow(context, context.getString(R.string.l7_debug_details)) {
+            toggle = L7Components.actionRow(context, context.getString(R.string.l7_debug_details)) {
                 expanded = !expanded
                 body.visibility = if (expanded) View.VISIBLE else View.GONE
-            })
+                toggle.titleView.text = context.getString(if (expanded) R.string.l7_debug_details_hide else R.string.l7_debug_details)
+            }.also(card::addView)
             row = L7SettingRow(context, context.getString(R.string.l7_debug_details)).apply { visibility = View.GONE }
             card.addView(row)
         }

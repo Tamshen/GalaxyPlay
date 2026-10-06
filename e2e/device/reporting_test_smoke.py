@@ -75,8 +75,9 @@ def tap(label):
     raise AssertionError('动作不可达：' + label)
 
 
+# 展开的明细可超过三屏，先回到正文顶部，再查找动作；不把未滚回当作按钮缺失。
 def top():
-    for _ in range(3):
+    for _ in range(10):
         adb('shell', 'input', 'swipe', '1080', '450', '1080', '1600', '180')
 
 
@@ -103,10 +104,10 @@ night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
     'zh': ('媒体上报测试', 'HUD 导航上报测试', '开始上报测试', '结束上报并注销', '取消',
            '切换测试曲目 A／B', '切换播放／暂停', '测试进度增加 15 秒', '切换封面 A／B／无封面',
-           '切换测试路名 A／B', '重新检查服务并发布当前路名', '记录未显示或异常', 'GalaxyPlay 测试曲目 B', '返回调试'),
+           '切换测试路名 A／B', '重新检查服务并发布当前路名', '未显示或与样例不符', 'GalaxyPlay 测试曲目 B', '返回调试'),
     'en': ('Media reporting test', 'HUD navigation reporting test', 'Start reporting test', 'End reporting and unregister', 'Cancel',
            'Switch test track A / B', 'Toggle play / pause', 'Advance test progress by 15 seconds', 'Switch artwork A / B / none',
-           'Switch test road A / B', 'Recheck service and publish current road', 'Record missing or abnormal display', 'GalaxyPlay test track B', 'Back to Debug'),
+           'Switch test road A / B', 'Recheck service and publish current road', 'No display or a sample mismatch', 'GalaxyPlay test track B', 'Back to Debug'),
 }
 
 try:
@@ -132,13 +133,14 @@ try:
             for kind, label in [('media', media), ('navigation', nav)]:
                 launch('settings-debug')
                 tap(label)
-                assert row(end).get('enabled') == 'false'
+                assert row(end) is None
                 screenshot(f'{language}-{kind}-{theme}-idle.png')
                 before = log()
                 tap(start); tap(cancel)
                 assert log() == before, '取消发生上报写入'
                 tap(start); tap(start)
                 assert row(end).get('enabled') == 'true'
+                assert not any('stage=' in text for text in visible()), '技术字段不能挤占样例'
                 if kind == 'media':
                     tap(track)
                     assert title_b in adb('shell', 'dumpsys', 'media_session').decode(errors='replace'), '真实 Android MediaSession 未更新曲目'
@@ -153,13 +155,26 @@ try:
                     tap(road); tap(refresh)
                     assert 'stage=explicitRefresh' in log()
                 assert 'exceptionType=ClassNotFoundException' in log(), 'AVD 缺 SDK 未明确记载'
+                top(); tap(missing)
+                assert any(('已记录：未符合预期' if language == 'zh' else 'Recorded: did not match expectations') in text for text in visible())
+                assert not any('ClassNotFoundException' in text for text in visible()), '技术字段默认应折叠'
+                tap('查看技术明细' if language == 'zh' else 'View technical details')
+                for _ in range(3):
+                    if any('ClassNotFoundException' in text for text in visible()):
+                        break
+                    adb('shell', 'input', 'swipe', '1080', '1700', '1080', '650', '180')
+                assert any('ClassNotFoundException' in text for text in visible()), '展开后应可查看首个 SDK 失败'
+                top(); tap('收起技术明细' if language == 'zh' else 'Hide technical details')
+                top()
+                tap(track if kind == 'media' else road)
+                top()
+                assert not any('Recorded: did not match expectations' in text or '已记录：未符合预期' in text for text in visible()), '新样例不得继承旧结果'
                 tap(missing)
-                assert any(('本轮首个异常' if language == 'zh' else 'First issue in this run') in text and 'ClassNotFoundException' in text for text in visible()), '首个 SDK 异常被后续本地成功信息挤掉'
                 screenshot(f'{language}-{kind}-{theme}-evidence.png')
                 launch('settings-debug-' + kind)
                 tap(end)
                 top()
-                assert row(end).get('enabled') == 'false'
+                assert row(end) is None
                 assert row(start).get('enabled') == 'true'
                 current = log()
                 assert 'stage=localRelease result=COMPLETED remoteClear=NOT_VERIFIED' in current
@@ -171,10 +186,10 @@ try:
                 nodes()
                 assert 'stage=userCleanupObservation result=RESIDUAL_OR_ABNORMAL origin=MANUAL phase=STOPPED' in log()
                 screenshot(f'{language}-{kind}-{theme}-cleanup.png')
-                tap(back)
+                top(); tap(back)
                 assert media in visible() or nav in visible()
                 print(f'{language} {theme} {kind} 页面、更新与结束通过', flush=True)
-    print('AVD 中英文昼夜媒体／HUD 测试、取消、曲目／进度／封面、离页保持、服务缺失证据、停止与默认落盘通过；未连接手机、未上传')
+    print('AVD 场景 ' + ', '.join(args.cases) + ' 的媒体／HUD 测试、取消、样例与结果绑定、明细、更新及停止通过；未连接手机、未上传')
 finally:
     # 异常时也尽力触发显式结束，随后关闭进程，不能把 force-stop 当远端注销通过。
     try:

@@ -121,4 +121,42 @@ class L7ReportingTestControllerTest {
         assertEquals(L7ReportingTestController.Phase.STOPPING, failed.snapshot().phase)
         assertTrue(logs.any { it.contains("completion=UNCONFIRMED") })
     }
+    @Test fun publishedPreviewAndUserResultAreBoundToTheDisplayedRunAndStep() {
+        engine.start(L7ReportingKind.MEDIA)
+        sessions.single().log("stage=androidMedia result=RETURNED track=A playing=false elapsedMs=0 cover=1 display=NOT_VERIFIED")
+        val first = engine.snapshot()
+        assertEquals("A", first.preview!!.track)
+        assertTrue(engine.observe(L7ReportingKind.MEDIA, true, first.run, first.step, first.phase))
+        sessions.single().log("stage=androidMedia result=RETURNED track=B playing=true elapsedMs=15000 cover=2 display=NOT_VERIFIED")
+        assertNull(engine.snapshot().observation)
+        assertFalse(engine.observe(L7ReportingKind.MEDIA, true, first.run, first.step, first.phase))
+        assertEquals("B", engine.snapshot().preview!!.track)
+        assertEquals(15000L, engine.snapshot().preview!!.elapsedMs)
+        assertTrue(logs.any { "stage=userObservation" in it && "step=${first.step}" in it })
+    }
+    @Test fun actionAndCleanupResetObservationContextAndRejectPendingOldClicks() {
+        engine.start(L7ReportingKind.NAVIGATION)
+        sessions.single().log("stage=fixture road=A active=true display=NOT_VERIFIED")
+        val old = engine.snapshot()
+        engine.action(L7ReportingKind.NAVIGATION, L7ReportingAction.REFRESH)
+        assertFalse(engine.observe(L7ReportingKind.NAVIGATION, true, old.run, old.step, old.phase))
+        val running = engine.snapshot()
+        engine.stop("USER")
+        assertFalse(engine.observe(L7ReportingKind.NAVIGATION, true))
+        sessions.single().released()
+        assertFalse(engine.observe(L7ReportingKind.NAVIGATION, true, running.run, running.step, running.phase))
+        val ended = engine.snapshot()
+        assertTrue(engine.observe(L7ReportingKind.NAVIGATION, false, ended.run, ended.step, ended.phase))
+        assertEquals(false, engine.snapshot().cleanupObservation)
+    }
+    @Test fun portReturnsAndUntrustedValuesDoNotInventASampleOrDisplayPass() {
+        engine.start(L7ReportingKind.MEDIA)
+        sessions.single().log("stage=updateState result=RETURNED")
+        sessions.single().log("stage=androidMedia result=RETURNED track=private playing=false elapsedMs=0 cover=1")
+        assertNull(engine.snapshot().preview)
+        assertNull(engine.snapshot().observation)
+        assertNull(L7ReportingPreview.parse(L7ReportingKind.MEDIA,
+            "stage=androidMedia result=RETURNED track=A playing=false elapsedMs=999999999999999999999999 cover=1"))
+    }
+
 }
