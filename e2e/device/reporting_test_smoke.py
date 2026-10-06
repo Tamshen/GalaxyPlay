@@ -64,14 +64,16 @@ def row(label):
 
 
 def tap(label):
-    for _ in range(6):
-        node = row(label)
-        if node is not None and node.get('enabled') == 'true' and node.get('clickable') == 'true':
-            x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
-            adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
-            time.sleep(.15)
-            return
-        adb('shell', 'input', 'swipe', '1080', '1700', '1080', '650', '180')
+    # 长明细中的快速甩动会跨过整个动作行；用重叠视口慢滚，并覆盖当前点上方。
+    for start, end in ((1550, 1100), (650, 1100)):
+        for _ in range(12):
+            node = row(label)
+            if node is not None and node.get('enabled') == 'true' and node.get('clickable') == 'true':
+                x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
+                adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+                time.sleep(.15)
+                return
+            adb('shell', 'input', 'swipe', '1080', str(start), '1080', str(end), '500')
     raise AssertionError('动作不可达：' + label)
 
 
@@ -158,13 +160,6 @@ try:
                 top(); tap(missing)
                 assert any(('已记录：未符合预期' if language == 'zh' else 'Recorded: did not match expectations') in text for text in visible())
                 assert not any('ClassNotFoundException' in text for text in visible()), '技术字段默认应折叠'
-                tap('查看技术明细' if language == 'zh' else 'View technical details')
-                for _ in range(3):
-                    if any('ClassNotFoundException' in text for text in visible()):
-                        break
-                    adb('shell', 'input', 'swipe', '1080', '1700', '1080', '650', '180')
-                assert any('ClassNotFoundException' in text for text in visible()), '展开后应可查看首个 SDK 失败'
-                top(); tap('收起技术明细' if language == 'zh' else 'Hide technical details')
                 top()
                 tap(track if kind == 'media' else road)
                 top()
@@ -186,10 +181,26 @@ try:
                 nodes()
                 assert 'stage=userCleanupObservation result=RESIDUAL_OR_ABNORMAL origin=MANUAL phase=STOPPED' in log()
                 screenshot(f'{language}-{kind}-{theme}-cleanup.png')
+                # 先结束限时上报，再检查长明细；阅读证据不应消耗两分钟动作窗口。
+                tap('查看技术明细' if language == 'zh' else 'View technical details')
+                for _ in range(5):
+                    if any('ClassNotFoundException' in text for text in visible()):
+                        break
+                    adb('shell', 'input', 'swipe', '1080', '1550', '1080', '1100', '500')
+                assert any('ClassNotFoundException' in text for text in visible()), '展开后应可查看首个 SDK 失败'
+                tap('收起技术明细' if language == 'zh' else 'Hide technical details')
+                assert not any('ClassNotFoundException' in text for text in visible()), '收起后仍展示技术字段'
                 top(); tap(back)
                 assert media in visible() or nav in visible()
                 print(f'{language} {theme} {kind} 页面、更新与结束通过', flush=True)
     print('AVD 场景 ' + ', '.join(args.cases) + ' 的媒体／HUD 测试、取消、样例与结果绑定、明细、更新及停止通过；未连接手机、未上传')
+except Exception:
+    try:
+        (output / 'failure.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+        (output / 'failure.xml').write_bytes(adb('shell', 'cat', '/sdcard/reporting-test.xml'))
+    except Exception as capture_error:
+        print(f'补充取证失败：{type(capture_error).__name__}；保留原失败', flush=True)
+    raise
 finally:
     # 异常时也尽力触发显式结束，随后关闭进程，不能把 force-stop 当远端注销通过。
     try:

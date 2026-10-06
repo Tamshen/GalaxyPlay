@@ -4,6 +4,8 @@
 
 全部自动化测试代码集中到本目录，按所属模块和测试类型分类；原包名、断言和依赖保留，通过模块 Gradle 的 sourceSets 映射执行。目录名采用 e2e，现有用例的类型仍是 JUnit/Robolectric 单元及组件回归，不将它们表述为真实 iPhone 的端到端验收。
 
+设备脚本按 `--serial` 固定 AVD，多个交互脚本依次执行，并与其他会话约定独占该模拟器；并发 ADB 启动其他应用会改变前台与节点树，不能据此判断产品失败。UI 定位只点击启用的动作行，不点击同名 Header；分类页先滚动查找离屏入口。自动化失败保留原断言及本地日志，补充截图／节点树失败不覆盖原异常。当前验收结论维护于开发说明，运行输出放在忽略的 `build/e2e/` 或 `build/previews/`。
+
 ## 目录与检阅顺序
 
 ```text
@@ -261,7 +263,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、十类导航及设置首页的「调试」和「日志」入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
 
-仅检查声道交互时追加 `--audio-only`：媒体/语音助手/导航两秒试听、立即停止、选流与保存分离、主题切换保留状态和取消恢复。不保存音频设置，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。
+仅检查声道交互时追加 `--audio-only`：临时切换为 L7 自定义模式，检查媒体/语音助手/导航两秒试听、立即停止、输出路由选择与保存分离、主题切换保留状态和取消恢复。原方案偏好与 L7 自定义文件／备份只在内存暂存，结束逐字节恢复；不保存路由参数，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。内置方案按产品设计隐藏逐用途编辑，不能把隐藏项当入口缺失。
 
 [MediaCodecSupportTest.kt](shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt) 覆盖 hvcC、混合起始码 Annex B、参数集缺失/类型错误/截断拒绝；字节夹具只检查封装，不验证实际 HEVC 硬件解码。[VideoStartupWatchdogTest.kt](shared/test/java/com/shilapi/xcertplay/media/VideoStartupWatchdogTest.kt) 检查无输入/帧不足不误报、超时只报一次、区分输出与呈现，以及 reset 后等待新输入。[L7AudioRouteDialogTest.kt](common/test/java/com/shilapi/xcertplay/L7AudioRouteDialogTest.kt) 检查内层选流不保存、外层取消恢复、外层确认只提交一次。模态框回归同时检查自定义内容中的主按钮主题和可用状态。
 
@@ -286,7 +288,7 @@ python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 
 [L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开四项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；同时确认首页和设置不再显示底部连接状态。首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
 
-此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
+此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。AVD 未声明 USB Host 时，完整脚本在首页检查后改为验证空闲退出，明确输出 USB 等待／投屏态跳过；这些场景不能记为已通过。`--settings-only` 可独立复验设置首页无返回按钮、子页 Header、正文滚动和固定左栏。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
 
 原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。`L7HotspotNavigationTest` 在 API 29/30 验证定制 Wi-Fi handler、原生热点入口失败恢复和无线设置回退；`L7HotspotActionsTest` 验证读取失败保留配置且不阻止写入。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
 
@@ -312,6 +314,6 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 车型三项回归使用 `CustomVehicleTemplatesTest`（API 29／30）核对系统初始值、三份文件隔离、已知车型自动适配、损坏与 AtomicFile 备份恢复、迟到保存拒绝和恢复默认保留。AVD 脚本 `l6_audio_model_smoke.py` 增补第三车型、中英文确认／取消、自动适配和自定义恢复；协议同意仅使用临时夹具，结束恢复原记录，不代替主动阅读／勾选契约测试。
 
-手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待、代次隔离、固定样例解析与 run／step／phase 判断绑定；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用、后台关闭待确认窗口、开始前隐藏无效按钮及技术明细默认折叠。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、样例变化清除旧判断、明细展开／收起、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。
+手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待、代次隔离、固定样例解析与 run／step／phase 判断绑定；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用、后台关闭待确认窗口、开始前隐藏无效按钮及技术明细默认折叠。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、样例变化清除旧判断、明细展开／收起、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。长明细使用重叠视口慢滚定位，展开阅读安排在显式结束上报后，避免消耗两分钟上报动作窗口；失败时先保存截图和节点树，再恢复配置。
 
 语音交互回归 `L7VoiceInputDebugPageTest` 覆盖显式启动、录音权限、后台恢复、Siri 请求去重、用户结果与请求绑定、重连丢弃旧判断并允许新请求、技术明细默认折叠；AVD `device/voice_input_smoke.py` 检查中英文昼夜、权限与 10 秒手动录音、停止／后台不续录、明细展开，逐字节恢复偏好与协议，恢复录音权限和昼夜。模拟器无真实手机，不把本地录音通过写成 Siri 识别通过。
