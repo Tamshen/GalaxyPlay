@@ -10,9 +10,9 @@ HAN = re.compile(r"[\u3400-\u9fff]")
 FORMAT = re.compile(r"%(?:\d+\$)?[\d.]*[dsf]")
 
 
-def resources(directory):
+def resources(*directories):
     result = {}
-    for path in sorted(directory.glob("*.xml")):
+    for path in sorted(path for directory in directories for path in directory.glob("*.xml")):
         for item in ET.parse(path).getroot():
             if item.tag not in ("string", "string-array", "plurals"):
                 continue
@@ -25,9 +25,10 @@ def resources(directory):
 def check():
     checked = 0
     for module in ("common", "mobile", "shared"):
-        base = ROOT / module / "src/main/res"
-        english = resources(base / "values-en")
-        for key, original in resources(base / "values").items():
+        roots = ([ROOT / "shared/src/main/res"] if module == "shared" else
+                 [ROOT / "galaxy" / module / "src/main/res"])
+        english = resources(*(base / "values-en" for base in roots))
+        for key, original in resources(*(base / "values" for base in roots)).items():
             source = "".join(original.itertext())
             if original.get("translatable") == "false" or not HAN.search(source):
                 continue
@@ -44,7 +45,7 @@ def check():
                 ), f"格式占位符不同：{module}: {key}"
             checked += 1
     for name in ("galaxyplay-first-use-agreement.en.md", "galaxyplay-third-party-notices.en.txt"):
-        assert not HAN.search((ROOT / "common/src/main/assets" / name).read_text()), f"英文正文含中文：{name}"
+        assert not HAN.search((ROOT / "galaxy/common/src/main/assets" / name).read_text()), f"英文正文含中文：{name}"
     print(f"英文资源检查通过：{checked} 项，含选项数组及格式占位符；英文正文无中文残留。")
 
 

@@ -209,7 +209,7 @@ def navigation_smoke():
 def audio_smoke():
     tap('音频路由')
     tap('媒体音乐')
-    route_names = {item.text for item in ET.parse(root / 'common/src/main/res/values/l7_media_diagnostics.xml').getroot().find('string-array').findall('item')}
+    route_names = {item.text for item in ET.parse(root / 'galaxy/common/src/main/res/values/l7_media_diagnostics.xml').getroot().find('string-array').findall('item')}
     current = next(n.attrib['text'] for n in nodes() if n.attrib.get('text') in route_names)
     stop = next(n for n in nodes() if n.attrib.get('text') == '停止试听')
     tap('试听此声道（2 秒）')

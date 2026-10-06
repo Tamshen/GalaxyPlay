@@ -33,6 +33,8 @@ android {
     }
     // 测试统一集中在根目录 e2e，保留各模块与测试类型的独立编译范围。
     sourceSets {
+        main.kotlin.directories.add(rootProject.file('galaxy/shared/src/main/java').path)
+        main.java.directories.add(rootProject.file('galaxy/shared/src/main/java').path)
         test.setRoot(rootProject.file('e2e/shared/test').path)
         androidTest.setRoot(rootProject.file('e2e/shared/androidTest').path)
         // 加密验证工具只随调试包提供，应用内音频自检样本保留运行时打包。

@@ -21,6 +21,9 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import com.shilapi.xcertplay.diagnostics.DiagnosticChannel
+import com.shilapi.xcertplay.diagnostics.DiagnosticEvent
+import com.shilapi.xcertplay.diagnostics.DiagnosticSink
 import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayContact
 import com.shilapi.xcertplay.airplay.AirPlayKnobState
@@ -154,6 +157,7 @@ class CarPlayController(
     private val clearPairRecord: () -> Unit = {},
     private val locationProvider: Iap2LocationProvider? = null,
     private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
+    diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
 ) : Closeable {
     /** 重连沿用当前控制器的实际传输方式，不使用可能已被修改的设置草稿。 */
     val transport: CarPlayTransport get() = config.transport
@@ -170,6 +174,7 @@ class CarPlayController(
 
     private val appContext = context.applicationContext
     private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
+    private val diagnostics = DiagnosticChannel(diagnosticAttempt.toLong(), diagnosticSink)
     private val diagnosticRun = AtomicInteger()
     private val usbManager = context.getSystemService(UsbManager::class.java)
     private val bluetoothAdapter =
@@ -404,6 +409,9 @@ class CarPlayController(
             if (closed) return
         }
         connectionDiagnostic("start transport=${config.transport}")
+        diagnostics.emit(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.START,
+            DiagnosticEvent.State.REQUESTED,
+            mapOf("wireless" to if (config.transport == CarPlayTransport.WIRELESS) 1L else 0L))
         videoListener?.let { listener ->
             videoGate = VideoInCarGate(
                 readParked = listener::readParked,
@@ -523,6 +531,7 @@ class CarPlayController(
             if (closed) return
             closed = true
         }
+        diagnostics.finish()
         sessionStateListener?.invoke(false)
         sessionStateListener = null
         navigationListener = null
@@ -2429,6 +2438,14 @@ class CarPlayController(
             if (expectedIphoneGeneration != null && expectedIphoneGeneration != iphoneGeneration.get()) return@post
             if (!closed && status != lastReportedStatus) {
                 lastReportedStatus = status
+                diagnostics.emit(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.STATE,
+                    when (status) {
+                        is CarPlayStatus.Failed -> DiagnosticEvent.State.FAILED
+                        CarPlayStatus.WirelessActive, CarPlayStatus.RunningControl -> DiagnosticEvent.State.RUNNING
+                        CarPlayStatus.ControlEnded -> DiagnosticEvent.State.ENDED
+                        CarPlayStatus.MfiReady, is CarPlayStatus.HotspotReady -> DiagnosticEvent.State.READY
+                        else -> DiagnosticEvent.State.WAITING
+                    }, mapOf("run" to diagnosticRun.get().toLong()))
                 connectionDiagnostic("stage=${status.javaClass.simpleName}")
                 connectionTimeline.mark(status.javaClass.simpleName, wirelessGeneration.get())?.let(::debugLog)
                 uiListener?.onDebugLog(status.debugLogMessage())

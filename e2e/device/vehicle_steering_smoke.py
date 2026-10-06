@@ -87,7 +87,7 @@ labels = {
 }
 try:
     # 合成协议与车型记录仅供 AVD 界面回归，结束逐字节恢复。
-    digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+    digest = hashlib.sha256(Path('galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
     write('shared_prefs/l7_agreement.xml', f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
     for language in args.languages:
         status, start, stop, right, skip, received, waiting = labels[language]

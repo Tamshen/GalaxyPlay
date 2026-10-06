@@ -92,7 +92,9 @@ class DiagnosticRedactorTest {
                     it.append("password=secret")
                 }
             }
-            val history = SessionLogFile.REPORT_NAMES.map { folder.resolve(it).readText() }
+            // 报告还包含按需创建的专项日志，本场景只产生连接历史文件。
+            val history = SessionLogFile.REPORT_NAMES.mapNotNull { folder.resolve(it).takeIf { file -> file.isFile }?.readText() }
+            assertEquals(8, history.size)
             assertEquals(8, folder.listFiles()!!.size)
             assertTrue(history.first().contains("session=2"))
             assertTrue(history.last().contains("session=9"))
