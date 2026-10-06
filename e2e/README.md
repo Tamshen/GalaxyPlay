@@ -304,4 +304,6 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 车型三项回归使用 `CustomVehicleTemplatesTest`（API 29／30）核对系统初始值、三份文件隔离、已知车型自动适配、损坏与 AtomicFile 备份恢复、迟到保存拒绝和恢复默认保留。AVD 脚本 `l6_audio_model_smoke.py` 增补第三车型、中英文确认／取消、自动适配和自定义恢复；协议同意仅使用临时夹具，结束恢复原记录，不代替主动阅读／勾选契约测试。
 
-手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待及代次隔离；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用和后台关闭待确认窗口。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。
+手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待、代次隔离、固定样例解析与 run／step／phase 判断绑定；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用、后台关闭待确认窗口、开始前隐藏无效按钮及技术明细默认折叠。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、样例变化清除旧判断、明细展开／收起、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。
+
+语音交互回归 `L7VoiceInputDebugPageTest` 覆盖显式启动、录音权限、后台恢复、Siri 请求去重、用户结果与请求绑定、重连丢弃旧判断并允许新请求、技术明细默认折叠；AVD `device/voice_input_smoke.py` 检查中英文昼夜、权限与 10 秒手动录音、停止／后台不续录、明细展开，逐字节恢复偏好与协议，恢复录音权限和昼夜。模拟器无真实手机，不把本地录音通过写成 Siri 识别通过。

@@ -37,6 +37,7 @@ internal object L7ReportingTests {
     }
     fun snapshot() = controller.snapshot()
     fun action(kind: L7ReportingKind, value: L7ReportingAction) = controller.action(kind, value)
-    fun observe(kind: L7ReportingKind, visible: Boolean) = controller.observe(kind, visible)
+    fun observe(kind: L7ReportingKind, visible: Boolean, run: Long? = null, step: Long? = null,
+                phase: L7ReportingTestController.Phase? = null) = controller.observe(kind, visible, run, step, phase)
     fun stop(reason: String) { controller.stop(reason); handler.removeCallbacks(timeout) }
 }

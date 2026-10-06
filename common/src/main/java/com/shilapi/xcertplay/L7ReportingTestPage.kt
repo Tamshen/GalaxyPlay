@@ -3,6 +3,8 @@ package com.shilapi.xcertplay
 import android.app.Activity
 import android.app.AlertDialog
 import android.widget.LinearLayout
+import android.view.View
+import android.widget.Toast
 import com.shilapi.xcertplay.host.R
 import java.io.Closeable
 
@@ -16,6 +18,9 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
     private lateinit var start: L7SettingRow
     private lateinit var end: L7SettingRow
     private lateinit var evidence: L7SettingRow
+    private val details: L7DebugDetails
+    private val actionsSection = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+    private var shown: L7ReportingTestController.Snapshot? = null
     private val controls = mutableListOf<L7SettingRow>()
     private val observations = mutableListOf<L7SettingRow>()
     private fun text(id: Int) = activity.getString(id)
@@ -23,14 +28,25 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
     init {
         L7SettingsSection.add(parent, text(R.string.l7_report_status),
             description = text(if (kind == L7ReportingKind.MEDIA) R.string.l7_report_media_hint else R.string.l7_report_navigation_hint)) { card ->
-            status = L7SettingRow(activity, text(R.string.l7_report_status)).also(card::addView)
+            status = L7SettingRow(activity, text(R.string.l7_listen_status)).also(card::addView)
             start = L7Components.actionRow(activity, text(R.string.l7_report_start)) { confirm() }.also(card::addView)
             end = L7Components.actionRow(activity, text(R.string.l7_report_end)) {
                 if (L7ReportingTests.snapshot().kind == kind) L7ReportingTests.stop("USER")
                 update()
             }.also(card::addView)
         }
-        L7SettingsSection.add(parent, text(R.string.l7_report_actions), footer = text(R.string.l7_report_lifetime)) { card ->
+        L7SettingsSection.add(parent, text(R.string.l7_report_evidence), footer = text(R.string.l7_report_evidence_hint)) { card ->
+            evidence = L7SettingRow(activity, text(R.string.l7_report_current_sample)).also(card::addView)
+            observations.add(L7Components.actionRow(activity, text(R.string.l7_report_visible)) {
+                observe(true)
+            }.also(card::addView))
+            observations.add(L7Components.actionRow(activity, text(R.string.l7_report_missing)) {
+                observe(false)
+            }.also(card::addView))
+            card.addView(L7Components.actionRow(activity, text(R.string.l7_report_logs)) { onLogs() })
+        }
+        parent.addView(actionsSection)
+        L7SettingsSection.add(actionsSection, text(R.string.l7_report_actions), footer = text(R.string.l7_report_lifetime)) { card ->
             val actions = if (kind == L7ReportingKind.MEDIA) listOf(
                 R.string.l7_report_track to L7ReportingAction.TRACK,
                 R.string.l7_report_play_pause to L7ReportingAction.PLAY_PAUSE,
@@ -43,16 +59,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
                 }.also(card::addView))
             }
         }
-        L7SettingsSection.add(parent, text(R.string.l7_report_evidence), footer = text(R.string.l7_report_evidence_hint)) { card ->
-            evidence = L7SettingRow(activity, text(R.string.l7_report_evidence)).also(card::addView)
-            observations.add(L7Components.actionRow(activity, text(R.string.l7_report_visible)) {
-                L7ReportingTests.observe(kind, true); update()
-            }.also(card::addView))
-            observations.add(L7Components.actionRow(activity, text(R.string.l7_report_missing)) {
-                L7ReportingTests.observe(kind, false); update()
-            }.also(card::addView))
-            card.addView(L7Components.actionRow(activity, text(R.string.l7_report_logs)) { onLogs() })
-        }
+        details = L7DebugDetails(activity, parent)
         update()
     }
 
@@ -77,6 +84,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         val revision = value.revision to phone
         if (previous == revision) return
         previous = revision
+        shown = value
         val own = value.kind == kind
         val busy = value.phase in setOf(L7ReportingTestController.Phase.RUNNING, L7ReportingTestController.Phase.STOPPING)
         val running = own && value.phase == L7ReportingTestController.Phase.RUNNING
@@ -90,22 +98,40 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         }
         status.setValue(text(phase))
         status.setFeedback(if (phone) text(R.string.l7_report_phone_busy)
-            else if (own) activity.getString(R.string.l7_report_run, value.run) else "")
+            else if (own && value.firstIssue != null) text(R.string.l7_report_service_issue) else "")
         start.isEnabled = !busy && !phone && L7Agreement.canUse(activity) && !L7AppExit.exiting
+        start.visibility = if (own && busy) View.GONE else View.VISIBLE
         end.isEnabled = running
+        end.visibility = if (own && busy) View.VISIBLE else View.GONE
+        actionsSection.visibility = if (running) View.VISIBLE else View.GONE
         controls.forEach { it.isEnabled = running && !phone }
-        observations.forEach { it.isEnabled = own && value.run > 0 }
+        observations.forEach {
+            it.isEnabled = own && (running && value.preview != null || value.phase == L7ReportingTestController.Phase.STOPPED)
+            it.visibility = if (it.isEnabled) View.VISIBLE else View.GONE
+        }
         val ended = own && value.phase == L7ReportingTestController.Phase.STOPPED
         listOf(if (ended) R.string.l7_report_cleared else R.string.l7_report_visible,
             if (ended) R.string.l7_report_residual else R.string.l7_report_missing).forEachIndexed { index, id ->
             val title = observations[index].titleView
             if (title.text.toString() != text(id)) title.text = text(id)
         }
-        evidence.setFeedback(if (own && value.lines.isNotEmpty()) {
-            val first = value.firstIssue?.let { activity.getString(R.string.l7_report_first_issue, it) }
-            (listOfNotNull(first) + value.lines.takeLast(4).filter { it != value.firstIssue }).joinToString("\n")
-        }
-            else text(R.string.l7_report_no_evidence))
+        evidence.setValue(when {
+            ended -> text(R.string.l7_report_cleanup_question)
+            running -> value.preview?.text(activity) ?: text(R.string.l7_report_preparing)
+            else -> text(R.string.l7_report_begin_first)
+        })
+        val observation = if (ended) value.cleanupObservation else value.observation
+        evidence.setFeedback(if (!own || value.preview == null && !ended) "" else if (observation == null) text(R.string.l7_report_compare_hint)
+            else text(if (observation) R.string.l7_report_result_ok else R.string.l7_report_result_bad))
+        details.update((listOfNotNull(value.firstIssue) + value.lines).distinct().joinToString("\n"))
+    }
+
+    private fun observe(visible: Boolean) {
+        if (disposed) return
+        val value = shown ?: return
+        if (!L7ReportingTests.observe(kind, visible, value.run, value.step, value.phase))
+            Toast.makeText(activity, R.string.l7_report_sample_changed, Toast.LENGTH_SHORT).show()
+        update()
     }
 
     fun background() { dialog?.dismiss(); dialog = null }

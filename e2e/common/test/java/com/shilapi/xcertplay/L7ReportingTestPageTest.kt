@@ -61,4 +61,13 @@ class L7ReportingTestPageTest {
         pending.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertEquals(L7ReportingTestController.Phase.IDLE, L7ReportingTests.snapshot().phase)
     }
+    @Test fun entryHidesUpdateActionsAndTechnicalDetailsUntilRequested() {
+        val actions = ReflectionHelpers.getField<LinearLayout>(page, "actionsSection")
+        assertEquals(android.view.View.GONE, actions.visibility)
+        assertEquals(activity.getString(R.string.l7_report_begin_first), row("evidence").valueView.text.toString())
+        val details = ReflectionHelpers.getField<L7DebugDetails>(page, "details")
+        val body = ReflectionHelpers.getField<L7SettingRow>(details, "body")
+        assertEquals(android.view.View.GONE, body.visibility)
+    }
+
 }

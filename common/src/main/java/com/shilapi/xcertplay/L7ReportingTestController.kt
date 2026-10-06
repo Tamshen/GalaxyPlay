@@ -19,7 +19,8 @@ internal class L7ReportingTestController(
     enum class Phase { IDLE, RUNNING, STOPPING, STOPPED }
     data class Snapshot(val run: Long = 0, val kind: L7ReportingKind? = null,
         val phase: Phase = Phase.IDLE, val deadline: Long = 0, val lines: List<String> = emptyList(),
-        val revision: Long = 0, val firstIssue: String? = null)
+        val revision: Long = 0, val firstIssue: String? = null, val step: Long = 0,
+        val preview: L7ReportingPreview? = null, val observation: Boolean? = null, val cleanupObservation: Boolean? = null)
     private var state = Snapshot()
     private var session: L7ReportingSession? = null
 
@@ -30,10 +31,14 @@ internal class L7ReportingTestController(
         log(line)
         synchronized(this) {
             if (state.run == run) {
+                val preview = L7ReportingPreview.parse(kind, value)?.takeIf { state.phase == Phase.RUNNING }
+                val changed = preview != null && preview != state.preview
                 val failed = value.contains("exceptionType=") || value.contains("tokenValid=false") ||
                     value.contains("accepted=false") || value.contains(" result=false")
                 state = state.copy(lines = (state.lines + line.take(700)).takeLast(12),
-                    revision = state.revision + 1, firstIssue = state.firstIssue ?: line.take(700).takeIf { failed })
+                    revision = state.revision + 1, firstIssue = state.firstIssue ?: line.take(700).takeIf { failed },
+                    preview = preview ?: state.preview, step = state.step + if (changed) 1 else 0,
+                    observation = if (changed) null else state.observation)
             }
         }
     }
@@ -69,6 +74,7 @@ internal class L7ReportingTestController(
     fun action(kind: L7ReportingKind, value: L7ReportingAction) {
         val target = synchronized(this) {
             if (state.kind != kind || state.phase != Phase.RUNNING) return
+            state = state.copy(step = state.step + 1, observation = null, revision = state.revision + 1)
             session
         }
         if (blocked()) { stop("CARPLAY_OR_AGREEMENT"); return }
@@ -81,15 +87,24 @@ internal class L7ReportingTestController(
         }
     }
 
-    fun observe(kind: L7ReportingKind, visible: Boolean) {
-        val value = snapshot()
-        if (value.run == 0L || value.kind != kind) return
+    fun observe(kind: L7ReportingKind, visible: Boolean, expectedRun: Long? = null, expectedStep: Long? = null,
+                expectedPhase: Phase? = null): Boolean {
+        val value = synchronized(this) {
+            if (state.run == 0L || state.kind != kind || state.phase !in setOf(Phase.RUNNING, Phase.STOPPED) ||
+                expectedRun != null && expectedRun != state.run || expectedStep != null && expectedStep != state.step ||
+                expectedPhase != null && expectedPhase != state.phase) return false
+            val value = state
+            state = if (state.phase == Phase.STOPPED) state.copy(cleanupObservation = visible, revision = state.revision + 1)
+                else state.copy(observation = visible, revision = state.revision + 1)
+            value
+        }
         val ended = value.phase == Phase.STOPPED
         val stage = if (ended) "userCleanupObservation" else "userObservation"
         val result = if (ended) {
             if (visible) "CLEARED" else "RESIDUAL_OR_ABNORMAL"
         } else if (visible) "VISIBLE" else "MISSING_OR_ABNORMAL"
-        event(value.run, kind, "stage=$stage result=$result origin=MANUAL phase=${value.phase}")
+        event(value.run, kind, "stage=$stage result=$result origin=MANUAL phase=${value.phase} step=${value.step}")
+        return true
     }
 
     fun expire() {

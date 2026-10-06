@@ -32,6 +32,16 @@ internal class L7DebugPage(
     }
 
     private fun home() {
+        L7SettingsSection.add(parent, labels.text(R.string.l7_debug_choose), description = labels.text(R.string.l7_debug_choose_hint)) { card ->
+            listOf(
+                Triple(R.string.l7_steering_title, R.string.l7_debug_goal_steering, "settings-debug-steering"),
+                Triple(R.string.l7_voice_title, R.string.l7_debug_goal_voice, "settings-debug-voice"),
+                Triple(R.string.l7_report_media_title, R.string.l7_debug_goal_media, "settings-debug-media"),
+                Triple(R.string.l7_report_navigation_title, R.string.l7_debug_goal_hud, "settings-debug-navigation"),
+            ).forEach { (title, hint, page) ->
+                card.addView(L7Components.actionRow(activity, labels.text(title), labels.text(hint)) { onNavigate(page) })
+            }
+        }
         L7SettingsSection.add(parent, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
@@ -45,11 +55,7 @@ internal class L7DebugPage(
                 onNavigate("settings-debug-results")
             }.also(card::addView)
         }
-        L7SettingsSection.add(parent, labels.text(R.string.l7_probe_modules), footer = labels.text(R.string.l7_probe_report_scope)) { card ->
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_steering_title)) { onNavigate("settings-debug-steering") })
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_voice_title)) { onNavigate("settings-debug-voice") })
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_report_media_title)) { onNavigate("settings-debug-media") })
-            card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_report_navigation_title)) { onNavigate("settings-debug-navigation") })
+        L7SettingsSection.add(parent) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_history)) { onNavigate("settings-debug-history") })
         }
     }

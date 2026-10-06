@@ -27,6 +27,7 @@ class L7VoiceInputDebugPageTest {
     private val sink = mock(AndroidMediaSink::class.java)
     private var grants = 0
     private var creates = 0
+    private val owner = Any()
     private val engine = L7VoiceInputTest(object : L7VoiceInputTest.Access {
         override fun permitted() = true
         override fun occupied() = false
@@ -51,6 +52,7 @@ class L7VoiceInputDebugPageTest {
     private fun connected() {
         `when`(controller.hasActiveSession()).thenReturn(true)
         `when`(controller.requestSiri()).thenReturn(true)
+        `when`(controller.activeMediaSessionOwner()).thenReturn(owner)
         CarPlayBackgroundSession.store(controller, sink, 1440, 1920, Any()) { it() }
         page.update()
     }
@@ -101,4 +103,36 @@ class L7VoiceInputDebugPageTest {
         page.close(); row("siri").performClick(); verify(controller, never()).requestSiri()
         assertFalse(engine.start(6))
     }
+    @Test fun siriResultIsBoundToTheQueuedRequestAndReconnectionRejectsOldResult() {
+        connected()
+        row("siri").performClick(); row("siri").performClick()
+        verify(controller, times(1)).requestSiri()
+        val results = ReflectionHelpers.getField<List<L7SettingRow>>(page, "voiceResults")
+        assertTrue(results.first().isEnabled)
+        results.first().performClick()
+        assertTrue(L7VoiceDiagnostics.store.snapshot().lines.any { "phase=USER_OBSERVATION" in it && "RESPONDED" in it })
+        val count = L7VoiceDiagnostics.store.snapshot().lines.count { "phase=USER_OBSERVATION" in it }
+        `when`(controller.activeMediaSessionOwner()).thenReturn(Any())
+        page.update()
+        assertFalse(results.first().isEnabled)
+        results.first().performClick()
+        assertEquals(count, L7VoiceDiagnostics.store.snapshot().lines.count { "phase=USER_OBSERVATION" in it })
+    }
+    @Test fun reconnectingBeforeAResultAllowsANewRequestWithoutRelabelingTheOldOne() {
+        connected(); row("siri").performClick()
+        val count = L7VoiceDiagnostics.store.snapshot().lines.count { "phase=USER_OBSERVATION" in it }
+        `when`(controller.activeMediaSessionOwner()).thenReturn(Any())
+        page.update()
+        assertTrue(row("siri").isEnabled)
+        assertEquals(count, L7VoiceDiagnostics.store.snapshot().lines.count { "phase=USER_OBSERVATION" in it })
+        row("siri").performClick()
+        verify(controller, times(2)).requestSiri()
+    }
+    @Test fun mainStatusUsesHumanLabelsAndTechnicalEvidenceStartsCollapsed() {
+        assertFalse(row("source").valueView.text.toString().contains("VOICE_RECOGNITION"))
+        assertFalse(row("level").valueView.text.toString().contains("RMS"))
+        val details = ReflectionHelpers.getField<L7DebugDetails>(page, "details")
+        assertEquals(android.view.View.GONE, ReflectionHelpers.getField<L7SettingRow>(details, "body").visibility)
+    }
+
 }

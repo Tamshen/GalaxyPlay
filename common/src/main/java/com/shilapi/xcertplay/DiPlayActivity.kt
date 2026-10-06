@@ -235,6 +235,7 @@ class DiPlayActivity : ComponentActivity() {
         super.onResume()
         steeringDebugPage?.resume()
         if (!L7Agreement.require(this)) return
+        voiceDebugPage?.resume()
         if (l7Ui && resources.configuration.densityDpi != L7UiDensity.value(this)) {
             recreate()
             return

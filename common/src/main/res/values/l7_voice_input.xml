@@ -1,18 +1,18 @@
 <resources>
     <string name="l7_voice_title">语音输入测试</string>
-    <string name="l7_voice_permission">麦克风权限</string>
+    <string name="l7_voice_permission">1. 麦克风权限</string>
     <string name="l7_voice_permission_hint">点击授权；授权后需手动开始测试。现有 CarPlay 会话若未启用麦克风，请重新连接。</string>
     <string name="l7_voice_privacy">仅在本页手动采集，最长 10 秒；离开页面或进入后台即停止。不保存录音，也不自动上传。</string>
     <string name="l7_voice_granted">已授权</string>
     <string name="l7_voice_missing">未授权</string>
     <string name="l7_voice_permission_ready">已授权，请手动开始测试。</string>
     <string name="l7_voice_permission_denied">未获授权，可在系统应用权限中开启麦克风后重试。</string>
-    <string name="l7_voice_local">本地麦克风测试</string>
-    <string name="l7_voice_local_hint">对车机说话并观察电平。RMS／峰值为 PCM 数值，零样本比例不代表语音识别结果。测试期间不能发起 Siri。</string>
-    <string name="l7_voice_source">标准输入源</string>
+    <string name="l7_voice_local">2. 检查车机录音</string>
+    <string name="l7_voice_local_hint">点击开始，对车机说一句话，观察输入电平。这里只检查能否采集音频；识别效果请在下一步用手机测试。</string>
+    <string name="l7_voice_source">录音方式</string>
     <string name="l7_voice_start">开始测试（10 秒）</string>
     <string name="l7_voice_stop">停止测试</string>
-    <string name="l7_voice_level">采集电平</string>
+    <string name="l7_voice_level">输入状态</string>
     <string name="l7_voice_stats">%1$d ms · %2$d bytes\nRMS %3$d · 峰值 %4$d · 零样本 %5$d%%</string>
     <string name="l7_voice_route">设备类型 %1$s · 系统静音：%2$s</string>
     <string name="l7_voice_yes">是</string>
@@ -27,15 +27,15 @@
     <string name="l7_voice_failed">测试失败</string>
     <string name="l7_voice_failure">失败原因：%1$s · code=%2$s</string>
     <string name="l7_voice_occupied">通话／Siri 正在使用麦克风，请结束后再测试。</string>
-    <string name="l7_voice_carplay">CarPlay 语音上行</string>
+    <string name="l7_voice_carplay">3. 测试手机 Siri</string>
     <string name="l7_voice_siri">发起 Siri 语音测试</string>
-    <string name="l7_voice_uplink">最近上行摘要</string>
-    <string name="l7_voice_uplink_hint">连接后发起 Siri，并对车机说话。摘要显示协议麦克风的采集与发送计数；请求入队、发送成功都不代表手机已识别语音。</string>
-    <string name="l7_voice_disconnected">尚无活动 CarPlay 会话</string>
+    <string name="l7_voice_uplink">手机语音状态</string>
+    <string name="l7_voice_uplink_hint">先连接手机，发起 Siri；打开后对车机说话，观察手机是否响应，再记录结果。请求发出不代表手机已经识别。</string>
+    <string name="l7_voice_disconnected">请先连接手机</string>
     <string name="l7_voice_connected">已连接，可发起测试</string>
     <string name="l7_voice_stop_first">请先停止本地测试</string>
     <string name="l7_voice_uplink_active">麦克风上行活动中</string>
-    <string name="l7_voice_siri_queued">请求已入队，等待手机开启语音流。</string>
+    <string name="l7_voice_siri_queued">已发出请求，等待手机开启语音输入。</string>
     <string name="l7_voice_siri_failed">请求未入队，请检查连接后重试。</string>
     <string name="l7_voice_empty_uplink">本次会话尚无麦克风摘要</string>
     <string name="l7_voice_logs">查看或导出日志</string>
