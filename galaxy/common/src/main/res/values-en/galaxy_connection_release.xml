@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_connection_release_pending">Resources from the previous connection have not finished closing. Exit and try again.</string>
+</resources>

@@ -56,6 +56,7 @@ class CarPlayVpnService : VpnService() {
 
     private val binder = LocalBinder()
     private val active = AtomicBoolean(false)
+    private val acceptWorkers = java.util.concurrent.ConcurrentHashMap.newKeySet<Thread>()
     private val sessionsLock = Any()
     private val sessions = mutableSetOf<AirPlaySession>()
     @Volatile private var attachment: AirPlayAttachment? = null
@@ -167,6 +168,20 @@ class CarPlayVpnService : VpnService() {
         if (attachment?.listenerIdentity === owner) releaseLocked()
     }
 
+    /** 非主线程等实际 accept 退出；关闭请求与 worker 退出分别判定。 */
+    fun awaitDetached(timeoutMillis: Long): Boolean {
+        require(timeoutMillis >= 0)
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        for (worker in acceptWorkers.toList()) {
+            if (worker === Thread.currentThread()) return false
+            val remaining = deadline - System.nanoTime()
+            if (remaining <= 0) return acceptWorkers.none { it.isAlive }
+            try { worker.join((remaining / 1_000_000L).coerceAtLeast(1L)) }
+            catch (_: InterruptedException) { Thread.currentThread().interrupt(); return false }
+        }
+        return acceptWorkers.none { it.isAlive }
+    }
+
     fun isAttached(): Boolean = active.get() && attachment != null
 
     /** 返回实际监听端口，首选端口冲突时该值可能与配置不同。 */
@@ -200,10 +215,11 @@ class CarPlayVpnService : VpnService() {
                 "airplay listener ready family=${if (bound.inetAddress is Inet6Address) "IPv6" else "IPv4"} port=${bound.localPort}",
             ) }
             Thread(
-                { acceptLoop(generation, bound) },
+                { try { acceptLoop(generation, bound) } finally { acceptWorkers.remove(Thread.currentThread()) } },
                 "airplay-accept",
             ).apply {
                 isDaemon = true
+                acceptWorkers.add(this)
                 start()
             }
         }
@@ -339,10 +355,10 @@ class CarPlayVpnService : VpnService() {
         additionalServers.forEach { it.close() }
         additionalServers = emptyList()
         closeSessionsLocked()
-        bridge?.close()
-        bridge = null
-        tun?.close()
-        tun = null
+        try { bridge?.close() } finally {
+            bridge = null
+            try { tun?.close() } finally { tun = null }
+        }
     }
 
     companion object {

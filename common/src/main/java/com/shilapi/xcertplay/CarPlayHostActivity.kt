@@ -3746,10 +3746,15 @@ class CarPlayHostActivity : ComponentActivity() {
         videoCanvasSize = null
         teardownExecutor.execute {
             oldController?.close()
-            oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS)
+            val clean = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
             oldSink?.close()
             runOnUiThread {
                 if (!shuttingDown.get() && generation == restartGeneration) {
+                    if (!clean) {
+                        appendLog("Connection replacement blocked reason=previous_resources_not_released")
+                        setConnectionStage(getString(R.string.galaxy_connection_release_pending))
+                        return@runOnUiThread
+                    }
                     handshakeResetInProgress = false
                     // 关闭旧会话期间窗口或权限可能变化，使用稳定后的当前尺寸重新检查。
                     maybeStartCarPlay()

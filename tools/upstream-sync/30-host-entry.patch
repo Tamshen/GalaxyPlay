@@ -3383,7 +3383,7 @@
                  ) {
                      return@postDelayed
                  }
-@@ -4257,39 +3724,34 @@
+@@ -4257,39 +3724,39 @@
          if (!CarPlayBackgroundSession.isOwner(this)) return
          if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
          val size = activeDisplaySize ?: return
@@ -3422,10 +3422,15 @@
 -                    "restart teardownWaitCompleted=$completed " +
 -                    "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}",
 -            )
-+            oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS)
++            val clean = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
              oldSink?.close()
              runOnUiThread {
                  if (!shuttingDown.get() && generation == restartGeneration) {
++                    if (!clean) {
++                        appendLog("Connection replacement blocked reason=previous_resources_not_released")
++                        setConnectionStage(getString(R.string.galaxy_connection_release_pending))
++                        return@runOnUiThread
++                    }
                      handshakeResetInProgress = false
 -                    // The display can rotate again while the old stack is closing. Use the
 -                    // latest accepted size, and wait for any pending resize to settle first.
@@ -3433,7 +3438,7 @@
                      maybeStartCarPlay()
                  }
              }
-@@ -4297,57 +3759,12 @@
+@@ -4297,57 +3764,12 @@
      }
  
      private fun showDiPlayHome(page: String = "home") {
@@ -3494,7 +3499,7 @@
  
      private fun saveSettingsAndReconnect() {
          if (!menuOpen) return
-@@ -4355,46 +3772,31 @@
+@@ -4355,46 +3777,31 @@
          if (!validateManualHotspotSettings()) return
          persistMenuSettings()
          settingsBaseline = null
@@ -3549,7 +3554,7 @@
          } else {
              maybeStartCarPlay()
          }
-@@ -4408,18 +3810,24 @@
+@@ -4408,18 +3815,24 @@
      }
  
      private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
@@ -3577,7 +3582,7 @@
          Log.i(TAG, "shutdown reason=$reason terminateProcess=$terminateProcess")
          teardownExecutor.execute {
              oldController?.close()
-@@ -4437,12 +3845,124 @@
+@@ -4437,12 +3850,124 @@
          }
      }
  
@@ -3704,7 +3709,7 @@
          }
      }
  
-@@ -4455,23 +3975,20 @@
+@@ -4455,23 +3980,20 @@
                  gestureTracking = false
              }
              MotionEvent.ACTION_POINTER_DOWN -> {
@@ -3732,7 +3737,7 @@
                  if (event.actionMasked == MotionEvent.ACTION_UP ||
                      event.actionMasked == MotionEvent.ACTION_CANCEL
                  ) {
-@@ -4486,8 +4003,8 @@
+@@ -4486,8 +4008,8 @@
                  val deltaX = Math.abs(pointerCentroid(event, horizontal = true) - gestureStartX)
                  val deltaY = pointerCentroid(event, horizontal = false) - gestureStartY
                  if (
@@ -3743,7 +3748,7 @@
                  ) {
                      gestureSequenceActive = false
                      gestureTracking = false
-@@ -4498,18 +4015,8 @@
+@@ -4498,18 +4020,8 @@
              return true
          }
  
@@ -3764,7 +3769,7 @@
          val queued = controller?.sendTouch(contacts) ?: false
          when (event.actionMasked) {
              MotionEvent.ACTION_DOWN,
-@@ -4545,14 +4052,6 @@
+@@ -4545,14 +4057,6 @@
                  Log.i(ClusterMapPresentation.TAG, "cluster stream active=$active")
                  appendLog("Cluster map: stream active=$active")
                  clusterPresentation?.setStreamActive(active)
@@ -3779,7 +3784,7 @@
              }
              updateDebugOverlays()
          }
-@@ -4567,7 +4066,7 @@
+@@ -4567,7 +4071,7 @@
  
      private fun setConnectionStage(message: String) {
          latestStage = message
@@ -3788,7 +3793,7 @@
          updateDebugOverlays()
      }
  
-@@ -4577,8 +4076,6 @@
+@@ -4577,8 +4081,6 @@
      }
  
      private fun friendlyStage(message: String): String = when {
@@ -3797,7 +3802,7 @@
          message.contains("Turn on Wi-Fi", true) -> getString(R.string.turn_on_wi_fi_in_the_head_unit_s_settings_to_connect)
          message.contains("Allow precise Location", true) -> getString(R.string.allow_precise_location_for_diplay_in_the_head_unit_s_app_p)
          message.contains("Allow Nearby devices", true) -> getString(R.string.allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per)
-@@ -4598,11 +4095,15 @@
+@@ -4598,11 +4100,15 @@
  
      private fun appendLog(message: String) {
          val safe = DiagnosticRedactor.redact(message) ?: return
@@ -3815,7 +3820,7 @@
      }
  
      private fun formattedLogLine(message: String, nowMillis: Long): String =
-@@ -4644,9 +4145,8 @@
+@@ -4644,9 +4150,8 @@
      }
  
      private fun applyFullscreenMode() {
@@ -3827,7 +3832,7 @@
          WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
          val controller = WindowInsetsControllerCompat(window, window.decorView)
          if (hideTop) {
-@@ -4663,23 +4163,21 @@
+@@ -4663,23 +4168,21 @@
              WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
      }
  
@@ -3856,7 +3861,7 @@
          CarPlayStatus.DiscoveringIphone -> getString(R.string.discovering_iphone)
          CarPlayStatus.WaitingForIphone -> getString(R.string.waiting_for_iphone_over_usb)
          CarPlayStatus.RequestingIphonePermission -> getString(R.string.requesting_iphone_usb_permission)
-@@ -4692,30 +4190,24 @@
+@@ -4692,30 +4195,24 @@
              if (wirelessEnabled) getString(R.string.starting_airplay_service) else getString(R.string.status_attaching_ncm)
          CarPlayStatus.RunningControl -> getString(R.string.carplay_control_running)
          CarPlayStatus.ControlEnded -> getString(R.string.carplay_control_window_ended)
@@ -3891,7 +3896,7 @@
          const val MAX_SETTINGS_MENU_WIDTH_PX = 1200
          val MENU_BACKGROUND = Color.rgb(12, 16, 19)
          val MENU_SECONDARY = Color.rgb(170, 180, 190)
-@@ -4738,89 +4230,4 @@
+@@ -4738,89 +4235,4 @@
      )
  }
  
