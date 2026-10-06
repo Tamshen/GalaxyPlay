@@ -61,4 +61,10 @@
     <string name="l7_audio_phone">电话</string>
     <string name="l7_audio_phone_usage">通话 · usage 2</string>
     <string name="l7_audio_phone_note">使用系统通信用途；请通过实际通话验证头枕输出。</string>
+    <string name="l7_video_failed_title">画面暂时无法显示</string>
+    <string name="l7_video_failed_message">连接仍保留。可以只重试画面，避免中断现有音频；恢复结果以实际画面为准。仍未恢复时，返回连接设置手动重新连接。</string>
+    <string name="l7_video_retry">重试画面</string>
+    <string name="l7_video_retrying">已请求重试，等待画面恢复</string>
+    <string name="l7_video_retry_unavailable">重试尚未启动或正在处理，请稍后再试；也可返回连接设置。</string>
+    <string name="l7_video_settings">返回连接设置</string>
 </resources>

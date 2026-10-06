@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.media
 
 import android.util.Log
 
-internal enum class VideoDropReason { OVERFLOW, EXPIRED, NO_TARGET, NO_CONFIG, WAIT_KEYFRAME, RECOVERY_WAIT, INVALID, INPUT_CAPACITY, OUTPUT_EXPIRED }
+internal enum class VideoDropReason { OVERFLOW, EXPIRED, NO_TARGET, NO_CONFIG, WAIT_KEYFRAME, RECOVERY_WAIT, INVALID, INPUT_CAPACITY, OUTPUT_EXPIRED, REBUILD_WAIT, INPUT_WAIT }
 
 /** 每五秒汇总接收、输入、提交和呈现回调；帧龄使用固定桶，不保存逐帧对象。 */
 internal class VideoStats(

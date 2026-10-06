@@ -49,6 +49,10 @@ e2e/
 
 ## 上游核心回归
 
+视频恢复专项：`VideoDecoderRecoveryTest` 运行真实视频 worker，以 codec 替身控制创建和输入耗时，检查创建超过 250 ms 后丢积压／等待新关键帧、迟到输入槽位保留、重复配置、旧／过期呈现和关闭期间重试。`VideoRecoveryGateTest`、`VideoInputStateTest`、`VideoPlaybackWatchdogTest` 覆盖有限冷却探测、稳定输出恢复额度与输入／呈现进展，`AndroidVideoRetryIsolationTest` 确认视频重试保留音频和麦克风；宿主与面板用例检查 H.264 提示、HEVC 回退待处理、显式动作与旧会话隔离。
+
+`../tools/scripts/python-frida16.sh e2e/device/video_recovery_smoke.py --serial emulator-5556 --frida-address 127.0.0.1:28066` 检查中英文昼夜的失败、重试拒绝／已请求、设置回调与恢复隐藏。需预先在 AVD 启动 Frida 16 测试服务并建立该模拟器的本地端口转发；脚本核对转发归属，结束恢复偏好、协议与昼夜。只注入合成面板／操作回调，不建立连接、不模拟成功解码；截图位于忽略目录 `build/previews/video-recovery/`。
+
 有线启动专项：`L7VpnConsentTest` 覆盖 VPN 已准备、缺少授权页面、服务／启动拒绝、其他调用异常、用户拒绝／取消、重复请求和销毁后的迟到回调；`L7WiredJournalTest` 覆盖关闭自动连接时的崩溃摘要、两次尝试、退出分类、旧尝试隔离、容量淘汰、主动结束及清空；`L7WiredUploadTest` 验证媒体／探测记录挤满预算时仍保留两次失败摘要与退出诊断，不包含异常消息。
 
 USB 授权回调专项：`IphoneUsbPermissionGateTest` 覆盖相同设备重复发现、设备替换、同路径重连、并发广播／轮询一次消费及取消失效；`IphoneUsbCallbackTest` 在 API 29／30／33 调用真实控制器回调与 PendingIntent 边界，检查旧设备／旧请求拒绝不误伤新尝试、拒绝后迟到成功、关闭与后续协议阶段拦截、成功后实际权限复查、已排队旧任务与失败提示失效、控制器重建广播隔离、请求编号解析，以及 iPhone／CH341 的系统 PendingIntent 回调交付。仅使用合成 USB 设备，不建立真实手机链路。

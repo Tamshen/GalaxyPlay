@@ -320,7 +320,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var uiScalePercent = CarPlayUiScale.DEFAULT
     private var displayDiagnosticAttempt: String? = null
     private var videoFailureDialog: android.app.AlertDialog? = null
-    private var pendingHevcFailure: Pair<Int, String>? = null
+    private var pendingVideoFailure: Pair<Int, com.shilapi.xcertplay.airplay.VideoCodec>? = null
+    private var videoRecoveryPanel: L7VideoRecoveryPanel? = null
     private var hevcEnabled = true
     private var hevcSoftwareDecoderEnabled = false
     private var advancedAudioChannelMappingSupported = false
@@ -992,7 +993,21 @@ class CarPlayHostActivity : ComponentActivity() {
             l7ChromeDensity = L7UiDensity.value(this)
             root.addView(navigation, FrameLayout.LayoutParams(-1, -1))
         }
+        videoRecoveryPanel = createVideoRecoveryPanel().also {
+            root.addView(it, FrameLayout.LayoutParams(-1, -1))
+        }
         return root
+    }
+
+    private fun createVideoRecoveryPanel() = L7VideoRecoveryPanel(L7UiDensity.wrap(this),
+        retry = ::retryCurrentVideo, settings = { showDiPlayHome("settings-connection") })
+
+    private fun retryCurrentVideo(): Boolean {
+        val failure = pendingVideoFailure ?: return false
+        if (failure.first != restartGeneration || shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return false
+        val queued = sink?.retryMainVideo() == true
+        appendLog("Video: userRetry generation=$restartGeneration queued=$queued audioRestart=false")
+        return queued
     }
 
     private fun createL7Waiting() = L7ConnectionPanel(L7UiDensity.wrap(this), wirelessEnabled,
@@ -1031,6 +1046,11 @@ class CarPlayHostActivity : ComponentActivity() {
         projectionNavigation = createL7Navigation().also {
             it.setConnected(controller?.hasActiveSession() == true)
             if (expanded) it.expand() else it.collapse()
+            root.addView(it, FrameLayout.LayoutParams(-1, -1))
+        }
+        videoRecoveryPanel?.let(root::removeView)
+        videoRecoveryPanel = createVideoRecoveryPanel().also {
+            if (pendingVideoFailure?.first == restartGeneration) it.failed()
             root.addView(it, FrameLayout.LayoutParams(-1, -1))
         }
         l7ChromeDensity = L7UiDensity.value(this)
@@ -3171,6 +3191,7 @@ class CarPlayHostActivity : ComponentActivity() {
             wirelessAudio = wirelessEnabled,
             callProcessingEnabled = AirPlayPersistence.loadCallProcessingEnabled(this),
             onVideoFailure = { codec, reason -> onVideoFailure(controllerGeneration, codec, reason) },
+            onVideoRecovered = { onVideoRecovered(controllerGeneration) },
             navigationStreamType = navigationStreamType,
             onScreenStreamActiveChanged = { type, active ->
                 onScreenStreamStateChanged(controllerGeneration, type, active)
@@ -3188,21 +3209,34 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun onVideoFailure(generation: Int, codec: com.shilapi.xcertplay.airplay.VideoCodec, reason: String) {
         runOnUiThread {
-            if (generation != restartGeneration || shuttingDown.get()) return@runOnUiThread
-            if (codec != com.shilapi.xcertplay.airplay.VideoCodec.H265 || !hevcEnabled) return@runOnUiThread
-            pendingHevcFailure = generation to reason
+            if (generation != restartGeneration || shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return@runOnUiThread
+            if (sink?.currentVideoFailure() != (codec to reason)) return@runOnUiThread
+            pendingVideoFailure = generation to codec
+            appendLog("Video: failure generation=$generation codec=$codec reason=$reason")
+            videoRecoveryPanel?.failed()
             showPendingVideoFailure()
         }
     }
 
+    private fun onVideoRecovered(generation: Int) {
+        runOnUiThread {
+            if (generation != restartGeneration || shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return@runOnUiThread
+            if (sink?.currentVideoFailure() != null) return@runOnUiThread
+            pendingVideoFailure = null
+            videoRecoveryPanel?.recovered()
+            videoFailureDialog?.dismiss()
+        }
+    }
+
     private fun showPendingVideoFailure() {
-        val failure = pendingHevcFailure ?: return
-        if (!hasWindowFocus() || menuOpen || isFinishing || videoFailureDialog != null) return
+        val failure = pendingVideoFailure ?: return
         if (failure.first != restartGeneration || !CarPlayBackgroundSession.isOwner(this)) {
-            pendingHevcFailure = null
+            pendingVideoFailure = null
+            videoRecoveryPanel?.recovered()
             return
         }
-        pendingHevcFailure = null
+        if (failure.second != com.shilapi.xcertplay.airplay.VideoCodec.H265 || !hevcEnabled) return
+        if (!hasWindowFocus() || menuOpen || isFinishing || videoFailureDialog != null) return
         setConnectionStage(getString(R.string.l7_hevc_failed_title))
         videoFailureDialog = L7Dialogs.builder(this).setTitle(R.string.l7_hevc_failed_title)
             .setMessage(R.string.l7_hevc_failed_message)
@@ -3291,8 +3325,6 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     if (message == "Video: first frame rendered") {
                         L7WiredDiagnostics.event(this@CarPlayHostActivity, wiredAttempt, "VIDEO", "FIRST_FRAME", outcome = "CONNECTED")
-                        pendingHevcFailure = null
-                        videoFailureDialog?.dismiss()
                     }
                     DisplayDiagnosticSnapshot.record(this@CarPlayHostActivity, displayDiagnosticAttempt, message)
 
@@ -3352,6 +3384,7 @@ class CarPlayHostActivity : ComponentActivity() {
             onScreenStreamStateChanged(restartGeneration, type, active)
         }
         snapshot.sink.setVideoSizeChangedListener { width, height -> updateVideoCanvas(generation, width, height) }
+        snapshot.sink.setVideoRecoveredListener { onVideoRecovered(generation) }
         snapshot.sink.setVideoFailureListener { codec, reason -> onVideoFailure(generation, codec, reason) }
         currentSurface?.let(::attachSurface)
         val serviceReused = snapshot.controller.hasActiveAirPlayAttachment()
@@ -3653,6 +3686,9 @@ class CarPlayHostActivity : ComponentActivity() {
         val size = activeDisplaySize ?: return
         appendLog(reason)
         activeScreenStreamTypes.clear()
+        pendingVideoFailure = null
+        videoRecoveryPanel?.recovered()
+        videoFailureDialog?.dismiss()
         setConnectionStage(reason)
         Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}")
         val generation = ++restartGeneration
@@ -3737,6 +3773,9 @@ class CarPlayHostActivity : ComponentActivity() {
         if (terminateProcess) L7StartupGuard.stopped()
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
         restartGeneration += 1
+        pendingVideoFailure = null
+        videoRecoveryPanel?.recovered()
+        videoFailureDialog?.dismiss()
         mainHandler.removeCallbacks(applyDisplaySize)
         val oldController = controller
         val oldSink = sink

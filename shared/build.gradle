@@ -46,4 +46,5 @@ dependencies {
     implementation libs.jmdns
     testImplementation libs.junit
     testImplementation libs.robolectric
+    testImplementation libs.mockito
 }
