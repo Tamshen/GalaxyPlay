@@ -55,6 +55,19 @@ def language(english):
     tap('应用' if english else 'Apply')
 
 
+def connection_rows(labels, scene):
+    # 输入交付不等于新页面已经绘制；按目标行就绪判断，保留最终失败现场。
+    for _ in range(6):
+        root = nodes()
+        try:
+            return root, [entry(label, root) for label in labels]
+        except AssertionError:
+            pass
+    (output / (scene + '-failed.xml')).write_bytes(ET.tostring(root, encoding='utf-8'))
+    (output / (scene + '-failed.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
+    raise AssertionError('连接设置未就绪：' + scene)
+
+
 original_night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 english = False
 try:
@@ -77,10 +90,9 @@ try:
             (output / (('en' if english_mode else 'zh') + '-' + night + '-menu.png')).write_bytes(
                 adb('exec-out', 'screencap', '-p'))
             tap('Connect' if english_mode else '连接')
-            root = nodes()
             labels = ('Wireless connection', 'Wired connection', 'Reconnect current connection') if english_mode else (
                 '无线连接', '有线连接', '重新连接当前连接')
-            rows = [entry(label, root) for label in labels]
+            root, rows = connection_rows(labels, ('en' if english_mode else 'zh') + '-' + night)
             positions = [int(re.findall(r'\d+', row.get('bounds'))[1]) for row in rows]
             assert positions == sorted(positions) and len(set(positions)) == 3, '重连须为第三项'
             assert rows[2].get('enabled') == 'false', '无会话时不得发起重连'
