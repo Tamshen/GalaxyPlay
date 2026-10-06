@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在已同意协议、未连接手机的 AVD 检查第三个重连入口及中英文昼夜，不建链或上传。"""
+"""在未连接手机的 AVD 检查五项菜单直达连接设置、第三个重连入口及中英文昼夜。"""
 import argparse
 from pathlib import Path
 import re
@@ -64,7 +64,19 @@ try:
             english = True
         for night in ('no', 'yes'):
             adb('shell', 'cmd', 'uimode', 'night', night)
-            launch('settings-connection')
+            launch('home')
+            tap('Expand menu' if english_mode else '展开菜单')
+            root = nodes()
+            menu = [n for n in root.iter('node') if n.get('clickable') == 'true' and n.get('content-desc') in (
+                ('Display', 'Connect', 'Settings', 'Vehicle', 'Exit') if english_mode else ('画面', '连接', '设置', '车机', '退出'))]
+            expected = ['Display', 'Connect', 'Settings', 'Vehicle', 'Exit'] if english_mode else ['画面', '连接', '设置', '车机', '退出']
+            assert [n.get('content-desc') for n in menu] == expected, '连接须位于画面下方'
+            for n in menu:
+                x1, y1, x2, y2 = map(int, re.findall(r'\d+', n.get('bounds')))
+                assert x2 > x1 and y2 > y1, '五个按钮都必须可见'
+            (output / (('en' if english_mode else 'zh') + '-' + night + '-menu.png')).write_bytes(
+                adb('exec-out', 'screencap', '-p'))
+            tap('Connect' if english_mode else '连接')
             root = nodes()
             labels = ('Wireless connection', 'Wired connection', 'Reconnect current connection') if english_mode else (
                 '无线连接', '有线连接', '重新连接当前连接')
@@ -81,7 +93,7 @@ try:
                 adb('exec-out', 'screencap', '-p'))
     adb('shell', 'input', 'keyevent', '4')
     assert any(n.get('text') == 'CarPlay authentication' for n in nodes().iter('node'))
-    print('重连入口顺序、无会话禁用及说明、中英文昼夜与返回检查通过；未建立手机连接。')
+    print('五项菜单、连接位于画面下方、直达连接设置、重连禁用及说明、中英文昼夜与返回通过；未建立手机连接。')
 finally:
     if english:
         language(False)

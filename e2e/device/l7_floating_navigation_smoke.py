@@ -48,7 +48,7 @@ def tap(label):
             node = find(label)
             if node is not None:
                 x1, y1, x2, y2 = bounds(node)
-                if label in ('画面', '设置', '车机', '退出'):
+                if label in ('画面', '连接', '断开连接', '设置', '车机', '退出'):
                     print(f'点击导航：{label}，入口={node.attrib.get("content-desc") or node.attrib.get("text")}，坐标={node.attrib["bounds"]}', flush=True)
                 adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
                 time.sleep(.3)
@@ -62,10 +62,10 @@ def screenshot(name):
 
 def menu_bounds():
     return [(n.attrib['content-desc'], bounds(n)) for n in nodes()
-            if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc') in ('画面', '设置', '车机', '退出')]
+            if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc') in ('画面', '连接', '断开连接', '设置', '车机', '退出')]
 
 def menu_labels():
-    expected = ['画面', '设置', '车机', '退出']
+    expected = ['画面', '连接', '设置', '车机', '退出']
     # 返回键交给 Activity 后再等布局完成，不重复发键或把动画中的空树当最终结果。
     actual = []
     for _ in range(4):
@@ -153,7 +153,7 @@ def check_home():
     screenshot('home')
     adb('shell', 'input', 'keyevent', '4')
     menu = menu_labels()
-    assert menu == ['画面', '设置', '车机', '退出'], '首页返回没有展开四项菜单：' + str(menu)
+    assert menu == ['画面', '连接', '设置', '车机', '退出'], '首页返回没有展开五项菜单：' + str(menu)
     screenshot('home-menu')
     fixed_menu = menu_bounds()
     assert all(b[2] < window[2] // 2 for _, b in fixed_menu), '菜单没有固定在窗口左侧'
@@ -279,7 +279,7 @@ try:
         launch()
         adb('shell', 'input', 'keyevent', '4')
         expected_menu = menu_bounds()
-        assert len(expected_menu) == 4, '首页四项菜单不可见'
+        assert len(expected_menu) == 5, '首页五项菜单不可见'
         tap('画面')
     else:
         expected_menu = check_home()
@@ -302,7 +302,7 @@ try:
     adb('shell', 'input', 'keyevent', '4')
     assert find('画面') is not None and host(), '返回键离开了投屏页'
     menu = [n.attrib.get('content-desc') for n in nodes() if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc')]
-    assert menu == ['画面', '设置', '车机', '退出'], '浮动菜单包含多余入口：' + str(menu)
+    assert menu == ['画面', '连接', '设置', '车机', '退出'], '浮动菜单包含多余入口：' + str(menu)
     screenshot('rail-day')
     tap('画面')
     x1, y1, x2, y2 = first_bounds
@@ -325,7 +325,7 @@ try:
     tap('展开菜单')
     tap('设置')
     require_menu(expected_menu, '从投屏进入设置时菜单位置变化')
-    print('跨页面坐标检查通过：首页、投屏等待页与设置的四个按钮坐标完全一致。', flush=True)
+    print('跨页面坐标检查通过：首页、投屏等待页与设置的五个按钮坐标完全一致。', flush=True)
     for label in ('关于', '调试', '日志', '连接设置'):
         tap(label)
         assert find('返回设置') is not None, '详细功能未归入设置：' + label
@@ -352,7 +352,7 @@ try:
     tap('画面')
     assert host() and find('展开菜单') is not None
     screenshot('floating-night')
-    print('浮动导航检查通过：四项菜单、返回车机保留服务、诊断日志整合、返回展开、拖动、主题与透明度保存。', flush=True)
+    print('浮动导航检查通过：五项菜单、返回车机保留服务、诊断日志整合、返回展开、拖动、主题与透明度保存。', flush=True)
     tap('展开菜单')
     tap('退出')
     tap('取消')

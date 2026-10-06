@@ -38,14 +38,14 @@ class L7ProjectionNavigationTest {
         (if (view.isClickable && !view.contentDescription.isNullOrEmpty()) listOf(view) else emptyList()) +
             if (view is ViewGroup) (0 until view.childCount).flatMap { actions(view.getChildAt(it)) } else emptyList()
 
-    @Test fun compactMenuHasFourActionsAndPreservesTheirNavigation() {
+    @Test fun compactMenuHasFiveActionsWithConnectionBelowDisplay() {
         val context = activity()
         val destinations = mutableListOf<String>()
         val overlay = L7ProjectionNavigation(context, {}) { destinations += it }
         layout(overlay)
         val panel = overlay.getChildAt(1)
         val buttons = actions(panel)
-        assertEquals(listOf("画面", "设置", "车机", "退出"), buttons.map { it.contentDescription.toString() })
+        assertEquals(listOf("画面", "连接", "设置", "车机", "退出"), buttons.map { it.contentDescription.toString() })
         buttons[0].performClick()
         assertFalse(overlay.expanded)
         overlay.expand()
@@ -56,8 +56,11 @@ class L7ProjectionNavigationTest {
         assertFalse(overlay.expanded)
         overlay.expand()
         buttons[3].performClick()
+        assertFalse(overlay.expanded)
+        overlay.expand()
+        buttons[4].performClick()
         assertTrue(overlay.expanded)
-        assertEquals(listOf("home", "settings", "car-home", "exit"), destinations)
+        assertEquals(listOf("home", "connection", "settings", "car-home", "exit"), destinations)
     }
 
     @Test fun connectedCollapseAndManualExpansionKeepFullVideoBounds() {
@@ -104,10 +107,11 @@ class L7ProjectionNavigationTest {
         overlay.setConnected(true)
         layout(overlay)
         assertTrue(overlay.expanded)
-        assertTrue(buttons[1].isSelected)
+        assertTrue(buttons[2].isSelected)
         assertFalse(picture.isSelected)
         assertEquals(originalBounds, bounds())
         assertEquals(View.VISIBLE, dot.visibility)
+        assertEquals("断开连接", buttons[1].contentDescription)
         assertEquals(context.getColor(R.color.product_ui_connected), label.currentTextColor)
         assertEquals(label.currentTextColor, icon.imageTintList!!.defaultColor)
         assertEquals("画面，iPhone 已连接", picture.contentDescription)
@@ -119,6 +123,7 @@ class L7ProjectionNavigationTest {
         overlay.setConnected(false)
         layout(overlay)
         assertEquals(View.INVISIBLE, dot.visibility)
+        assertEquals("连接", buttons[1].contentDescription)
         assertEquals("画面", picture.contentDescription)
         assertEquals(context.getColor(R.color.product_ui_accent), label.currentTextColor)
         assertEquals(originalBounds, bounds())

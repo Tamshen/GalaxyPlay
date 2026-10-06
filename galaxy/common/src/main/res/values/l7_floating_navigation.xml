@@ -1,12 +1,14 @@
 <resources>
     <string name="l7_rail_expand">展开菜单</string>
     <string name="l7_nav_picture">画面</string>
+    <string name="l7_nav_connect">连接</string>
+    <string name="l7_nav_disconnect">断开连接</string>
     <string name="l7_nav_picture_connected">画面，iPhone 已连接</string>
     <string name="l7_nav_car_home">车机</string>
     <string name="l7_nav_exit">退出</string>
     <string name="l7_about_row_hint">应用版本、项目说明与许可证</string>
     <string name="l7_floating_transparency">悬浮图标透明度</string>
-    <string name="l7_floating_hint">连接后菜单自动收起。图标可以拖动；点击图标或按返回键，四项菜单固定在左上角展开。透明度返回投屏页后生效。</string>
+    <string name="l7_floating_hint">连接后菜单自动收起。图标可以拖动；点击图标或按返回键，五项菜单固定在左上角展开。透明度返回投屏页后生效。</string>
     <string name="l7_exit_app">退出应用</string>
     <string name="l7_exit_title">退出 GalaxyPlay？</string>
     <string name="l7_exit_message">将断开 CarPlay、关闭悬浮日志和后台服务，并结束应用进程。</string>

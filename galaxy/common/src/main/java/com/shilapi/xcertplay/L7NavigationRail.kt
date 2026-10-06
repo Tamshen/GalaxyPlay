@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -15,7 +16,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.shilapi.xcertplay.host.R
 
-/** 一级导航保留画面、设置、车机、退出；详细功能统一归入设置。 */
+/** 连接动作位于画面下方，详细功能统一归入设置。 */
 internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : LinearLayout(context) {
     private val buttons = mutableMapOf<String, View>()
     private var connected = false
@@ -40,6 +41,7 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
         val navigation = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val items = listOf(
             Triple("home", R.string.l7_nav_picture, R.drawable.ic_l7_projection),
+            Triple("connection", R.string.l7_nav_connect, R.drawable.ic_l7_connection),
             Triple("settings", R.string.settings, R.drawable.ic_l7_settings),
             Triple("car-home", R.string.l7_nav_car_home, R.drawable.ic_l7_home),
             Triple("exit", R.string.l7_nav_exit, R.drawable.ic_l7_exit),
@@ -104,6 +106,11 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
         buttons["home"]?.let {
             it.contentDescription = context.getString(if (value) R.string.l7_nav_picture_connected else R.string.l7_nav_picture)
             L7Ui.refresh(it)
+        }
+        buttons["connection"]?.let { item ->
+            val title = context.getString(if (value) R.string.l7_nav_disconnect else R.string.l7_nav_connect)
+            item.contentDescription = title
+            ((item as ViewGroup).getChildAt(1) as TextView).text = title
         }
     }
 

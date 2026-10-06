@@ -43,7 +43,7 @@ e2e/
 
 设置双栏检查：`python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh --settings-only --output-dir build/previews/settings-columns`。仅在已同意协议的 AVD 运行，检查右侧正文滚动、左栏及 Header 固定、昼夜选中态、两级返回、首页悬浮菜单恢复和按钮坐标一致；不建立连接，结束留在设置。
 
-桌面菜单检查：`python3 e2e/device/l7_desktop_menu_smoke.py --adb ../tools/scripts/adb.sh`。仅在已同意协议的 AVD 运行，授予本应用的模拟器悬浮权限，检查前后台互斥、拖动、四项菜单与当前页选中态、返回同一等待宿主、设置开关以及退出取消/确认清理。完成后应用退出；截图在 `build/previews/desktop-menu/`。Android 11 的默认 UI 转储不包含非焦点悬浮窗，桌面操作按系统报告的窗口边界点击，桌面选中态需目视复核截图；应用内选中态由无障碍节点断言。
+桌面菜单检查：`python3 e2e/device/l7_desktop_menu_smoke.py --adb ../tools/scripts/adb.sh`。仅在已同意协议的 AVD 运行，授予本应用的模拟器悬浮权限，检查前后台互斥、拖动、五项菜单与当前页选中态、返回同一等待宿主、设置开关以及退出取消/确认清理。完成后应用退出；截图在 `build/previews/desktop-menu/`。Android 11 的默认 UI 转储不包含非焦点悬浮窗，桌面操作按系统报告的窗口边界点击，桌面选中态需目视复核截图；应用内选中态由无障碍节点断言。
 
 应用界面 DPI 检查：`python3 e2e/device/l7_ui_density_smoke.py --adb ../tools/scripts/adb.sh`，仅在已同意协议的 AVD 运行。检查三档实际缩放、自定义与非法输入、重启保存、系统 DPI 不变，以及 USB 等待期间切换后宿主和服务保留；完成后恢复中档。截图在 `build/previews/ui-density/`。
 
@@ -118,9 +118,11 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 ## 连接分步引导与失败提示
 
+[GalaxyConnectionMenuTest](common/test/java/com/shilapi/xcertplay/GalaxyConnectionMenuTest.kt) 在 API 29／30 验证连接项未连接时只打开设置、等待尝试不取消、已连接必须确认、取消保持、重复确认只停止一次，以及弹窗期间会话结束／替换不能误断开。只使用控制器替身，不建立手机链路。
+
 `L7VoiceInputTestTest`／`L7VoiceInputDebugPageTest`／`L7VoiceTraceStoreTest` 覆盖显式授权、十秒限时、重复启动、后台／关闭、迟到创建、通话接管、错误释放、技术摘要与旧会话隔离。`python3 e2e/device/voice_input_smoke.py` 仅在 AVD 检查权限拒绝、授权后不自动采集、手动停止、后台停止、限时完成、中英文昼夜与返回；本地生成摘要日志，不连接手机或上传。真实 Siri 识别与听感另行验收。
 
-`L7ConnectionReconnectTest` 模拟旧会话延迟释放，检查连接设置第三项沿用当前无线／USB 传输方式、释放完成前不拉起宿主、重复点击和其他停止任务互斥、无会话／已关闭控制器禁用，以及页面结束或退出期间拒绝迟到重连。`python3 e2e/device/reconnect_settings_smoke.py` 检查第三项顺序、禁用原因、中英文昼夜和返回；仅允许未连接手机且已同意协议的 AVD，不建立连接或上传。真实手机重连结果另行验收。
+`L7ConnectionReconnectTest` 模拟旧会话延迟释放，检查连接设置第三项沿用当前无线／USB 传输方式、释放完成前不拉起宿主、重复点击和其他停止任务互斥、无会话／已关闭控制器禁用，以及页面结束或退出期间拒绝迟到重连。`python3 e2e/device/reconnect_settings_smoke.py` 检查五项菜单顺序、连接项直达连接设置、第三项重连顺序／禁用原因、中英文昼夜和返回；仅允许未连接手机且已同意协议的 AVD，不建立连接或上传。真实手机重连结果另行验收。
 
 `L7WirelessPrerequisitesTest` 验证蓝牙关闭与失效配对不能通过、确认前不继续连接或申请权限；`L7HotspotActionsTest` 在 API 29/30 验证自动读取不弹窗、显式操作错误保留、权限拒绝不写入/开启、配置保存但超时不报成功、真实开启确认；配合 `L7HotspotTaskTest`、`L7WirelessHotspotGateTest` 和通用任务弹窗回归。`L7WiredSettingsTest` 检查进入仅检测、缺设备明确确认、已有设备沿用核心授权、能力不足阻止连接、后台丢弃迟到结果；`L7RoutesTest` 验证两个子页返回连接方式。
 
@@ -282,7 +284,7 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 ## 首页、投屏悬浮菜单与退出
 
-[L7ProjectionNavigationTest](common/test/java/com/shilapi/xcertplay/L7ProjectionNavigationTest.kt) 检查画面/设置/车机/退出四个入口及回调、设置双栏延伸为整高左栏且保留按钮实例/位置/选中态、右侧可操作、左栏空白不透传，返回首页恢复悬浮底板、连接状态触发收起、手动展开保持、API 29/30 绿色状态点与当前页面选中态独立且断开复原、固定左侧菜单留白/裁切、拖动入口后菜单位置不变与窗口尺寸适配、全尺寸视频不随侧栏变化、触控透传与遮罩拦截、拖动边界与恢复、透明度刷新。[L7DisplayGeometryTest](common/test/java/com/shilapi/xcertplay/L7DisplayGeometryTest.kt) 检查规格换算、部分占屏、旋转、编码缩放不改变毫米尺寸，以及未测得窗口拒绝协商。几何夹具为合成数据。
+[L7ProjectionNavigationTest](common/test/java/com/shilapi/xcertplay/L7ProjectionNavigationTest.kt) 检查画面/连接/设置/车机/退出五个入口及回调、设置双栏延伸为整高左栏且保留按钮实例/位置/选中态、右侧可操作、左栏空白不透传，返回首页恢复悬浮底板、连接状态触发收起、手动展开保持、API 29/30 绿色状态点与当前页面选中态独立且断开复原、固定左侧菜单留白/裁切、拖动入口后菜单位置不变与窗口尺寸适配、全尺寸视频不随侧栏变化、触控透传与遮罩拦截、拖动边界与恢复、透明度刷新。[L7DisplayGeometryTest](common/test/java/com/shilapi/xcertplay/L7DisplayGeometryTest.kt) 检查规格换算、部分占屏、旋转、编码缩放不改变毫米尺寸，以及未测得窗口拒绝协商。几何夹具为合成数据。
 
 设备回归执行：
 
@@ -290,9 +292,9 @@ python3 e2e/device/flyme_ui_smoke.py \
 python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh
 ```
 
-[L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开四项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；同时确认首页和设置不再显示底部连接状态。首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
+[L7HomePanelTest](common/test/java/com/shilapi/xcertplay/L7HomePanelTest.kt) 覆盖首次三入口、配置后四行、各入口回调、等待/已连接状态以及无线配置完整性与 USB 快捷连接。追加 `--home-only` 仅检查首页完整窗口居中、默认收起、返回展开五项菜单、跨区域拖动图标后菜单固定左上角、设置与子页菜单坐标一致、正文滚动/昼夜切换、设置往返和点击画面收起；不启动 USB 等待会话。完整流程也会先执行这组首页检查；同时确认首页和设置不再显示底部连接状态。首页已验证后可用 `--projection-only` 继续检查投屏菜单与设置往返。
 
-此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查四个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。AVD 未声明 USB Host 时，完整脚本在首页检查后改为验证空闲退出，明确输出 USB 等待／投屏态跳过；这些场景不能记为已通过。`--settings-only` 可独立复验设置首页无返回按钮、子页 Header、正文滚动和固定左栏。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
+此脚本只允许 emulator 序列号，在已安装最新 APK 的 AVD 中启动 USB 等待页，检查五个菜单入口、返回车机保留等待服务、设置内调试日志归并及日志查看/刷新、关于/连接设置的返回层级、返回展开、拖动、设置透明度、昼夜截图、退出取消及确认后进程/服务消失。退出检查会关闭模拟器中的本应用；完成后恢复原透明度和昼夜模式，再打开浮动入口预览。AVD 未声明 USB Host 时，完整脚本在首页检查后改为验证空闲退出，明确输出 USB 等待／投屏态跳过；这些场景不能记为已通过。`--settings-only` 可独立复验设置首页无返回按钮、子页 Header、正文滚动和固定左栏。没有真实 iPhone，会话接通后自动收起由组件用例覆盖；真实连接、解码与车机生命周期仍需单独验收。截图默认保存到 `build/previews/floating-navigation/`，可用 `--output-dir` 指定独立目录，不纳入 Git。
 
 原生热点回归：[L7HotspotTaskTest.kt](common/test/java/com/shilapi/xcertplay/L7HotspotTaskTest.kt) 覆盖只读进入、权限拒绝、失败保留、运行热点不重配及取消后的旧结果；[NativeHotspotCredentialsTest.kt](shared/test/java/com/shilapi/xcertplay/network/NativeHotspotCredentialsTest.kt) 检查稳定名称、独立随机密码和掩码拒绝。`L7HotspotNavigationTest` 在 API 29/30 验证定制 Wi-Fi handler、原生热点入口失败恢复和无线设置回退；`L7HotspotActionsTest` 验证读取失败保留配置且不阻止写入。所有接口使用替身，不修改宿主或实车网络；实际权限与热点开启需上车验收。
 

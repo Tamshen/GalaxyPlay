@@ -91,7 +91,7 @@ internal class L7ProjectionNavigation(
     }
 
     private fun updatePanelLayout() {
-        // 四个按钮复用原实例和坐标；设置页只将底板延伸为整高左栏。
+        // 五个按钮复用原实例和坐标；设置页只将底板延伸为整高左栏。
         val inset = dp(MENU_INSET)
         panel.layoutParams = LayoutParams(
             if (settingsPage) settingsColumnWidth(context) else dp(MENU_WIDTH),
