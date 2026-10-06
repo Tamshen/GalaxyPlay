@@ -72,6 +72,7 @@ class Iap2UsbMuxHost private constructor(
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }
+            if (readerThread.isAlive) throw java.io.IOException("USBMUX reader still closing")
         }
     }
 

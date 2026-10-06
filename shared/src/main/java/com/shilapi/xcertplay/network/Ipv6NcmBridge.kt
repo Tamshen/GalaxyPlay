@@ -54,10 +54,13 @@ class Ipv6NcmBridge(
 
     override fun close() {
         if (!running.compareAndSet(true, false)) return
-        ncm.close()
-        tun.close()
-        join(ncmToTunThread)
-        join(tunToNcmThread)
+        try { ncm.close() } finally {
+            tun.close()
+            if (::ncmToTunThread.isInitialized) join(ncmToTunThread)
+            if (::tunToNcmThread.isInitialized) join(tunToNcmThread)
+        }
+        if (::ncmToTunThread.isInitialized && ncmToTunThread.isAlive ||
+            ::tunToNcmThread.isInitialized && tunToNcmThread.isAlive) throw IOException("NCM/VPN workers still closing")
     }
 
     private fun runNcmToTun() {

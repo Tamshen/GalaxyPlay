@@ -230,6 +230,8 @@ class CarPlayController(
     @Volatile private var ch341Host: Ch341UsbHost? = null
     @Volatile private var mfiSession: MfiSession? = null
     @Volatile private var mux: Iap2UsbMuxHost? = null
+    @Volatile private var wiredResources = newWiredResources()
+    @Volatile private var teardownClean = false
     @Volatile private var csm: Iap2Session? = null
     @Volatile private var activeSession: AirPlaySession? = null
     @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
@@ -480,14 +482,21 @@ class CarPlayController(
     }
 
     /** Re-runs iPhone discovery/bring-up using the already-open MFi session. */
-    fun reconnectIphone() = synchronized(lifecycleLock) {
+    fun reconnectIphone(): Unit = synchronized(lifecycleLock) {
         if (closed) return
         if (mfiSession == null) {
             startMfi()
         } else if (config.transport == CarPlayTransport.WIRELESS) {
             restartWireless()
         } else {
-            startIphone()
+            val previous = wiredResources
+            invalidateIphonePermission()
+            Thread({
+                previous.close()
+                if (previous.awaitClosed(EXECUTOR_CLOSE_TIMEOUT_MILLIS)) synchronized(lifecycleLock) {
+                    if (!closed && wiredResources === previous) startIphone()
+                }
+            }, "carplay-wired-restart").apply { isDaemon = true; start() }
         }
     }
 
@@ -684,13 +693,21 @@ class CarPlayController(
                         closeBestEffort("Wi-Fi scan pause") { wifiScanPause?.close() }
                         wifiScanPause = null
                     } else {
-                        closeBestEffort("CSM") { csm?.close() }
+                        closeBestEffort("wired resources") {
+                            val resources = wiredResources
+                            resources.close()
+                            if (!resources.awaitClosed(EXECUTOR_CLOSE_TIMEOUT_MILLIS)) throw IOException("Wired resources still closing")
+                        }
                         csm = null
                     }
-                    closeBestEffort("USBMUX") { mux?.close() }
+                    if (config.transport == CarPlayTransport.WIRELESS) closeBestEffort("USBMUX") { mux?.close() }
                     mux = null
                     if (config.transport == CarPlayTransport.WIRED) {
-                        closeBestEffort("VPN/NCM") { service?.detach() }
+                        closeBestEffort("VPN/NCM") {
+                            service?.detach()
+                            if (service != null && !service.awaitDetached(EXECUTOR_CLOSE_TIMEOUT_MILLIS))
+                                throw IOException("AirPlay accept workers still closing")
+                        }
                     }
                     closeBestEffort("MFi") { mfiSession?.close() }
                     mfiSession = null
@@ -715,6 +732,7 @@ class CarPlayController(
                         if (executorTerminated && closeFailures.get() == 0) DiagnosticEvent.State.ENDED else DiagnosticEvent.State.UNKNOWN,
                         mapOf("executorTerminated" to if (executorTerminated) 1L else 0L,
                             "closeFailures" to closeFailures.get().toLong()))
+                    teardownClean = executorTerminated && closeFailures.get() == 0
                     diagnostics.close()
                     teardownComplete.countDown()
                 }
@@ -805,7 +823,7 @@ class CarPlayController(
     fun awaitClosed(timeoutMillis: Long): Boolean {
         require(timeoutMillis >= 0) { "timeoutMillis must not be negative" }
         return try {
-            teardownComplete.await(timeoutMillis, TimeUnit.MILLISECONDS)
+            teardownComplete.await(timeoutMillis, TimeUnit.MILLISECONDS) && teardownClean
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             false
@@ -1765,6 +1783,13 @@ class CarPlayController(
     }
 
     private fun startIphone() {
+        if (closed) return
+        wiredResources.close()
+        if (closeFailures.get() != 0) {
+            onStatus(CarPlayStatus.Failed("Previous USB resources could not be released"))
+            return
+        }
+        wiredResources = newWiredResources()
         invalidateIphonePermission()
         diagnosticRun.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
@@ -2017,12 +2042,18 @@ class CarPlayController(
         )
     }
 
+    private fun newWiredResources() = WiredResources { name, error ->
+        closeFailures.incrementAndGet()
+        connectionDiagnostic("wired resource close failed component=$name error=${error.javaClass.simpleName}")
+    }
+
     private fun openDataPaths(device: UsbDevice) {
         phase = Phase.DATAPATHS
         debugLog("wired opening iPhone USB data paths")
         onStatus(CarPlayStatus.SelectingConfiguration)
         onStatus(CarPlayStatus.OpeningDataPaths)
         val generation = iphoneGeneration.get()
+        val resources = wiredResources
         iphoneHost.openIap2UsbSessionAsync(device, executor) { result ->
             if (closed || generation != iphoneGeneration.get() || phase != Phase.DATAPATHS) {
                 if (result is IphoneUsbHost.Iap2SessionResult.Connected) result.session.close()
@@ -2030,11 +2061,13 @@ class CarPlayController(
             }
             when (result) {
                 is IphoneUsbHost.Iap2SessionResult.Connected -> {
+                    if (!resources.own("USB", result.session)) return@openIap2UsbSessionAsync
                     try {
-                        val ncm = openNcm(device)
-                        runStack(result.session, ncm)
+                        connectionDiagnostic("wired stage=NCM_OPEN result=BEGIN")
+                        val ncm = openNcm(device, resources)
+                        runStack(result.session, ncm, resources, generation)
                     } catch (error: Throwable) {
-                        result.session.close()
+                        resources.release(result.session)
                         fail(error, generation)
                     }
                 }
@@ -2043,7 +2076,7 @@ class CarPlayController(
         }
     }
 
-    private fun openNcm(device: UsbDevice): NcmUsbBridge {
+    private fun openNcm(device: UsbDevice, resources: WiredResources): NcmUsbBridge {
         val configuration = IphoneCarPlayConfiguration.find(device)
             ?: throw IphoneUsbException.Protocol(
                 "iPhone exposes no CarPlay configuration for NCM",
@@ -2058,16 +2091,31 @@ class CarPlayController(
         )
         val connection = requireUsbManager().openDevice(device)
             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
-        return NcmUsbBridge.open(connection, function, onDiagnostic = ::connectionDiagnostic)
+        val opening = java.io.Closeable { connection.close() }
+        if (!resources.own("NCM_OPEN", opening)) throw IOException("NCM opening cancelled")
+        try {
+            val ncm = NcmUsbBridge.open(connection, function, onDiagnostic = ::connectionDiagnostic)
+            if (!resources.transfer(opening, "NCM", ncm)) throw IOException("NCM opened after close")
+            connectionDiagnostic("wired stage=NCM_OPEN result=COMPLETED")
+            return ncm
+        } catch (error: Throwable) {
+            resources.release(opening)
+            throw error
+        }
     }
 
-    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
+    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, resources: WiredResources, generation: Int) {
         phase = Phase.CONTROL
         var ncmOwnedLocally = true
         try {
-            if (closed) return
+            if (!resources.own("USB", usbSession)) { ncm.close(); return }
+            if (!resources.own("NCM", ncm)) return
+            if (closed || generation != iphoneGeneration.get()) return
+            connectionDiagnostic("wired stage=USBMUX_OPEN result=BEGIN")
             val mux = Iap2UsbMuxHost.open(usbSession, onDiagnostic = ::connectionDiagnostic)
+            if (!resources.transfer(usbSession, "USBMUX", mux)) return
             this.mux = mux
+            connectionDiagnostic("wired stage=USBMUX_OPEN result=COMPLETED")
             debugLog("wired USBMUX host opened")
             onStatus(CarPlayStatus.Pairing)
             val pairingClient = LockdownPairingClient(mux)
@@ -2082,38 +2130,6 @@ class CarPlayController(
             )
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
-            // Temporary lab capture, limited to accessory/authentication messages and two minutes.
-            try {
-                val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
-                Thread({
-                    try {
-                        relay.use {
-                            val deadline = System.nanoTime() + 120_000_000_000L
-                            val pending = StringBuilder()
-                            val relevant = Regex(" (accessoryd|ACCCarPlayService|iap2d|CarPlay)([\\[(])", RegexOption.IGNORE_CASE)
-                            while (!closed && System.nanoTime() < deadline) {
-                                val bytes = relay.recv(8192, 1000) ?: continue
-                                if (bytes.isEmpty()) break
-                                pending.append(bytes.toString(Charsets.UTF_8).replace('\u0000', '\n'))
-                                while (true) {
-                                    val end = pending.indexOf("\n")
-                                    if (end < 0) break
-                                    val line = pending.substring(0, end)
-                                    pending.delete(0, end + 1)
-                                    if (relevant.containsMatchIn(line)) debugLog("PHONE ${line.take(2000)}")
-                                }
-                                if (pending.length > 65536) pending.clear()
-                            }
-                        }
-                        debugLog("phone authentication diagnostic capture ended")
-                    } catch (error: Exception) {
-                        debugLog("phone authentication diagnostic capture ended: ${error.javaClass.simpleName}")
-                    }
-                }, "carplay-lab-phone-diagnostics").apply { isDaemon = true; start() }
-                debugLog("phone authentication diagnostic capture started")
-            } catch (error: Exception) {
-                debugLog("phone authentication diagnostics unavailable: ${error.message}")
-            }
             val carkit = try {
                 carKitClient.open(pairRecord, config.label)
             } catch (error: Throwable) {
@@ -2176,7 +2192,9 @@ class CarPlayController(
                 onTrace = ::debugLog,
                 onArtwork = artworkTransferHandler(),
             )
+            if (!resources.own("CSM", csm)) return
             this.csm = csm
+            connectionDiagnostic("wired stage=CSM_OPEN result=COMPLETED")
             debugLog("wired iAP2 CSM channel opened")
 
             val ncmHostMac = ncm.hostMac ?: config.hostMac
@@ -2225,10 +2243,11 @@ class CarPlayController(
             )
         } catch (error: Throwable) {
             debugLog("wired bring-up failed", error)
+            resources.close()
             if (!ncmOwnedLocally) vpnService?.detach()
-            fail(error)
+            fail(error, generation)
         } finally {
-            if (ncmOwnedLocally) ncm.close()
+            if (ncmOwnedLocally) resources.release(ncm)
         }
     }
 

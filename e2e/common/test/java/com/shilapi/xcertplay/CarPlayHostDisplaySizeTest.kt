@@ -50,7 +50,9 @@ class CarPlayHostDisplaySizeTest {
         // Source-only tests have no provisioned local authentication identity.
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
         // Exercise host startup without launching vendor-service workers or real transports.
-        controllerConstruction = mockConstruction(CarPlayController::class.java)
+        controllerConstruction = mockConstruction(CarPlayController::class.java) { mock, _ ->
+            org.mockito.Mockito.`when`(mock.awaitClosed(org.mockito.Mockito.anyLong())).thenReturn(true)
+        }
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
         CarPlayBackgroundSession::class.java.getDeclaredField("owner").apply { isAccessible = true }
@@ -362,6 +364,20 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(size(1920, 990), getField("activeDisplaySize"))
         assertEquals(0, getField("restartGeneration"))
         assertEquals(0, keepLogs())
+    }
+
+    @Test @Config(sdk = [30]) fun incompleteResourceReleaseCannotCreateReplacementController() {
+        allowStartup()
+        startSession(windowWidth = 2250, windowHeight = 1080)
+        val old = org.mockito.Mockito.mock(CarPlayController::class.java)
+        setField("controller", old)
+        org.mockito.Mockito.`when`(old.awaitClosed(org.mockito.Mockito.anyLong())).thenReturn(false)
+        val constructions = controllerConstruction.constructed().size
+        applySize(1080, 2250)
+        finishTeardown()
+        assertEquals(constructions, controllerConstruction.constructed().size)
+        assertTrue(getField("handshakeResetInProgress") as Boolean)
+        assertNull(getField("controller"))
     }
 
     @Test fun resizeWithoutASessionRecordsTheSizeWithoutAnotherTeardown() {

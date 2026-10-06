@@ -86,6 +86,7 @@ class CarPlayVpnScopeTest {
             assertTrue(service.isAttached())
             val newServer = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
             service.detach()
+            assertTrue(service.awaitDetached(2000))
             service.detach()
             assertTrue(newServer.isClosed)
             assertReleased(service)

@@ -139,6 +139,7 @@ class NcmUsbBridge internal constructor(
         }
         connection.close()
         runCatching { requestToClose?.close() }
+        if (statusThread?.isAlive == true) throw java.io.IOException("NCM status worker still closing")
     }
 
     private fun drainStatus(endpoint: UsbEndpoint) {
