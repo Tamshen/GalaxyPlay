@@ -25,16 +25,15 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [30])
 @LooperMode(LooperMode.Mode.PAUSED)
 class L7ConnectionReconnectTest {
-    private lateinit var activity: DiPlayActivity
+    private lateinit var activity: GalaxySettingsActivity
     private val controller = mock(CarPlayController::class.java)
     private var stopped: (() -> Unit)? = null
     private var stopRequests = 0
 
     @Before fun setup() {
         CarPlayBackgroundSession.clear()
-        activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        activity = Robolectric.buildActivity(GalaxySettingsActivity::class.java).get()
         activity.setTheme(R.style.Theme_Xcertplay)
-        ReflectionHelpers.setField(activity, "l7Ui\$delegate", lazy { true })
         L7Agreement.accept(activity)
         // 无线用合成配置隔离热点操作；用例只验证旧会话停止和宿主重新打开。
         AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)

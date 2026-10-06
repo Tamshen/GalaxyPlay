@@ -71,7 +71,7 @@ rpc.exports = {
     show: function() {
         return ui(function() {
             var activity;
-            Java.choose('com.shilapi.xcertplay.DiPlayActivity', {
+            Java.choose('com.shilapi.xcertplay.GalaxySettingsActivity', {
                 onMatch: function(a) {
                     if (!a.isDestroyed() && a.hasWindowFocus()) {
                         activity = Java.retain(a); return 'stop';
@@ -139,7 +139,7 @@ try:
             write(paths[0], ET.tostring(prefs, encoding='utf-8'))
             write(paths[1], f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
             adb('shell', 'cmd', 'uimode', 'night', theme)
-            adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity',
+            adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity',
                 '--es', 'page', 'settings-connection')
             pid = int(adb('shell', 'pidof', package).decode().strip())
             session = device.attach(pid)
@@ -188,5 +188,5 @@ finally:
         assert read(path) == data, '偏好恢复失败'
     adb('shell', 'cmd', 'uimode', 'night', night)
     adb('shell', 'rm', '-f', '/sdcard/galaxyplay-video-recovery.xml')
-    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-connection')
+    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-connection')
 print('AVD 恢复面板检查通过，原偏好／协议／昼夜恢复；合成回调不代表实车解码恢复。')

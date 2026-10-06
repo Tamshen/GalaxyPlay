@@ -54,7 +54,7 @@ def preferences():
 
 
 adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n',
-    package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-audio')
+    package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-audio')
 original = preferences()
 profiles = ('L7 配置', 'L7 BUS', '自定义模板')
 initial = next(label for label in profiles if label in texts())
@@ -115,5 +115,5 @@ try:
     print('AVD 通过：L7／L7 BUS 隐藏细节、自定义编辑／文件选择器取消与导航试听，原文件不变；不代表实车发声。')
 finally:
     adb('shell', 'input', 'keyevent', '4')
-    adb('shell', 'am', 'start', '-W', '-n', package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-audio')
+    adb('shell', 'am', 'start', '-W', '-n', package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-audio')
     select(initial)

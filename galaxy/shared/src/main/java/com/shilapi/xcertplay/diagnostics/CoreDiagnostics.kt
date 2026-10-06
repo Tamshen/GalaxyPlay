@@ -35,6 +35,7 @@ class DiagnosticChannel(
     private val started = clockNanos()
     private var sequence = 0L
     private var closed = false
+    private var stopping = false
 
     @Synchronized fun emit(
         component: DiagnosticEvent.Component,
@@ -43,9 +44,17 @@ class DiagnosticChannel(
         metrics: Map<String, Long> = emptyMap(),
     ) {
         if (closed) return
+        if (stopping && kind != DiagnosticEvent.Kind.RELEASE) return
         // 数值字段数量及名称有界；错误诊断不能阻断传输或资源释放。
         if (metrics.size > 12 || metrics.keys.any { !METRIC.matches(it) }) return
         publish(component, kind, state, metrics)
+    }
+
+    /** 先记录停止请求，拒绝迟到业务事件，但允许当前拥有者补充实际释放结果。 */
+    @Synchronized fun stopRequested() {
+        if (closed || stopping) return
+        stopping = true
+        publish(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.STOP, DiagnosticEvent.State.REQUESTED, emptyMap())
     }
 
     private fun publish(component: DiagnosticEvent.Component, kind: DiagnosticEvent.Kind,
@@ -60,7 +69,7 @@ class DiagnosticChannel(
     @Synchronized fun finish() {
         if (closed) return
         closed = true
-        publish(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.STOP, DiagnosticEvent.State.REQUESTED, emptyMap())
+        if (!stopping) publish(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.STOP, DiagnosticEvent.State.REQUESTED, emptyMap())
     }
 
     @Synchronized override fun close() { closed = true }

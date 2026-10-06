@@ -12,7 +12,7 @@ class BootReceiver : BroadcastReceiver() {
         if (!L7Agreement.canUse(context)) return
         if (!AirPlayPersistence.loadAutoStartOnBoot(context)) return
 
-        val launch = Intent(context, DiPlayActivity::class.java).apply {
+        val launch = Intent(context, GalaxySettingsActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or

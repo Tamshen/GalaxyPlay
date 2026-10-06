@@ -16,7 +16,7 @@ assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 base = [args.adb, '-s', args.serial]
 package = 'com.ecarx.carplay'
 prefs_path = 'shared_prefs/diplay.xml'
-activity = package+'/com.shilapi.xcertplay.DiPlayActivity'
+activity = package+'/com.shilapi.xcertplay.GalaxySettingsActivity'
 output = Path('build/previews/startup-recovery')
 output.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +117,7 @@ try:
     adb('shell', 'am', 'start', '-W', '-a', 'android.hardware.usb.action.USB_DEVICE_ATTACHED',
         '-n', package+'/com.shilapi.xcertplay.CarPlayHostActivity')
     resumed = adb('shell', 'dumpsys', 'activity', 'activities').decode()
-    assert re.search(r'mResumedActivity:.*com.shilapi.xcertplay.DiPlayActivity', resumed)
+    assert re.search(r'mResumedActivity:.*com.shilapi.xcertplay.GalaxySettingsActivity', resumed)
     assert values(read_prefs())['auto_connect'][1] == 'false'
     print('AVD 通过：第三次崩溃后关闭自动连接、设置可访问、USB 直达受保护、原配置保留。')
 finally:

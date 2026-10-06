@@ -23,7 +23,7 @@ internal object L7AudioRouteDialog {
         add(L7Components.text(context, context.getString(R.string.l7_audio_route_help), secondary = true))
         val status = L7Components.text(context, context.getString(R.string.l7_audio_test_ready), secondary = true)
         val stop = L7Components.actionButton(context, context.getString(R.string.l7_audio_test_stop)) {}
-        val preview = AudioChannelPreview(
+        val preview = GalaxyAudioChannelPreview(
             onUnavailable = {
                 status.text = context.getString(R.string.contrib_audio_home_channel_preview_unavailable, it)
                 stop.isEnabled = false

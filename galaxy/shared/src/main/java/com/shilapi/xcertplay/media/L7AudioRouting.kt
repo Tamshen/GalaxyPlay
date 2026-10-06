@@ -13,7 +13,7 @@ import java.io.Closeable
 /** 会话拥有监听器；关闭绑定后，迟到回调不能操作已释放的播放/录音对象。 */
 internal class L7AudioRouting(context: Context?, private val preferBus: Boolean = false,
                               private val template: AudioRoutingTemplate? = null,
-                              private val report: (String) -> Unit) : Closeable {
+                              private val report: (String) -> Unit) : AudioRouteProvider {
     private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val handler = Handler(Looper.getMainLooper())
     private val bindings = mutableSetOf<Binding>()
@@ -31,7 +31,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
         private val sampleRate: Int,
         private val channels: Int,
         private val useBus: Boolean,
-    ) : Closeable {
+    ) : AudioRouteBinding {
         private var released = false
         private var attached = false
         private var lastActual: String? = null
@@ -70,7 +70,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
             reportActual()
         }
 
-        fun reportActual() = synchronized(this@L7AudioRouting) {
+        override fun reportActual() = synchronized(this@L7AudioRouting) {
             if (released || closed) return@synchronized
             val device = runCatching { routing.routedDevice }.getOrNull()
             // 仅记录固件配置中确认的 BUS；观察真实路由不等于请求或进入头枕。
@@ -95,8 +95,8 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
     }
 
     @Synchronized
-    fun bind(routing: AudioRouting, channel: AudioChannel, input: Boolean,
-             sampleRate: Int, channels: Int, useBus: Boolean = true): Binding {
+    override fun bind(routing: AudioRouting, channel: AudioChannel, input: Boolean,
+             sampleRate: Int, channels: Int, useBus: Boolean): Binding {
         val binding = Binding(routing, channel, input, sampleRate, channels, useBus)
         if (closed) { binding.close(); return binding }
         bindings.add(binding)

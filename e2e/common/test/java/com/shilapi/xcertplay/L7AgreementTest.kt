@@ -18,6 +18,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], qualifiers = "zh-rCN")
 class L7AgreementTest {
+    @org.junit.Before fun resetApplicationState() {
+        // Robolectric 每个用例创建新的 Application；旧进程启动保护不能持有前一份偏好。
+        org.robolectric.util.ReflectionHelpers.setStaticField(L7StartupGuard::class.java, "recovery", null)
+    }
     private fun activity() = Robolectric.buildActivity(Activity::class.java).setup().get().apply {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
     }

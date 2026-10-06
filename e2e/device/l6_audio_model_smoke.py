@@ -69,7 +69,7 @@ def tap(label):
 
 
 def launch(page="settings-vehicle"):
-    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity',
+    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity',
         '--es', 'page', page)
 
 

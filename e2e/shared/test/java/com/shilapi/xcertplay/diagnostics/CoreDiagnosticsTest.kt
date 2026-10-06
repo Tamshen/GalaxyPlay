@@ -86,4 +86,20 @@ class CoreDiagnosticsTest {
         assertEquals(mapOf("bytes" to 48L), events.single().metrics)
         assertEquals(1L, events.single().sequence)
     }
+
+    @Test fun stopRequestRejectsLateBusinessButKeepsActualReleaseResultUntilClosed() {
+        val events = mutableListOf<DiagnosticEvent>()
+        val channel = DiagnosticChannel(8, DiagnosticSink(events::add))
+        channel.stopRequested(); channel.stopRequested()
+        channel.emit(component, kind, state)
+        channel.emit(component, DiagnosticEvent.Kind.FAILURE, DiagnosticEvent.State.FAILED)
+        channel.emit(component, DiagnosticEvent.Kind.RELEASE, DiagnosticEvent.State.UNKNOWN,
+            mapOf("closeFailures" to 1L))
+        channel.finish()
+        channel.emit(component, DiagnosticEvent.Kind.RELEASE, DiagnosticEvent.State.ENDED)
+        assertEquals(listOf(DiagnosticEvent.Kind.STOP, DiagnosticEvent.Kind.RELEASE), events.map { it.kind })
+        assertEquals(DiagnosticEvent.State.UNKNOWN, events.last().state)
+        assertEquals(8L, events.last().session)
+        assertEquals(1L, events.last().metrics["closeFailures"])
+    }
 }

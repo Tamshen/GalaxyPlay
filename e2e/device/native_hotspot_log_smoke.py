@@ -51,7 +51,7 @@ def tap(*labels):
     raise AssertionError('入口不可达：'+str(labels))
 
 def launch(page):
-    adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
 
 def screenshot(name):
     (output/(name+'.png')).write_bytes(adb('exec-out', 'screencap', '-p'))

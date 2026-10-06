@@ -14,15 +14,15 @@ class BydClusterSongTest {
     fun followsTitleArtistAndPlaybackStatus() {
         val state = ClusterSongState()
 
-        assertEquals(ClusterSong("Numb — Linkin Park", false),
+        assertEquals(ClusterSong("Numb — Linkin Park", false, "Numb"),
             state.accept(update { group(0) { string(1, "Numb"); string(12, "Linkin Park") } }))
-        assertEquals(ClusterSong("Numb — Linkin Park", true), state.accept(update { group(1) { u8(0, 1) } }))
+        assertEquals(ClusterSong("Numb — Linkin Park", true, "Numb"), state.accept(update { group(1) { u8(0, 1) } }))
         // Elapsed time alone changes nothing on the card.
         assertNull(state.accept(update { group(1) { u32(1, 120_706L) } }))
-        assertEquals(ClusterSong("Numb — Linkin Park", false), state.accept(update { group(1) { u8(0, 2) } }))
+        assertEquals(ClusterSong("Numb — Linkin Park", false, "Numb"), state.accept(update { group(1) { u8(0, 2) } }))
         // A title-only incremental update retains the last artist.
-        assertEquals(ClusterSong("Podcast — Linkin Park", false), state.accept(update { group(0) { string(1, "Podcast") } }))
-        assertEquals(ClusterSong("Podcast — Host", false), state.accept(update { group(0) { string(12, "Host") } }))
+        assertEquals(ClusterSong("Podcast — Linkin Park", false, "Podcast"), state.accept(update { group(0) { string(1, "Podcast") } }))
+        assertEquals(ClusterSong("Podcast — Host", false, "Podcast"), state.accept(update { group(0) { string(12, "Host") } }))
     }
 
     @Test
@@ -60,10 +60,10 @@ class BydClusterSongTest {
             group(0) { string(1, "Track"); string(12, "Artist") }
             group(1) { u8(0, 1) }
         })
-        assertEquals(ClusterSong("Lyric line — Artist", true),
+        assertEquals(ClusterSong("Lyric line — Artist", true, "Lyric line"),
             state.accept(update { group(0) { string(1, "Lyric line") } }))
         assertNull(state.accept(update { group(0) { u32(4, 180_000L) } }))
-        assertEquals(ClusterSong("Lyric line — Artist", true), state.current())
+        assertEquals(ClusterSong("Lyric line — Artist", true, "Lyric line"), state.current())
     }
 
     @Test
@@ -80,7 +80,7 @@ class BydClusterSongTest {
     fun completeTrackUpdateReplacesBothTitleAndArtist() {
         val state = ClusterSongState()
         state.accept(update { group(0) { string(1, "First track"); string(12, "First artist") } })
-        assertEquals(ClusterSong("Second track — Second artist", false),
+        assertEquals(ClusterSong("Second track — Second artist", false, "Second track"),
             state.accept(update { group(0) { string(1, "Second track"); string(12, "Second artist") } }))
         assertEquals(ClusterSong("Third track", false),
             state.accept(update { group(0) { string(1, "Third track"); string(12, "") } }))

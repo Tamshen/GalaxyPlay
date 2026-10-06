@@ -15,7 +15,7 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [30])
 class GalaxyCodecProbePageTest {
     @Test fun openingIsReadOnlySoftwareIsExplicitAndBackgroundDoesNotRestart() {
-        val activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        val activity = Robolectric.buildActivity(GalaxySettingsActivity::class.java).get()
         activity.setTheme(R.style.Theme_Xcertplay)
         L7Agreement.accept(activity)
         var creates = 0

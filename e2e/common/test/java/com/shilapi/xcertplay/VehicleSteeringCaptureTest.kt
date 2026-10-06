@@ -21,7 +21,7 @@ class VehicleSteeringCaptureTest {
 
     @Test fun unknownWindowKeysAreObservedWithoutConsumptionOrPhoneCommands() {
         var sends = 0
-        val callback = CarPlayMediaCallback(observeKey = capture::key) { _, _ -> sends++ }
+        val callback = GalaxyMediaCallback(observeKey = capture::key) { _, _ -> sends++ }
         val event = KeyEvent(1, 2, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_UNKNOWN, 0, 0, 999, 321)
         assertFalse(callback.onKey(event, "window-key"))
         assertEquals(0, sends)
@@ -32,7 +32,7 @@ class VehicleSteeringCaptureTest {
 
     @Test fun knownMediaStillForwardsExactlyOnceAndKeepsReleaseEvidence() {
         var sends = 0
-        val callback = CarPlayMediaCallback(observeKey = capture::key) { _, _ -> sends++ }
+        val callback = GalaxyMediaCallback(observeKey = capture::key) { _, _ -> sends++ }
         connected = true
         assertTrue(callback.onKey(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT), "media-session-key"))
         assertTrue(callback.onKey(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT), "media-session-key"))

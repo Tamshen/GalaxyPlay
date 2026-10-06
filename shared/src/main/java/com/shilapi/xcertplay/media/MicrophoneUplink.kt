@@ -23,14 +23,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 internal class MicrophoneUplink(
     private val config: MicrophoneConfig,
-    private val audioRouting: L7AudioRouting? = null,
+    private val audioRouting: AudioRouteProvider? = null,
     private val report: (String) -> Unit = {},
     private val callProcessingEnabled: Boolean = true,
     private val factorySource: Int? = null,
     private val onStopRequested: () -> Unit = {},
     private val onEnded: () -> Unit = {},
 ) : Closeable {
-    @Volatile private var routeBinding: L7AudioRouting.Binding? = null
+    @Volatile private var routeBinding: AudioRouteBinding? = null
     private var packetsSent = 0L
     private val running = AtomicBoolean(false)
     private val firstPacketLogged = AtomicBoolean(false)
@@ -236,7 +236,7 @@ internal class MicrophoneUplink(
                 socket = socket,
                 counters = counters,
                 body = body,
-                samples = config.samplesPerPacket,
+                samples = config.rtpSamplesPerPacket,
             )
         }
     }

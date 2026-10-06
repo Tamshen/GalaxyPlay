@@ -35,7 +35,7 @@ def texts():
 
 def launch(page):
     adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n',
-        package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+        package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
 
 
 def tap(label):

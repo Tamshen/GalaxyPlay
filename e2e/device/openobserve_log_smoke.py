@@ -28,7 +28,7 @@ def adb(*parts, binary=False):
     return data if binary else data.decode()
 
 def launch():
-    adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-debug-logs')
+    adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-debug-logs')
     time.sleep(.7)
 
 def nodes():

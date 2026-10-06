@@ -62,6 +62,6 @@ internal object DisplayDiagnosticSnapshot {
     fun report(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return fields.flatMap { prefs.getString(it, null)?.lines().orEmpty().mapNotNull(DiagnosticRedactor::redact) }
-            .joinToString("\n").ifEmpty { "No display negotiation recorded yet." }
+            .map { it.take(700) }.joinToString("\n").ifEmpty { "No display negotiation recorded yet." }
     }
 }

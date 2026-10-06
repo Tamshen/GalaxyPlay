@@ -86,7 +86,7 @@ def require_menu(expected, message):
     raise AssertionError(f'{message}；预期={expected}，实际={actual}')
 
 def launch(page='home'):
-    adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
     time.sleep(.5)
 
 def host():

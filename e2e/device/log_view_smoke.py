@@ -56,7 +56,7 @@ def screenshot(name):
 
 def launch():
     adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n',
-        package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-debug')
+        package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-debug')
 
 
 def search(value):

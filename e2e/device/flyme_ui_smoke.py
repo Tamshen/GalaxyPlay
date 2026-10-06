@@ -88,7 +88,7 @@ def settings_selected():
 
 
 def launch(page='home'):
-    adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
     time.sleep(1)
 
 

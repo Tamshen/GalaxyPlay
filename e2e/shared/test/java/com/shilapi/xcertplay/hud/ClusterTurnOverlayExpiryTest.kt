@@ -31,6 +31,34 @@ class ClusterTurnOverlayExpiryTest {
         assertEquals(150, events.last()!!.distanceMeters)
     }
 
+    @Test fun endingTheSessionKeepsTheTurnCardAcrossTheDrop() = withRoute { route, _, events ->
+        BydNavigationOutputs.endNow(preserveTurnOverlay = true)
+        assertEquals(150, route.currentApple()!!.distanceMeters)
+        assertEquals(150, events.last()!!.distanceMeters)
+    }
+
+    @Test fun explicitStopStillClearsTheTurnCardImmediately() = withRoute { route, _, events ->
+        BydNavigationOutputs.endNow()
+        assertNull(route.currentApple())
+        assertNull(events.last())
+        assertEquals(2, events.size)
+    }
+
+    @Test fun noRoutePacketsDoNotExtendRetainedGuidanceOrReplaceItsRoad() = withRoute { route, advance, events ->
+        val before = route.currentApple()
+        advance(119_000_000_000L)
+        route.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x01, 0) + tlv(0x03, 88))
+        assertEquals(before, route.currentApple())
+        advance(120_000_000_000L)
+        route.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x01, 0))
+        BydNavigationOutputs.refreshTurnOverlay()
+        assertNull(route.currentApple())
+        assertNull(events.last())
+        route.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x01, 2))
+        route.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlv(0x0a, 0, 0, 0, 5))
+        assertNull(route.currentApple())
+    }
+
     private fun withRoute(test: (BydHudRouteState, (Long) -> Unit, MutableList<ClusterTurnGuidance?>) -> Unit) {
         var now = 0L
         val field = BydNavigationOutputs::class.java.getDeclaredField("overlayRoute").apply { isAccessible = true }

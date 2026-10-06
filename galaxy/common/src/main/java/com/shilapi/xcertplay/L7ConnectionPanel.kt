@@ -25,6 +25,8 @@ internal class L7ConnectionPanel(
         gravity = Gravity.CENTER
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
+    val retryButton = L7Components.actionButton(context, context.getString(R.string.galaxy_wireless_retry)) { onReturn() }
+        .apply { visibility = View.GONE }
     val recoveryButton = L7Components.actionButton(context, context.getString(R.string.reset_carplay_wi_fi), click = onRecovery)
         .apply { visibility = View.GONE }
     private val cancelButton = L7Components.actionButton(context, context.getString(R.string.l7_cancel_connection)) {
@@ -65,6 +67,7 @@ internal class L7ConnectionPanel(
             if (wireless) R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow
             else R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an
         ), secondary = true).apply { textSize = 18f; gravity = Gravity.CENTER }, row(top = 16))
+        card.addView(retryButton, row(top = 24))
         card.addView(recoveryButton, row(top = 24))
         card.addView(L7Components.actionButton(context, context.getString(R.string.back_to_diplay),
             primary = true, click = onReturn), row(top = 24))

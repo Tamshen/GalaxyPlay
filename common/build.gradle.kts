@@ -42,7 +42,9 @@ android {
     sourceSets {
         getByName("main").kotlin.directories.add(rootProject.file("galaxy/common/src/main/java").path)
         getByName("main").java.directories.add(rootProject.file("galaxy/common/src/main/java").path)
-        getByName("main").res.directories.apply { clear(); add(rootProject.file("galaxy/common/src/main/res").path) }
+        getByName("main").res.directories.apply { clear(); add(project.file("src/main/res").path) }
+        getByName("debug").res.directories.add(rootProject.file("galaxy/common/src/main/res").path)
+        getByName("release").res.directories.add(rootProject.file("galaxy/common/src/main/res").path)
         getByName("main").assets.directories.apply { clear(); add(rootProject.file("galaxy/common/src/main/assets").path) }
         getByName("main").manifest.srcFile(rootProject.file("galaxy/common/src/main/AndroidManifest.xml"))
         getByName("main").assets.directories.add(layout.buildDirectory.dir("generated/galaxyplay-license-assets").get().asFile.path)
@@ -62,8 +64,12 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.dexmaker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    testImplementation(libs.jmdns)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.mockito)

@@ -6,6 +6,7 @@ import java.security.MessageDigest
 
 /** 保留上游启动与身份入口，产品准备交给独立 Galaxy 策略。 */
 internal object DiPlayBootstrap {
+    fun ensure(context: Context, mfiTarget: com.shilapi.xcertplay.orchestration.MfiTarget) = ensure(context)
     fun ensure(context: Context) = GalaxyStartupPolicy.ensure(context)
     fun reload(context: Context) = GalaxyStartupPolicy.reload(context)
 

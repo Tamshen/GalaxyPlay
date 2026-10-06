@@ -22,11 +22,48 @@ import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
-class CarPlayMediaKeysTest {
+class GalaxyMediaKeysTest {
     @Before fun resetProviderPathCache() {
         org.robolectric.util.ReflectionHelpers.getStaticField<MutableMap<String, Any>>(
             androidx.core.content.FileProvider::class.java, "sCache").clear()
     }
+    @Test fun retiredHostContextIsNotUsedByControllerListeners() {
+        val app = RuntimeEnvironment.getApplication()
+        var retired = false
+        val context = object : ContextWrapper(app) {
+            override fun getResources(): Resources { check(!retired); return super.getResources() }
+            override fun getPackageManager(): android.content.pm.PackageManager { check(!retired); return super.getPackageManager() }
+            override fun getSystemService(name: String): Any? { check(!retired); return super.getSystemService(name) }
+        }
+        val controller = mock(CarPlayController::class.java)
+        var connected: ((Boolean) -> Unit)? = null
+        doAnswer { connected = it.getArgument(0); null }.`when`(controller).sessionStateListener = any()
+        GalaxyMediaKeys.attach(context, controller, {})
+        try {
+            retired = true
+            `when`(controller.hasActiveSession()).thenReturn(true)
+            connected!!(true)
+            assertSame(controller, ReflectionHelpers.getField(GalaxyMediaKeys, "controller"))
+        } finally { GalaxyMediaKeys.detach(controller) }
+    }
+
+    @Test fun oldMetadataAndDetachCannotAffectReplacementController() {
+        val app = RuntimeEnvironment.getApplication()
+        val old = mock(CarPlayController::class.java)
+        val next = mock(CarPlayController::class.java)
+        var metadata: ((CarPlayNowPlaying) -> Unit)? = null
+        doAnswer { metadata = it.getArgument(0); null }.`when`(old).nowPlayingListener = any()
+        GalaxyMediaKeys.attach(app, old, {})
+        val oldMetadata = metadata!!
+        GalaxyMediaKeys.attach(app, next, {})
+        try {
+            oldMetadata(CarPlayNowPlaying(title = "retired session"))
+            GalaxyMediaKeys.detach(old)
+            assertSame(next, ReflectionHelpers.getField(GalaxyMediaKeys, "controller"))
+            assertNull(ReflectionHelpers.getField<CarPlayNowPlaying>(GalaxyMediaKeys, "mediaInfo").title)
+        } finally { GalaxyMediaKeys.detach(next) }
+    }
+
     @Test fun metadataListenerPublishesOneSnapshotWithSelectedCoverRatherThanPreviousUri() {
         val app = RuntimeEnvironment.getApplication()
         val controller = mock(CarPlayController::class.java)
@@ -34,13 +71,13 @@ class CarPlayMediaKeysTest {
         doAnswer { metadata = it.getArgument(0); null }.`when`(controller).nowPlayingListener = any()
         val center = mock(L7MediaCenterSession::class.java)
         val direct = java.util.concurrent.Executor { it.run() }
-        CarPlayMediaKeys.attach(app, controller, {})
+        GalaxyMediaKeys.attach(app, controller, {})
         val covers = L7MediaArtwork(app, direct, direct) { uri ->
-            val value: CarPlayNowPlaying = ReflectionHelpers.getField(CarPlayMediaKeys, "mediaInfo")
+            val value: CarPlayNowPlaying = ReflectionHelpers.getField(GalaxyMediaKeys, "mediaInfo")
             center.update(value, uri)
         }
-        ReflectionHelpers.setField(CarPlayMediaKeys, "covers", covers)
-        ReflectionHelpers.setField(CarPlayMediaKeys, "mediaCenter", center)
+        ReflectionHelpers.setField(GalaxyMediaKeys, "covers", covers)
+        ReflectionHelpers.setField(GalaxyMediaKeys, "mediaCenter", center)
         try {
             val bytes = java.io.ByteArrayOutputStream().also { output ->
                 android.graphics.Bitmap.createBitmap(10, 10, android.graphics.Bitmap.Config.ARGB_8888).let {
@@ -61,7 +98,7 @@ class CarPlayMediaKeysTest {
             assertEquals(1, nextCalls.size)
             assertEquals(next, nextCalls.single().getArgument<CarPlayNowPlaying>(0))
             assertNull(nextCalls.single().getArgument<android.net.Uri?>(1))
-        } finally { CarPlayMediaKeys.detach(controller) }
+        } finally { GalaxyMediaKeys.detach(controller) }
     }
 
     @Test fun metadataBeforeAirPlayActivationIsHeldUntilRealSessionThenReplayed() {
@@ -80,8 +117,8 @@ class CarPlayMediaKeysTest {
         `when`(controller.activeMediaSessionOwner()).thenReturn(Any())
         var resumed = 0
         val construction = mockConstruction(MediaSession::class.java)
-        CarPlayMediaKeys.attach(context, controller, { resumed++ })
-        val bridge: CarPlayMediaSession = ReflectionHelpers.getField(CarPlayMediaKeys, "bridge")
+        GalaxyMediaKeys.attach(context, controller, { resumed++ })
+        val bridge: CarPlayMediaSession = ReflectionHelpers.getField(GalaxyMediaKeys, "bridge")
         try {
             shadowOf(Looper.getMainLooper()).idle()
             metadata!!(CarPlayNowPlaying(title = "synthetic-song", playing = true, playbackKnown = true))
@@ -102,6 +139,6 @@ class CarPlayMediaKeysTest {
             connection!!(false)
             shadowOf(Looper.getMainLooper()).idle()
             assertNull(bridge.session)
-        } finally { CarPlayMediaKeys.detach(controller); construction.close() }
+        } finally { GalaxyMediaKeys.detach(controller); construction.close() }
     }
 }
