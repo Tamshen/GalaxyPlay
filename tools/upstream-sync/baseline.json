@@ -1,5 +1,5 @@
 {
-  "tag": "v0.2.13",
+  "tag": "e871f94d20cd99f24acf08a7ee5ec19e2fed3654",
   "commit": "e871f94d20cd99f24acf08a7ee5ec19e2fed3654",
   "managed": [
     "build.gradle.kts",
@@ -692,7 +692,7 @@
     "common/src/main/java/com/shilapi/xcertplay/CarHotspotSetup.kt": "781f989422f178d776bc2c765b3ef6a02e6954c23afd0c6a121d0b3c0c75e904",
     "common/src/main/java/com/shilapi/xcertplay/CarPlayCallKeys.kt": "059b5b419355f2af0d90f09166bbbcdc3e9d3706d6b5589e95082cc95276fc99",
     "common/src/main/java/com/shilapi/xcertplay/CarPlayDock.kt": "4cb4a0bd75d1cffabb017ea08306bb05ebdd878a3c419a76db3ffdc2dfb54c77",
-    "common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt": "470136f557d0ec91cde8e7939f01aa6980946f0bb023b9eda9b850acff21d2fc",
+    "common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt": "9bb96f28a8104eb4b4cc9aaaf16fe345e2d4cedaf199d14cc4e02214381788f0",
     "common/src/main/java/com/shilapi/xcertplay/CarPlayMediaKeys.kt": "5702270f816b98f66fb17eb16c796be56613036774f46a9bd70ae804fd49bbd1",
     "common/src/main/java/com/shilapi/xcertplay/CarPlayNightMode.kt": "7065cf166697bd6e7a8ff2242813c71a691b948c8ada533019c1e116a5557484",
     "common/src/main/java/com/shilapi/xcertplay/CarPlayPicture.kt": "461c33933424448c798846f28fda4e4b2c69e1cce85fe5bcb8574abb06078af2",
@@ -1200,7 +1200,7 @@
     "shared/src/main/java/com/shilapi/xcertplay/iap2/wire/Iap2Wire.kt": "f6fb6707e0ba0a21bed9cd08cfdc1557745cf66a5acff0c03358af9a98690af6",
     "shared/src/main/java/com/shilapi/xcertplay/iap2/wire/Iap2WireCodec.kt": "860865941159f56bd11172682ee504f623f249a1b052ce8542ddf90a269703f5",
     "shared/src/main/java/com/shilapi/xcertplay/location/AndroidCarPlayLocationProvider.kt": "0106cfdae2aeb7eb62ff440f980eac95f092c94198197b0bc12576a3cca99f80",
-    "shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt": "c46b2edb68b28c693e4b9196357523bc2ce112d67d2b5b1f6436a60f12e3cd1b",
+    "shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt": "4c2fff153031327a929f33593f5bbbd783751c97eeca53ae0effe9fed6668b11",
     "shared/src/main/java/com/shilapi/xcertplay/media/AudioBufferProgress.kt": "d819eb8c2d0763dcc33a2235df336efe0c06750c5c865ddc6d61ead40d7f4dcc",
     "shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt": "641096d277dc6bc1a686bc91f4bed355001fdb26c0f2c7994d1170ba55129666",
     "shared/src/main/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatus.kt": "f54ca6d8e674f5064ad3a32913d5158d6c09217fcc32ef5e050771f28951767b",

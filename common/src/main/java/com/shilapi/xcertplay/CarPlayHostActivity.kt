@@ -270,7 +270,9 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
 
-    private var videoView: TextureView? = null
+    private var videoView: View? = null
+    private var softwareVideo: GalaxySoftwareVideoOutput? = null
+    private var videoWindowProbe: android.view.ViewTreeObserver.OnPreDrawListener? = null
     private val touchTracker = CarPlayTouchMapper.Tracker()
     private var videoCanvasSize: DisplaySize? = null
     private var videoViewport: VideoViewport? = null
@@ -324,6 +326,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var pendingVideoFailure: Pair<Int, com.shilapi.xcertplay.airplay.VideoCodec>? = null
     private var videoRecoveryPanel: L7VideoRecoveryPanel? = null
     private var hevcEnabled = true
+    private var sessionAvcFallback = false
     private var hevcSoftwareDecoderEnabled = false
     private var advancedAudioChannelMappingSupported = false
     private var advancedAudioChannelMapping = false
@@ -902,6 +905,9 @@ class CarPlayHostActivity : ComponentActivity() {
         dismissClusterPresentation()
         mainHandler.removeCallbacks(applyDisplaySize)
         mainHandler.removeCallbacks(expireOldLogLines)
+        removeVideoWindowProbe()
+        softwareVideo?.close()
+        softwareVideo = null
         currentSurface?.let { surface ->
             retireVideoSurface(surface, currentSurfaceTexture)
         }
@@ -982,6 +988,7 @@ class CarPlayHostActivity : ComponentActivity() {
             connectionPanel = panel
         }
         videoView = video
+        observeVideoWindow(video)
         gestureOverlay = gestureLayer
         updateDebugOverlays()
         if (l7DebugLogs) {
@@ -1426,6 +1433,7 @@ class CarPlayHostActivity : ComponentActivity() {
             setOnCheckedChangeListener { _, checked ->
                 if (hevcEnabled == checked) return@setOnCheckedChangeListener
                 hevcEnabled = checked
+                sessionAvcFallback = false
                 appendLog(
                     "HEVC (H.265) ${if (hevcEnabled) "enabled" else "disabled"}; " +
                         "applies when settings close",
@@ -2911,7 +2919,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val candidates = com.shilapi.xcertplay.media.VideoDecoderCapabilities.query(mime,
             display.widthPixels, display.heightPixels, display.fps.toDouble(), messages::add)
         val hardware = candidates.any { it.hardware }
-        val supported = hardware && !(hevcEnabled && hevcSoftwareDecoderEnabled)
+        val supported = if (hevcEnabled && hevcSoftwareDecoderEnabled) candidates.any { it.software } else hardware
         CanvasSupport(supported, if (supported) "supported" else "no_hardware_canvas_support",
             messages.joinToString("\n").ifEmpty { "Decoder capability result=no_decoder" })
     } catch (error: Exception) {
@@ -2930,7 +2938,8 @@ class CarPlayHostActivity : ComponentActivity() {
         )
         val resolutionDisplay = CarPlayDisplayScale.apply(baseDisplay, displayScaleTenths)
         val requestedPercent = uiScalePercent
-        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, uiScalePercent)
+        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, requestedPercent)
+        var effectivePercent = requestedPercent
         val candidate = scaledDisplay
         val support = when {
             uiScalePercent >= CarPlayUiScale.DEFAULT -> CanvasSupport(true, "not_enlarging", "Decoder capability enlargement check not required")
@@ -2939,8 +2948,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (!support.supported) {
             scaledDisplay = resolutionDisplay
-            uiScalePercent = CarPlayUiScale.DEFAULT
-            AirPlayPersistence.saveUiScalePercent(this, uiScalePercent)
+            effectivePercent = CarPlayUiScale.DEFAULT
             appendLog("Larger CarPlay canvas unavailable reason=${support.reason}; using Default icon and text size")
             runOnUiThread {
                 android.widget.Toast.makeText(this,
@@ -2948,7 +2956,24 @@ class CarPlayHostActivity : ComponentActivity() {
                     android.widget.Toast.LENGTH_LONG).show()
             }
         }
-        appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
+        appendLog("CarPlay size=${CarPlayUiScale.label(effectivePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
+        var effectiveHevc = hevcEnabled && !sessionAvcFallback
+        val capabilityLog = mutableListOf<String>()
+        fun support(mime: String, rate: Int, software: Boolean): Boolean? {
+            capabilityLog.clear()
+            val candidates = runCatching { com.shilapi.xcertplay.media.VideoDecoderCapabilities.query(
+                mime, scaledDisplay.widthPixels, scaledDisplay.heightPixels, rate.toDouble(), capabilityLog::add) }.getOrNull()
+                ?: return null
+            if (candidates.any { if (software) it.software else it.hardware }) return true
+            return if (capabilityLog.any { "query failed" in it }) null else false
+        }
+        val effectiveFormat = com.shilapi.xcertplay.media.VideoSessionFormat.select(
+            effectiveHevc, fps, hevcSoftwareDecoderEnabled, ::support)
+        if (effectiveFormat.hevc != effectiveHevc || effectiveFormat.fps != fps) {
+            effectiveHevc = effectiveFormat.hevc
+            scaledDisplay = scaledDisplay.copy(fps = effectiveFormat.fps)
+            appendLog("Video session fallback codec=H264 fps=30 preferencePreserved=true")
+        }
         val display = scaledDisplay.copy(
             safeArea = AirPlaySafeArea.toInsets(
                 mapping = AirPlayPersistence.loadSafeAreaRect(this, size.width, size.height),
@@ -2964,8 +2989,8 @@ class CarPlayHostActivity : ComponentActivity() {
             "base=${resolutionDisplay.widthPixels}x${resolutionDisplay.heightPixels} " +
             "candidate=${candidate.widthPixels}x${candidate.heightPixels} fps=$fps " +
             "codec=${if (hevcEnabled) "HEVC" else "H.264"} softwareHevc=$hevcSoftwareDecoderEnabled"
-        val effectiveSummary = "Display effective percent=$uiScalePercent " +
-            "canvas=${display.widthPixels}x${display.heightPixels} decision=${support.reason} " +
+        val effectiveSummary = "Display effective percent=$effectivePercent " +
+            "canvas=${display.widthPixels}x${display.heightPixels} decision=${support.reason} effectiveHevc=$effectiveHevc effectiveFps=${display.fps} " +
             "physical=${physical.widthMm}x${physical.heightMm}mm safeArea=${display.safeArea} " +
             "drawOutside=${display.safeAreaDrawOutside}"
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.begin(this, requestSummary, support.details, effectiveSummary)
@@ -2980,7 +3005,7 @@ class CarPlayHostActivity : ComponentActivity() {
             main = display,
             cluster = clusterDisplayConfig(),
             rightHandDrive = rightHandDrive,
-            hevc = hevcEnabled,
+            hevc = effectiveHevc,
             supportsOpusOutput = wirelessEnabled,
             microphone = microphoneAvailable,
             manufacturer = normalizedManufacturer(),
@@ -3143,6 +3168,7 @@ class CarPlayHostActivity : ComponentActivity() {
         videoHeight: Int,
         controllerGeneration: Int,
         localMusic: Boolean,
+        videoFps: Int,
     ): AndroidMediaSink {
         // 固定当前会话文件，解码器的迟到回调不能写入新会话。
         val diagnosticLog = sessionLog
@@ -3156,6 +3182,7 @@ class CarPlayHostActivity : ComponentActivity() {
             advancedAudioChannelMapping = if (audioTemplate != null) true else advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
             localMediaAudioEnabled = localMusic,
+            videoFps = videoFps,
             mediaChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA)
                 ?: AirPlayPersistence.loadMediaAudioChannel(this),
             navigationChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION)
@@ -3216,8 +3243,7 @@ class CarPlayHostActivity : ComponentActivity() {
             .setPositiveButton(R.string.l7_hevc_use_avc) { _, _ ->
                 // 旧会话弹窗不能改变新会话；编码格式必须通过重新协商切换。
                 if (failure.first == restartGeneration && !shuttingDown.get() && CarPlayBackgroundSession.isOwner(this)) {
-                    hevcEnabled = false
-                    AirPlayPersistence.saveHevcEnabled(this, false)
+                    sessionAvcFallback = true
                     restartCarPlay("HEVC failed; user selected H.264")
                 }
             }.create().also { dialog ->
@@ -3445,6 +3471,7 @@ class CarPlayHostActivity : ComponentActivity() {
             videoHeight = airPlayConfig.main.heightPixels,
             controllerGeneration = controllerGeneration,
             localMusic = localMusic,
+            videoFps = airPlayConfig.main.fps,
         )
         sink = renderer
         updateVideoCanvas(controllerGeneration, airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels)
@@ -3841,18 +3868,19 @@ class CarPlayHostActivity : ComponentActivity() {
             ?: DisplaySize(width, height)
         val viewport = VideoViewport.fit(width, height, canvas.width, canvas.height)
         videoViewport = viewport
-        video.isOpaque = viewport.left == 0.0 && viewport.top == 0.0
-        video.setTransform(Matrix().apply {
+        softwareVideo?.layout(viewport)
+        (video as? TextureView)?.isOpaque = viewport.left == 0.0 && viewport.top == 0.0
+        (video as? TextureView)?.setTransform(Matrix().apply {
             setScale((viewport.width / width).toFloat(), (viewport.height / height).toFloat())
             postTranslate(viewport.left.toFloat(), viewport.top.toFloat())
         })
     }
 
-    private fun retireVideoSurface(surface: Surface, texture: SurfaceTexture?) {
+    private fun retireVideoSurface(surface: Surface, texture: SurfaceTexture?, releaseSurface: Boolean = true) {
         if (texture != null) retiringTextures.add(texture)
         val owners = surfaceOwners.remove(surface).orEmpty().toList()
         val release = {
-            mainHandler.post { surface.release(); texture?.release() }
+            mainHandler.post { if (releaseSurface) surface.release(); texture?.release() }
             Unit
         }
         if (owners.isEmpty()) { release(); return }
@@ -3874,6 +3902,60 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun observeVideoWindow(texture: TextureView) {
+        val probe = android.view.ViewTreeObserver.OnPreDrawListener {
+            if (!texture.isAttachedToWindow) true else {
+                removeVideoWindowProbe()
+                if (!isDestroyed && videoView === texture && !texture.isHardwareAccelerated) {
+                    useSoftwareVideoOutput(texture)
+                    false
+                } else true
+            }
+        }
+        videoWindowProbe = probe
+        texture.viewTreeObserver.addOnPreDrawListener(probe)
+    }
+
+    private fun removeVideoWindowProbe() {
+        videoWindowProbe?.let { probe ->
+            videoView?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnPreDrawListener(probe)
+        }
+        videoWindowProbe = null
+    }
+
+    private fun useSoftwareVideoOutput(texture: TextureView) {
+        if (videoView !== texture || softwareVideo != null || isDestroyed) return
+        val root = texture.parent as? FrameLayout ?: return
+        val index = root.indexOfChild(texture)
+        currentSurface?.let { retireVideoSurface(it, currentSurfaceTexture) }
+        currentSurface = null
+        currentSurfaceTexture = null
+        texture.surfaceTextureListener = null
+        lateinit var output: GalaxySoftwareVideoOutput
+        output = GalaxySoftwareVideoOutput(this, created = { surface ->
+            if (!isDestroyed && softwareVideo === output) {
+                currentSurface = surface
+                attachSurface(surface)
+            }
+        }, destroyed = { surface ->
+            if (currentSurface === surface) {
+                currentSurface = null
+                retireVideoSurface(surface, null, releaseSurface = false)
+            }
+        }, resized = { width, height ->
+            if (softwareVideo === output) {
+                updateVideoViewport(width, height)
+                scheduleDisplaySize(width, height)
+            }
+        })
+        softwareVideo = output
+        videoView = output.viewport
+        root.removeView(texture)
+        root.addView(output.viewport, index, texture.layoutParams)
+        appendLog("Video output mode=SURFACE windowHardwareAccelerated=false pictureAdjustments=false")
+        android.widget.Toast.makeText(this, R.string.galaxy_software_video_note, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private fun attachSurface(surface: Surface) {

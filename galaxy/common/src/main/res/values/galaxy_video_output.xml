@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_software_video_note">当前窗口使用 SurfaceView 输出，颜色调整不可用；已保存的颜色设置保留。</string>
+</resources>

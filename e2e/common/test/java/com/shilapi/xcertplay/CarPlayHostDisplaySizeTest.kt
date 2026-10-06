@@ -75,6 +75,26 @@ class CarPlayHostDisplaySizeTest {
         controllerConstruction.close()
     }
 
+    @Test fun unsupportedEnlargementDoesNotPersistCanvasOrCodecPreferences() {
+        allowStartup()
+        AirPlayPersistence.saveUiScalePercent(activity, 75)
+        setField("uiScalePercent", 75)
+        setField("fps", 60)
+        setField("hevcEnabled", true)
+        setField("hevcSoftwareDecoderEnabled", true)
+        val method = activity.javaClass.getDeclaredMethod("createAirPlayConfig", sizeClass).apply { isAccessible = true }
+        val config = method.invoke(activity, size(1440, 1920)) as AirPlayConfig
+        assertEquals(75, getField("uiScalePercent"))
+        assertEquals(75, AirPlayPersistence.loadUiScalePercent(activity))
+        assertEquals(60, getField("fps"))
+        assertEquals(true, getField("hevcEnabled"))
+        assertEquals(60, config.main.fps)
+        assertTrue(config.hevc)
+        assertEquals(true, getField("hevcSoftwareDecoderEnabled"))
+        assertEquals(1440, config.main.widthPixels)
+        assertEquals(1920, config.main.heightPixels)
+    }
+
     @Test fun surroundViewOpenAndCloseKeepsTheNegotiatedCanvas() {
         val display = startSession()
         applySize(1920, 942)
