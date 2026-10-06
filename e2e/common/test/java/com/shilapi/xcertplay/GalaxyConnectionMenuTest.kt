@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.os.Looper
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AndroidMediaSink
+import com.shilapi.xcertplay.orchestration.CarPlayTransport
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import org.junit.After
 import org.junit.Assert.*
@@ -12,6 +13,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -25,25 +27,32 @@ class GalaxyConnectionMenuTest {
     private var dialog: AlertDialog? = null
     private var settingsOpened = 0
     private var stopRequests = 0
+    private var deferStop = false
+    private var release: (() -> Unit)? = null
 
     @Before fun setup() {
         CarPlayBackgroundSession.clear()
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         activity.setTheme(R.style.Theme_Xcertplay)
+        L7Agreement.accept(activity)
     }
 
     @After fun cleanup() {
         dialog?.dismiss()
+        release?.invoke()
+        shadowOf(Looper.getMainLooper()).idle()
         CarPlayBackgroundSession.clear()
         activity.finish()
     }
 
-    private fun session(): CarPlayController {
+    private fun session(transport: CarPlayTransport = CarPlayTransport.WIRED): CarPlayController {
         val controller = mock(CarPlayController::class.java)
+        `when`(controller.transport).thenReturn(transport)
         CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1440, 1920, Any()) {
             stopRequests++
-            CarPlayBackgroundSession.clear(controller)
-            it()
+            val completion = it
+            val finish = { CarPlayBackgroundSession.clear(controller); completion() }
+            if (deferStop) release = finish else finish()
         }
         CarPlayBackgroundSession.active = true
         return controller
@@ -83,14 +92,19 @@ class GalaxyConnectionMenuTest {
         assertTrue(CarPlayBackgroundSession.active)
     }
 
-    @Test fun confirmingStopsCurrentSessionOnce() {
+    @Test fun confirmingReopensWiredHostOnceUsingActualTransport() {
         session()
         select()
+        AirPlayPersistence.saveWirelessEnabled(activity, true)
         val confirm = dialog!!.getButton(AlertDialog.BUTTON_POSITIVE)
         confirm.performClick()
         confirm.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1, stopRequests)
+        assertFalse(AirPlayPersistence.loadWirelessEnabled(activity))
+        val app = shadowOf(activity.application)
+        assertEquals(CarPlayHostActivity::class.java.name, app.nextStartedActivity.component!!.className)
+        assertNull(app.nextStartedActivity)
         assertFalse(CarPlayBackgroundSession.hasSession())
         assertFalse(CarPlayBackgroundSession.active)
         assertEquals(0, settingsOpened)
@@ -116,4 +130,65 @@ class GalaxyConnectionMenuTest {
         assertEquals(0, stopRequests)
         assertEquals(0, settingsOpened)
     }
+    @Test fun wirelessReconnectWaitsForReleaseAndKeepsActualTransport() {
+        session(CarPlayTransport.WIRELESS)
+        AirPlayPersistence.saveWirelessEnabled(activity, false)
+        deferStop = true
+        select()
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, stopRequests)
+        assertNull(shadowOf(activity.application).nextStartedActivity)
+        assertFalse(AirPlayPersistence.loadWirelessEnabled(activity))
+        release!!.invoke()
+        release!!.invoke()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(AirPlayPersistence.loadWirelessEnabled(activity))
+        val app = shadowOf(activity.application)
+        assertEquals(CarPlayHostActivity::class.java.name, app.nextStartedActivity.component!!.className)
+        assertNull(app.nextStartedActivity)
+    }
+
+    @Test fun anotherSessionCreatedDuringReleaseCannotBeReplacedByReconnect() {
+        session()
+        deferStop = true
+        select()
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val replacement = session()
+        release!!.invoke()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertSame(replacement, CarPlayBackgroundSession.snapshot()!!.controller)
+        assertNull(shadowOf(activity.application).nextStartedActivity)
+    }
+
+    @Test fun appExitDuringReleasePreventsHostReopening() {
+        session()
+        deferStop = true
+        select()
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        org.robolectric.util.ReflectionHelpers.setStaticField(L7AppExit::class.java, "exiting", true)
+        try {
+            release!!.invoke()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNull(shadowOf(activity.application).nextStartedActivity)
+        } finally {
+            org.robolectric.util.ReflectionHelpers.setStaticField(L7AppExit::class.java, "exiting", false)
+        }
+    }
+
+    @Test fun stoppingRetiresOldHostButApplicationCanOpenReplacementAfterRelease() {
+        session()
+        deferStop = true
+        select()
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        activity.finish()
+        release!!.invoke()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(CarPlayHostActivity::class.java.name,
+            shadowOf(activity.application).nextStartedActivity.component!!.className)
+    }
+
 }

@@ -71,8 +71,9 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
             })
             val iconFrame = FrameLayout(context)
             iconFrame.addView(ImageView(context).apply {
-                setImageResource(icon)
+                setImageResource(if (key == "connection" && connected) R.drawable.ic_l7_refresh else icon)
                 L7Ui.bind(this) {
+                    if (key == "connection") setImageResource(if (connected) R.drawable.ic_l7_refresh else icon)
                     imageTintList = ColorStateList.valueOf(foreground())
                 }
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -108,9 +109,10 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
             L7Ui.refresh(it)
         }
         buttons["connection"]?.let { item ->
-            val title = context.getString(if (value) R.string.l7_nav_disconnect else R.string.l7_nav_connect)
+            val title = context.getString(if (value) R.string.l7_nav_reconnect else R.string.l7_nav_connect)
             item.contentDescription = title
             ((item as ViewGroup).getChildAt(1) as TextView).text = title
+            L7Ui.refresh(item)
         }
     }
 

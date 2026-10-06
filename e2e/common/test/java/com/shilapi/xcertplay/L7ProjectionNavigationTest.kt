@@ -111,7 +111,7 @@ class L7ProjectionNavigationTest {
         assertFalse(picture.isSelected)
         assertEquals(originalBounds, bounds())
         assertEquals(View.VISIBLE, dot.visibility)
-        assertEquals("断开连接", buttons[1].contentDescription)
+        assertEquals("重连", buttons[1].contentDescription)
         assertEquals(context.getColor(R.color.product_ui_connected), label.currentTextColor)
         assertEquals(label.currentTextColor, icon.imageTintList!!.defaultColor)
         assertEquals("画面，iPhone 已连接", picture.contentDescription)

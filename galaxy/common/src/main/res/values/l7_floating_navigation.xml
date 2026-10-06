@@ -2,7 +2,9 @@
     <string name="l7_rail_expand">展开菜单</string>
     <string name="l7_nav_picture">画面</string>
     <string name="l7_nav_connect">连接</string>
-    <string name="l7_nav_disconnect">断开连接</string>
+    <string name="l7_nav_reconnect">重连</string>
+    <string name="l7_menu_reconnect_confirm">暂时中断当前 CarPlay 会话，并沿用当前无线或有线方式重新连接？</string>
+    <string name="l7_menu_reconnect_failed">无法重新连接，请进入连接设置检查。</string>
     <string name="l7_nav_picture_connected">画面，iPhone 已连接</string>
     <string name="l7_nav_car_home">车机</string>
     <string name="l7_nav_exit">退出</string>
