@@ -1,7 +1,6 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
-import android.os.Build
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
 import com.shilapi.xcertplay.airplay.AirPlayPhysicalSizeBasis
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
@@ -39,12 +38,8 @@ object AirPlayPersistence {
     private const val KEY_HEVC_ENABLED = "hevc_enabled"
     private const val KEY_HEVC_SOFTWARE_DECODER = "hevc_software_decoder"
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
-    private const val KEY_CALL_PROCESSING_ENABLED = "l7_call_processing_enabled"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
-    private const val KEY_L7_AUDIO_BUS_ENABLED = "l7_audio_bus_enabled"
-    private const val KEY_BLUETOOTH_MEDIA_EXCLUSIVE = "bluetooth_media_exclusive"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
-    private const val KEY_ASSISTANT_AUDIO_CHANNEL = "assistant_audio_channel"
     private const val KEY_NAVIGATION_AUDIO_CHANNEL = "navigation_audio_channel"
     private const val KEY_NAVIGATION_STREAM_TYPE = "navigation_stream_type"
     private const val KEY_WIRELESS_ENABLED = "wireless_enabled"
@@ -130,9 +125,7 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadAdvancedAudioChannelMapping(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, true)
+    fun loadAdvancedAudioChannelMapping(context: Context): Boolean = GalaxyPreferencePolicy.loadAdvancedAudioChannelMapping(context)
 
     fun saveAdvancedAudioChannelMapping(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -150,9 +143,7 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadAudioFocusEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, true)
+    fun loadAudioFocusEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadAudioFocusEnabled(context)
 
     fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -160,96 +151,35 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadL7AudioBusEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_L7_AUDIO_BUS_ENABLED, false)
+    fun loadL7AudioBusEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadL7AudioBusEnabled(context)
 
-    fun saveL7AudioBusEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_L7_AUDIO_BUS_ENABLED, enabled).apply()
-    }
+    fun saveL7AudioBusEnabled(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveL7AudioBusEnabled(context, enabled)
 
     /** 只恢复音频，不清除配对、认证或蓝牙媒体交接设置。 */
-    fun restoreUsageAudioDefaults(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_AUDIO_FOCUS_ENABLED, true)
-            .putBoolean(KEY_L7_AUDIO_BUS_ENABLED, false)
-            .putBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, true)
-            .putBoolean(KEY_CALL_PROCESSING_ENABLED, true)
-            .putInt(KEY_MEDIA_AUDIO_CHANNEL, 101)
-            .putInt(KEY_ASSISTANT_AUDIO_CHANNEL, 102)
-            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, 103)
-            .remove(KEY_NAVIGATION_STREAM_TYPE)
-            .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS)
-            .putBoolean("l7_usage_audio_defaults_v1", true)
-            .commit()
-    }
+    fun restoreUsageAudioDefaults(context: Context) = GalaxyPreferencePolicy.restoreUsageAudioDefaults(context)
 
     /** 只迁移上一版整套默认输出；自定义路由及焦点、缓冲等独立设置保留。 */
-    fun migrateUsageAudioDefaults(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getBoolean("l7_usage_audio_defaults_v1", false)) return
-        val editor = prefs.edit().putBoolean("l7_usage_audio_defaults_v1", true)
-        if (prefs.getBoolean("l7_boyue_audio_0211", false) &&
-            prefs.getInt(KEY_MEDIA_AUDIO_CHANNEL, -1) == 0 &&
-            prefs.getInt(KEY_ASSISTANT_AUDIO_CHANNEL, -1) == 0 &&
-            prefs.getInt(KEY_NAVIGATION_AUDIO_CHANNEL, -1) == 14) {
-            editor.putInt(KEY_MEDIA_AUDIO_CHANNEL, 101)
-                .putInt(KEY_ASSISTANT_AUDIO_CHANNEL, 102)
-                .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, 103)
-        }
-        editor.commit()
-    }
+    fun migrateUsageAudioDefaults(context: Context) = GalaxyPreferencePolicy.migrateUsageAudioDefaults(context)
 
-    fun loadCallProcessingEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CALL_PROCESSING_ENABLED, true)
+    fun loadCallProcessingEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadCallProcessingEnabled(context)
 
-    fun saveCallProcessingEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_CALL_PROCESSING_ENABLED, enabled).apply()
-    }
+    fun saveCallProcessingEnabled(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveCallProcessingEnabled(context, enabled)
 
-    fun loadBluetoothMediaExclusive(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_BLUETOOTH_MEDIA_EXCLUSIVE, true)
+    fun loadBluetoothMediaExclusive(context: Context): Boolean = GalaxyPreferencePolicy.loadBluetoothMediaExclusive(context)
 
-    fun saveBluetoothMediaExclusive(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_BLUETOOTH_MEDIA_EXCLUSIVE, enabled).apply()
-    }
+    fun saveBluetoothMediaExclusive(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveBluetoothMediaExclusive(context, enabled)
 
-    fun loadMediaAudioChannel(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_AUDIO_CHANNEL, 101)
-            .takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0
+    fun loadMediaAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadMediaAudioChannel(context)
 
-    fun saveMediaAudioChannel(context: Context, channel: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_MEDIA_AUDIO_CHANNEL, channel.takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0)
-            .apply()
-    }
+    fun saveMediaAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveMediaAudioChannel(context, channel)
 
-    fun loadNavigationAudioChannel(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_NAVIGATION_AUDIO_CHANNEL,
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_NAVIGATION_STREAM_TYPE, 103))
-            .takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0
+    fun loadNavigationAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadNavigationAudioChannel(context)
 
-    fun saveNavigationAudioChannel(context: Context, channel: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, channel.takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0)
-            .apply()
-    }
+    fun saveNavigationAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveNavigationAudioChannel(context, channel)
 
-    fun loadAssistantAudioChannel(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_ASSISTANT_AUDIO_CHANNEL, 102)
-            .takeIf { com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it) } ?: 0
+    fun loadAssistantAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadAssistantAudioChannel(context)
 
-    fun saveAssistantAudioChannel(context: Context, channel: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_ASSISTANT_AUDIO_CHANNEL, channel.takeIf {
-                com.shilapi.xcertplay.media.AudioOutputPolicy.valid(it)
-            } ?: 0).apply()
-    }
+    fun saveAssistantAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveAssistantAudioChannel(context, channel)
 
     fun loadWirelessEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -274,13 +204,7 @@ object AirPlayPersistence {
     }
 
     // 认证方式和远程参数作为一次设置保存，避免重启后读取到不完整的远程配置。
-    fun saveMfiConfiguration(context: Context, target: MfiTarget, server: String? = null, token: String? = null) {
-        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_MFI_TARGET, target.name)
-        if (server != null) editor.putString(KEY_REMOTE_MFI_SERVER, server)
-        if (token != null) editor.putString(KEY_REMOTE_MFI_TOKEN, token)
-        check(editor.commit())
-    }
+    fun saveMfiConfiguration(context: Context, target: MfiTarget, server: String? = null, token: String? = null) = GalaxyPreferencePolicy.saveMfiConfiguration(context, target, server, token)
 
     fun loadMfiI2cPath(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -316,24 +240,9 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadWirelessHotspotMode(context: Context): WirelessHotspotMode {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val stored = prefs.getString(KEY_WIRELESS_HOTSPOT_MODE, null)
-        val mode = WirelessHotspotMode.entries.firstOrNull { it.name == stored }
-            ?: WirelessHotspotMode.MANUAL
-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT ||
-            (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && mode == WirelessHotspotMode.WIFI_P2P)
-        ) WirelessHotspotMode.MANUAL else mode
-        if (stored != supported.name) saveWirelessHotspotMode(context, supported)
-        return supported
-    }
+    fun loadWirelessHotspotMode(context: Context): WirelessHotspotMode = GalaxyPreferencePolicy.loadWirelessHotspotMode(context)
 
-    fun saveWirelessHotspotMode(context: Context, mode: WirelessHotspotMode) {
-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_WIRELESS_HOTSPOT_MODE, supported.name)
-            .apply()
-    }
+    fun saveWirelessHotspotMode(context: Context, mode: WirelessHotspotMode) = GalaxyPreferencePolicy.saveWirelessHotspotMode(context, mode)
 
     fun loadManualHotspotSsid(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -341,16 +250,7 @@ object AirPlayPersistence {
             .orEmpty()
 
     /** 系统读取或明确接受的配置一次写入，避免下次建链读到新名称和旧密码。 */
-    fun saveNativeHotspotCredentials(context: Context, value: com.shilapi.xcertplay.network.NativeHotspotCredentials) {
-        require(value.valid())
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_MANUAL_HOTSPOT_SSID, value.ssid)
-            .putString(KEY_MANUAL_HOTSPOT_PASSPHRASE, value.password)
-            .putString(KEY_MANUAL_HOTSPOT_SECURITY, value.security.name)
-            .putString(KEY_MANUAL_HOTSPOT_BAND, ManualHotspotBand.AUTO.name)
-            .putInt(KEY_MANUAL_HOTSPOT_CHANNEL, 0)
-            .apply()
-    }
+    fun saveNativeHotspotCredentials(context: Context, value: com.shilapi.xcertplay.network.NativeHotspotCredentials) = GalaxyPreferencePolicy.saveNativeHotspotCredentials(context, value)
 
     fun saveManualHotspotSsid(context: Context, ssid: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -544,9 +444,7 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadClusterMapEnabled(context: Context): Boolean =
-        com.shilapi.xcertplay.l7.L7VehiclePolicy.BYD_FEATURES_ENABLED &&
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, false)
+    fun loadClusterMapEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadClusterMapEnabled(context)
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()
