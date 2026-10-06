@@ -87,12 +87,12 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
             val input = sock.getInputStream()
             while (!closed.get()) {
                 stats.reading()
-                val header = readFully(input, HEADER_LEN) ?: break
+                val header = stats.measure(StreamReceiveStats.Stage.HEADER) { readFully(input, HEADER_LEN) } ?: break
                 val bodySize = readU32Le(header, 0)
                 if (bodySize > MAX_BODY) break
-                val body = readFully(input, bodySize) ?: break
+                val body = stats.measure(StreamReceiveStats.Stage.BODY) { readFully(input, bodySize) } ?: break
                 stats.received(HEADER_LEN + bodySize)
-                onMessage(header, body)
+                onMessage(header, body, stats)
                 stats.processed()
             }
         } catch (error: Exception) {
@@ -105,23 +105,26 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         }
     }
 
-    private fun onMessage(header: ByteArray, body: ByteArray) {
+    private fun onMessage(header: ByteArray, body: ByteArray, stats: StreamReceiveStats) {
         when (header[OPCODE_OFFSET].toInt() and 0xff) {
             OP_VIDEO_FRAME -> {
                 val payload = if (body.size >= ScreenCodec.TAG_SIZE) {
-                    ScreenCodec.decryptFrame(key, frameCounter.get(), header, body)
-                        .also { frameCounter.incrementAndGet() }
+                    stats.measure(StreamReceiveStats.Stage.DECRYPT) {
+                        ScreenCodec.decryptFrame(key, frameCounter.get(), header, body)
+                            .also { frameCounter.incrementAndGet() }
+                    }
                 } else {
                     body
                 }
                 if (firstFrameLogged.compareAndSet(false, true)) {
                     Log.i(
                         TAG,
-                        "video first decrypted frame sealed=${body.size} plain=${payload.size} " +
-                        "head=${payload.hexPrefix(16)}",
+                        "video first decrypted frame sealed=${body.size} plain=${payload.size}",
                     )
                 }
-                listener.onFrame(ScreenCodec.lengthPrefixedToAnnexB(payload))
+                stats.measure(StreamReceiveStats.Stage.DISPATCH) {
+                    listener.onFrame(ScreenCodec.lengthPrefixedToAnnexB(payload))
+                }
             }
             OP_VIDEO_CONFIG -> {
                 val (codec, codecData) = ScreenCodec.detectConfig(body)
@@ -153,9 +156,6 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         const val MAX_BODY = 8 * 1024 * 1024
     }
 }
-
-private fun ByteArray.hexPrefix(length: Int): String =
-    take(length).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
 /** Extracts the avcC/hvcC codec-data record from a VideoConfig payload. */
 object ScreenCodec {

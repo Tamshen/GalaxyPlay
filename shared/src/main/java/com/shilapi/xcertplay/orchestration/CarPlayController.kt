@@ -205,6 +205,8 @@ class CarPlayController(
         )
     }
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    // 媒体 IPC 卡住时拒绝额外按键，不合并连续切歌，也不影响触控队列语义。
+    private val mediaCommands = java.util.concurrent.Semaphore(32)
     private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -630,25 +632,29 @@ class CarPlayController(
         if (closed) { anchor("DROP", "CLOSED"); return false }
         val session = activeSession ?: run { anchor("DROP", "NO_SESSION"); return false }
         if (session !== expectedOwner) { anchor("DROP", "STALE_SESSION"); return false }
+        if (!mediaCommands.tryAcquire()) { anchor("DROP", "QUEUE_FULL"); return false }
         return try {
             anchor("QUEUE_SUBMIT")
             touchExecutor.execute {
-                anchor("QUEUE_EXECUTE")
-                if (closed || activeSession !== session) {
-                    anchor("DROP", "STALE_SESSION")
-                    debugLog("Audio: media execute index=$index drop=STALE_SESSION")
-                } else try {
-                    anchor("CHANNEL_WRITE_BEGIN")
-                    val written = session.sendMediaChecked(index)
-                    anchor(if (written) "CHANNEL_WRITTEN" else "CHANNEL_FAILED")
-                    debugLog("Audio: media execute index=$index channelWritten=$written")
-                } catch (error: Exception) {
-                    anchor("CHANNEL_FAILED", error.javaClass.simpleName)
-                    debugLog("Audio: media execute index=$index exceptionType=${error.javaClass.simpleName}")
-                }
+                try {
+                    anchor("QUEUE_EXECUTE")
+                    if (closed || activeSession !== session) {
+                        anchor("DROP", "STALE_SESSION")
+                        debugLog("Audio: media execute index=$index drop=STALE_SESSION")
+                    } else try {
+                        anchor("CHANNEL_WRITE_BEGIN")
+                        val written = session.sendMediaChecked(index)
+                        anchor(if (written) "CHANNEL_WRITTEN" else "CHANNEL_FAILED")
+                        debugLog("Audio: media execute index=$index channelWritten=$written")
+                    } catch (error: Exception) {
+                        anchor("CHANNEL_FAILED", error.javaClass.simpleName)
+                        debugLog("Audio: media execute index=$index exceptionType=${error.javaClass.simpleName}")
+                    }
+                } finally { mediaCommands.release() }
             }
             true
         } catch (error: Exception) {
+            mediaCommands.release()
             anchor("DROP", "QUEUE_REJECTED:${error.javaClass.simpleName}")
             false
         }
