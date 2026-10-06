@@ -49,6 +49,7 @@ if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 
 if [[ "$build_mode" != "image" ]]; then
     python3 "$project_dir/e2e/checks/check_galaxy_layout.py"
+    python3 "$project_dir/scripts/sync-upstream-core.py" verify
 fi
 
 # 本机 SDK 路径在 Linux 中不可用，避免混用两套工具链。

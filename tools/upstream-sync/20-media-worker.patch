@@ -1,0 +1,2369 @@
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt
+@@ -2,12 +2,10 @@
+ 
+ import android.content.Context
+ import android.media.AudioAttributes
+-import android.media.AudioFocusRequest
+ import android.media.AudioFormat as AndroidAudioFormat
+ import android.media.AudioManager
+ import android.media.AudioTrack
+ import android.media.MediaCodec
+-import android.media.MediaCodecList
+ import android.media.MediaFormat
+ import android.os.Build
+ import android.os.Handler
+@@ -31,92 +29,6 @@
+ import java.util.concurrent.atomic.AtomicLong
+ import java.util.concurrent.TimeUnit
+ 
+-/** AudioTrack's attributes getter is only available from Android 10. */
+-internal fun audioTrackAttributesForFocus(track: AudioTrack, configured: AudioAttributes): AudioAttributes =
+-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) track.audioAttributes else configured
+-
+-/** Owns one focus request for all eligible tracks in a CarPlay sink. */
+-internal class AudioFocusCoordinator(
+-    context: Context?,
+-    private val enabled: Boolean,
+-    private val report: (String) -> Unit = {},
+-) {
+-    private data class Entry(val channel: AudioChannel, val attributes: AudioAttributes)
+-
+-    private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+-    private val active = LinkedHashMap<AudioTrack, Entry>()
+-    private var request: AudioFocusRequest? = null
+-    private var requestedChannel: AudioChannel? = null
+-    private val listener = AudioManager.OnAudioFocusChangeListener { change ->
+-        synchronized(this) {
+-            runCatching { report("Audio: focus change=$change activeTracks=${active.size}") }
+-            when (change) {
+-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> setVolume(DUCKED_VOLUME)
+-                AudioManager.AUDIOFOCUS_GAIN -> setVolume(FULL_VOLUME)
+-                // Keep CarPlay audio running on permanent or transient loss. Some head units
+-                // do not send a later gain callback after taking focus back.
+-            }
+-        }
+-    }
+-
+-    @Synchronized
+-    fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
+-        if (!enabled || manager == null || channel == AudioChannel.NAVIGATION) return
+-        active[track] = Entry(channel, attributes)
+-        refreshRequest()
+-    }
+-
+-    @Synchronized
+-    fun release(track: AudioTrack) {
+-        if (active.remove(track) != null) refreshRequest()
+-    }
+-
+-    private fun refreshRequest() {
+-        val primary = active.values.maxByOrNull { it.channel.focusPriority() }
+-        if (primary == null) {
+-            request?.let { manager?.abandonAudioFocusRequest(it) }
+-            request = null
+-            requestedChannel = null
+-            return
+-        }
+-        if (request != null && requestedChannel == primary.channel) return
+-        request?.let { manager?.abandonAudioFocusRequest(it) }
+-        val gain = when (primary.channel) {
+-            AudioChannel.MEDIA -> AudioManager.AUDIOFOCUS_GAIN
+-            AudioChannel.PHONE -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+-            AudioChannel.ASSISTANT -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+-            AudioChannel.NAVIGATION -> return
+-        }
+-        val next = AudioFocusRequest.Builder(gain)
+-            .setAudioAttributes(primary.attributes)
+-            .setOnAudioFocusChangeListener(listener, Handler(Looper.getMainLooper()))
+-            .build()
+-        request = next
+-        requestedChannel = primary.channel
+-        val result = manager?.requestAudioFocus(next)
+-        val line = "Audio: focus requested channel=${primary.channel} gain=$gain granted=$result activeTracks=${active.size}"
+-        Log.i(TAG, line)
+-        runCatching { report(line) }
+-    }
+-
+-    private fun setVolume(volume: Float) {
+-        active.keys.forEach { track -> runCatching { track.setStereoVolume(volume, volume) } }
+-    }
+-
+-    private fun AudioChannel.focusPriority(): Int = when (this) {
+-        AudioChannel.MEDIA -> 3
+-        AudioChannel.PHONE -> 2
+-        AudioChannel.ASSISTANT -> 1
+-        AudioChannel.NAVIGATION -> 0
+-    }
+-
+-    private companion object {
+-        const val TAG = "DiPlay-AudioFocus"
+-        const val FULL_VOLUME = 1f
+-        const val DUCKED_VOLUME = 0.2f
+-    }
+-}
+-
+ /**
+  * Android rendering backend for the CarPlay media engine. Video frames are
+  * decoded with MediaCodec onto a Surface; audio streams are decoded to PCM and
+@@ -138,37 +50,67 @@
+     onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
+     private val mediaBufferMillis: Int = MediaAudioBuffer.DEFAULT_MILLIS,
+     private val onAudioDiagnostic: (String) -> Unit = {},
+-    /** True while any music ("media") audio stream is running; called from media threads. */
+-    private val onMediaAudioChanged: (Boolean) -> Unit = {},
++    onMediaAudioChanged: (Boolean) -> Unit = {},
++    onVideoSizeChanged: ((Int, Int) -> Unit)? = null,
++    onVideoFailure: ((VideoCodec, String) -> Unit)? = null,
++    private val assistantChannel: Int = 0,
++    private val callProcessingEnabled: Boolean = true,
++    private val wirelessAudio: Boolean = false,
++    platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
++    onVideoRecovered: (() -> Unit)? = null,
+ ) : MediaSink {
++    @Volatile private var mediaAudioChanged = onMediaAudioChanged
++
++    /** 回调绑定控制器归属，旧渲染线程不得改变新会话的媒体按键状态。 */
++    fun setMediaAudioChangedListener(listener: (Boolean) -> Unit) { mediaAudioChanged = listener }
++
++    fun resumeMediaAudioFocus() = audioFocusCoordinator.resumeMedia()
++    @Volatile private var videoRecovered = onVideoRecovered
++    @Volatile private var videoFailure = onVideoFailure
++    @Volatile private var mainVideoFailure: Pair<VideoCodec, String>? = null
++    @Volatile private var videoSizeChanged = onVideoSizeChanged
++    @Volatile private var mainVideoSize = videoWidth to videoHeight
+     private val appContext = context?.applicationContext
+-    private val audioManager = appContext?.getSystemService(AudioManager::class.java)
++    private val factoryAudio = platformAdaptation.profile
++    private val audioRoutingTemplate = platformAdaptation.template
+     private val audioFocusCoordinator = AudioFocusCoordinator(
+         appContext,
+         audioFocusEnabled,
+         onAudioDiagnostic,
++        factoryRouting = factoryAudio != null,
++        template = audioRoutingTemplate,
+     )
++    private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
++    private val callTimeline = CallAudioTimeline(onAudioDiagnostic, ::audioRecoveryState)
++
++    private fun audioRecoveryState(): String {
++        val mode = runCatching { appContext?.getSystemService(AudioManager::class.java)?.mode }.getOrNull()
++        return "audioMode=${mode ?: "unknown"} ${audioFocusCoordinator.diagnosticState()}"
++    }
++    private val audioRouting = platformAdaptation.audioRoutes(appContext, onAudioDiagnostic)
+     private val screenStateLock = Any()
++    private val videoLifecycleLock = Any()
++    @Volatile private var closed = false
++    private val retiringVideoDecoders = mutableSetOf<VideoDecoder>()
+     private val activeScreenTypes = mutableSetOf<Int>()
+-    private val defaultSurface = surface
++    private var defaultSurface = surface
+     @Volatile private var screenStreamActiveChanged = onScreenStreamActiveChanged
+     private val surfaces = ConcurrentHashMap<Int, Surface>()
+     private val videoDecoders = ConcurrentHashMap<Int, VideoDecoder>()
+     private val mediaAudioTypes = mutableSetOf<AudioStreamId>()
++    private val assistantAudioTypes = mutableSetOf<AudioStreamId>()
++    private val assistantMicrophoneTypes = mutableSetOf<AudioStreamId>()
++    /** 按协议的语音流状态判断，不将电话录音或媒体存在视为 Siri 活动。 */
++    @Synchronized fun isAssistantAudioActive(): Boolean =
++        !closed && (assistantAudioTypes.isNotEmpty() || assistantMicrophoneTypes.isNotEmpty())
++    /** 本地调试录音避让已存在的电话或 Siri 上行。 */
++    fun hasMicrophoneUplink(): Boolean = !closed && microphoneUplinks.isNotEmpty()
+     private val audioRenderers = ConcurrentHashMap<AudioStreamId, AudioRenderer>()
+     private val microphoneUplinks = ConcurrentHashMap<AudioStreamId, MicrophoneUplink>()
+-    private val audioModeLock = Any()
+-    private var communicationModeStream: AudioStreamId? = null
+-    private var savedAudioMode = AudioManager.MODE_NORMAL
+     private val pendingVideoCodec = ConcurrentHashMap<Int, VideoCodec>()
+     private val videoRecoveryHandlers = ConcurrentHashMap<Int, () -> Unit>()
+     private val videoDiagnosticHandlers = ConcurrentHashMap<Int, (String) -> Unit>()
+     private val recoveryPending = AtomicBoolean(false)
+-    // Extra decoders draw the same stream on other surfaces, such as the centre card.
+-    private val mirrorLock = Any()
+-    private val mirrorSurfaces = HashMap<Pair<Int, String>, Surface>()
+-    private val mirrorDecoders = HashMap<Pair<Int, String>, VideoDecoder>()
+-    private val lastVideoConfig = ConcurrentHashMap<Int, Pair<VideoCodec, ByteArray>>()
+     private val recoveryExecutor = Executors.newSingleThreadExecutor { task ->
+         Thread(task, "carplay-video-recovery").apply { isDaemon = true }
+     }
+@@ -185,7 +127,7 @@
+         if (!recoveryPending.compareAndSet(false, true)) return
+         try {
+             recoveryExecutor.execute {
+-                try { videoRecoveryHandlers[type]?.invoke() }
++                try { if (!closed) videoRecoveryHandlers[type]?.invoke() }
+                 catch (error: Exception) { Log.w("xcertplay-usb", "Video keyframe request failed", error) }
+                 finally { recoveryPending.set(false) }
+             }
+@@ -193,36 +135,36 @@
+     }
+ 
+     fun setSurface(type: Int, surface: Surface) {
+-        surfaces[type] = surface
+-        videoDecoders[type]?.setSurface(surface)
++        synchronized(videoLifecycleLock) {
++            if (closed) return
++            surfaces[type] = surface
++            videoDecoders[type]?.setSurface(surface)
++        }
+     }
+ 
+     fun clearSurface(type: Int, surface: Surface) {
+-        if (surfaces.remove(type, surface)) videoDecoders[type]?.setSurface(null)
+-    }
+-
+-    /**
+-     * Also decodes stream [type] onto [surface] with its own decoder, one per [key], which
+-     * starts at the next keyframe it asks for; null stops it. The stream's own surface is not affected.
+-     */
+-    fun setMirrorSurface(type: Int, key: String, surface: Surface?) {
+-        val id = type to key
+-        synchronized(mirrorLock) {
+-            mirrorDecoders.remove(id)?.close()
+-            if (surface == null) {
+-                mirrorSurfaces.remove(id)
+-                return
+-            }
+-            mirrorSurfaces[id] = surface
+-        }
+-        lastVideoConfig[type]?.let { (codec, data) -> mirrorDecoders(type).forEach { it.configure(codec, data) } }
+-    }
+-
+-    private fun mirrorDecoders(type: Int): List<VideoDecoder> = synchronized(mirrorLock) {
+-        if (mirrorSurfaces.isEmpty()) return emptyList()
+-        mirrorSurfaces.filterKeys { it.first == type }.map { (id, surface) ->
+-            mirrorDecoders.getOrPut(id) { newVideoDecoder(type, surface, " stream=$type mirror=${id.second}") }
+-        }
++        synchronized(videoLifecycleLock) {
++            if (surfaces.remove(type, surface)) videoDecoders[type]?.setSurface(null)
++        }
++    }
++
++    /** 先阻止新 decoder 绑定，再等所有仍可能持有目标的 worker 解除，UI 无需阻塞。 */
++    fun detachSurface(surface: Surface, onDetached: () -> Unit) {
++        val decoders = synchronized(videoLifecycleLock) {
++            surfaces.entries.removeIf { it.value === surface }
++            if (defaultSurface === surface) defaultSurface = null
++            (videoDecoders.values + retiringVideoDecoders).distinct().also { targets ->
++                if (targets.isNotEmpty()) {
++                    val remaining = AtomicInteger(targets.size)
++                    targets.forEach { decoder ->
++                        decoder.detachSurface(surface) {
++                            if (remaining.decrementAndGet() == 0) onDetached()
++                        }
++                    }
++                }
++            }
++        }
++        if (decoders.isEmpty()) onDetached()
+     }
+ 
+     fun setScreenStreamActiveChangedListener(listener: ((Int, Boolean) -> Unit)?) {
+@@ -232,31 +174,51 @@
+         }
+     }
+ 
++    fun setVideoSizeChangedListener(listener: ((Int, Int) -> Unit)?) {
++        videoSizeChanged = listener
++        val (width, height) = mainVideoSize
++        listener?.invoke(width, height)
++    }
++
++    fun setVideoFailureListener(listener: ((VideoCodec, String) -> Unit)?) {
++        videoFailure = listener
++        mainVideoFailure?.let { listener?.invoke(it.first, it.second) }
++    }
++
++    fun setVideoRecoveredListener(listener: (() -> Unit)?) { videoRecovered = listener }
++
++    /** 宿主执行排队回调时再核对状态，不能让已退休 worker 清除新视频的失败提示。 */
++    fun currentVideoFailure(): Pair<VideoCodec, String>? = mainVideoFailure
++
++    /** 用户只重试主屏解码与关键帧，不关闭连接、音频或麦克风通道。 */
++    fun retryMainVideo(): Boolean = synchronized(videoLifecycleLock) {
++        if (closed) return@synchronized false
++        videoDecoders[110]?.retry() ?: false
++    }
++
+     override fun onVideoCodec(type: Int, codec: VideoCodec) {
+         pendingVideoCodec[type] = codec
+     }
+ 
+     override fun onVideoConfig(type: Int, codecData: ByteArray) {
+         val codec = pendingVideoCodec[type] ?: VideoCodec.H264
+-        lastVideoConfig[type] = codec to codecData
+-        videoDecoder(type).configure(codec, codecData)
+-        mirrorDecoders(type).forEach { it.configure(codec, codecData) }
++        videoDecoder(type)?.configure(codec, codecData)
+     }
+ 
+     override fun onVideoFrame(type: Int, naluBytes: ByteArray) {
+-        videoDecoder(type).submit(naluBytes)
+-        mirrorDecoders(type).forEach { it.submit(naluBytes) }
++        videoDecoder(type)?.submit(naluBytes)
+     }
+ 
+     override fun onScreenStreamActive(type: Int, active: Boolean) {
+         if (!active) {
+             videoRecoveryHandlers.remove(type)
+             videoDiagnosticHandlers.remove(type)
+-            videoDecoders.remove(type)?.close()
+-            synchronized(mirrorLock) {
+-                mirrorDecoders.keys.filter { it.first == type }.forEach { mirrorDecoders.remove(it)?.close() }
+-            }
+-            lastVideoConfig.remove(type)
++            synchronized(videoLifecycleLock) {
++                videoDecoders.remove(type)?.let { decoder ->
++                    retiringVideoDecoders.add(decoder)
++                    decoder.close()
++                }
++            }
+             pendingVideoCodec.remove(type)
+         }
+         synchronized(screenStateLock) {
+@@ -265,17 +227,22 @@
+         }
+     }
+ 
++    @Synchronized
+     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
+-        audioRenderer(id, format).start()
++        if (closed) return
++        audioRenderer(id, format)?.start()
+         if (format.audioType == "media") updateMediaAudio(id, true)
++        if (format.audioType.equals("speechrecognition", ignoreCase = true)) assistantAudioTypes.add(id)
+     }
+ 
+     override fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) {
+-        audioRenderer(id, format).submit(rtp, sample)
+-    }
+-
++        audioRenderer(id, format)?.submit(rtp, sample)
++    }
++
++    @Synchronized
+     override fun onAudioStopped(id: AudioStreamId) {
+         audioRenderers.remove(id)?.close()
++        assistantAudioTypes.remove(id)
+         updateMediaAudio(id, false)
+     }
+ 
+@@ -285,117 +252,135 @@
+             if (active) mediaAudioTypes.add(id) else mediaAudioTypes.remove(id)
+             before to mediaAudioTypes.isNotEmpty()
+         }
+-        if (before != after) onMediaAudioChanged(after)
+-    }
+-
++        if (before != after) mediaAudioChanged(after)
++    }
++
++    @Synchronized
+     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
+-        // This callback runs on the downlink thread; microphone failures must not stop playback.
++        if (closed) return
+         try {
+-            if (config.audioType == "telephony") enterCommunicationMode(id)
+-            val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, onAudioDiagnostic) }
+-            if (!uplink.start()) {
+-                microphoneUplinks.remove(id, uplink)
+-                restoreAudioMode(id)
+-            }
++            if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) callMode.acquire(id)
++            if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
++            val uplink = microphoneUplinks.computeIfAbsent(id) {
++                val ticket = if (config.audioType.equals("telephony", true)) callTimeline.start(CallAudioTimeline.Leg.UPLINK) else null
++                MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled,
++                    factorySource = factoryAudio?.microphoneSource(config.audioType, config.sampleRate, wirelessAudio),
++                    onStopRequested = { callTimeline.stopRequested(ticket) }) {
++                    try { callMode.release(id) } finally { callTimeline.released(ticket) }
++                }
++            }
++            if (!uplink.start()) onMicrophoneStopped(id)
+         } catch (error: Exception) {
+-            Log.e("xcertplay-usb", "microphone start failed stream=$id", error)
++            // 麦克风失败不能打断下行音频，释放本次录音和通信模式后等待下一次流启动。
+             MicrophoneCaptureStats.reportStartFailure(config, error, onAudioDiagnostic)
+             onMicrophoneStopped(id)
+         }
+     }
+ 
++    @Synchronized
+     override fun onMicrophoneStopped(id: AudioStreamId) {
+-        try {
+-            microphoneUplinks.remove(id)?.close()
+-        } finally {
+-            restoreAudioMode(id)
+-        }
+-    }
+-
+-    private fun enterCommunicationMode(id: AudioStreamId) {
+-        val manager = audioManager ?: return
+-        synchronized(audioModeLock) {
+-            if (communicationModeStream != null) return
+-            // Select the HAL communication path before AudioRecord is created.
+-            savedAudioMode = manager.mode
+-            manager.mode = AudioManager.MODE_IN_COMMUNICATION
+-            communicationModeStream = id
+-            Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id")
+-        }
+-    }
+-
+-    private fun restoreAudioMode(id: AudioStreamId?) {
+-        val manager = audioManager ?: return
+-        synchronized(audioModeLock) {
+-            val active = communicationModeStream ?: return
+-            if (id != null && id != active) return
+-            communicationModeStream = null
+-            try {
+-                manager.mode = savedAudioMode
+-                Log.i("xcertplay-usb", "audio mode restored to ${manager.mode}")
+-            } catch (error: RuntimeException) {
+-                Log.w("xcertplay-usb", "could not restore audio mode $savedAudioMode", error)
+-            }
++        try { microphoneUplinks.remove(id)?.close() }
++        finally {
++            assistantMicrophoneTypes.remove(id)
++            callMode.release(id)
+         }
+     }
+ 
+     fun close() {
++        synchronized(videoLifecycleLock) {
++            if (closed) return
++            closed = true
++            videoDecoders.values.forEach { retiringVideoDecoders.add(it); it.close() }
++            videoDecoders.clear()
++            surfaces.clear()
++            defaultSurface = null
++            videoSizeChanged = null
++        }
+         synchronized(screenStateLock) {
+             activeScreenTypes.forEach { screenStreamActiveChanged?.invoke(it, false) }
+             activeScreenTypes.clear()
+             screenStreamActiveChanged = null
+         }
+-        videoDecoders.values.forEach(VideoDecoder::close)
+-        videoDecoders.clear()
+-        synchronized(mirrorLock) {
+-            mirrorDecoders.values.forEach(VideoDecoder::close)
+-            mirrorDecoders.clear()
+-            mirrorSurfaces.clear()
+-        }
+         videoRecoveryHandlers.clear()
+         videoDiagnosticHandlers.clear()
+         recoveryExecutor.shutdownNow()
+-        audioRenderers.values.forEach(AudioRenderer::close)
+-        audioRenderers.clear()
++        synchronized(this) {
++            callTimeline.close()
++            audioFocusCoordinator.close()
++            audioRouting?.close()
++            audioRenderers.values.forEach(AudioRenderer::close)
++            audioRenderers.clear()
++            try { microphoneUplinks.values.forEach { runCatching { it.close() } } }
++            finally { microphoneUplinks.clear(); callMode.close() }
++            assistantAudioTypes.clear()
++            assistantMicrophoneTypes.clear()
++        }
+         val hadMedia = synchronized(mediaAudioTypes) { mediaAudioTypes.isNotEmpty().also { mediaAudioTypes.clear() } }
+-        if (hadMedia) onMediaAudioChanged(false)
+-        try {
+-            microphoneUplinks.values.forEach(MicrophoneUplink::close)
+-        } finally {
+-            microphoneUplinks.clear()
+-            restoreAudioMode(null)
+-        }
+-    }
+-
+-    private fun videoDecoder(type: Int): VideoDecoder =
+-        videoDecoders.computeIfAbsent(type) { newVideoDecoder(type, surfaces[type] ?: defaultSurface) }
+-
+-    private fun newVideoDecoder(type: Int, surface: Surface?, statsLabel: String? = null) = VideoDecoder(
+-        type,
+-        surface,
+-        videoWidth,
+-        videoHeight,
+-        preferSoftwareHevcDecoder,
+-        requestKeyFrame = { requestVideoRecovery(type) },
+-        report = { videoDiagnosticHandlers[type]?.invoke(it) },
+-        statsLabel = statsLabel,
+-    )
++        if (hadMedia) mediaAudioChanged(false)
++    }
++
++    private fun videoDecoder(type: Int): VideoDecoder? = synchronized(videoLifecycleLock) {
++        if (closed) return@synchronized null
++        videoDecoders.computeIfAbsent(type) {
++            VideoDecoder(
++                type,
++                surfaces[type] ?: defaultSurface,
++                videoWidth,
++                videoHeight,
++                preferSoftwareHevcDecoder,
++                requestKeyFrame = { requestVideoRecovery(type) },
++                report = {
++                    videoDiagnosticHandlers[type]?.invoke(it)
++                },
++                onFailure = { source, codec, reason ->
++                    val current = synchronized(videoLifecycleLock) {
++                        (type == 110 && !closed && videoDecoders[type] === source).also {
++                            if (it) mainVideoFailure = codec to reason
++                        }
++                    }
++                    if (current) videoFailure?.invoke(codec, reason)
++                },
++                onRecovered = { source ->
++                    val current = synchronized(videoLifecycleLock) {
++                        (type == 110 && !closed && videoDecoders[type] === source).also {
++                            if (it) mainVideoFailure = null
++                        }
++                    }
++                    if (current) videoRecovered?.invoke()
++                },
++                onClosed = { decoder -> synchronized(videoLifecycleLock) { retiringVideoDecoders.remove(decoder) } },
++                onOutputSize = { width, height ->
++                    if (type == 110 && !closed) {
++                        mainVideoSize = width to height
++                        videoSizeChanged?.invoke(width, height)
++                    }
++                },
++            )
++        }
++    }
+ 
+     @Synchronized
+-    private fun audioRenderer(id: AudioStreamId, format: AudioFormat): AudioRenderer {
++    private fun audioRenderer(id: AudioStreamId, format: AudioFormat): AudioRenderer? {
++        if (closed) return null
+         val existing = audioRenderers[id]
+         if (existing?.format == format) return existing
+         existing?.close()
+         return AudioRenderer(
+             format,
+-            advancedAudioChannelMapping,
++            if (audioRoutingTemplate != null) true else advancedAudioChannelMapping,
+             audioFocusEnabled,
+-            mediaChannel,
+-            navigationChannel,
++            audioRoutingTemplate?.choice(AudioOutputRole.MEDIA) ?: mediaChannel,
++            audioRoutingTemplate?.choice(AudioOutputRole.NAVIGATION) ?: navigationChannel,
++            audioRoutingTemplate?.choice(AudioOutputRole.ASSISTANT) ?: assistantChannel,
+             audioFocusCoordinator,
++            audioRouting,
++            factoryAudio,
+             navigationStreamType,
+             mediaBufferMillis,
+             onAudioDiagnostic,
++            wirelessAudio,
++            callTimeline,
++            ::audioRecoveryState,
+         ).also { audioRenderers[id] = it }
+     }
+ }
+@@ -409,81 +394,156 @@
+     private val preferSoftwareHevcDecoder: Boolean,
+     private val requestKeyFrame: () -> Unit,
+     private val report: (String) -> Unit,
+-    statsLabel: String? = null,
++    private val onFailure: (VideoDecoder, VideoCodec, String) -> Unit,
++    private val onRecovered: (VideoDecoder) -> Unit,
++    private val onClosed: (VideoDecoder) -> Unit,
++    private val onOutputSize: (Int, Int) -> Unit,
++    // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
++    private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
+ ) : Closeable {
+-    private val queue = VideoDecodeQueue()
+     @Volatile private var running = true
+     @Volatile private var decoder: MediaCodec? = null
+-    private var outputSurface: Surface? = surface
++    @Volatile private var outputSurface: Surface? = surface
++    @Volatile private var desiredSurface: Surface? = surface
++    private val lifecycleLock = Any()
++    private var terminated = false
++    private val exitCallbacks = mutableListOf<() -> Unit>()
++    private val recoveryGate = VideoRecoveryGate()
++    private val inputSlot = VideoInputSlot()
++    private val inputProgress = VideoInputProgress()
++    private val manualRetryPending = AtomicBoolean(false)
++    private val startupWatchdog = VideoStartupWatchdog()
++    private val playbackWatchdog = VideoPlaybackWatchdog()
++    @Volatile private var failureReported = false
++    private val decoderCandidateCache = mutableMapOf<String, List<VideoDecoderCandidate>>()
++    private val outputInfo = MediaCodec.BufferInfo()
++    private val inputTiming = VideoInputTiming()
++    private val renderHandler = Handler(Looper.getMainLooper())
++    @Volatile private var surfaceChangedUs = 0L
+     private var lastConfig: VideoJob.Config? = null
+-    private var renderedFrameLogged = false
++    @Volatile private var renderedFrameLogged = false
+     private var submittedFrameLogged = false
+     private var duplicateConfigLogged = false
+-    private var failureReports = 0
+     private val referenceChain = VideoReferenceChain()
+     private var lastKeyFrameRequestNs = 0L
+-    // The main screen keeps the historical log format; other screens are labelled.
+-    private val stats = VideoStats(statsLabel ?: if (streamType == 110) "" else " stream=$streamType")
++    // 主屏统计不添加流类型后缀，其余流独立标记。
++    private val stats = VideoStats(if (streamType == 110) "" else " stream=$streamType")
++    private val queue = VideoDecodeQueue(onDepth = stats::onQueued)
+     private val thread = Thread(::run, "carplay-video").apply { isDaemon = true; start() }
+ 
+     fun configure(codec: VideoCodec, codecData: ByteArray) {
+-        queue.offer(VideoJob.Config(codec, codecData))
++        synchronized(lifecycleLock) { if (running) queue.offer(VideoJob.Config(codec, codecData)) }
+     }
+ 
+     fun submit(nalus: ByteArray) {
+-        stats.onReceived(nalus.size)
+-        queue.offer(VideoJob.Frame(nalus))
++        synchronized(lifecycleLock) {
++            if (!running) return
++            val frame = VideoJob.Frame(nalus)
++            playbackWatchdog.received(frame.receivedNs)
++            stats.onReceived(nalus.size)
++            queue.offer(frame)
++        }
++    }
++
++    fun retry(): Boolean = synchronized(lifecycleLock) {
++        if (!running || !manualRetryPending.compareAndSet(false, true)) return@synchronized false
++        queue.offer(VideoJob.Retry)
++        true
+     }
+ 
+     fun setSurface(surface: Surface?) {
+-        queue.offer(VideoJob.SurfaceChanged(surface))
++        synchronized(lifecycleLock) {
++            if (!running) return
++            desiredSurface = surface
++            queue.offer(VideoJob.SurfaceChanged(surface))
++        }
++    }
++
++    fun detachSurface(surface: Surface, onDetached: () -> Unit) {
++        val completeNow = synchronized(lifecycleLock) {
++            if (desiredSurface === surface) desiredSurface = null
++            when {
++                terminated -> true
++                !running -> { exitCallbacks.add(onDetached); false }
++                else -> { queue.offer(VideoJob.SurfaceChanged(desiredSurface, onDetached)); false }
++            }
++        }
++        if (completeNow) onDetached()
+     }
+ 
+     override fun close() {
+-        running = false
+-        thread.interrupt()
++        synchronized(lifecycleLock) { running = false; desiredSurface = null; thread.interrupt() }
+     }
+ 
+     private fun run() {
+         try {
+             while (running) {
+-                val job = queue.poll(5)
++                // 有输入待输出时快排空；静态画面降低轮询，控制/输入入队会立即唤醒。
++                val job = queue.poll(if (inputTiming.pending > 0) 5 else 50)
+                 try {
+                     when (job) {
+                         is VideoJob.Config -> configureDecoder(job)
+                         is VideoJob.Frame -> {
+-                            if (System.nanoTime() - job.receivedNs > MAX_FRAME_AGE_NS) {
+-                                queue.discardFrames()
+-                                recover("video backlog exceeded 250 ms")
+-                            } else feed(job.nalus)
++                            if (VideoFrameBudget.remainingNs(job.receivedNs, System.nanoTime()) == 0L) {
++                                stats.onDropped(1 + queue.discardFrames(), VideoDropReason.EXPIRED)
++                                resync("video backlog exceeded 250 ms")
++                            } else feed(job)
+                         }
+-                        is VideoJob.SurfaceChanged -> changeSurface(job.surface)
+-                        is VideoJob.Resync -> recover("video queue overflow")
++                        is VideoJob.SurfaceChanged -> {
++                            try { changeSurface(job.surface) }
++                            catch (error: Exception) { releaseDecoder(); throw error }
++                            finally { job.onApplied() }
++                        }
++                        is VideoJob.Resync -> resync("video queue overflow")
++                        is VideoJob.Retry -> {
++                            try {
++                                recoveryGate.reset(); failureReported = false
++                                releaseDecoder()
++                                resync("manual video retry")
++                                lastConfig?.let(::configureDecoder)
++                            } finally { manualRetryPending.set(false) }
++                        }
+                         null -> Unit
+                     }
+                     decoder?.let(::drainOutput)
++                    if (outputSurface?.isValid == true && outputSurface === desiredSurface) {
++                        if (playbackWatchdog.failure(System.nanoTime())) {
++                            resync("no fresh presentation for 8s")
++                            reportFailure("received video without fresh presentation for 8s")
++                        }
++                        startupWatchdog.failure(System.nanoTime())?.let {
++                            report("startup stalled: $it")
++                            recover("startup stalled: $it")
++                            reportFailure(it)
++                        }
++                    }
+                     stats.logIfDue()?.let(report)
+-                    if (referenceChain.needsKeyFrame && lastConfig != null && outputSurface != null) requestKeyFrameIfDue()
++                    if (recoveryGate.canRetry(System.nanoTime()) && referenceChain.needsKeyFrame &&
++                        lastConfig != null && outputSurface != null) requestKeyFrameIfDue()
+                 } catch (error: Exception) {
+                     if (running) Log.e(TAG, "video decoder job failed: ${job?.javaClass?.simpleName}", error)
+-                    if (running) reportFailure("stage=${job?.javaClass?.simpleName ?: "drain"}", error)
+-                    releaseDecoder()
+-                    referenceChain.reset()
+-                    requestKeyFrameIfDue()
+-                } catch (error: LinkageError) {
+-                    if (running) reportFailure("stage=${job?.javaClass?.simpleName ?: "drain"}", error)
+-                    throw error
++                    if (running) report("decoder error ${error.javaClass.simpleName}; waiting for keyframe")
++                    if (running) recover("decoder exception ${error.javaClass.simpleName}")
+                 }
+             }
+         } catch (_: InterruptedException) {
+             // Worker shut down.
+         } finally {
+             releaseDecoder()
++            val callbacks = synchronized(lifecycleLock) {
++                terminated = true
++                queue.drain().filterIsInstance<VideoJob.SurfaceChanged>().map { it.onApplied } +
++                    exitCallbacks.toList().also { exitCallbacks.clear() }
++            }
++            callbacks.forEach { runCatching { it() } }
++            onClosed(this)
+         }
+     }
+ 
+     private fun configureDecoder(config: VideoJob.Config) {
+         val previous = lastConfig
++        val changed = previous == null || previous.codec != config.codec || !previous.codecData.contentEquals(config.codecData)
++        if (changed) { recoveryGate.reset(); failureReported = false }
+         if (
+             decoder != null &&
+             previous?.codec == config.codec &&
+@@ -496,10 +556,13 @@
+             return
+         }
+         lastConfig = config
++        if (!recoveryGate.canRetry(System.nanoTime())) return
+         duplicateConfigLogged = false
+         releaseDecoder()
+         referenceChain.reset()
+-        val surface = outputSurface ?: return
++        val surface = outputSurface?.takeIf { it.isValid && it === desiredSurface } ?: return
++        if (!recoveryGate.beginAttempt(System.nanoTime())) return
++        val setupStartedNs = System.nanoTime()
+         val codec = config.codec
+         val codecData = config.codecData
+         val mime = if (codec == VideoCodec.H265) MediaFormat.MIMETYPE_VIDEO_HEVC
+@@ -514,25 +577,39 @@
+                 pps.takeIf { it.isNotEmpty() }?.let { START_CODE + it },
+             )
+         }
+-        // Some vendor decoders (e.g. MediaTek c2.mtk.avc.decoder) reject the tuned
+-        // parameters with BAD_VALUE. Fall back to a minimal format, then to software.
+-        val attempts = listOf(
+-            DecoderAttempt(codecName = null, tuned = true),
+-            DecoderAttempt(codecName = null, tuned = false),
+-        ) + softwareDecoderName(mime)?.let { listOf(DecoderAttempt(it, tuned = false)) }.orEmpty()
++        if (codec == VideoCodec.H265 && csd.isEmpty()) {
++            report("HEVC configuration rejected: missing or malformed VPS/SPS/PPS bytes=${codecData.size}")
++            recover("HEVC initialization parameters invalid")
++            reportFailure("HEVC initialization parameters invalid")
++            return
++        }
++        report("codec config mime=$mime source=${if (codecData.firstOrNull() == 1.toByte()) "record" else "AnnexB"} csdBytes=${csd.sumOf { it.size }}")
++        // 每个可用硬件先试调优格式，再试精简格式；全部失败才尝试软件。
++        val candidates = decoderCandidates(mime)
++        val attempts = candidates.flatMap { candidate ->
++            if (candidate.software) listOf(DecoderAttempt(candidate, false))
++            else listOf(DecoderAttempt(candidate, true), DecoderAttempt(candidate, false))
++        }
+         var next: MediaCodec? = null
+         for (attempt in attempts) {
++            // 系统 create/configure/start 为同步调用；只约束后续候选，不用第二个线程争抢 codec。
++            if (!running || System.nanoTime() - setupStartedNs >= 3_000_000_000L) break
+             next = tryConfigure(mime, csd, surface, attempt)
+             if (next != null) break
+         }
+         if (next == null) {
+-            report("decoder configuration failed mime=$mime size=${width}x$height")
++            recover("decoder configuration failed mime=$mime size=${width}x$height")
+         }
+         decoder = next
+         renderedFrameLogged = false
+         submittedFrameLogged = false
+         if (next != null) {
+-            report("decoder=${next.name} mime=$mime size=${width}x$height")
++            playbackWatchdog.ready()
++            resync("decoder ready setupMs=${(System.nanoTime() - setupStartedNs) / 1_000_000}", VideoDropReason.REBUILD_WAIT)
++            val info = next.codecInfo
++            val hardware = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isHardwareAccelerated
++            val software = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly
++            report("decoder=${next.name} hardware=$hardware software=$software mime=$mime size=${width}x$height")
+             Log.i(
+                 TAG,
+                 "video decoder configured name=${next.name} mime=$mime size=${width}x$height",
+@@ -540,7 +617,7 @@
+         }
+     }
+ 
+-    private data class DecoderAttempt(val codecName: String?, val tuned: Boolean)
++    private data class DecoderAttempt(val candidate: VideoDecoderCandidate, val tuned: Boolean)
+ 
+     private fun buildFormat(mime: String, csd: List<ByteArray>, tuned: Boolean): MediaFormat =
+         MediaFormat.createVideoFormat(mime, width, height).apply {
+@@ -558,23 +635,56 @@
+         attempt: DecoderAttempt,
+     ): MediaCodec? {
+         var candidate: MediaCodec? = null
++        var phase = "create"
+         return try {
+             val format = buildFormat(mime, csd, attempt.tuned)
+-            val codec = attempt.codecName?.let { MediaCodec.createByCodecName(it) } ?: createDecoder(mime)
++            val codec = createCodec(attempt.candidate.name)
+             candidate = codec
+             if (attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+-                codec.codecInfo.getCapabilitiesForType(mime).isFeatureSupported("low-latency")) {
++                attempt.candidate.lowLatency) {
+                 format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+             }
++            phase = "configure"
+             codec.configure(format, surface, null, 0)
++            codec.setOnFrameRenderedListener({ source, presentationUs, renderedNs ->
++                if (running && decoder === source && outputSurface === desiredSurface &&
++                    desiredSurface != null && presentationUs >= surfaceChangedUs) {
++                    stats.onPresented(presentationUs, renderedNs)
++                    val now = System.nanoTime()
++                    // 迟到的实际呈现仍记统计，但不能把旧画面当作本次恢复成功。
++                    if (VideoFrameBudget.remainingNs(presentationUs * 1000, now) > 0) {
++                        playbackWatchdog.presented(now)
++                        val recovering = failureReported
++                        failureReported = false
++                        if (!renderedFrameLogged) {
++                            renderedFrameLogged = true
++                            startupWatchdog.rendered()
++                            report("first frame rendered")
++                            Log.i(TAG, "video decoder first Surface presentation callback")
++                            onRecovered(this@VideoDecoder)
++                        } else if (recovering) {
++                            report("video presentation resumed")
++                            onRecovered(this@VideoDecoder)
++                        }
++                    }
++                }
++            }, renderHandler)
++            phase = "start"
+             codec.start()
++            report("decoder attempt=${codec.name} tuned=${attempt.tuned} " +
++                "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency}")
+             codec
+         } catch (error: Exception) {
+             runCatching { candidate?.release() }
+-            reportFailure("stage=configure tuned=${attempt.tuned} mime=$mime", error)
++            val detail = (error as? MediaCodec.CodecException)?.diagnosticInfo ?: error.javaClass.simpleName
++            val codecError = error as? MediaCodec.CodecException
++            report("configure rejected decoder=${attempt.candidate.name} phase=$phase tuned=${attempt.tuned} " +
++                "mime=$mime size=${width}x$height diagnostic=$detail errorCode=${codecError?.errorCode} " +
++                "recoverable=${codecError?.isRecoverable} transient=${codecError?.isTransient} " +
++                "reason=${error.message?.replace('\n', ' ')?.replace('\r', ' ')?.take(160)}")
+             Log.w(
+                 TAG,
+-                "video decoder configure failed name=${attempt.codecName ?: "default"} " +
++                "video decoder configure failed name=${attempt.candidate.name} " +
+                     "tuned=${attempt.tuned} mime=$mime size=${width}x$height",
+                 error,
+             )
+@@ -582,44 +692,39 @@
+         }
+     }
+ 
+-    private fun softwareDecoderName(mime: String): String? {
+-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+-        return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
+-            !it.isEncoder && it.isSoftwareOnly && mime in it.supportedTypes
+-        }?.name
+-    }
+-
+-    private fun createDecoder(mime: String): MediaCodec {
+-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+-            mime == MediaFormat.MIMETYPE_VIDEO_HEVC &&
+-            preferSoftwareHevcDecoder
+-        ) {
+-            val software = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
+-                !it.isEncoder && it.isSoftwareOnly && mime in it.supportedTypes
+-            }
+-            if (software != null) {
+-                try {
+-                    return MediaCodec.createByCodecName(software.name)
+-                } catch (error: Exception) {
+-                    Log.w(TAG, "software HEVC decoder unavailable name=${software.name}", error)
+-                }
+-            }
+-        }
+-        return MediaCodec.createDecoderByType(mime)
++    private fun decoderCandidates(mime: String): List<VideoDecoderCandidate> = decoderCandidateCache.getOrPut(mime) {
++        val candidates = VideoDecoderCapabilities.query(mime, width, height, report = report)
++        if (candidates.isEmpty()) report("no usable decoder mime=$mime size=${width}x$height reason=capability_filter")
++        VideoDecoderSelection.ordered(candidates,
++            preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC)
+     }
+ 
+     private fun changeSurface(surface: Surface?) {
++        if (surface != null && surface !== desiredSurface) {
++            // 排队期间已被替换的目标不再创建或重绑 codec；解除仍持有的旧目标。
++            if (outputSurface !== desiredSurface) {
++                releaseDecoder(); outputSurface = null; referenceChain.reset()
++            }
++            return
++        }
+         if (outputSurface === surface) return
+         outputSurface = surface
++        surfaceChangedUs = System.nanoTime() / 1000
++        renderedFrameLogged = false
++        startupWatchdog.reset()
++        failureReported = false
+         if (surface == null) {
+             releaseDecoder()
+             Log.i(TAG, "video decoder detached from surface")
+             return
+         }
++        // 新的显示目标是显式恢复机会；保留成功切换的 codec，不无条件重建。
++        recoveryGate.reset()
+         val codec = decoder
+         if (codec != null) {
+             try {
+                 codec.setOutputSurface(surface)
++                playbackWatchdog.ready()
+                 Log.i(TAG, "video decoder output surface updated")
+                 return
+             } catch (error: Exception) {
+@@ -630,75 +735,147 @@
+         lastConfig?.let(::configureDecoder)
+     }
+ 
+-    private fun feed(nalus: ByteArray) {
++    private fun feed(frame: VideoJob.Frame) {
++        val nalus = frame.nalus
++        val config = lastConfig ?: run { stats.onDropped(reason = VideoDropReason.NO_CONFIG); return }
++        if (outputSurface == null || outputSurface !== desiredSurface) {
++            // 跳过的是压缩参考帧，目标返回后必须重新建立参考链。
++            stats.onDropped(reason = VideoDropReason.NO_TARGET); releaseDecoder(); referenceChain.reset(); return
++        }
++        if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) {
++            stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return
++        }
+         val annexB = MediaCodecSupport.toAnnexB(nalus)
+-        val config = lastConfig ?: return
+-        if (outputSurface == null) return
+-        if (annexB.isEmpty()) { recover("invalid video access unit"); return }
++        if (annexB.isEmpty()) { stats.onDropped(); resync("invalid video access unit"); return }
+         if (!referenceChain.accepts(annexB, config.codec)) {
++            stats.onDropped(reason = VideoDropReason.WAIT_KEYFRAME)
+             requestKeyFrameIfDue()
+             return
+         }
+-        if (decoder == null) configureDecoder(config)
+-        val codec = decoder ?: return
++        if (decoder == null) {
++            configureDecoder(config)
++            // 重建期间收到的压缩帧已失去时效，等下一份新关键帧；不把创建时间计成输入失败。
++            stats.onDropped(reason = VideoDropReason.REBUILD_WAIT)
++            return
++        }
++        val codec = decoder ?: run { stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return }
+         if (!submittedFrameLogged) {
+             submittedFrameLogged = true
+             Log.i(
+                 TAG,
+-                "video decoder first input avcc=${nalus.size} annexB=${annexB.size}",
++                "video decoder first input avcc=${nalus.size} annexB=${annexB.size} " +
++                    "head=${annexB.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
+             )
+         }
+-        val index = VideoInputPump.acquire(
+-            running = { running }, drain = { drainOutput(codec) },
+-            dequeue = { codec.dequeueInputBuffer(INPUT_TIMEOUT_US) },
+-        )
+-        if (index < 0) { recover("video decoder input stalled"); return }
++        val index = inputSlot.acquire { VideoInputPump.acquire(
++            running = { running && outputSurface === desiredSurface }, drain = { drainOutput(codec) },
++            dequeue = {
++                val remaining = VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime())
++                if (remaining == 0L) -1 else codec.dequeueInputBuffer(minOf(INPUT_TIMEOUT_US, remaining / 1000))
++            },
++            timeoutNs = VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()),
++        ) }
++        if (!running) return
++        if (outputSurface !== desiredSurface) {
++            stats.onDropped(reason = VideoDropReason.NO_TARGET); releaseDecoder(); referenceChain.reset(); return
++        }
++        if (index < 0) {
++            stats.onDropped(reason = VideoDropReason.INPUT_WAIT)
++            if (inputProgress.timedOut(System.nanoTime())) recover("video decoder input stalled for 2s")
++            else resync("video input temporarily unavailable")
++            return
++        }
++        if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
++            stats.onDropped(reason = VideoDropReason.EXPIRED)
++            resync("video input frame expired; retaining input slot")
++            return
++        }
+         val input = checkNotNull(codec.getInputBuffer(index)) { "Decoder input buffer unavailable" }
+         input.clear()
+         if (annexB.size <= input.remaining()) {
+             input.put(annexB)
+-            codec.queueInputBuffer(index, 0, annexB.size, System.nanoTime() / 1000, 0)
++            if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
++                stats.onDropped(reason = VideoDropReason.EXPIRED)
++                resync("video input copy expired; retaining input slot"); return
++            }
++            // 本地接收时刻作为 PTS，可关联输入、输出和 Surface 回调的帧龄。
++            val inputNs = System.nanoTime()
++            codec.queueInputBuffer(index, 0, annexB.size, frame.receivedNs / 1000, 0)
++            inputSlot.queued()
++            inputProgress.reset()
++            inputTiming.record(frame.receivedNs / 1000, inputNs)
++            stats.onInput(frame.receivedNs)
++            startupWatchdog.input(inputNs)
+             referenceChain.onQueued()
+         } else {
++            stats.onDropped(reason = VideoDropReason.INPUT_CAPACITY)
+             recover("video frame exceeded codec input capacity")
+             return
+         }
+         drainOutput(codec)
+     }
+ 
++    /** 积压只丢压缩参考链并请求新关键帧；健康 codec 保留，不消耗故障重建额度。 */
++    private fun resync(reason: String, dropReason: VideoDropReason = VideoDropReason.EXPIRED) {
++        val dropped = queue.discardFrames()
++        if (dropped > 0) stats.onDropped(dropped, dropReason)
++        referenceChain.reset()
++        if (dropped > 0 || dropReason == VideoDropReason.REBUILD_WAIT) report("resync: $reason dropped=$dropped")
++        requestKeyFrameIfDue()
++    }
++
+     private fun recover(reason: String) {
++        if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) return
+         Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
+         stats.onRecovery()
+-        report("recovery: $reason; waiting for keyframe")
+-        // Recreate with codec-specific data: flush can discard CSD before the first output.
++        recoveryGate.onFailure(System.nanoTime())
++        report("recovery: $reason attempt=${recoveryGate.failures}/4 " +
++            "probes=${recoveryGate.probes}/2 " +
++            "${if (recoveryGate.terminal) "automatic retries exhausted; manual video retry available"
++                else if (recoveryGate.exhausted) "cooldown; bounded probe available after 15s" else "waiting for keyframe"}")
++        if (recoveryGate.exhausted) reportFailure(reason)
++        // 重建时重新提交初始化数据，不能 flush 后丢失首帧参数。
+         releaseDecoder()
+         referenceChain.reset()
+         requestKeyFrameIfDue()
+     }
+ 
++    private fun reportFailure(reason: String) {
++        if (failureReported) return
++        val config = lastConfig ?: return
++        failureReported = true
++        report("video unavailable codec=${config.codec} reason=$reason")
++        onFailure(this, config.codec, reason)
++    }
++
+     private fun requestKeyFrameIfDue() {
++        if (!running || desiredSurface == null) return
+         val now = System.nanoTime()
++        if (!recoveryGate.canRetry(now)) return
+         if (lastKeyFrameRequestNs != 0L && now - lastKeyFrameRequestNs < 1_000_000_000L) return
+         lastKeyFrameRequestNs = now
+         requestKeyFrame()
+     }
+ 
+     private fun drainOutput(codec: MediaCodec) {
+-        val info = MediaCodec.BufferInfo()
++        val info = outputInfo
+         while (running) {
+             val index = codec.dequeueOutputBuffer(info, 0)
+             when {
+                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> return
+                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> logOutputFormat(codec.outputFormat)
+                 index >= 0 -> {
+-                    val render = outputSurface != null
++                    startupWatchdog.output()
++                    inputProgress.output()
++                    val now = System.nanoTime()
++                    val expired = VideoFrameBudget.remainingNs(info.presentationTimeUs * 1000, now) == 0L
++                    val render = running && !expired && outputSurface != null && outputSurface === desiredSurface
++                    val decodeNs = inputTiming.take(info.presentationTimeUs, now)
++                    // 已解码图像可以丢弃，不会破坏 codec 内部参考链；避免补播过期画面。
+                     codec.releaseOutputBuffer(index, render)
+-                    if (render) stats.onRendered()
+-                    if (render && !renderedFrameLogged) {
+-                        renderedFrameLogged = true
+-                        report("first frame rendered")
+-                        Log.i(TAG, "video decoder rendered first frame bytes=${info.size}")
+-                    }
++                    if (render) {
++                        stats.onSubmitted(info.presentationTimeUs, decodeNs); recoveryGate.onOutput(now)
++                    } else stats.onDropped(reason = if (expired) VideoDropReason.OUTPUT_EXPIRED else VideoDropReason.NO_TARGET)
+                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
+                 }
+                 else -> return
+@@ -707,6 +884,13 @@
+     }
+ 
+     private fun logOutputFormat(format: MediaFormat) {
++        val codedWidth = format.intOrNull(MediaFormat.KEY_WIDTH) ?: width
++        val codedHeight = format.intOrNull(MediaFormat.KEY_HEIGHT) ?: height
++        val visibleWidth = ((format.intOrNull("crop-right") ?: (codedWidth - 1)) -
++            (format.intOrNull("crop-left") ?: 0) + 1).coerceIn(1, codedWidth.coerceAtLeast(1))
++        val visibleHeight = ((format.intOrNull("crop-bottom") ?: (codedHeight - 1)) -
++            (format.intOrNull("crop-top") ?: 0) + 1).coerceIn(1, codedHeight.coerceAtLeast(1))
++        onOutputSize(visibleWidth, visibleHeight)
+         report("output format requested=${width}x${height} " +
+             "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
+             "crop=${format.intOrNull("crop-left")},${format.intOrNull("crop-top")}," +
+@@ -726,19 +910,16 @@
+         )
+     }
+ 
+-    private fun reportFailure(context: String, error: Throwable) {
+-        // A bad decoder can fail again on every frame; exported detail stays bounded per worker.
+-        if (failureReports >= 8) return
+-        failureReports++
+-        runCatching { report("decoder failed api=${Build.VERSION.SDK_INT} $context " +
+-            MediaFailureSummary.describe(error)) }
+-    }
+-
+     @Synchronized
+     private fun releaseDecoder() {
+         val codec = decoder
+         decoder = null
++        inputTiming.clear()
++        inputSlot.clear(); inputProgress.reset()
++        startupWatchdog.reset()
++        playbackWatchdog.ready()
+         if (codec != null) {
++            runCatching { codec.setOnFrameRenderedListener(null, null) }
+             try {
+                 codec.stop()
+             } catch (_: Exception) {
+@@ -756,7 +937,6 @@
+         const val TAG = "xcertplay-usb"
+         const val MAX_INPUT_SIZE = 8 * 1024 * 1024
+         const val INPUT_TIMEOUT_US = 10_000L
+-        const val MAX_FRAME_AGE_NS = 250_000_000L
+         val START_CODE = byteArrayOf(0x00, 0x00, 0x00, 0x01)
+     }
+ }
+@@ -779,13 +959,25 @@
+     private val audioFocusEnabled: Boolean,
+     private val mediaChannel: Int,
+     private val navigationChannel: Int,
++    private val assistantChannel: Int,
+     private val audioFocusCoordinator: AudioFocusCoordinator,
++    private val audioRouting: AudioRouteProvider?,
++    private val factoryAudio: PlatformAudioProfile?,
+     private val navigationStreamType: Int,
+     private val mediaBufferMillis: Int,
+     private val report: (String) -> Unit,
++    private val wirelessAudio: Boolean,
++    private val callTimeline: CallAudioTimeline,
++    private val audioRecoveryState: () -> String,
+ ) : Closeable {
+-    private data class AudioPacket(val rtp: ByteArray, val sample: Int)
+-
++    private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
++
++    private val e5Realtime = E5WirelessAudioBuffer.applies(wirelessAudio, format)
++    private val playoutClock = if (e5Realtime) WirelessAudioPlayoutClock(format.sampleRate) else null
++    private var pendingPacket: AudioPacket? = null
++    private var pendingDueNs = 0L
++
++    private var routeBinding: AudioRouteBinding? = null
+     private var trackAttributes: AudioAttributes? = null
+     private var mappedChannel: AudioChannel? = null
+     private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
+@@ -832,10 +1024,12 @@
+     private var lastDecoderOutputMetadata: String? = null
+     private var decoderOutputReports = 0
+     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
++    private var callTicket: CallAudioTimeline.Ticket? = null
+ 
+     fun start() {
+         if (started) return
+         started = true
++        if (format.audioType.equals("telephony", true)) callTicket = callTimeline.start(CallAudioTimeline.Leg.DOWNLINK)
+         thread.start()
+     }
+ 
+@@ -846,7 +1040,7 @@
+             val previous = lastArrivalNs.getAndSet(now)
+             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
+         }
+-        if (!started || !queue.offer(AudioPacket(rtp, sample))) {
++        if (!started || !queue.offer(AudioPacket(rtp, sample, System.nanoTime()))) {
+             if (started) packetsDropped.incrementAndGet()
+             if (started && !droppedPacketsLogged) {
+                 droppedPacketsLogged = true
+@@ -857,6 +1051,7 @@
+     }
+ 
+     override fun close() {
++        callTimeline.stopRequested(callTicket)
+         running = false
+         thread.interrupt()
+     }
+@@ -866,20 +1061,20 @@
+             runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
+                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
+                 "mapping=${if (advancedAudioChannelMapping) "automotive" else "mobile"} " +
+-                "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") }
++                "mediaChannel=$mediaChannel navigationChannel=$navigationChannel assistantChannel=$assistantChannel focus=$audioFocusEnabled") }
+             when (format.codec) {
+                 AudioCodecKind.AAC_LC -> configureCodec(MediaFormat.MIMETYPE_AUDIO_AAC)
+                 AudioCodecKind.OPUS -> configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
+                 AudioCodecKind.LPCM -> Unit
+             }
++            if (!running) return
+             createTrack()
+             diagnosticStage = "focus"
+             requestAudioFocus()
+             while (running) {
+                 diagnosticStage = "packet"
+-                queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
+-                // Output becomes ready asynchronously, including after the last packet of a burst.
+-                // Waiting for the next UDP packet can strand decoded sound for hundreds of ms.
++                nextPacket()?.let(::handle)
++                // 尾包之后仍需轮询解码输出，避免短句等待下一个网络包才播放。
+                 diagnosticStage = "decoder-output"
+                 codec?.let(::drainCodec)
+                 diagnosticStage = "buffer-maintenance"
+@@ -888,20 +1083,35 @@
+                 logStatsIfDue()
+             }
+         } catch (_: InterruptedException) {
+-            // Worker shut down.
++            // 会话关闭，结束当前 worker。
+         } catch (error: Exception) {
+             if (running) {
+                 Log.e(TAG, "audio renderer worker failed", error)
+                 reportFailure(error)
+             }
+         } catch (error: LinkageError) {
+-            // Record an unsupported platform API without changing the existing crash semantics.
++            // 记录不支持的系统 API，保留原异常语义。
+             if (running) reportFailure(error)
+             throw error
+         } finally {
+             runCatching { logStatsIfDue(force = true) }
+-            release()
+-        }
++            try { release() } finally { callTimeline.released(callTicket) }
++        }
++    }
++
++    private fun nextPacket(): AudioPacket? {
++        if (pendingPacket == null) {
++            val packet = queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS) ?: return null
++            val clock = playoutClock ?: return packet
++            pendingPacket = packet
++            pendingDueNs = clock.dueNs(packet.sample, packet.receivedNs)
++        }
++        val remaining = pendingDueNs - System.nanoTime()
++        if (remaining > 0) {
++            TimeUnit.NANOSECONDS.sleep(minOf(remaining, AUDIO_POLL_MILLIS * 1_000_000L))
++            return null
++        }
++        return pendingPacket.also { pendingPacket = null }
+     }
+ 
+     private fun configureCodec(mime: String) {
+@@ -934,7 +1144,7 @@
+                 start = { diagnosticStage = "decoder-start"; it.start() },
+                 release = { it.release() },
+             ).also {
+-                // A vendor name getter or diagnostic callback must not discard a started codec.
++                // 驱动名称查询或诊断回调失败不能丢弃已启动的解码器。
+                 runCatching {
+                     val name = it.name
+                     Log.i(TAG, "audio decoder configured mime=$mime name=$name")
+@@ -956,9 +1166,8 @@
+         val minBuffer = AudioTrack.getMinBufferSize(format.sampleRate, channelMask, encoding)
+         if (minBuffer <= 0) {
+             Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}")
+-            runCatching { report("Audio: track unavailable api=${Build.VERSION.SDK_INT} stage=$diagnosticStage " +
+-                "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} " +
+-                "channels=${format.channels} minBufferResult=$minBuffer") }
++            runCatching { report("Audio: track unavailable stage=$diagnosticStage " +
++                "audioType=${format.audioType} rate=${format.sampleRate} channels=${format.channels} minBufferResult=$minBuffer") }
+             return
+         }
+         val selection = mappedSelection()
+@@ -966,15 +1175,15 @@
+         val streamOverride = channelOverride(selection.channel)
+         var attributes = audioAttributesFor(selection, streamOverride)
+         trackAttributes = attributes
+-        val plan = MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
+-            format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
++        val plan = if (e5Realtime) E5WirelessAudioBuffer.plan(format.sampleRate, format.channels, minBuffer)
++            else MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
++                format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
+         bytesPerSecond = format.sampleRate * frameBytes
+         val built: AudioTrack
+         var routeLabel: String
+         diagnosticStage = "track-build"
+-        if (streamOverride == 0) {
+-            attributes = audioAttributesFor(selection)
+-            routeLabel = "usage"
++        if (!AudioOutputPolicy.isLegacy(streamOverride)) {
++            routeLabel = "usage=${attributes.usage} preset=$streamOverride"
+             built = AudioTrack.Builder()
+                 .setAudioAttributes(attributes)
+                 .setAudioFormat(pcmFormat(encoding, channelMask))
+@@ -1008,19 +1217,18 @@
+         track = built
+         diagnosticStage = "track-attributes"
+         trackAttributes = audioTrackAttributesForFocus(built, attributes)
++        routeBinding = audioRouting?.bind(built, AudioOutputPolicy.routingChannel(selection.channel, streamOverride),
++            false, format.sampleRate, format.channels, useBus = !AudioOutputPolicy.isLegacy(streamOverride))
+         diagnosticStage = "track-capacity"
+         val capacityBytes = built.bufferSizeInFrames * frameBytes
+-        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes, PREBUFFER_WRITE_CHUNK_BYTES)
+-        val trackMetadata = runCatching {
+-            "api=${Build.VERSION.SDK_INT} trackState=${built.state} trackRate=${built.sampleRate} " +
+-                "usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType} " +
+-                "attributesSource=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "track" else "configured"}"
+-        }.getOrDefault("api=${Build.VERSION.SDK_INT} trackMetadata=unavailable")
++        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
++            if (e5Realtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
+         report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
+             "rate=${format.sampleRate} channels=${format.channels} " +
+             "route=$routeLabel " +
+             "bufferMs=${capacityBytes * 1000L / bytesPerSecond} startMs=${startThresholdBytes * 1000L / bytesPerSecond} " +
+-            trackMetadata)
++            "wireless=$wirelessAudio jitterTargetMs=${if (e5Realtime) E5WirelessAudioBuffer.JITTER_MILLIS else 0} " +
++            "trackState=${built.state} usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType}")
+         Log.i(
+             TAG,
+             "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
+@@ -1033,19 +1241,20 @@
+             TAG,
+             "audio route type=${format.payloadType} audioType=${format.audioType} " +
+                 "mode=${if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE} " +
+-                "channel=${selection.channel} usage=${usageFor(selection.channel)} " +
+-                "contentType=${contentTypeFor(selection.contentType)} " +
++                "channel=${selection.channel} usage=${built.audioAttributes.usage} " +
++                "contentType=${built.audioAttributes.contentType} " +
+                 "streamOverride=$streamOverride " +
+                 "focus=${if (audioFocusEnabled) "on" else "off"}",
+         )
+     }
+ 
+-    /** 0 uses usage-based routing; 1–20 attempt legacy stream types supported by the head unit. */
++    /** 输出策略可修改，电话保持协议用途；未知持久化值退回内置推荐。 */
+     private fun channelOverride(channel: AudioChannel): Int = when (channel) {
+         AudioChannel.MEDIA -> mediaChannel
+         AudioChannel.NAVIGATION -> navigationChannel
+-        else -> 0
+-    }
++        AudioChannel.ASSISTANT -> assistantChannel
++        AudioChannel.PHONE, AudioChannel.RINGTONE -> 0
++    }.takeIf(AudioOutputPolicy::valid) ?: 0
+ 
+     private fun audioAttributesFor(
+         selection: AudioChannelSelection,
+@@ -1061,13 +1270,17 @@
+                 Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
+             }
+         }
++        factoryAudio?.let { return it.attributes(selection.channel, contentTypeFor(selection.contentType), streamOverride) }
+         return AudioAttributes.Builder()
+-            .setUsage(usageFor(selection.channel))
++            .setUsage(AudioOutputPolicy.usage(selection.channel, streamOverride))
+             .setContentType(contentTypeFor(selection.contentType))
+             .build()
+     }
+ 
+     private fun mappedSelection(): AudioChannelSelection {
++        if (factoryAudio != null && format.audioType.equals("alert", true)) {
++            return AudioChannelSelection(AudioChannel.RINGTONE, AudioContentType.SPEECH)
++        }
+         val mode = if (advancedAudioChannelMapping) {
+             AudioChannelMappingMode.AUTOMOTIVE_BUS
+         } else {
+@@ -1081,20 +1294,17 @@
+     }
+ 
+     private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
+-        AudioAttributes.Builder()
++        factoryAudio?.attributes(selection.channel, contentTypeFor(selection.contentType), 0) ?: AudioAttributes.Builder()
+             .setUsage(usageFor(selection.channel))
+             .setContentType(contentTypeFor(selection.contentType))
+             .build()
+ 
+-    /**
+-     * Shares a sink-level focus request across all active non-navigation renderers.
+-     * Navigation guidance intentionally takes no focus: it overlays media without ducking it.
+-     */
++    /** L7 对齐博越配置，导航也参与共享焦点；通用核心保留无厂商配置分支。 */
+     private fun requestAudioFocus() {
+         val channel = mappedChannel ?: return
+         val attributes = trackAttributes ?: return
+-        if (channel == AudioChannel.NAVIGATION) {
+-            Log.i(TAG, "audio focus skipped channel=NAVIGATION; overlays without ducking")
++        if (channel == AudioChannel.NAVIGATION && factoryAudio == null) {
++            runCatching { report("Audio: focus skipped channel=NAVIGATION policy=diplay-0.2.11") }
+             return
+         }
+         track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
+@@ -1135,6 +1345,7 @@
+     private fun usageFor(channel: AudioChannel): Int = when (channel) {
+         AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
+         AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
++        AudioChannel.RINGTONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
+         AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
+     }
+@@ -1257,7 +1468,7 @@
+             when {
+                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> return
+                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+-                    // Vendor metadata inspection must not interrupt otherwise working playback.
++                    // 驱动元数据查询失败不应中断已正常工作的播放。
+                     if (decoderOutputReports < 4) runCatching {
+                         val outputFormat = codec.outputFormat
+                         val metadata = "rate=${outputFormat.intOrNull(MediaFormat.KEY_SAMPLE_RATE)} " +
+@@ -1320,7 +1531,7 @@
+             val writeLength = if (playbackStarted) {
+                 length - written
+             } else {
+-                minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES)
++                minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES, (startThresholdBytes - prebufferBytes).coerceAtLeast(frameBytes))
+             }
+             val writeStarted = System.nanoTime()
+             diagnosticStage = "track-write"
+@@ -1361,7 +1572,7 @@
+ 
+     private fun maintainPlaybackBuffer() {
+         val track = track ?: return
+-        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
++        if (bufferProgress.shouldRebuffer(!e5Realtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
+                 track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
+             // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
+             // then use the configured start threshold again when music resumes.
+@@ -1382,6 +1593,7 @@
+         val now = System.nanoTime()
+         if (statsWindowStartNs == 0L) statsWindowStartNs = now
+         if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
++        routeBinding?.reportActual()
+         val underruns = track?.underrunCount ?: 0
+         val lastRx = lastArrivalNs.get()
+         val currentTrack = track
+@@ -1410,8 +1622,13 @@
+             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
+         Log.i(STATS_TAG, line)
+         report(line)
++        if (mappedChannel == AudioChannel.MEDIA) {
++            // 单独一行避免原有音频统计被截断；沿既有五秒窗口记录，不增加采样线程。
++            runCatching { report("Audio: mediaRecovery monoMs=${android.os.SystemClock.elapsedRealtime()} " +
++                "${callTimeline.snapshot()} ${audioRecoveryState()} ended=$force") }
++        }
+         if (format.codec != AudioCodecKind.LPCM) {
+-            // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
++            // 单独输出解码计数，避免被诊断记录的单行长度限制截断。
+             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
+                 "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
+                 "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
+@@ -1459,6 +1676,8 @@
+     @Synchronized
+     private fun release() {
+         abandonAudioFocus()
++        routeBinding?.close()
++        routeBinding = null
+         val codec = codec
+         this.codec = null
+         if (codec != null) {
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt
+@@ -2,16 +2,17 @@
+ 
+ import android.media.AudioManager
+ 
+-internal enum class AudioChannelMappingMode {
++enum class AudioChannelMappingMode {
+     MOBILE_COMPATIBLE,
+     AUTOMOTIVE_BUS,
+ }
+ 
+-internal enum class AudioChannel {
++enum class AudioChannel {
+     MEDIA,
+     PHONE,
+     ASSISTANT,
+     NAVIGATION,
++    RINGTONE,
+ }
+ 
+ internal enum class AudioContentType {
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatus.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatus.kt
+@@ -4,7 +4,7 @@
+ import com.shilapi.xcertplay.iap2.message.Iap2ControlMessages
+ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+ 
+-/** The retained subset of the iPhone's incremental iAP2 NowPlayingUpdate state. */
++/** 保留手机增量歌曲信息；playbackKnown 区分首次暂停与尚未收到播放状态。 */
+ data class CarPlayNowPlaying(
+     val title: String? = null,
+     val album: String? = null,
+@@ -14,12 +14,11 @@
+     val durationMillis: Long? = null,
+     val elapsedMillis: Long? = null,
+     val playing: Boolean = false,
++    val playbackKnown: Boolean = false,
+ )
+ 
+ /**
+- * Retains NowPlayingUpdate (0x5001) fields requested by [Iap2ControlMessages]. Updates carry only
+- * what changed, so an omitted field preserves its previous value while a present empty string
+- * clears it.
++ * 保留 NowPlayingUpdate（0x5001）中申请的字段；缺失字段沿用旧值，显式空字符串清除旧值。
+  */
+ class CarPlayPlaybackStatus {
+     var nowPlaying = CarPlayNowPlaying()
+@@ -27,7 +26,7 @@
+ 
+     val playing: Boolean get() = nowPlaying.playing
+ 
+-    /** The complete new retained state when this frame changed it, otherwise null. */
++    /** 字段或已知播放状态发生变化时返回完整状态，否则不重复发布。 */
+     fun acceptUpdate(frame: Iap2Frame): CarPlayNowPlaying? {
+         if (frame.messageId != NOW_PLAYING_UPDATE) return null
+         val body = runCatching { Iap2BodyReader.of(frame) }.getOrNull() ?: return null
+@@ -43,27 +42,29 @@
+             durationMillis = media.updatedU32(DURATION, previous.durationMillis),
+             elapsedMillis = playback.updatedU32(ELAPSED, previous.elapsedMillis),
+             playing = playback.updatedStatus(previous.playing),
++            playbackKnown = previous.playbackKnown ||
++                runCatching { playback?.optionalU8(STATUS) != null }.getOrDefault(false),
+         )
+         if (next == previous) return null
+         nowPlaying = next
+         return next
+     }
+ 
+-    /** The new state when [frame] changed it, otherwise null. */
++    /** 首次明确状态或播放变化才回传，不能吞掉首次暂停，也不能因进度更新恢复焦点。 */
+     fun accept(frame: Iap2Frame): Boolean? {
+-        val previous = playing
+-        val next = acceptUpdate(frame)?.playing ?: return null
+-        return next.takeIf { it != previous }
++        val previous = nowPlaying
++        val next = acceptUpdate(frame) ?: return null
++        return next.playing.takeIf { next.playbackKnown && (!previous.playbackKnown || it != previous.playing) }
+     }
+ 
+-    /** The session ended: nothing plays any more. */
++    /** 会话结束时清除已知状态，下个会话的首次暂停仍需发布。 */
+     fun clear(): Boolean? {
+-        if (!playing) return null
+-        nowPlaying = nowPlaying.copy(playing = false)
+-        return false
++        val wasPlaying = playing
++        nowPlaying = nowPlaying.copy(playing = false, playbackKnown = false)
++        return if (wasPlaying) false else null
+     }
+ 
+-    /** Clears all retained metadata at the end of a CarPlay session. */
++    /** 会话结束时清除歌曲信息与已知播放状态。 */
+     fun clearAll(): CarPlayNowPlaying? {
+         if (nowPlaying == CarPlayNowPlaying()) return null
+         nowPlaying = CarPlayNowPlaying()
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/CarPlayTouchMapper.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/CarPlayTouchMapper.kt
+@@ -30,4 +30,50 @@
+         }
+         return contacts
+     }
++
++    /** 每个宿主持有自己的状态；Android pointer 索引变化不会交换协议接触点。 */
++    class Tracker {
++        private val state = VideoTouchState()
++        fun reset() { state.reset() }
++        fun contacts(event: MotionEvent, viewport: VideoViewport): List<AirPlayContact> {
++            if (event.actionMasked == MotionEvent.ACTION_DOWN) state.reset()
++            val lifted = when (event.actionMasked) {
++                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> event.getPointerId(event.actionIndex)
++                else -> null
++            }
++            val samples = (0 until event.pointerCount).map { index ->
++                VideoTouchPoint(event.getPointerId(index), event.getX(index).toDouble(), event.getY(index).toDouble())
++            }
++            return state.update(samples, viewport, lifted,
++                event.actionMasked == MotionEvent.ACTION_CANCEL,
++                when (event.actionMasked) {
++                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> event.getPointerId(event.actionIndex)
++                    else -> null
++                })
++        }
++    }
+ }
++
++internal data class VideoTouchPoint(val pointerId: Int, val x: Double, val y: Double)
++
++internal class VideoTouchState {
++    private val slots = LinkedHashMap<Int, Int>()
++    fun reset() { slots.clear() }
++    fun update(points: List<VideoTouchPoint>, viewport: VideoViewport, lifted: Int? = null,
++               cancel: Boolean = false, pressed: Int? = null): List<AirPlayContact> {
++        if (cancel) { reset(); return emptyList() }
++        // 只有视频内的新按下才建立接触点；从黑边滑入不会生成幽灵按下。
++        points.firstOrNull { it.pointerId == pressed && viewport.contains(it.x, it.y) }?.let { point ->
++            if (point.pointerId !in slots && slots.size < 2) {
++                slots[point.pointerId] = (0..1).first { it !in slots.values }
++            }
++        }
++        val contacts = points.mapNotNull { point ->
++            slots[point.pointerId]?.let { slot ->
++                AirPlayContact(slot, viewport.normalizedX(point.x), viewport.normalizedY(point.y), point.pointerId != lifted)
++            }
++        }
++        if (lifted != null) slots.remove(lifted)
++        return contacts
++    }
++}
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/LegacyAudioFallback.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/LegacyAudioFallback.kt
+@@ -1,7 +1,7 @@
+ package com.shilapi.xcertplay.media
+ 
+ /** A ROM can reject a legacy stream by throwing or returning an uninitialized track. */
+-internal object LegacyAudioFallback {
++object LegacyAudioFallback {
+     fun <T> build(
+         createLegacy: () -> T,
+         isInitialized: (T) -> Boolean,
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecStartup.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecStartup.kt
+@@ -1,6 +1,6 @@
+ package com.shilapi.xcertplay.media
+ 
+-/** A failed configure/start still owns the created codec and must release it before propagating. */
++/** 编解码器配置或启动失败时，释放已创建的实例后再传播原始异常。 */
+ internal object MediaCodecStartup {
+     fun <T> create(
+         create: () -> T,
+@@ -14,7 +14,7 @@
+             start(candidate)
+             return candidate
+         } catch (failure: Throwable) {
+-            // Driver cleanup can fail too; preserve the original configure/start failure.
++            // 驱动清理也可能失败，保留原始配置或启动异常。
+             runCatching { release(candidate) }
+             throw failure
+         }
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecSupport.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecSupport.kt
+@@ -22,47 +22,14 @@
+         return (sps.firstOrNull() ?: ByteArray(0)) to (pps.firstOrNull() ?: ByteArray(0))
+     }
+ 
+-    /**
+-     * Converts an HEVCDecoderConfigurationRecord (hvcC) into Annex B VPS/SPS/PPS CSD.
+-     *
+-     * Android video decoders expect the initialization data as NAL units with start codes,
+-     * not as the raw ISO-BMFF hvcC record.
+-     */
+-    fun hevcCodecSpecificData(codecData: ByteArray): ByteArray {
+-        if (codecData.size < HEVC_FIXED_RECORD_SIZE || codecData[0].toInt() != 1) {
+-            return ByteArray(0)
+-        }
+-
+-        var cursor = HEVC_ARRAY_COUNT_OFFSET
+-        val arrayCount = codecData[cursor++].toInt() and 0xff
+-        val output = ByteArrayOutputStream()
+-        repeat(arrayCount) {
+-            if (cursor >= codecData.size) return ByteArray(0)
+-            cursor += 1 // array_completeness, reserved, and nal_unit_type
+-            if (cursor + 2 > codecData.size) return ByteArray(0)
+-            val nalUnitCount = readU16Be(codecData, cursor)
+-            cursor += 2
+-            repeat(nalUnitCount) {
+-                if (cursor + 2 > codecData.size) return ByteArray(0)
+-                val nalUnitLength = readU16Be(codecData, cursor)
+-                cursor += 2
+-                if (cursor + nalUnitLength > codecData.size) return ByteArray(0)
+-                output.write(START_CODE)
+-                output.write(codecData, cursor, nalUnitLength)
+-                cursor += nalUnitLength
+-            }
+-        }
+-        return output.toByteArray()
+-    }
++    /** 初始化数据支持 hvcC 与 Annex B，缺少参数集时拒绝空配置。 */
++    fun hevcCodecSpecificData(codecData: ByteArray): ByteArray = HevcConfiguration.csd(codecData)
+ 
+     /** Converts CarPlay's length-prefixed NAL units into an Annex B byte stream. */
+     fun toAnnexB(lengthPrefixed: ByteArray): ByteArray {
+-        if (lengthPrefixed.size >= 4 &&
+-            lengthPrefixed[0] == 0.toByte() &&
+-            lengthPrefixed[1] == 0.toByte() &&
+-            lengthPrefixed[2] == 0.toByte() &&
+-            lengthPrefixed[3] == 1.toByte()
+-        ) {
++        if (lengthPrefixed.size >= 3 && lengthPrefixed[0] == 0.toByte() &&
++            lengthPrefixed[1] == 0.toByte() && (lengthPrefixed[2] == 1.toByte() ||
++                (lengthPrefixed.size >= 4 && lengthPrefixed[2] == 0.toByte() && lengthPrefixed[3] == 1.toByte()))) {
+             return lengthPrefixed
+         }
+ 
+@@ -188,6 +155,4 @@
+             ((source[offset + 2].toInt() and 0xff) shl 8) or
+             (source[offset + 3].toInt() and 0xff)
+ 
+-    private const val HEVC_FIXED_RECORD_SIZE = 23
+-    private const val HEVC_ARRAY_COUNT_OFFSET = 22
+ }
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/MediaFailureSummary.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/MediaFailureSummary.kt
+@@ -1,6 +1,6 @@
+ package com.shilapi.xcertplay.media
+ 
+-/** Bounded failure metadata for exported reports; exception messages can contain private inputs. */
++/** 导出有界异常元数据；异常原文可能包含私有输入，不予记录。 */
+ internal object MediaFailureSummary {
+     fun describe(error: Throwable): String {
+         val failures = mutableListOf<Throwable>()
+@@ -12,7 +12,7 @@
+             current = next.cause
+         }
+         val types = failures.joinToString("/") { identifier(it.javaClass.simpleName, 64) }
+-        // Keep one code location, never the complete stack, source filename or arbitrary caller.
++        // 仅保留一个媒体代码位置，不导出完整堆栈、源文件名或任意调用方。
+         val frame = failures.asSequence().flatMap { it.stackTrace.asSequence() }.firstOrNull {
+             it.className.startsWith("android.media.") ||
+                 it.className.startsWith("com.shilapi.xcertplay.media.")
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneCaptureStats.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneCaptureStats.kt
+@@ -7,7 +7,7 @@
+     RECORDING, READ, CAPTURE, START,
+ }
+ 
+-/** Capture-thread counters only. Never retains PCM, encoded packets, keys or endpoint metadata. */
++/** 仅记录采集线程计数，不保留 PCM、编码包、密钥或端点信息。 */
+ internal class MicrophoneCaptureStats(
+     config: MicrophoneConfig,
+     private val report: (String) -> Unit,
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneUplink.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneUplink.kt
+@@ -3,9 +3,6 @@
+ import android.media.AudioFormat as AndroidAudioFormat
+ import android.media.AudioRecord
+ import android.media.MediaRecorder
+-import android.media.audiofx.AcousticEchoCanceler
+-import android.media.audiofx.AudioEffect
+-import android.media.audiofx.NoiseSuppressor
+ import android.util.Log
+ import com.shilapi.xcertplay.airplay.AudioCodecKind
+ import com.shilapi.xcertplay.airplay.MicrophoneConfig
+@@ -26,21 +23,28 @@
+  */
+ internal class MicrophoneUplink(
+     private val config: MicrophoneConfig,
+-    private val onDiagnostic: (String) -> Unit = {},
++    private val audioRouting: AudioRouteProvider? = null,
++    private val report: (String) -> Unit = {},
++    private val callProcessingEnabled: Boolean = true,
++    private val factorySource: Int? = null,
++    private val onStopRequested: () -> Unit = {},
++    private val onEnded: () -> Unit = {},
+ ) : Closeable {
++    @Volatile private var routeBinding: AudioRouteBinding? = null
++    private var packetsSent = 0L
+     private val running = AtomicBoolean(false)
+-    private val stats = MicrophoneCaptureStats(config, report = { message ->
+-        Log.i(TAG, message)
+-        onDiagnostic(message)
+-    })
++    private val firstPacketLogged = AtomicBoolean(false)
+     @Volatile private var recorder: AudioRecord? = null
+     @Volatile private var socket: DatagramSocket? = null
+     @Volatile private var opusEncoder: OpusEncoder? = null
+-    @Volatile private var effects: List<AudioEffect> = emptyList()
+     private var thread: Thread? = null
++    private var effects: TelephonyAudioEffects? = null
++    private val ended = AtomicBoolean(false)
++    private val stats = MicrophoneCaptureStats(config, report)
+ 
+     fun start(): Boolean {
+         if (!running.compareAndSet(false, true)) return true
++        ended.set(false)
+ 
+         val channelMask = if (config.channels >= 2) {
+             AndroidAudioFormat.CHANNEL_IN_STEREO
+@@ -55,11 +59,11 @@
+         if (minBuffer <= 0) {
+             Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
+             stats.failure(MicrophoneFailureStage.MIN_BUFFER, code = minBuffer)
+-            running.set(false)
++            release()
+             return false
+         }
+ 
+-        val source = when (config.audioType) {
++        val source = when (config.audioType.lowercase()) {
+             "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
+             "speechrecognition" -> MediaRecorder.AudioSource.VOICE_RECOGNITION
+             else -> MediaRecorder.AudioSource.MIC
+@@ -72,35 +76,40 @@
+         if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
+             Log.w(TAG, "microphone Opus encoder is unavailable")
+             stats.failure(MicrophoneFailureStage.ENCODER)
+-            running.set(false)
++            release()
+             return false
+         }
+         val bufferSize = maxOf(minBuffer * 2, config.frameBytes * 4)
+-        val nextRecorder = try {
+-            AudioRecord.Builder()
+-                .setAudioSource(source)
+-                .setAudioFormat(
+-                    AndroidAudioFormat.Builder()
+-                        .setEncoding(AndroidAudioFormat.ENCODING_PCM_16BIT)
+-                        .setSampleRate(config.sampleRate)
+-                        .setChannelMask(channelMask)
+-                        .build(),
+-                )
+-                .setBufferSizeInBytes(bufferSize)
+-                .build()
+-        } catch (error: Exception) {
+-            Log.e(TAG, "microphone recorder creation failed", error)
+-            stats.failure(MicrophoneFailureStage.RECORDER_CREATION, error)
++        // 博越配置优先厂商输入源；权限拒绝、初始化或启动失败后释放，再尝试标准源。
++        val nextRecorder = listOfNotNull(factorySource, source).distinct().firstNotNullOfOrNull { candidate ->
++            var built: AudioRecord? = null
++            var stage = MicrophoneFailureStage.RECORDER_CREATION
++            try {
++                val record = AudioRecord.Builder().setAudioSource(candidate)
++                    .setAudioFormat(AndroidAudioFormat.Builder().setEncoding(AndroidAudioFormat.ENCODING_PCM_16BIT)
++                        .setSampleRate(config.sampleRate).setChannelMask(channelMask).build())
++                    .setBufferSizeInBytes(bufferSize).build()
++                built = record
++                stage = MicrophoneFailureStage.RECORDER_INITIALIZATION
++                check(record.state == AudioRecord.STATE_INITIALIZED)
++                stage = MicrophoneFailureStage.RECORDING
++                if (callProcessingEnabled && config.audioType.equals("telephony", true)) {
++                    effects = TelephonyAudioEffects(record.audioSessionId, report)
++                }
++                record.startRecording()
++                check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
++                runCatching { report("Audio: microphone source=$candidate factory=${candidate == factorySource}") }
++                record
++            } catch (error: Exception) {
++                stats.failure(stage, error)
++                effects?.close(); effects = null
++                runCatching { built?.release() }
++                null
++            }
++        }
++        if (nextRecorder == null) {
+             nextEncoder?.close()
+-            running.set(false)
+-            return false
+-        }
+-        if (nextRecorder.state != AudioRecord.STATE_INITIALIZED) {
+-            Log.w(TAG, "microphone recorder failed to initialize")
+-            stats.failure(MicrophoneFailureStage.RECORDER_INITIALIZATION, code = nextRecorder.state)
+-            nextRecorder.release()
+-            nextEncoder?.close()
+-            running.set(false)
++            release()
+             return false
+         }
+ 
+@@ -112,9 +121,10 @@
+         } catch (error: Exception) {
+             Log.e(TAG, "microphone socket creation failed", error)
+             stats.failure(MicrophoneFailureStage.SOCKET_CREATION, error)
++            effects?.close(); effects = null
+             nextRecorder.release()
+             nextEncoder?.close()
+-            running.set(false)
++            release()
+             return false
+         }
+ 
+@@ -122,13 +132,24 @@
+         socket = nextSocket
+         opusEncoder = nextEncoder
+         return try {
+-            if (config.audioType == "telephony") effects = voiceEffects(nextRecorder.audioSessionId)
+-            nextRecorder.startRecording()
+-            stats.started(routeType(nextRecorder))
++            val channel = when (config.audioType.lowercase()) {
++                "telephony" -> AudioChannel.PHONE
++                "speechrecognition" -> AudioChannel.ASSISTANT
++                else -> AudioChannel.NAVIGATION
++            }
++            routeBinding = audioRouting?.bind(nextRecorder, channel, true, config.sampleRate, config.channels)
++            stats.started(runCatching { nextRecorder.routedDevice?.type }.getOrNull())
++            routeBinding?.reportActual()
+             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
+                 isDaemon = true
+                 start()
+             }
++            Log.i(
++                TAG,
++                "microphone uplink started type=${config.audioType} " +
++                    "rate=${config.sampleRate} channels=${config.channels} " +
++                    "frameMs=${config.frameMillis} port=${config.port}",
++            )
+             true
+         } catch (error: Exception) {
+             Log.e(TAG, "microphone recording failed", error)
+@@ -138,56 +159,32 @@
+         }
+     }
+ 
+-    private fun voiceEffects(sessionId: Int): List<AudioEffect> = listOfNotNull(
+-        enabledEffect("AEC") {
+-            if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(sessionId) else null
+-        },
+-        enabledEffect("NS") {
+-            if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(sessionId) else null
+-        },
+-    )
+-
+-    // Advertised effects may still fail to initialize on a vendor ROM. Keep recording without them.
+-    private fun enabledEffect(name: String, create: () -> AudioEffect?): AudioEffect? {
+-        var effect: AudioEffect? = null
+-        try {
+-            effect = create()
+-            if (effect != null) {
+-                val status = effect.setEnabled(true)
+-                if (status == AudioEffect.SUCCESS && effect.enabled) {
+-                    Log.i(TAG, "microphone effect=$name enabled=true")
+-                    return effect
+-                }
+-                Log.w(TAG, "microphone effect=$name could not be enabled status=$status")
+-            } else {
+-                Log.i(TAG, "microphone effect=$name unavailable")
+-            }
+-        } catch (error: RuntimeException) {
+-            Log.w(TAG, "microphone effect=$name unavailable; continuing without it", error)
+-        }
+-        effect?.let(::releaseEffect)
+-        return null
+-    }
+-
+-    private fun releaseEffect(effect: AudioEffect) {
+-        try {
+-            effect.release()
+-        } catch (error: RuntimeException) {
+-            Log.w(TAG, "microphone effect release failed", error)
+-        }
+-    }
+-
+     private fun capture(recorder: AudioRecord, socket: DatagramSocket) {
+         val frame = ByteArray(config.frameBytes)
+         val readBuffer = ByteArray(maxOf(frame.size, MIN_READ_BYTES))
+         val counters = MicrophoneCounters()
+-        val routeInfo = { routeType(recorder) }
+         var filled = 0
++        val signal = MicrophoneSignalStats()
++        var bytesRead = 0L
++        var windowStart = System.nanoTime()
++        fun logStats(ended: Boolean = false) {
++            routeBinding?.reportActual()
++            val line = "Audio: microphone type=${config.audioType} rate=${config.sampleRate} " +
++                "channels=${config.channels} recordingState=${recorder.recordingState} " +
++                "bytes=$bytesRead samples=${signal.samples} zeroPercent=${signal.zeroPercent} " +
++                "rms=${signal.rms} peak=${signal.peak} packetsSent=$packetsSent ended=$ended"
++            Log.i(TAG, line)
++            runCatching { report(line) }
++            bytesRead = 0
++            signal.resetWindow()
++            windowStart = System.nanoTime()
++        }
+         try {
+             while (running.get()) {
+                 stats.reading()
+                 val count = recorder.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
+                 stats.read(count)
++                stats.flush { recorder.routedDevice?.type }
+                 if (count < 0) {
+                     if (running.get()) {
+                         Log.e(TAG, "microphone read failed code=$count")
+@@ -196,9 +193,12 @@
+                     return
+                 }
+                 if (count == 0) {
+-                    stats.flush(routeType = routeInfo)
++                    if (System.nanoTime() - windowStart >= STATS_WINDOW_NS) logStats()
+                     continue
+                 }
++                signal.add(readBuffer, count)
++                bytesRead += count
++                if (System.nanoTime() - windowStart >= STATS_WINDOW_NS) logStats()
+                 var offset = 0
+                 while (offset < count && running.get()) {
+                     val copied = minOf(frame.size - filled, count - offset)
+@@ -210,7 +210,6 @@
+                         filled = 0
+                     }
+                 }
+-                stats.flush(routeType = routeInfo)
+             }
+         } catch (error: Exception) {
+             if (running.get()) {
+@@ -218,7 +217,8 @@
+                 stats.failure(MicrophoneFailureStage.CAPTURE, error)
+             }
+         } finally {
+-            stats.flush(ended = true, routeType = routeInfo)
++            runCatching { logStats(ended = true) }
++            stats.flush(ended = true) { recorder.routedDevice?.type }
+             running.set(false)
+             release()
+         }
+@@ -256,16 +256,22 @@
+         )
+         try {
+             socket.send(DatagramPacket(packet, packet.size, config.host, config.port))
++            packetsSent++
+             stats.sent()
++            if (firstPacketLogged.compareAndSet(false, true)) {
++                Log.i(
++                    TAG,
++                    "microphone first packet bytes=${packet.size} body=${body.size} " +
++                        "port=${config.port}",
++                )
++            }
+         } catch (error: Exception) {
+-            stats.sendFailed()
+-            if (running.get()) throw error
+-        }
+-    }
+-
+-    private fun routeType(recorder: AudioRecord): Int? = runCatching { recorder.routedDevice?.type }.getOrNull()
++            if (running.get()) { stats.sendFailed(); throw error }
++        }
++    }
+ 
+     override fun close() {
++        runCatching { onStopRequested() }
+         if (!running.compareAndSet(true, false)) {
+             release()
+             return
+@@ -294,9 +300,10 @@
+     @Synchronized
+     private fun release() {
+         running.set(false)
+-        val currentEffects = effects
+-        effects = emptyList()
+-        currentEffects.forEach(::releaseEffect)
++        effects?.close()
++        effects = null
++        runCatching { routeBinding?.close() }
++        routeBinding = null
+         val currentRecorder = recorder
+         recorder = null
+         try {
+@@ -313,12 +320,14 @@
+         }
+         val currentEncoder = opusEncoder
+         opusEncoder = null
+-        currentEncoder?.close()
++        runCatching { currentEncoder?.close() }
++        if (ended.compareAndSet(false, true)) runCatching { onEnded() }
+     }
+ 
+     private companion object {
+         const val TAG = "xcertplay-usb"
+         const val MIN_READ_BYTES = 2_048
+         const val CLOSE_JOIN_MILLIS = 500L
++        const val STATS_WINDOW_NS = 5_000_000_000L
+     }
+ }
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/VideoDecodeQueue.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/VideoDecodeQueue.kt
+@@ -2,14 +2,18 @@
+ 
+ import android.view.Surface
+ import com.shilapi.xcertplay.airplay.VideoCodec
+-import java.util.concurrent.LinkedBlockingQueue
++import java.util.ArrayDeque
+ import java.util.concurrent.TimeUnit
++import java.util.concurrent.locks.ReentrantLock
++import kotlin.concurrent.withLock
+ 
+ internal sealed interface VideoJob {
+     data class Config(val codec: VideoCodec, val codecData: ByteArray) : VideoJob
+     data class Frame(val nalus: ByteArray, val receivedNs: Long = System.nanoTime()) : VideoJob
+-    data class SurfaceChanged(val surface: Surface?) : VideoJob
++    // 完成信号只在 worker 解除旧目标后调用，宿主据此释放 Surface。
++    data class SurfaceChanged(val surface: Surface?, val onApplied: () -> Unit = {}) : VideoJob
+     data object Resync : VideoJob
++    data object Retry : VideoJob
+ }
+ 
+ /** Do not resume dependent pictures after losing a reference frame. */
+@@ -22,32 +26,73 @@
+     fun onQueued() { needsKeyFrame = false }
+ }
+ 
+-/** Limit latency and memory without ever dropping a reference frame silently. */
++/** 普通入队和出队只更新计数；超限时清除压缩参考链，保持控制任务的相对顺序。 */
+ internal class VideoDecodeQueue(
+     // Wi-Fi delivers frames in bursts after a radio gap; the decoder's 250 ms age check bounds latency.
+     private val maxFrames: Int = 60,
+     private val maxBytes: Int = 8 * 1024 * 1024,
++    private val onDepth: (Int, Long, Int) -> Unit = { _, _, _ -> },
+ ) {
+-    private val jobs = LinkedBlockingQueue<VideoJob>()
++    private val lock = ReentrantLock()
++    private val available = lock.newCondition()
++    private val jobs = ArrayDeque<VideoJob>()
++    private var frameCount = 0
++    private var byteCount = 0L
++    val queuedFrames: Int get() = lock.withLock { frameCount }
++    val queuedBytes: Long get() = lock.withLock { byteCount }
+ 
+-    @Synchronized fun offer(job: VideoJob) {
++    /** 返回丢弃数量，供低频诊断汇总；正常路径不创建统计列表。 */
++    fun offer(job: VideoJob): Int = lock.withLock {
++        var dropped = 0
+         if (job is VideoJob.Frame) {
+-            val frames = jobs.filterIsInstance<VideoJob.Frame>()
+-            if (frames.size >= maxFrames || frames.sumOf { it.nalus.size.toLong() } + job.nalus.size > maxBytes) {
+-                discardFrames()
+-                jobs.offer(VideoJob.Resync)
++            if (frameCount >= maxFrames || byteCount + job.nalus.size > maxBytes) {
++                dropped = discardFrames()
++                jobs.addLast(VideoJob.Resync)
+             }
+-            // A single oversized frame is also a lost reference chain.
+-            if (job.nalus.size > maxBytes) return
++            if (job.nalus.size > maxBytes) {
++                available.signal()
++                onDepth(frameCount, byteCount, dropped + 1)
++                return@withLock dropped + 1
++            }
++            frameCount++
++            byteCount += job.nalus.size
+         }
+-        jobs.offer(job)
++        jobs.addLast(job)
++        available.signal()
++        onDepth(frameCount, byteCount, dropped)
++        dropped
+     }
+ 
+-    @Synchronized fun discardFrames() {
++    fun discardFrames(): Int = lock.withLock {
++        val dropped = frameCount
+         jobs.removeIf { it is VideoJob.Frame || it is VideoJob.Resync }
++        frameCount = 0
++        byteCount = 0
++        dropped
+     }
+ 
+-    fun poll(timeoutMillis: Long): VideoJob? = jobs.poll(timeoutMillis, TimeUnit.MILLISECONDS)
++    fun poll(timeoutMillis: Long): VideoJob? = lock.withLock {
++        var remaining = TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
++        while (jobs.isEmpty()) {
++            if (remaining <= 0) return@withLock null
++            remaining = available.awaitNanos(remaining)
++        }
++        jobs.removeFirst().also { job ->
++            if (job is VideoJob.Frame) { frameCount--; byteCount -= job.nalus.size }
++        }
++    }
++
++    /** worker 退出时仍须完成目标解除回调，避免宿主资源永久等待。 */
++    fun drain(): List<VideoJob> = lock.withLock {
++        jobs.toList().also { jobs.clear(); frameCount = 0; byteCount = 0 }
++    }
++}
++
++/** 接收、排队和输入等待共用同一个帧龄上限，不能逐阶段叠加超时。 */
++internal object VideoFrameBudget {
++    const val MAX_AGE_NS = 250_000_000L
++    fun remainingNs(receivedNs: Long, nowNs: Long): Long =
++        (MAX_AGE_NS - (nowNs - receivedNs).coerceAtLeast(0)).coerceAtLeast(0)
+ }
+ 
+ /** Drain output while waiting for input: full output buffers can otherwise starve input forever. */
+@@ -57,14 +102,15 @@
+         drain: () -> Unit,
+         dequeue: () -> Int,
+         nanoTime: () -> Long = System::nanoTime,
+-        timeoutNs: Long = TimeUnit.MILLISECONDS.toNanos(500),
++        timeoutNs: Long = VideoFrameBudget.MAX_AGE_NS,
+     ): Int {
+         val start = nanoTime()
+         while (running()) {
++            if (nanoTime() - start >= timeoutNs) break
+             drain()
+             val index = dequeue()
++            // 已取到的槽位由调用方决定提交或重建，不能遗失输入槽位。
+             if (index >= 0) return index
+-            if (nanoTime() - start >= timeoutNs) break
+         }
+         return -1
+     }
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/VideoStats.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/VideoStats.kt
+@@ -2,7 +2,9 @@
+ 
+ import android.util.Log
+ 
+-/** Five-second video counters that separate network/iPhone gaps from decoder throughput. */
++internal enum class VideoDropReason { OVERFLOW, EXPIRED, NO_TARGET, NO_CONFIG, WAIT_KEYFRAME, RECOVERY_WAIT, INVALID, INPUT_CAPACITY, OUTPUT_EXPIRED, REBUILD_WAIT, INPUT_WAIT }
++
++/** 每五秒汇总接收、输入、提交和呈现回调；帧龄使用固定桶，不保存逐帧对象。 */
+ internal class VideoStats(
+     private val label: String = "",
+     private val nanoTime: () -> Long = System::nanoTime,
+@@ -11,6 +13,16 @@
+     private var lastArrivalNs = 0L
+     private var received = 0
+     private var rendered = 0
++    private var input = 0
++    private var submitted = 0
++    private var dropped = 0
++    private var queueHighWaterFrames = 0
++    private var queueHighWaterBytes = 0L
++    private val inputAge = FrameAgeHistogram()
++    private val outputAge = FrameAgeHistogram()
++    private val presentedAge = FrameAgeHistogram()
++    private val decodeAge = FrameAgeHistogram()
++    private val dropReasons = IntArray(VideoDropReason.entries.size)
+     private var recoveries = 0
+     private var bytes = 0L
+     private var maxArrivalGapNs = 0L
+@@ -34,7 +46,24 @@
+         bytes += size
+     }
+ 
+-    @Synchronized fun onRendered() { rendered++ }
++    @Synchronized fun onQueued(frames: Int, bytes: Long, discarded: Int) {
++        queueHighWaterFrames = maxOf(queueHighWaterFrames, frames)
++        queueHighWaterBytes = maxOf(queueHighWaterBytes, bytes)
++        dropped += discarded
++        dropReasons[VideoDropReason.OVERFLOW.ordinal] += discarded
++    }
++
++    @Synchronized fun onDropped(count: Int = 1, reason: VideoDropReason = VideoDropReason.INVALID) {
++        dropped += count; dropReasons[reason.ordinal] += count
++    }
++    @Synchronized fun onInput(receivedNs: Long) { input++; inputAge.add(nanoTime() - receivedNs) }
++    @Synchronized fun onSubmitted(presentationUs: Long, decodeNs: Long) {
++        submitted++; outputAge.add(nanoTime() - presentationUs * 1000)
++        if (decodeNs >= 0) decodeAge.add(decodeNs)
++    }
++    @Synchronized fun onPresented(presentationUs: Long, renderedNs: Long) {
++        rendered++; presentedAge.add(renderedNs - presentationUs * 1000)
++    }
+ 
+     @Synchronized fun onRecovery() { recoveries++ }
+ 
+@@ -43,18 +72,28 @@
+         val elapsedNs = now - windowStartNs
+         if (elapsedNs < WINDOW_NS) return null
+         val seconds = elapsedNs / 1e9
+-        if (received == 0 && touchSamples == 0) { windowStartNs = now; return null }
++        if (received == 0 && submitted == 0 && rendered == 0 && recoveries == 0 && touchSamples == 0) {
++            windowStartNs = now; return null
++        }
+         val touchAvgMs = if (touchSamples == 0) -1 else touchLatencySumNs / touchSamples / 1_000_000
+-        val line = ("video stats$label rx=%.1ffps shown=%.1ffps maxGap=%dms kbps=%d recoveries=%d " +
+-            "touch2frame avg=%dms max=%dms n=%d touchSendMax=%dms").format(
+-            received / seconds, rendered / seconds, maxArrivalGapNs / 1_000_000,
++        // presented 是 MediaCodec 的 Surface 呈现回调，不代表物理屏幕扫描测量。
++        val line = ("video stats$label rx=%.1ffps input=%.1ffps submitted=%.1ffps presented=%.1ffps " +
++            "maxGap=%dms kbps=%d recoveries=%d dropped=%d queueMax=%dframes/%dbytes " +
++            "ageP95Bucket input=%dms decode=%dms output=%dms presented=%dms " +
++            "touch2rx avg=%dms max=%dms n=%d touchSendMax=%dms").format(
++            received / seconds, input / seconds, submitted / seconds, rendered / seconds, maxArrivalGapNs / 1_000_000,
+             (bytes * 8 / 1000 / seconds).toLong(), recoveries,
++            dropped, queueHighWaterFrames, queueHighWaterBytes,
++            inputAge.p95Millis(), decodeAge.p95Millis(), outputAge.p95Millis(), presentedAge.p95Millis(),
+             touchAvgMs, maxTouchLatencyNs / 1_000_000, touchSamples, TouchLatencyProbe.maxSendNs / 1_000_000,
+-        )
++        ) + " dropReasons=" + VideoDropReason.entries.filter { dropReasons[it.ordinal] > 0 }
++            .joinToString(",") { "${it.name}:${dropReasons[it.ordinal]}" }
+         TouchLatencyProbe.maxSendNs = 0
+         Log.i(TAG, line)
+         windowStartNs = now
+         received = 0; rendered = 0; recoveries = 0; bytes = 0; maxArrivalGapNs = 0
++        input = 0; submitted = 0; dropped = 0; queueHighWaterFrames = 0; queueHighWaterBytes = 0
++        inputAge.clear(); decodeAge.clear(); outputAge.clear(); presentedAge.clear(); dropReasons.fill(0)
+         touchSamples = 0; touchLatencySumNs = 0; maxTouchLatencyNs = 0
+         return line
+     }
+@@ -65,3 +104,49 @@
+         const val IDLE_GAP_NS = 2_000_000_000L // longer gaps are a static screen, not lag
+     }
+ }
++
++/** 关联有限数量的输入 PTS 与输入时间；覆盖超限旧样本，不让诊断占用无限内存。 */
++internal class VideoInputTiming(private val capacity: Int = 64) {
++    private val pts = LongArray(capacity) { Long.MIN_VALUE }
++    private val times = LongArray(capacity)
++    private var next = 0
++    var pending = 0
++        private set
++    fun record(presentationUs: Long, inputNs: Long) {
++        if (pts[next] == Long.MIN_VALUE) pending++
++        pts[next] = presentationUs; times[next] = inputNs; next = (next + 1) % capacity
++    }
++    fun take(presentationUs: Long, nowNs: Long): Long {
++        val index = pts.indexOf(presentationUs)
++        if (index < 0) return -1
++        pts[index] = Long.MIN_VALUE
++        pending--
++        return (nowNs - times[index]).coerceAtLeast(0)
++    }
++    fun clear() { pts.fill(Long.MIN_VALUE); next = 0; pending = 0 }
++}
++
++/** P95 返回所在桶的上界，最后一桶返回实际最大值；无样本返回 -1。 */
++internal class FrameAgeHistogram {
++    private val boundsMs = longArrayOf(1, 5, 10, 16, 33, 50, 100, 150, 250, 500, 1000)
++    private val counts = IntArray(boundsMs.size + 1)
++    private var samples = 0
++    private var maxMs = 0L
++    fun add(ageNs: Long) {
++        val ms = (ageNs.coerceAtLeast(0) + 999_999) / 1_000_000
++        var bucket = 0
++        while (bucket < boundsMs.size && ms > boundsMs[bucket]) bucket++
++        counts[bucket]++; samples++; maxMs = maxOf(maxMs, ms)
++    }
++    fun p95Millis(): Long {
++        if (samples == 0) return -1
++        val target = (samples.toLong() * 95 + 99) / 100
++        var accumulated = 0L
++        for (index in counts.indices) {
++            accumulated += counts[index]
++            if (accumulated >= target) return if (index < boundsMs.size) boundsMs[index] else maxMs
++        }
++        return maxMs
++    }
++    fun clear() { counts.fill(0); samples = 0; maxMs = 0 }
++}
+--- a/shared/src/main/jni/Android.mk
++++ b/shared/src/main/jni/Android.mk
+@@ -10,3 +10,6 @@
+ LOCAL_SRC_FILES := local_hotspot_radio.c
+ LOCAL_CFLAGS := -Wall -Wextra -Werror
+ include $(BUILD_SHARED_LIBRARY)
++
++# 独立 Galaxy 调试库；正式媒体 worker 不调用该入口。
++include $(LOCAL_PATH)/../../../../galaxy/shared/src/main/jni/Android.mk

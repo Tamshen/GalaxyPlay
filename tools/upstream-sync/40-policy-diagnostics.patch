@@ -1,0 +1,1102 @@
+--- a/common/src/main/java/com/shilapi/xcertplay/AirPlayPersistence.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/AirPlayPersistence.kt
+@@ -1,12 +1,13 @@
+ package com.shilapi.xcertplay
+ 
++import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
++import com.shilapi.xcertplay.network.WifiP2pChannels
++
+ import android.content.Context
+-import android.os.Build
+ import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
+ import com.shilapi.xcertplay.airplay.AirPlayPhysicalSizeBasis
+ import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
+ import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
+-import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
+ import com.shilapi.xcertplay.airplay.CarPlayUiScale
+ import com.shilapi.xcertplay.airplay.AirPlayIdentity
+ import com.shilapi.xcertplay.airplay.PairingStore
+@@ -16,14 +17,19 @@
+ import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
+ import com.shilapi.xcertplay.orchestration.MfiTarget
+ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
+-import com.shilapi.xcertplay.network.WifiP2pChannels
+ import com.shilapi.xcertplay.transport.LockdownPairRecord
+ import java.io.File
+ 
+ /** SharedPreferences persistence for the accessory identity and paired controllers. */
+ object AirPlayPersistence {
+-    /** 0 uses usage-based routing; 1–20 select stream types supported by the head unit. */
+     val AUDIO_CHANNELS = 0..20
++    private const val KEY_WIFI_P2P_PREFERRED_CHANNEL = "wifi_p2p_preferred_channel"
++    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_POSITION = "cluster_turn_card_overlay_position"
++    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE = "cluster_turn_card_overlay_size"
++    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_X = "cluster_turn_card_overlay_x_percent"
++    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_Y = "cluster_turn_card_overlay_y_percent"
++    private const val KEY_CENTER_MAP_FOLLOWS_DASHBOARD = "center_map_follows_dashboard"
++    private const val KEY_SETTINGS_GESTURE_FINGERS = "settings_gesture_fingers"
+     private const val PREFS = "xcertplay_airplay"
+     private const val KEY_IDENT_PRIVATE = "identity_private"
+     private const val KEY_IDENT_PUBLIC = "identity_public"
+@@ -49,7 +55,6 @@
+     private const val KEY_NAVIGATION_STREAM_TYPE = "navigation_stream_type"
+     private const val KEY_WIRELESS_ENABLED = "wireless_enabled"
+     private const val KEY_WIRELESS_HOTSPOT_MODE = "wireless_hotspot_mode"
+-    private const val KEY_WIFI_P2P_PREFERRED_CHANNEL = "wifi_p2p_preferred_channel"
+     private const val KEY_MANUAL_HOTSPOT_SSID = "manual_hotspot_ssid"
+     private const val KEY_MANUAL_HOTSPOT_PASSPHRASE = "manual_hotspot_passphrase"
+     private const val KEY_MANUAL_HOTSPOT_BAND = "manual_hotspot_band"
+@@ -73,12 +78,6 @@
+     private const val KEY_CLUSTER_CONTENT = "cluster_content"
+     private const val KEY_CLUSTER_MARKER_X = "cluster_marker_horizontal_step"
+     private const val KEY_CLUSTER_MARKER_Y = "cluster_marker_vertical_step"
+-    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_POSITION = "cluster_turn_card_overlay_position"
+-    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE = "cluster_turn_card_overlay_size"
+-    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_X = "cluster_turn_card_overlay_x_percent"
+-    private const val KEY_CLUSTER_TURN_CARD_OVERLAY_Y = "cluster_turn_card_overlay_y_percent"
+-    private const val KEY_CENTER_MAP_FOLLOWS_DASHBOARD = "center_map_follows_dashboard"
+-    private const val KEY_SETTINGS_GESTURE_FINGERS = "settings_gesture_fingers"
+     private const val KEY_WIDTH_PHYSICAL_MM = "display_width_physical_mm"
+     private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
+     private const val KEY_MAX_DETECTED_WIDTH = "display_max_detected_width"
+@@ -172,9 +171,7 @@
+             .apply()
+     }
+ 
+-    fun loadAdvancedAudioChannelMapping(context: Context): Boolean =
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-            .getBoolean(KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, false)
++    fun loadAdvancedAudioChannelMapping(context: Context): Boolean = GalaxyPreferencePolicy.loadAdvancedAudioChannelMapping(context)
+ 
+     fun saveAdvancedAudioChannelMapping(context: Context, enabled: Boolean) {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+@@ -192,9 +189,7 @@
+             .apply()
+     }
+ 
+-    fun loadAudioFocusEnabled(context: Context): Boolean =
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-            .getBoolean(KEY_AUDIO_FOCUS_ENABLED, false)
++    fun loadAudioFocusEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadAudioFocusEnabled(context)
+ 
+     fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+@@ -202,29 +197,35 @@
+             .apply()
+     }
+ 
+-    fun loadMediaAudioChannel(context: Context): Int =
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-            .getInt(KEY_MEDIA_AUDIO_CHANNEL, 0)
+-            .takeIf { it in AUDIO_CHANNELS } ?: 0
+-
+-    fun saveMediaAudioChannel(context: Context, channel: Int) {
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putInt(KEY_MEDIA_AUDIO_CHANNEL, channel.takeIf { it in AUDIO_CHANNELS } ?: 0)
+-            .apply()
+-    }
+-
+-    fun loadNavigationAudioChannel(context: Context): Int {
+-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        // Inherit the legacy value only when the new key is absent; preserve fresh-install and explicit 0 defaults.
+-        return prefs.getInt(KEY_NAVIGATION_AUDIO_CHANNEL, prefs.getInt(KEY_NAVIGATION_STREAM_TYPE, 0))
+-            .takeIf { it in AUDIO_CHANNELS } ?: 0
+-    }
+-
+-    fun saveNavigationAudioChannel(context: Context, channel: Int) {
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, channel.takeIf { it in AUDIO_CHANNELS } ?: 0)
+-            .apply()
+-    }
++    fun loadL7AudioBusEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadL7AudioBusEnabled(context)
++
++    fun saveL7AudioBusEnabled(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveL7AudioBusEnabled(context, enabled)
++
++    /** 只恢复音频，不清除配对、认证或蓝牙媒体交接设置。 */
++    fun restoreUsageAudioDefaults(context: Context) = GalaxyPreferencePolicy.restoreUsageAudioDefaults(context)
++
++    /** 只迁移上一版整套默认输出；自定义路由及焦点、缓冲等独立设置保留。 */
++    fun migrateUsageAudioDefaults(context: Context) = GalaxyPreferencePolicy.migrateUsageAudioDefaults(context)
++
++    fun loadCallProcessingEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadCallProcessingEnabled(context)
++
++    fun saveCallProcessingEnabled(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveCallProcessingEnabled(context, enabled)
++
++    fun loadBluetoothMediaExclusive(context: Context): Boolean = GalaxyPreferencePolicy.loadBluetoothMediaExclusive(context)
++
++    fun saveBluetoothMediaExclusive(context: Context, enabled: Boolean) = GalaxyPreferencePolicy.saveBluetoothMediaExclusive(context, enabled)
++
++    fun loadMediaAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadMediaAudioChannel(context)
++
++    fun saveMediaAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveMediaAudioChannel(context, channel)
++
++    fun loadNavigationAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadNavigationAudioChannel(context)
++
++    fun saveNavigationAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveNavigationAudioChannel(context, channel)
++
++    fun loadAssistantAudioChannel(context: Context): Int = GalaxyPreferencePolicy.loadAssistantAudioChannel(context)
++
++    fun saveAssistantAudioChannel(context: Context, channel: Int) = GalaxyPreferencePolicy.saveAssistantAudioChannel(context, channel)
+ 
+     fun loadWirelessEnabled(context: Context): Boolean =
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+@@ -248,6 +249,9 @@
+             .apply()
+     }
+ 
++    // 认证方式和远程参数作为一次设置保存，避免重启后读取到不完整的远程配置。
++    fun saveMfiConfiguration(context: Context, target: MfiTarget, server: String? = null, token: String? = null) = GalaxyPreferencePolicy.saveMfiConfiguration(context, target, server, token)
++
+     fun loadMfiI2cPath(context: Context): String =
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+             .getString(KEY_MFI_I2C_PATH, null)
+@@ -282,22 +286,9 @@
+             .apply()
+     }
+ 
+-    fun loadWirelessHotspotMode(context: Context): WirelessHotspotMode {
+-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        val stored = prefs.getString(KEY_WIRELESS_HOTSPOT_MODE, null)
+-        val mode = WirelessHotspotMode.entries.firstOrNull { it.name == stored }
+-            ?: WirelessHotspotMode.MANUAL
+-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
+-        if (stored != supported.name) saveWirelessHotspotMode(context, supported)
+-        return supported
+-    }
+-
+-    fun saveWirelessHotspotMode(context: Context, mode: WirelessHotspotMode) {
+-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putString(KEY_WIRELESS_HOTSPOT_MODE, supported.name)
+-            .apply()
+-    }
++    fun loadWirelessHotspotMode(context: Context): WirelessHotspotMode = GalaxyPreferencePolicy.loadWirelessHotspotMode(context)
++
++    fun saveWirelessHotspotMode(context: Context, mode: WirelessHotspotMode) = GalaxyPreferencePolicy.saveWirelessHotspotMode(context, mode)
+ 
+     fun loadWifiP2pPreferredChannel(context: Context): Int = runCatching {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+@@ -329,6 +320,9 @@
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+             .getString(KEY_MANUAL_HOTSPOT_SSID, null)
+             .orEmpty()
++
++    /** 系统读取或明确接受的配置一次写入，避免下次建链读到新名称和旧密码。 */
++    fun saveNativeHotspotCredentials(context: Context, value: com.shilapi.xcertplay.network.NativeHotspotCredentials) = GalaxyPreferencePolicy.saveNativeHotspotCredentials(context, value)
+ 
+     fun saveManualHotspotSsid(context: Context, ssid: String) {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+@@ -549,8 +543,7 @@
+             .apply()
+     }
+ 
+-    fun loadClusterMapEnabled(context: Context): Boolean =
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, false)
++    fun loadClusterMapEnabled(context: Context): Boolean = GalaxyPreferencePolicy.loadClusterMapEnabled(context)
+ 
+     fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
+--- a/common/src/main/java/com/shilapi/xcertplay/AppLocale.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/AppLocale.kt
+@@ -2,7 +2,6 @@
+ package com.shilapi.xcertplay
+ 
+ import android.app.Activity
+-import android.app.AlertDialog
+ import android.app.LocaleManager
+ import android.os.Build
+ import android.os.LocaleList
+@@ -11,18 +10,12 @@
+ import com.shilapi.xcertplay.host.R
+ import java.util.Locale
+ 
+-/** Platform app locales on Android 13+, with a persisted context override on older Android. */
++/** 仅提供中英文；Android 13 起使用系统应用语言，旧系统使用持久化配置。 */
+ object AppLocale {
+     const val SYSTEM = "system"
+     const val ENGLISH = "en"
+     const val SIMPLIFIED_CHINESE = "zh"
+-    const val TRADITIONAL_CHINESE = "zh-TW"
+-    const val ARABIC = "ar"
+-    const val RUSSIAN = "ru"
+-    const val SPANISH = "es"
+-    const val UKRAINIAN = "uk"
+-
+-    val ALL = listOf(SYSTEM, ENGLISH, SIMPLIFIED_CHINESE, TRADITIONAL_CHINESE, ARABIC, RUSSIAN, SPANISH, UKRAINIAN)
++    val ALL = listOf(SYSTEM, ENGLISH, SIMPLIFIED_CHINESE)
+ 
+     private const val PREFS = "diplay"
+     private const val KEY_LANGUAGE = "app_language"
+@@ -32,19 +25,7 @@
+     fun preference(context: Context): String {
+         if (Build.VERSION.SDK_INT >= 33) {
+             val locales = context.getSystemService(LocaleManager::class.java).applicationLocales
+-            if (locales.isEmpty) return SYSTEM
+-            val selected = locales[0]
+-            if (selected.language != "zh") return selected.language
+-            // An explicit BCP 47 script is more specific than the region's usual script.
+-            return when (selected.script) {
+-                "Hant" -> TRADITIONAL_CHINESE
+-                "Hans" -> SIMPLIFIED_CHINESE
+-                else -> if (selected.country in setOf("TW", "HK", "MO")) {
+-                    TRADITIONAL_CHINESE
+-                } else {
+-                    SIMPLIFIED_CHINESE
+-                }
+-            }
++            return if (locales.isEmpty) SYSTEM else locales[0].language.takeIf { it in ALL } ?: SYSTEM
+         }
+         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+             .getString(KEY_LANGUAGE, SYSTEM)?.takeIf { it in ALL } ?: SYSTEM
+@@ -63,15 +44,18 @@
+         }
+     }
+ 
+-    /** On Android 13+, the OS is the single source of truth for the app language. */
++    /** Android 13 起以系统应用语言为准，已移除的旧语言回到跟随系统。 */
+     fun wrap(context: Context): Context {
+         if (Build.VERSION.SDK_INT >= 33) {
+             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++            val manager = context.getSystemService(LocaleManager::class.java)
++            val current = manager.applicationLocales
++            val removedLanguage = !current.isEmpty && current[0].language !in ALL
++            if (removedLanguage) manager.applicationLocales = LocaleList.getEmptyLocaleList()
+             if (!prefs.getBoolean(KEY_MIGRATED, false)) {
+-                val manager = context.getSystemService(LocaleManager::class.java)
+                 val previous = locale(prefs.getString(KEY_LANGUAGE, SYSTEM) ?: SYSTEM)
+-                // Never overwrite a language already chosen through Android Settings.
+-                if (manager.applicationLocales.isEmpty && previous != null) {
++                // 已有系统选择优先，清理旧语言时也不恢复更早的应用偏好。
++                if (!removedLanguage && manager.applicationLocales.isEmpty && previous != null) {
+                     manager.applicationLocales = LocaleList(previous)
+                 }
+                 prefs.edit().putBoolean(KEY_MIGRATED, true).remove(KEY_LANGUAGE).apply()
+@@ -79,7 +63,8 @@
+             return context
+         }
+         val locale = locale(preference(context)) ?: return context
+-        val configuration = Configuration(context.resources.configuration).apply {
++        // 只覆盖语言，昼夜、密度和字体继续随系统更新，避免长期运行的日志服务固定旧主题。
++        val configuration = Configuration().apply {
+             setLocale(locale)
+             setLayoutDirection(locale)
+         }
+@@ -88,7 +73,15 @@
+ 
+     fun showPicker(activity: Activity) {
+         var selected = ALL.indexOf(preference(activity)).coerceAtLeast(0)
+-        AlertDialog.Builder(activity)
++        if (activity.resources.getBoolean(R.bool.config_l7_product_ui)) {
++            L7Components.select(activity, activity.getString(R.string.language_app_language),
++                ALL.map { displayName(activity, it) }, selected, activity.getString(R.string.language_apply)) { index ->
++                save(activity, ALL[index])
++                if (Build.VERSION.SDK_INT < 33) activity.recreate()
++            }
++            return
++        }
++        L7Dialogs.builder(activity)
+             .setTitle(R.string.language_app_language)
+             .setSingleChoiceItems(ALL.map { displayName(activity, it) }.toTypedArray(), selected) { _, index ->
+                 selected = index
+@@ -97,7 +90,7 @@
+                 val next = ALL[selected]
+                 if (next != preference(activity)) {
+                     save(activity, next)
+-                    // LocaleManager recreates activities itself on Android 13+.
++                    // Android 13 起由 LocaleManager 自动重建页面。
+                     if (Build.VERSION.SDK_INT < 33) activity.recreate()
+                 }
+             }
+@@ -105,27 +98,17 @@
+             .show()
+     }
+ 
+-    /** Names stay in their native form for every language; only "system default" is localized. */
++    /** 语言名称使用各自原文，只有“跟随系统”随当前语言翻译。 */
+     fun displayName(context: Context, language: String): String = when (language) {
+         SYSTEM -> context.getString(R.string.language_system_default)
+         ENGLISH -> "English"
+         SIMPLIFIED_CHINESE -> "简体中文"
+-        TRADITIONAL_CHINESE -> "繁體中文"
+-        ARABIC -> "العربية"
+-        RUSSIAN -> "Русский"
+-        SPANISH -> "Español"
+-        UKRAINIAN -> "Українська"
+         else -> language
+     }
+ 
+     private fun locale(language: String): Locale? = when (language) {
+         ENGLISH -> Locale.ENGLISH
+         SIMPLIFIED_CHINESE -> Locale.SIMPLIFIED_CHINESE
+-        TRADITIONAL_CHINESE -> Locale.TRADITIONAL_CHINESE
+-        ARABIC -> Locale("ar")
+-        RUSSIAN -> Locale("ru")
+-        SPANISH -> Locale("es")
+-        UKRAINIAN -> Locale("uk")
+         else -> null
+     }
+ }
+--- a/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
+@@ -1,19 +1,37 @@
+ package com.shilapi.xcertplay
+ 
++import java.io.File
+ import java.text.SimpleDateFormat
+ import java.util.Date
+ import java.util.Locale
+ 
+-/** Queued entries retain only their exact file target and a redacted, bounded metadata string. */
++/** 队列只保存所属会话文件与已脱敏元数据；清空后拒绝旧代次尚未落盘的记录。 */
+ internal object AsyncDiagnosticLog {
+-    private data class Entry(val target: SessionLogFile, val line: String)
+-    private val writer = BoundedDiagnosticWriter<Entry> { it.target.append(it.line) }
++    private data class Entry(val target: SessionLogFile, val line: String, val generation: Long)
++    @Volatile private var generation = 0L
++    private val writer = BoundedDiagnosticWriter<Entry> {
++        synchronized(SessionLogFile.storageLock) {
++            if (it.generation == generation) it.target.append(it.line)
++        }
++    }
+ 
+     fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
+         if (target == null) return
++        val captured = generation
+         val safe = DiagnosticRedactor.redact(message) ?: return
+         val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
+-        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe")) }
++        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe", captured)) }
++    }
++
++    /** 由后台维护任务调用，当前会话仍可从新代次继续记录。 */
++    internal fun clear(directory: File) = synchronized(SessionLogFile.storageLock) {
++        generation++
++        SessionLogFile.REPORT_NAMES.forEach { name ->
++            val file = File(directory, name)
++            if (file.exists()) {
++                if (name == "diplay.log") file.writeText("") else check(file.delete())
++            }
++        }
+     }
+ 
+     internal fun awaitIdle(timeoutMillis: Long): Boolean = writer.awaitIdle(timeoutMillis)
+--- a/common/src/main/java/com/shilapi/xcertplay/BootReceiver.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/BootReceiver.kt
+@@ -9,11 +9,10 @@
+ class BootReceiver : BroadcastReceiver() {
+     override fun onReceive(context: Context, intent: Intent) {
+         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+-        val launchEnabled = AirPlayPersistence.loadAutoStartOnBoot(context)
+-        StartupDiagnosticSnapshot.received(context, launchEnabled)
+-        if (!launchEnabled) return
++        if (!L7Agreement.canUse(context)) return
++        if (!AirPlayPersistence.loadAutoStartOnBoot(context)) return
+ 
+-        val launch = Intent(context, DiPlayActivity::class.java).apply {
++        val launch = Intent(context, GalaxySettingsActivity::class.java).apply {
+             addFlags(
+                 Intent.FLAG_ACTIVITY_NEW_TASK or
+                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
+@@ -22,10 +21,8 @@
+         }
+         try {
+             context.startActivity(launch)
+-            StartupDiagnosticSnapshot.launchResult(context)
+         } catch (error: RuntimeException) {
+-            StartupDiagnosticSnapshot.launchResult(context, error)
+-            Log.w(TAG, "Boot auto-start could not launch DiPlayActivity", error)
++            Log.w(TAG, "Boot auto-start could not launch CarPlayHostActivity", error)
+         }
+     }
+ 
+--- a/common/src/main/java/com/shilapi/xcertplay/BoundedDiagnosticWriter.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/BoundedDiagnosticWriter.kt
+@@ -3,7 +3,7 @@
+ import java.io.Closeable
+ import java.util.ArrayDeque
+ 
+-/** One daemon writer, with at most [maxPending] queued entries plus its active write. */
++/** 单个后台写入线程，最多保留 maxPending 条待写记录及一条正在写入的记录。 */
+ internal class BoundedDiagnosticWriter<T : Any>(
+     private val maxPending: Int = 64,
+     private val write: (T) -> Unit,
+@@ -22,7 +22,7 @@
+         }
+     }
+ 
+-    /** Never waits for disk. Under overload, discard the oldest pending entry. */
++    /** 不等待磁盘；队列已满时丢弃最旧的待写记录。 */
+     fun enqueue(entry: T): Boolean = synchronized(monitor) {
+         if (closed) return@synchronized false
+         if (pending.size == maxPending) {
+@@ -45,7 +45,7 @@
+                 active = true
+                 pending.removeFirst()
+             }
+-            // Disk failures or a broken diagnostic callback must not stop later writes.
++            // 磁盘或诊断回调失败不能阻止后续记录。
+             try {
+                 runCatching { write(next) }
+             } finally {
+@@ -57,7 +57,7 @@
+         }
+     }
+ 
+-    /** For a bounded best-effort flush outside transport/UI callbacks, or deterministic tests. */
++    /** 仅供非传输、非 UI 线程限时等待写入，以及确定性测试。 */
+     fun awaitIdle(timeoutMillis: Long): Boolean = synchronized(monitor) {
+         val deadline = System.nanoTime() + timeoutMillis.coerceAtLeast(0) * 1_000_000L
+         while (active || pending.isNotEmpty()) {
+@@ -68,7 +68,7 @@
+         true
+     }
+ 
+-    /** Stop accepting new entries; drain pending work without waiting on the caller. */
++    /** 停止接收新记录，后台继续写完队列，调用方无需等待。 */
+     override fun close() = synchronized(monitor) {
+         closed = true
+         monitor.notifyAll()
+--- a/common/src/main/java/com/shilapi/xcertplay/DarkMode.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DarkMode.kt
+@@ -2,13 +2,11 @@
+ 
+ import android.content.res.Configuration
+ 
+-/**
+- * Returns the explicit night state carried by [uiMode], or null when the head unit reports
+- * UI_MODE_NIGHT_UNDEFINED so callers keep their previous state instead of flipping to light.
+- */
+-internal fun nightModeOrNull(uiMode: Int): Boolean? =
+-    when (uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+-        Configuration.UI_MODE_NIGHT_YES -> true
+-        Configuration.UI_MODE_NIGHT_NO -> false
+-        else -> null
+-    }
++internal fun isDarkMode(uiMode: Int): Boolean =
++    uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
++
++internal fun nightModeOrNull(uiMode: Int): Boolean? = when (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) {
++    android.content.res.Configuration.UI_MODE_NIGHT_YES -> true
++    android.content.res.Configuration.UI_MODE_NIGHT_NO -> false
++    else -> null
++}
+--- a/common/src/main/java/com/shilapi/xcertplay/DiPlayBootstrap.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DiPlayBootstrap.kt
+@@ -2,44 +2,13 @@
+ 
+ import android.content.Context
+ import com.shilapi.xcertplay.airplay.AirPlayIdentity
+-import com.shilapi.xcertplay.mfi.LocalMfiAuthenticationClient
+-import com.shilapi.xcertplay.orchestration.MfiTarget
+-import java.io.File
+ import java.security.MessageDigest
+ 
+-/** Installs the private beta's experimental identity. It has no remote fallback. */
++/** 保留上游启动与身份入口，产品准备交给独立 Galaxy 策略。 */
+ internal object DiPlayBootstrap {
+-    @Volatile private var ready = false
+-
+-    @Synchronized fun ensure(context: Context, mfiTarget: MfiTarget) {
+-        if (mfiTarget != MfiTarget.LOCAL) return
+-        if (ready) return
+-        val target = File(context.noBackupFilesDir, LocalMfiAuthenticationClient.DIRECTORY)
+-        if (!target.exists()) {
+-            val staging = File(context.noBackupFilesDir, "offline-mfi-staging")
+-            staging.deleteRecursively()
+-            check(staging.mkdirs()) { "Could not prepare local authentication" }
+-            staging.setReadable(false, false); staging.setReadable(true, true)
+-            staging.setExecutable(false, false); staging.setExecutable(true, true)
+-            try {
+-                for (name in listOf("identity.pk8", "certificate.p7b")) {
+-                    val file = File(staging, name)
+-                    context.assets.open("offline-mfi/$name").use { input ->
+-                        file.outputStream().use { output -> input.copyTo(output) }
+-                    }
+-                    file.setReadable(false, false); file.setReadable(true, true)
+-                    file.setWritable(false, false); file.setWritable(true, true)
+-                }
+-                LocalMfiAuthenticationClient.load(staging)
+-                check(staging.renameTo(target)) { "Could not install local authentication" }
+-            } finally {
+-                staging.deleteRecursively()
+-            }
+-        }
+-        LocalMfiAuthenticationClient.load(target)
+-        AirPlayPersistence.saveDebugLogsEnabled(context, false)
+-        ready = true
+-    }
++    fun ensure(context: Context, mfiTarget: com.shilapi.xcertplay.orchestration.MfiTarget) = ensure(context)
++    fun ensure(context: Context) = GalaxyStartupPolicy.ensure(context)
++    fun reload(context: Context) = GalaxyStartupPolicy.reload(context)
+ 
+     fun deviceId(identity: AirPlayIdentity): String {
+         val bytes = MessageDigest.getInstance("SHA-256").digest(identity.publicKey).take(6).toByteArray()
+@@ -57,6 +26,6 @@
+     }
+     fun autoConnect(context: Context) = prefs(context).getBoolean("auto_connect", false)
+     fun saveAutoConnect(context: Context, value: Boolean) {
+-        prefs(context).edit().putBoolean("auto_connect", value).apply()
++        GalaxyStartupPolicy.saveAutoConnect(context, value)
+     }
+ }
+--- a/common/src/main/java/com/shilapi/xcertplay/DiPlaySessionService.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DiPlaySessionService.kt
+@@ -17,7 +17,7 @@
+ class DiPlaySessionService : Service() {
+     override fun onBind(intent: Intent?): IBinder? = null
+     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+-        if (intent?.action == ACTION_STOP) {
++        if (intent?.action == ACTION_STOP || !L7Agreement.canUse(this)) {
+             CarPlayBackgroundSession.stop()
+             stopSelf()
+             return START_NOT_STICKY
+@@ -28,7 +28,7 @@
+         val stop = PendingIntent.getService(this, 1, Intent(this, DiPlaySessionService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+         val notification = Notification.Builder(this, CHANNEL)
+             .setSmallIcon(R.drawable.ic_diplay_notification)
+-            .setContentTitle("DiPlay")
++            .setContentTitle(getString(R.string.app_name))
+             .setContentText("CarPlay connection running")
+             .setContentIntent(open).setOngoing(true)
+             .addAction(Notification.Action.Builder(null, "Disconnect", stop).build()).build()
+--- a/common/src/main/java/com/shilapi/xcertplay/DiagnosticExportStore.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DiagnosticExportStore.kt
+@@ -66,11 +66,12 @@
+     }
+ 
+     @RequiresApi(Build.VERSION_CODES.Q)
+-    fun saveToDownloads(resolver: ContentResolver, fileName: String, report: String): Uri {
++    fun saveToDownloads(resolver: ContentResolver, fileName: String, report: String,
++                        mimeType: String = "text/plain", directory: String = "GalaxyPlay"): Uri {
+         val values = ContentValues().apply {
+             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+-            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+-            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/DiPlay")
++            put(MediaStore.Downloads.MIME_TYPE, mimeType)
++            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/$directory")
+             put(MediaStore.Downloads.IS_PENDING, 1)
+         }
+         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+--- a/common/src/main/java/com/shilapi/xcertplay/DiagnosticRedactor.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DiagnosticRedactor.kt
+@@ -1,17 +1,81 @@
+ package com.shilapi.xcertplay
+ 
+-/** Diagnostics describe state transitions; protocol payloads and credentials are never exported. */
++/** 只遮盖敏感值；保留技术字段、状态和计数，原始协议载荷仍不进入诊断。 */
+ internal object DiagnosticRedactor {
+-    private val secret = Regex("(?i)(pass(word|phrase)?|token|private.?key|certificate|pair.?record|ssid|body=|payload=|hex=)")
++    const val MAX_LINE = 4096
++    private val field = Regex("""(?i)(?<![\w-])["']?(password|passphrase|pass|token|access[_-]?token|refresh[_-]?token|private[_-]?key|secret|certificate|pair[_-]?record|ssid|authorization|cookie|android[_-]?id|serial(?:number)?|imei|imsi|iccid|vin|fingerprint|phone[_-]?number|(?:phone|device|peer|host|bluetooth)?[_-]?name|phone|device|peer|device[_-]?id|body|payload|hex)["']?\s*[:=]\s*""")
++    private val nextField = Regex("""[,;\s]+(?=["']?[A-Za-z_][\w.\-/\[\]]*["']?\s*[:=])""")
++    private val rawDump = Regex("""(?:^|\s)(?:TRACE|PHONE)\s|-----\s*(?:BEGIN|END)\b|^[A-Za-z0-9+/]{48,}={0,2}$""")
+     private val mac = Regex("(?i)(?<![0-9a-f])(?:[0-9a-f]{2}:){5}[0-9a-f]{2}(?![0-9a-f])")
+     private val identifier = Regex("(?i)\\b[0-9a-f]{24,}\\b|\\b[0-9a-f]{8}-[0-9a-f-]{27,}\\b")
+     private val address = Regex("(?<![0-9])(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?![0-9])")
+-    private val namedDevice = Regex("(?i)(phone|device|peer|host)?name[=:]")
+     private val ipv6 = Regex("(?i)(?:[0-9a-f]{1,4}:)*[0-9a-f]{0,4}::[0-9a-f:]*(?:%[a-z0-9_.-]+)?|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}")
++    private val url = Regex("""(?i)https?://[^\s<>"']+""")
++    private val path = Regex("""(?:/Users/|/storage/|/data/).*?(?=\s+[A-Za-z_][\w.-]*\s*[:=]|["'<>]|$)""")
++    private val bearer = Regex("""(?i)\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_.=-]+""")
++    private val versionField = Regex("""(?i)(?:[\w.]*version|firmware|build)\s*[:=]\s*["']?$""")
++
+     fun redact(line: String): String? {
+-        if (line.contains("TRACE ") || line.contains("PHONE ") || line.contains('\n') || line.contains('\r')) return null
+-        if (secret.containsMatchIn(line) || namedDevice.containsMatchIn(line)) return null
+-        return line.replace(mac, "[address]").replace(identifier, "[identifier]")
+-            .replace(address, "[ip]").replace(ipv6, "[ip]").take(700)
++        if (rawDump.containsMatchIn(line) || line.any { it.code < 32 && it != '\t' || it.code == 127 }) return null
++        var safe = fields(line).replace(url, "[url]").replace(path, "[path]")
++            .replace(bearer, "[authorization]").replace(mac, "[address]").replace(identifier, "[identifier]")
++        val beforeAddresses = safe
++        safe = address.replace(safe) { match ->
++            // 四段版本号不是网络地址，版本上下文中的数字完整保留。
++            if (versionField.containsMatchIn(beforeAddresses.substring(0, match.range.first))) match.value else "[ip]"
++        }.replace(ipv6, "[ip]")
++        return if (safe.length <= MAX_LINE) safe else safe.take(MAX_LINE - 12) + " [truncated]"
++    }
++
++    private fun fields(line: String): String = buildString {
++        var cursor = 0
++        while (cursor < line.length) {
++            val match = field.find(line, cursor) ?: break
++            val start = match.range.last + 1
++            val key = match.groupValues[1].lowercase().replace("_", "").replace("-", "")
++            val end = if (key == "cookie" && line.getOrNull(start) !in listOf('"', '\'')) line.length else valueEnd(line, start)
++            val value = line.substring(start, end)
++            append(line, cursor, start)
++            append(if (technicalValue(key, value)) value else "[redacted]")
++            cursor = end
++        }
++        append(line, cursor, line.length)
++    }
++
++    private fun technicalValue(key: String, value: String): Boolean {
++        val plain = value.trim().trim('"', '\'')
++        if (plain in setOf("[redacted]", "[ip]", "[address]", "[identifier]", "[url]", "[path]", "[authorization]")) return true
++        if (key in setOf("device", "peer") && (mac.matches(plain) || address.matches(plain) || ipv6.matches(plain))) return true
++        return when (key) {
++            "name", "device", "peer", "deviceid" ->
++                plain.matches(Regex("(?i)(?:c2\\.|OMX\\.)[\\w.-]+|BUS[0-9]{2}_[A-Z0-9_]+|[0-9]{1,6}"))
++            else -> false
++        }
++    }
++
++    private fun valueEnd(line: String, start: Int): Int {
++        if (start >= line.length) return line.length
++        val first = line[start]
++        if (first !in "\"'[{(") return nextField.find(line, start)?.range?.first ?: line.length
++        var quote: Char? = null
++        var escaped = false
++        var depth = 0
++        for (i in start until line.length) {
++            val char = line[i]
++            if (escaped) { escaped = false; continue }
++            if (char == '\\') { escaped = true; continue }
++            if (quote != null) {
++                if (char == quote) {
++                    quote = null
++                    if (depth == 0) return i + 1
++                }
++            } else when (char) {
++                '\'', '"' -> quote = char
++                '[', '{', '(' -> depth++
++                ']', '}', ')' -> if (--depth == 0) return i + 1
++            }
++        }
++        // 引号或结构不完整时遮蔽余下内容，不把残缺载荷当作普通字段。
++        return line.length
+     }
+ }
+--- a/common/src/main/java/com/shilapi/xcertplay/DisplayDiagnosticSnapshot.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/DisplayDiagnosticSnapshot.kt
+@@ -9,7 +9,7 @@
+ /** Small, redacted snapshot retained separately from the rotating session logs. */
+ internal object DisplayDiagnosticSnapshot {
+     private const val PREFS = "diplay_display_diagnostics"
+-    private val fields = listOf("selection", "request", "capability", "effective", "phone", "decoder", "output")
++    private val fields = listOf("selection", "environment", "device", "connection", "request", "capability", "effective", "phone", "decoder", "decoderFailure", "output", "recovery", "presentation", "stats")
+     private fun stamp() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
+ 
+     @Synchronized
+@@ -24,6 +24,10 @@
+         val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+         fields.filter { it != "selection" }.forEach(editor::remove)
+         editor.putString("attempt", attempt)
++        DiagnosticRedactor.redact(L7SystemDiagnostic.report(context))?.let {
++            editor.putString("environment", "${stamp()} $it")
++        }
++        editor.putString("device", L7DeviceDiagnostic.capture(context).joinToString("\n") { "${stamp()} $it" })
+         for ((key, line) in listOf("request" to request, "capability" to capability, "effective" to effective)) {
+             DiagnosticRedactor.redact(line)?.let { editor.putString(key, "${stamp()} $it") }
+         }
+@@ -41,8 +45,13 @@
+         if (attempt == null || prefs.getString("attempt", null) != attempt) return
+         val field = when {
+             message.startsWith("Phone display peer ") -> "phone"
++            message.startsWith("Connection stage=") -> "connection"
+             message.startsWith("Video: decoder=") || message.startsWith("Video: decoder configuration failed") -> "decoder"
++            message.startsWith("Video: configure rejected ") || message.startsWith("Video: no usable decoder ") -> "decoderFailure"
+             message.startsWith("Video: output format ") -> "output"
++            message.startsWith("Video: recovery: ") -> "recovery"
++            message == "Video: first frame rendered" -> "presentation"
++            message.startsWith("Video: video stats") -> "stats"
+             else -> return
+         }
+         val safe = DiagnosticRedactor.redact(message) ?: return
+@@ -52,7 +61,7 @@
+     @Synchronized
+     fun report(context: Context): String {
+         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        return fields.mapNotNull { prefs.getString(it, null)?.let(DiagnosticRedactor::redact) }
+-            .joinToString("\n").ifEmpty { "No display negotiation recorded yet." }
++        return fields.flatMap { prefs.getString(it, null)?.lines().orEmpty().mapNotNull(DiagnosticRedactor::redact) }
++            .map { it.take(700) }.joinToString("\n").ifEmpty { "No display negotiation recorded yet." }
+     }
+ }
+--- a/common/src/main/java/com/shilapi/xcertplay/MainActivity.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/MainActivity.kt
+@@ -35,6 +35,7 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        if (!L7Agreement.require(this)) return
+         enableEdgeToEdge()
+         setContent {
+             XcertplayTheme {
+--- a/common/src/main/java/com/shilapi/xcertplay/NowPlayingArtworkQueue.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/NowPlayingArtworkQueue.kt
+@@ -3,7 +3,7 @@
+ import com.shilapi.xcertplay.transport.Iap2FileTransferReceiver
+ import java.util.concurrent.Executor
+ 
+-/** Bounds compressed artwork waiting for decode and decoded images waiting for the main thread. */
++/** 限制待解码封面及待主线程接收的图片数量。 */
+ internal class NowPlayingArtworkQueue<Image : Any>(
+     private val worker: Executor,
+     private val main: Executor,
+@@ -13,7 +13,7 @@
+ ) {
+     private data class Request(val owner: Any, val id: Int, val version: Long, val bytes: ByteArray)
+     private data class Result<Image>(val request: RequestInfo, val image: Image?)
+-    // Results must not retain the compressed payload while waiting for the main thread.
++    // 等待主线程交付时不再保留压缩数据。
+     private data class RequestInfo(val owner: Any, val id: Int, val version: Long)
+ 
+     private val lock = Any()
+@@ -25,7 +25,7 @@
+     private var workerScheduled = false
+     private var deliveryScheduled = false
+ 
+-    /** A fresh token also invalidates a decode already in progress. */
++    /** 新会话令牌同时使正在解码的旧任务失效。 */
+     fun newSession(): Any = synchronized(lock) {
+         clearLocked()
+         Any().also { owner = it }
+@@ -50,7 +50,7 @@
+             while (pending.size > MAX_PENDING) pending.remove(pending.keys.first())
+             if (workerScheduled) false else { workerScheduled = true; true }
+         }
+-        // Only one worker runnable is queued, regardless of the number of received transfers.
++        // 无论收到多少传输，每个队列最多安排一个解码任务。
+         if (schedule) worker.execute(::drain)
+     }
+ 
+@@ -85,8 +85,7 @@
+                 ready.remove(ready.keys.first())!!
+             }
+             if (isCurrent(result.request)) {
+-                // The receiver checks this token again under its own session lock. Never call it
+-                // while holding our lock: session teardown acquires the locks in the other order.
++                // 接收方在自己的会话锁内再次检查令牌。调用时不能持有队列锁，避免与会话关闭反向加锁。
+                 publish(result.request.owner, result.request.id, result.image)
+             } else result.image?.let(discard)
+         }
+@@ -96,6 +95,6 @@
+     private fun isCurrentLocked(info: RequestInfo): Boolean = owner === info.owner && latest[info.id] == info.version
+ 
+     private companion object {
+-        const val MAX_PENDING = 4 // At most 8 MiB compressed, plus the one decode in progress.
++        const val MAX_PENDING = 4 // 最多 8 MiB 待解码数据，另加一个正在解码的任务。
+     }
+ }
+--- a/common/src/main/java/com/shilapi/xcertplay/ProcessExitDiagnostics.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/ProcessExitDiagnostics.kt
+@@ -4,7 +4,7 @@
+ import android.content.Context
+ import android.os.Build
+ 
+-/** Own-app numeric exit metadata only; never read traces, descriptions or process state blobs. */
++/** 仅读取本应用的数字退出信息，不读取堆栈、描述或进程状态内容。 */
+ internal object ProcessExitDiagnostics {
+     private const val MAX_RECORDS = 3
+     private const val UNSUPPORTED = "Process exits available=false requiresApi=30"
+@@ -57,7 +57,7 @@
+         return "Process exits available=false error=$type"
+     }
+ 
+-    // Stable public Android 11 reason codes. Keep newer/unknown values visible as numbers.
++    // 使用 Android 11 公开原因编号；较新或未知原因仍保留数字值。
+     private fun reason(code: Int) = when (code) {
+         0 -> "unknown"
+         1 -> "self_exit"
+--- a/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
+@@ -3,9 +3,9 @@
+ import java.io.Closeable
+ import java.io.File
+ 
+-/** Bounded, private diagnostics. Each write is redacted before touching storage. */
+-internal class SessionLogFile(val file: File) : Closeable {
+-    private val lock = Any()
++/** 每行先脱敏再落盘，按 UTF-8 字节预算轮转并保留最近八份日志。 */
++internal class SessionLogFile(val file: File, private val archiveNames: List<String> = ARCHIVE_NAMES) : Closeable {
++    private val lock = storageLock
+     private var closed = false
+     fun reset(header: String) = synchronized(lock) {
+         if (!closed) {
+@@ -18,28 +18,33 @@
+     fun append(line: String) = synchronized(lock) {
+         if (closed) return@synchronized
+         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
++        val bytes = (safe + "\n").toByteArray(Charsets.UTF_8)
+         runCatching {
+-            if (file.length() > MAX_BYTES) {
++            file.parentFile?.mkdirs()
++            if (file.length() + bytes.size > MAX_BYTES) {
+                 rotate()
+                 file.writeText("")
+             }
+-            file.appendText(safe + "\n")
++            file.appendBytes(bytes)
+         }
+         Unit
+     }
+     private fun rotate() {
+         if (!file.exists() || file.length() == 0L) return
+-        for (index in ARCHIVE_NAMES.lastIndex downTo 1) {
+-            val source = File(file.parentFile, ARCHIVE_NAMES[index - 1])
+-            val destination = File(file.parentFile, ARCHIVE_NAMES[index])
++        for (index in archiveNames.lastIndex downTo 1) {
++            val source = File(file.parentFile, archiveNames[index - 1])
++            val destination = File(file.parentFile, archiveNames[index])
+             if (source.exists()) source.copyTo(destination, overwrite = true)
+         }
+-        file.copyTo(File(file.parentFile, ARCHIVE_NAMES.first()), overwrite = true)
++        file.copyTo(File(file.parentFile, archiveNames.first()), overwrite = true)
+     }
+     override fun close() = synchronized(lock) { closed = true }
+     companion object {
++        internal val storageLock = Any()
+         const val MAX_BYTES = 512 * 1024L
+         private val ARCHIVE_NAMES = listOf("previous.log") + (2..7).map { "previous-$it.log" }
+-        val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log"
++        val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log" + listOf("steering-previous-2.log", "steering-previous.log", "steering.log",
++            "voice-input-previous-2.log", "voice-input-previous.log", "voice-input.log",
++            "debug-previous-2.log", "debug-previous.log", "debug.log")
+     }
+ }
+--- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydClusterMapPause.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydClusterMapPause.kt
+@@ -2,6 +2,7 @@
+ 
+ import android.content.Context
+ import android.util.Log
++import com.shilapi.xcertplay.l7.L7VehiclePolicy
+ import java.util.concurrent.Executors
+ import java.util.concurrent.TimeUnit
+ import java.util.concurrent.atomic.AtomicBoolean
+@@ -39,6 +40,7 @@
+ 
+     /** Never waits for the ticker: an adb read in flight does not hold up opening or reconnecting. */
+     fun initialize(appContext: Context) {
++        if (!L7VehiclePolicy.BYD_FEATURES_ENABLED) return
+         context = appContext.applicationContext
+         if (tickerStarted.compareAndSet(false, true)) {
+             Executors.newSingleThreadScheduledExecutor { runnable ->
+--- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydNavigationOutputs.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydNavigationOutputs.kt
+@@ -2,11 +2,13 @@
+ 
+ import android.content.Context
+ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
++import com.shilapi.xcertplay.l7.L7VehiclePolicy
+ 
+ /** Nonblocking boundary between phone control messages and vendor services. */
+ object BydNavigationOutputs {
+     /** Recover a journaled interrupted output when the app opens, even before a phone reconnects. */
+     fun onAppOpened(context: Context) {
++        if (!L7VehiclePolicy.bydOutputsAllowed(context)) return
+         BydOemClusterNavi.restoreIfNeeded(context)
+         BydDiLink3ClusterOutput.restoreIfNeeded(context)
+         com.shilapi.xcertplay.network.WifiScanPause.restoreIfNeeded(context)
+@@ -17,6 +19,7 @@
+         if (BydOutputSettings.enabled(context)) BydClusterBridge.prepareProjectionDisplay(context.applicationContext)
+     }
+     fun setDiagnosticHold(hold: Boolean) { BydStandaloneHudOutput.syntheticHold = hold }
++    @Volatile private var outputsEnabled = false
+     @Volatile private var useStandalone = false
+     @Volatile private var overlayListener: ((ClusterTurnGuidance?) -> Unit)? = null
+     private val overlayLock = Any()
+@@ -57,6 +60,8 @@
+     fun parked(context: Context): Boolean? = BydParkedState.parked(context.applicationContext)
+ 
+     fun start(context: Context) {
++        if (!L7VehiclePolicy.bydOutputsAllowed(context)) return
++        outputsEnabled = true
+         val app = context.applicationContext
+         useStandalone = BydStandaloneHudOutput.available(app)
+         if (useStandalone) standalone.start { BydStandaloneNavigationBridge.initialize(app) }
+@@ -70,6 +75,7 @@
+     }
+ 
+     internal fun onFrame(frame: Iap2Frame) {
++        if (!outputsEnabled) return
+         if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
+             BydClusterSong.onFrame(frame)
+             return
+@@ -140,6 +146,8 @@
+ 
+     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
+     fun endNow(preserveTurnOverlay: Boolean = false) {
++        // 清理本地状态不依赖厂商能力；不能让停用输出留下旧导航卡片。
++        outputsEnabled = false
+         standalone.clear(); hud.clear(); cluster.clear(); BydClusterSong.end(); BydCarPlayCall.end()
+         // Only a wireless session replacement retains the card. Explicit controller close
+         // and wired disconnect still clear it immediately.
+--- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydOutputSettings.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydOutputSettings.kt
+@@ -1,6 +1,7 @@
+ package com.shilapi.xcertplay.hud
+ 
+ import android.content.Context
++import com.shilapi.xcertplay.l7.L7VehiclePolicy
+ import com.shilapi.xcertplay.transport.EvChargingConnectors
+ 
+ /**
+@@ -26,18 +27,21 @@
+     const val DEFAULT_LOW_CHARGE_PERCENT = 20
+     val lowChargePresets = listOf(10, 15, 20, 25, 30)
+ 
+-    fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, true)
++    fun enabled(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_ENABLED, true)
+ 
+     fun setEnabled(context: Context, enabled: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+ 
+     /** Ask the iPhone to stop drawing the cluster map while the cluster hides it (needs ADB over network). */
+-    fun clusterStreamPause(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_STREAM_PAUSE, false)
++    fun clusterStreamPause(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_CLUSTER_STREAM_PAUSE, false)
+ 
+     fun setClusterStreamPause(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_CLUSTER_STREAM_PAUSE, enabled).apply()
+ 
+     /** Tell the iPhone the car's charge and range (needs ADB over network); applies on the next connection. */
+-    fun batteryToIphone(context: Context): Boolean = prefs(context).getBoolean(KEY_BATTERY_TO_IPHONE, false)
++    fun batteryToIphone(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_BATTERY_TO_IPHONE, false)
+ 
+     fun setBatteryToIphone(context: Context, enabled: Boolean) {
+         prefs(context).edit().putBoolean(KEY_BATTERY_TO_IPHONE, enabled).commit()
+@@ -58,7 +62,8 @@
+     }
+ 
+     /** Send wheel speed and gear with the car's GPS (needs ADB over network); applies on the next connection. */
+-    fun wheelSpeedToIphone(context: Context): Boolean = prefs(context).getBoolean(KEY_WHEEL_SPEED_TO_IPHONE, false)
++    fun wheelSpeedToIphone(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_WHEEL_SPEED_TO_IPHONE, false)
+ 
+     fun setWheelSpeedToIphone(context: Context, enabled: Boolean) {
+         prefs(context).edit().putBoolean(KEY_WHEEL_SPEED_TO_IPHONE, enabled).commit()
+@@ -67,33 +72,35 @@
+     fun wheelSpeedToIphoneActive(context: Context): Boolean =
+         wheelSpeedToIphone(context) && supportedInSelectedMode(context) { it.motionSupported }
+     /** Offer iOS 27 video in car, played only while the gear reads P (needs ADB over network). */
+-    fun videoWhileParked(context: Context): Boolean = prefs(context).getBoolean(KEY_VIDEO_WHILE_PARKED, false)
++    fun videoWhileParked(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_VIDEO_WHILE_PARKED, false)
+ 
+     fun setVideoWhileParked(context: Context, enabled: Boolean) {
+         prefs(context).edit().putBoolean(KEY_VIDEO_WHILE_PARKED, enabled).commit()
+     }
+ 
+     /** Show the CarPlay song in the dashboard's music card (needs ADB over network); applies at once. */
+-    fun clusterSong(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_SONG, false)
++    fun clusterSong(context: Context): Boolean =
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_CLUSTER_SONG, false)
+ 
+     fun setClusterSong(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_CLUSTER_SONG, enabled).apply()
+ 
+     /** Show CarPlay calls on the dashboard and HUD like BYD's CarPlay app (needs ADB over network); applies at once. */
+-    fun carPlayCalls(context: Context): Boolean = prefs(context).getBoolean(KEY_CARPLAY_CALLS, false)
++    fun carPlayCalls(context: Context): Boolean = L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_CARPLAY_CALLS, false)
+ 
+     fun setCarPlayCalls(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_CARPLAY_CALLS, enabled).apply()
+ 
+     /** Unverified DiLink 3 call/voice/media key handling requires a separate explicit opt-in. */
+     fun carPlayCallControls(context: Context): Boolean =
+-        prefs(context).getBoolean(KEY_CARPLAY_CALL_CONTROLS, false)
++        L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_CARPLAY_CALL_CONTROLS, false)
+ 
+     fun setCarPlayCallControls(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_CARPLAY_CALL_CONTROLS, enabled).apply()
+ 
+     /** Show a new song on the dashboard for a few seconds only, then an empty card. */
+-    fun clusterSongOnChange(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_SONG_ON_CHANGE, false)
++    fun clusterSongOnChange(context: Context): Boolean = L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_CLUSTER_SONG_ON_CHANGE, false)
+ 
+     fun setClusterSongOnChange(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_CLUSTER_SONG_ON_CHANGE, enabled).apply()
+@@ -121,7 +128,7 @@
+     }
+ 
+     /** Optional title/lyrics when navigation is absent; only the verified HUD output can send it. */
+-    fun hudSong(context: Context): Boolean = prefs(context).getBoolean(KEY_HUD_SONG, false)
++    fun hudSong(context: Context): Boolean = L7VehiclePolicy.bydOutputsAllowed(context) && prefs(context).getBoolean(KEY_HUD_SONG, false)
+     fun setHudSong(context: Context, enabled: Boolean) =
+         prefs(context).edit().putBoolean(KEY_HUD_SONG, enabled).apply()
+ 
+@@ -141,18 +148,18 @@
+     fun setLowChargePercent(context: Context, percent: Int) =
+         prefs(context).edit().putInt(KEY_LOW_CHARGE_PERCENT, percent).apply()
+ 
+-    fun standaloneHudAvailable(context: Context): Boolean = BydStandaloneHudOutput.available(context)
++    fun standaloneHudAvailable(context: Context): Boolean = L7VehiclePolicy.bydOutputsAllowed(context) && BydStandaloneHudOutput.available(context)
+     fun standaloneHudDiagnosticReport(context: Context): String = BydStandaloneHudOutput.diagnostics(context)
+ 
+     /** Whether the head unit has a BYD navigation receiver. This says nothing about ADB vehicle data. */
+     fun navigationAvailable(context: Context): Boolean =
+-        BydStandaloneHudOutput.available(context) ||
++        L7VehiclePolicy.bydOutputsAllowed(context) && (BydStandaloneHudOutput.available(context) ||
+             BydAmapAdapter.find { installed(context, it) } != null ||
+-            installed(context, "com.ts.car.someip.service")
++            installed(context, "com.ts.car.someip.service"))
+ 
+     /** Whether the head unit has a BYD navigation receiver or is a BYD head unit, so settings can show navigation/map options. */
+     fun available(context: Context): Boolean =
+-        navigationAvailable(context) ||
++        L7VehiclePolicy.bydOutputsAllowed(context) && (navigationAvailable(context) ||
+             installed(context, "com.byd.carsettings") ||
+             installed(context, "com.byd.appmgr") ||
+             installed(context, "com.byd.deviceinfo") ||
+@@ -161,7 +168,7 @@
+             android.os.Build.BRAND.contains("BYD", ignoreCase = true) ||
+             android.os.Build.MANUFACTURER.contains("BYD", ignoreCase = true) ||
+             android.os.Build.PRODUCT.contains("BYD", ignoreCase = true) ||
+-            android.os.Build.DEVICE.contains("BYD", ignoreCase = true)
++            android.os.Build.DEVICE.contains("BYD", ignoreCase = true))
+ 
+     private fun installed(context: Context, pkg: String): Boolean =
+         runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+--- a/shared/src/main/java/com/shilapi/xcertplay/mfi/LocalMfiAuthenticationClient.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/mfi/LocalMfiAuthenticationClient.kt
+@@ -41,19 +41,33 @@
+     }
+ 
+     companion object {
+-        /** Private app directory loaded only when local authentication is selected. */
++        /** 应用私有的本地身份目录，仅在显式选择 LOCAL 后端时使用。 */
+         const val DIRECTORY = "offline-mfi"
+         private const val MAX_FILE_BYTES = 16 * 1024
+ 
+         fun load(directory: File, onSignature: (Int) -> Unit = {}): LocalMfiAuthenticationClient {
+             require(directory.isDirectory) { "Offline MFi directory is missing or invalid" }
+             val encodedKey = readBounded(File(directory, "identity.pk8"))
+-            val privateKey = try {
+-                KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(encodedKey))
++            return try {
++                fromEncoded(encodedKey, readBounded(File(directory, "certificate.p7b")), onSignature)
+             } finally {
+                 encodedKey.fill(0)
+             }
+-            val certificate = readBounded(File(directory, "certificate.p7b"))
++        }
++
++        // 文字导入与文件加载使用同一校验，避免两条路径接受不同的密钥或证书。
++        internal fun fromEncoded(
++            encodedKey: ByteArray,
++            certificate: ByteArray,
++            onSignature: (Int) -> Unit = {},
++        ): LocalMfiAuthenticationClient {
++            require(encodedKey.isNotEmpty() && encodedKey.size <= MAX_FILE_BYTES)
++            require(certificate.isNotEmpty() && certificate.size <= MAX_FILE_BYTES)
++            val privateKey = try {
++                KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(encodedKey))
++            } catch (error: Exception) {
++                throw IllegalArgumentException("Invalid P-256 PKCS#8 private key", error)
++            }
+             val certificates = CertificateFactory.getInstance("X.509")
+                 .generateCertificates(certificate.inputStream())
+             require(certificates.size == 1) { "Expected one accessory certificate" }
+@@ -72,7 +86,7 @@
+             verifier.initVerify(publicKey)
+             verifier.update(challenge)
+             require(verifier.verify(signature)) { "Local private key does not match certificate" }
+-            return LocalMfiAuthenticationClient(privateKey, certificate, onSignature)
++            return LocalMfiAuthenticationClient(privateKey, certificate.copyOf(), onSignature)
+         }
+ 
+         private fun readBounded(file: File): ByteArray = file.inputStream().use { stream ->

@@ -1,0 +1,1214 @@
+--- a/e2e/common/test/java/com/shilapi/xcertplay/AsyncDiagnosticLogTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/AsyncDiagnosticLogTest.kt
+@@ -22,7 +22,7 @@
+             assertFalse(evidence.contains("192.168.49.1"))
+             assertFalse(evidence.contains("private-token")); assertFalse(evidence.contains("private-audio"))
+             assertFalse(current.file.readText().contains("teardown end"))
+-            assertEquals(4, evidence.lineSequence().count())
++            assertEquals(6, evidence.lineSequence().count())
+         } finally {
+             old.close(); current.close(); folder.deleteRecursively()
+         }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
+@@ -62,17 +62,18 @@
+         assertEquals(0, context.receivers.size)
+     }
+ 
+-    @Test fun availableWiredUsbStillRegistersAndClosesBothIphoneReceivers() {
++    @Test fun availableWiredUsbRegistersAndClosesPermissionAttachAndDetachReceivers() {
+         val context = UsbContext(true)
+         val controller = controller(context, CarPlayTransport.WIRED, MfiTarget.LOCAL)
+         controller.start()
+-        assertEquals(2, context.receivers.size)
+-        assertTrue(context.receivers.values.any { it.hasAction("${context.packageName}.IPHONE_USB_PERMISSION") })
++        assertEquals(3, context.receivers.size)
++        assertTrue(context.receivers.values.any { it.actionsIterator().asSequence().any { action -> action.startsWith("${context.packageName}.IPHONE_USB_PERMISSION.") } })
+         assertTrue(context.receivers.values.any { it.hasAction("android.hardware.usb.action.USB_DEVICE_ATTACHED") })
++        assertTrue(context.receivers.values.any { it.hasAction("android.hardware.usb.action.USB_DEVICE_DETACHED") })
+         controller.close()
+         assertTrue(controller.awaitClosed(2_000))
+         assertEquals(0, context.receivers.size)
+-        assertEquals(2, context.unregistered)
++        assertEquals(3, context.unregistered)
+     }
+ 
+     @Test fun availableWirelessCh341StillWaitsForMfiAndClosesItsPermissionReceiver() {
+--- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayMediaCallbackTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayMediaCallbackTest.kt
+@@ -1,11 +1,9 @@
+ package com.shilapi.xcertplay
+ 
++import android.graphics.Bitmap
+ import android.content.Intent
+-import android.graphics.Bitmap
+-import android.media.MediaMetadata
+ import android.view.KeyEvent
+ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
+-import com.shilapi.xcertplay.media.CarPlayNowPlaying
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertNull
+ import org.junit.Assert.assertSame
+@@ -17,9 +15,9 @@
+ 
+ @RunWith(RobolectricTestRunner::class)
+ @Config(sdk = [29], manifest = Config.NONE)
+-class CarPlayMediaCallbackTest {
++class GalaxyMediaCallbackTest {
+     private val sent = mutableListOf<Int>()
+-    private val callback = CarPlayMediaCallback { index, _ -> sent += index }
++    private val callback = GalaxyMediaCallback { index, _ -> sent += index }
+ 
+     @Test
+     fun controllerPlayAndPauseAreExplicit() {
+@@ -65,29 +63,27 @@
+         assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
+     }
+ 
+-    @Test
+-    fun nowPlayingFieldsBecomeAndroidMediaMetadata() {
+-        val artwork = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+-        val metadata = CarPlayMediaKeys.androidMetadata(
+-            CarPlayNowPlaying(
+-                title = "Dreams",
+-                album = "Rumours",
+-                artist = "Fleetwood Mac",
+-                sourceApp = "Music",
+-                durationMillis = 257_000,
+-            ),
+-            artwork,
+-        )
++    @Test fun l7ExplicitHardwarePauseDoesNotToggleMusicBackOn() {
++        val l7 = GalaxyMediaCallback(explicitHardwareActions = true) { index, _ -> sent += index }
++        listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE).forEach {
++            l7.onMediaButtonEvent(button(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, it, 0)))
++        }
++        assertEquals(listOf(CarPlayMediaButton.PLAY, CarPlayMediaButton.PAUSE, CarPlayMediaButton.PLAY_PAUSE), sent)
++    }
+ 
+-        assertEquals("Dreams", metadata.getString(MediaMetadata.METADATA_KEY_TITLE))
+-        assertEquals("Dreams", metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE))
+-        assertEquals("Fleetwood Mac", metadata.getString(MediaMetadata.METADATA_KEY_ARTIST))
+-        assertEquals("Fleetwood Mac", metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE))
+-        assertEquals("Rumours", metadata.getString(MediaMetadata.METADATA_KEY_ALBUM))
+-        assertEquals("Music", metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+-        assertEquals(257_000, metadata.getLong(MediaMetadata.METADATA_KEY_DURATION))
+-        assertEquals(artwork, metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART))
+-        assertEquals(artwork, metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON))
++    @Test fun tracedKeyDistinguishesRepeatReleaseAndUnsupportedWithoutForwarding() {
++        val store = L7SteeringDiagnostics.store
++        store.clear()
++        val received = mutableListOf<L7SteeringTrace>()
++        val traced = GalaxyMediaCallback(explicitHardwareActions = true,
++            tracedSend = { _, _, ticket -> received += ticket }) { _, _ -> error("不得绕过诊断入口") }
++        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0), "window-key")
++        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 1), "window-key")
++        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0), "window-key")
++        traced.onKey(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP, 0), "media-session-key")
++        assertEquals(1, received.size)
++        assertEquals(listOf("REPEAT", "KEY_UP_OR_OTHER_ACTION", "UNSUPPORTED_KEY"),
++            store.snapshot().events.filter { it.stage in listOf("FILTER", "DROP") }.map { it.detail })
+     }
+ 
+     @Test
+@@ -116,14 +112,4 @@
+     }
+ 
+     private fun button(event: KeyEvent) = Intent(Intent.ACTION_MEDIA_BUTTON).putExtra(Intent.EXTRA_KEY_EVENT, event)
+-
+-    @Test
+-    fun positionAndPlayStateDoNotRepublishMetadata() {
+-        val song = CarPlayNowPlaying(title = "Song", artist = "Artist", artworkTransferId = 7, elapsedMillis = 1_000, playing = true)
+-        assertEquals(false, CarPlayMediaKeys.metadataChanged(song, song.copy(elapsedMillis = 1_450)))
+-        assertEquals(false, CarPlayMediaKeys.metadataChanged(song, song.copy(playing = false)))
+-        assertEquals(true, CarPlayMediaKeys.metadataChanged(song, song.copy(title = "Next")))
+-        assertEquals(true, CarPlayMediaKeys.metadataChanged(song, song.copy(artworkTransferId = 8)))
+-        assertEquals(true, CarPlayMediaKeys.metadataChanged(CarPlayNowPlaying(), song))
+-    }
+ }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/DarkModeTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/DarkModeTest.kt
+@@ -1,24 +1,19 @@
+ package com.shilapi.xcertplay
+ 
+ import android.content.res.Configuration
+-import org.junit.Assert.assertEquals
+-import org.junit.Assert.assertNull
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
+ import org.junit.Test
+ 
+ class DarkModeTest {
+     @Test
+     fun darkModeIsDetectedWithUnrelatedConfigurationBits() {
+-        assertEquals(true, nightModeOrNull(Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_CAR))
++        assertTrue(isDarkMode(Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_CAR))
+     }
+ 
+     @Test
+-    fun lightModeIsDetectedWithUnrelatedConfigurationBits() {
+-        assertEquals(false, nightModeOrNull(Configuration.UI_MODE_NIGHT_NO or Configuration.UI_MODE_TYPE_CAR))
+-    }
+-
+-    @Test
+-    fun undefinedModeIsIgnored() {
+-        assertNull(nightModeOrNull(Configuration.UI_MODE_NIGHT_UNDEFINED))
+-        assertNull(nightModeOrNull(Configuration.UI_MODE_TYPE_CAR))
++    fun lightAndUndefinedModesAreNotDark() {
++        assertFalse(isDarkMode(Configuration.UI_MODE_NIGHT_NO))
++        assertFalse(isDarkMode(Configuration.UI_MODE_NIGHT_UNDEFINED))
+     }
+ }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticExportStoreTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticExportStoreTest.kt
+@@ -37,7 +37,7 @@
+         val uri = DiagnosticExportStore.saveToDownloads(resolver, "DiPlay-test.txt", report)
+         assertEquals(provider.uri, uri)
+         assertEquals(report, provider.file.readText())
+-        assertEquals("Download/DiPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
++        assertEquals("Download/GalaxyPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
+         assertEquals("text/plain", provider.insertValues!!.getAsString(MediaStore.Downloads.MIME_TYPE))
+         assertEquals(1, provider.insertValues!!.getAsInteger(MediaStore.Downloads.IS_PENDING))
+         assertEquals(0, provider.publishValues!!.getAsInteger(MediaStore.Downloads.IS_PENDING))
+@@ -52,6 +52,13 @@
+         }
+         assertNull(provider.publishValues)
+         assertFalse(provider.deleted)
++    }
++
++    @Test fun structuredReportUsesJsonMimeAndProductDirectory() {
++        DiagnosticExportStore.saveToDownloads(resolver, "test.json", "{\"schemaVersion\":1}", "application/json", "GalaxyPlay")
++        assertEquals("application/json", provider.insertValues!!.getAsString(MediaStore.Downloads.MIME_TYPE))
++        assertEquals("Download/GalaxyPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
++        assertEquals(provider.file.readText(), provider.contentAtPublish)
+     }
+ 
+     @Test fun deniedWriteRemovesOnlyTheNewPendingEntry() {
+--- a/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
+@@ -5,55 +5,6 @@
+ import java.nio.file.Files
+ 
+ class DiagnosticRedactorTest {
+-    @Test fun additionalTroubleshootingMetadataSurvivesSavedReportWithoutPayloads() {
+-        val lines = listOf(
+-            "wireless startup elapsedMs=10000 authenticated=true wifiConfigs=2 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=WiFi_discovery_or_AirPlay_TCP startRequestAgeMs=9000 firstTcpAfterStartMs=none",
+-            "receiveCounters windowMs=10000 udpScope=device ifaceRx=sampled ifaceRxPacketsDelta=400 ifaceRxBytesDelta=8000 ifaceRxDroppedDelta=2 ifaceRxErrorsDelta=0 ifaceRxMissedErrorsDelta=1 udp4=sampled udp4InDatagramsDelta=390 udp4InErrorsDelta=2 udp4RcvbufErrorsDelta=1 udp4InCsumErrorsDelta=1 udp6=unavailable failureClass=FileNotFoundException",
+-            "Audio: renderer failed api=30 audioType=default codec=OPUS stage=decoder-configure error=IllegalArgumentException causes=IllegalArgumentException at=android.media.MediaCodec.configure:100",
+-            "Audio: decoder stats audioType=default codec=OPUS inputQueuedTotal=20 inputDroppedTotal=0 shortOpusPacketsTotal=2 decoderUnavailablePacketsTotal=0 outputBuffersTotal=19 ended=true",
+-            "THEME_DIAGNOSTIC sample source=poll uiMode=0x13 nightMask=0x10 reported=light applied=light sessionActive=true pollsSinceSample=30 callbacksSinceSample=0",
+-            "Process exit index=0 ageMs=5000 reason=native_crash reasonCode=5 status=11 importance=100 pssKiB=2048 rssKiB=4096",
+-        )
+-        val folder = Files.createTempDirectory("diplay-troubleshooting-report").toFile()
+-        try {
+-            val file = folder.resolve("diplay.log")
+-            SessionLogFile(file).use { log ->
+-                log.reset("started")
+-                for (line in lines) {
+-                    assertTrue("New fields must fit the export cap", line.length < 700)
+-                    assertEquals(line, DiagnosticRedactor.redact(line))
+-                    log.append(line)
+-                }
+-                log.append("Audio: payload=private-recording")
+-            }
+-            val report = file.readText()
+-            lines.forEach { assertTrue(report.contains(it)) }
+-            assertFalse(report.contains("private-recording"))
+-        } finally { folder.deleteRecursively() }
+-    }
+-
+-    @Test fun boundedMicrophoneStartFailureAndCaptureCountersSurviveRedaction() {
+-        val lines = listOf(
+-            "Microphone: start type=telephony source=VOICE_COMMUNICATION codec=OPUS rate=48000 channels=1 frameMs=20 routedDeviceType=15",
+-            "Microphone: failure type=speechrecognition source=VOICE_RECOGNITION codec=LPCM rate=16000 channels=1 frameMs=20 stage=READ error=none code=-3",
+-            "Microphone: stats type=telephony source=VOICE_COMMUNICATION codec=OPUS rate=48000 channels=1 frameMs=20 routedDeviceType=15 captureBytes=1920 reads=2 zeroReads=1 readErrors=0 readMaxMs=30 encodedFrames=1 emptyEncodedFrames=1 udpSent=2 sendErrors=1 sendGapMaxMs=30 ended=false",
+-        )
+-        for (line in lines) assertEquals(line, DiagnosticRedactor.redact(line))
+-        assertNull(DiagnosticRedactor.redact("Microphone: payload=private-audio"))
+-        assertFalse(DiagnosticRedactor.redact("Microphone: failure peer=192.168.49.1")!!.contains("192.168.49.1"))
+-    }
+-
+-    @Test fun connectionTimingAndCachedServiceMetadataSurviveWithoutPersonalIdentifiers() {
+-        val lines = listOf(
+-            "CONNECTION_DIAGNOSTIC attempt=2 phase=CONTROL wired io final readCalls=105 writeCalls=50 readTimeouts=3 ends=0 failures=1 maxReadMs=909 maxWriteMs=1937",
+-            "CONNECTION_DIAGNOSTIC attempt=2 phase=WIRELESS Bluetooth snapshot point=after-failure enabled=true bondState=12 cachedServiceCount=5 cachedIap2Service=false",
+-            "CONNECTION_DIAGNOSTIC generation=2 restart teardownWaitCompleted=false elapsedMs=4000",
+-            "CONNECTION_DIAGNOSTIC attempt=2 phase=USB_DISCOVERY USB configuration ready=true configurationId=6 reenumerationAttempts=0 action=reuse-descriptors",
+-        )
+-        for (line in lines) assertEquals(line, DiagnosticRedactor.redact(line))
+-        assertNull(DiagnosticRedactor.redact("CONNECTION_DIAGNOSTIC attempt=2 payload=private-data"))
+-        assertFalse(DiagnosticRedactor.redact("CONNECTION_DIAGNOSTIC attempt=2 peer=192.168.49.1 id=0123456789abcdef0123456789abcdef")!!.contains("192.168.49.1"))
+-    }
+     @Test fun savedDriveReportKeepsMediaPerformanceCounters() {
+         val folder = Files.createTempDirectory("diplay-media-report").toFile()
+         try {
+@@ -69,15 +20,52 @@
+             assertTrue(report.contains(video))
+         } finally { folder.deleteRecursively() }
+     }
+-    @Test fun payloadAndCredentialLinesNeverReachReports() {
+-        for (line in listOf("TRACE IAP2 tx key", "hotspot passphrase=secret", "token=secret", "certificate bytes=607", "rx body={phone: 'Jane'}", "ok\nsecret", "wifi ssid=Home", "wireless name=Jane Smith’s iPhone")) {
++    @Test fun payloadValuesAreHiddenWithoutDroppingTechnicalContext() {
++        for (line in listOf("hotspot passphrase=secret", "token=secret", "rx body={phone: 'secret'}",
++            "wifi ssid=secret", "wireless name=secret with spaces", "serial=secret")) {
++            val safe = DiagnosticRedactor.redact(line)!!
++            assertFalse(safe.contains("secret"))
++            assertTrue(safe.contains("[redacted]"))
++            assertEquals(safe, DiagnosticRedactor.redact(safe))
++        }
++        for (line in listOf("TRACE IAP2 tx key", "PHONE packet", "ok\nsecret", "-----BEGIN PRIVATE KEY-----"))
+             assertNull(line, DiagnosticRedactor.redact(line))
+-        }
++        assertEquals("certificate bytes=607", DiagnosticRedactor.redact("certificate bytes=607"))
+     }
++
++    @Test fun technicalNamesAndParametersSurviveSensitiveFieldMasking() {
++        val technical = listOf(
++            "name=c2.qti.hevc.decoder profile=2 level=153 width=1440 height=1920 error=0xfffffff4",
++            "audio device=BUS00_MEDIA deviceId=5 usage=12 focus=44 sampleRate=48000 channels=2 underruns=3",
++            "entry=PERM:android.permission.ACCESS_TOKEN granted=false appOp=ignored",
++            "entry=PERM:android.permission.CALL_PHONE result=DENIED",
++            "decoderName=OMX.qcom.video.decoder.hevc bypass=false serialExecutor=1 payloadBytes=420 maxGapMs=150",
++            "firmware=1.2.3.4 api=30 physical=201x268mm",
++        )
++        technical.forEach { assertEquals(it, DiagnosticRedactor.redact(it)) }
++        val safe = DiagnosticRedactor.redact("stage=mfi token=secret status=failed code=403 elapsedMs=200")!!
++        assertEquals("stage=mfi token=[redacted] status=failed code=403 elapsedMs=200", safe)
++        val json = DiagnosticRedactor.redact("rx payload={\"nested\":{\"password\":\"secret\"}} codec=HEVC error=-12")!!
++        assertEquals("rx payload=[redacted] codec=HEVC error=-12", json)
++        assertEquals("peerName=[redacted] stage=connected", DiagnosticRedactor.redact("peerName=\"private phone\" stage=connected"))
++        assertFalse(DiagnosticRedactor.redact("server=https://private.example/api path=/data/user/0/private code=401")!!.contains("private"))
++    }
++
++    @Test fun longTechnicalLinesHaveAnExplicitMarkerInsteadOfSilentTruncation() {
++        val original = "codec config " + "width=1440 ".repeat(600)
++        val safe = DiagnosticRedactor.redact(original)!!
++        assertEquals(DiagnosticRedactor.MAX_LINE, safe.length)
++        assertTrue(safe.endsWith(" [truncated]"))
++    }
++
+     @Test fun stateTransitionsSurviveWithoutAddressesOrIdentifiers() {
+         val line = DiagnosticRedactor.redact("connected peer=C0:A6:00:29:58:0A ip=192.168.31.71 id=0123456789abcdef0123456789abcdef ipv6=fe80::1234:5678:abcd:9%p2p0")!!
+         assertTrue(line.contains("connected"))
+         assertFalse(line.contains("C0:A6")); assertFalse(line.contains("192.168")); assertFalse(line.contains("012345")); assertFalse(line.contains("fe80"))
++        assertEquals(line, DiagnosticRedactor.redact(line))
++        val peer = DiagnosticRedactor.redact("Microphone: start type=telephony codec=OPUS peer=192.168.49.1")!!
++        assertEquals("Microphone: start type=telephony codec=OPUS peer=[ip]", peer)
++        assertEquals(peer, DiagnosticRedactor.redact(peer))
+     }
+     @Test fun logRotationIsBoundedAndRedactionHappensBeforeDisk() {
+         val folder = Files.createTempDirectory("diplay-log-test").toFile()
+@@ -104,7 +92,9 @@
+                     it.append("password=secret")
+                 }
+             }
+-            val history = SessionLogFile.REPORT_NAMES.map { folder.resolve(it).readText() }
++            // 报告还包含按需创建的专项日志，本场景只产生连接历史文件。
++            val history = SessionLogFile.REPORT_NAMES.mapNotNull { folder.resolve(it).takeIf { file -> file.isFile }?.readText() }
++            assertEquals(8, history.size)
+             assertEquals(8, folder.listFiles()!!.size)
+             assertTrue(history.first().contains("session=2"))
+             assertTrue(history.last().contains("session=9"))
+@@ -124,20 +114,4 @@
+         for (line in lines) assertNotNull(line, DiagnosticRedactor.redact(line))
+         assertFalse(DiagnosticRedactor.redact(lines.last())!!.contains("192.168.49.1"))
+     }
+-
+-    @Test fun startupAndAirPlayMilestonesSurviveExportWithoutWeakeningPayloadFilters() {
+-        val lines = listOf(
+-            "wireless startup elapsedMs=10000 authenticated=true wifiConfigs=2 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=WiFi_discovery_or_AirPlay_TCP",
+-            "interfaceState=up multicast=true ipv4Usable=1 ipv6LinkLocal=1 ipv6Scoped=1",
+-            "p2pGroup=present owner=true sameGroup=true reportedP2pClients=0 association=unknown legacyClients=not_exposed",
+-            "bonjourAdded=0 bonjourResolved=0 bonjourAddressMismatch=0 connectProbes=0 connectProbe2xx=0 lastProbe=not_started",
+-            "control probe stage=REQUEST_SENT attempt=1 family=IPv6",
+-            "airplay TCP accepted family=IPv6",
+-            "airplay control request method=POST route=pair-verify contentBytes=128",
+-            "airplay control response status=200 contentBytes=32",
+-            "iap2 availability wired=unknown wireless=true themeAssets=unknown",
+-        )
+-        for (line in lines) assertEquals(line, line, DiagnosticRedactor.redact(line))
+-        assertNull(DiagnosticRedactor.redact("airplay rx POST /pair-verify body=secret"))
+-    }
+ }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/DisplayDiagnosticSnapshotTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/DisplayDiagnosticSnapshotTest.kt
+@@ -11,6 +11,34 @@
+ @Config(sdk = [29], manifest = Config.NONE)
+ class DisplayDiagnosticSnapshotTest {
+     private val context get() = RuntimeEnvironment.getApplication()
++
++    @Test fun sessionDeviceDensitySurvivesLaterDisplayChanges() {
++        val metrics = context.resources.displayMetrics
++        val previous = metrics.densityDpi
++        try {
++            metrics.densityDpi = 160
++            DisplayDiagnosticSnapshot.begin(context, "request", "capability", "effective")
++            metrics.densityDpi = 182
++            assertTrue(DisplayDiagnosticSnapshot.report(context).contains("densityDpi=160"))
++            assertFalse(DisplayDiagnosticSnapshot.report(context).contains("densityDpi=182"))
++            assertTrue(L7DeviceDiagnostic.capture(context).any { it.contains("densityDpi=182") })
++            assertTrue(DisplayDiagnosticSnapshot.report(context).contains("board="))
++        } finally {
++            metrics.densityDpi = previous
++        }
++    }
++
++    @Test fun decoderFailureRemainsWithRecoveryButIsClearedOnReconnect() {
++        val old = DisplayDiagnosticSnapshot.begin(context, "request", "capability", "effective")
++        DisplayDiagnosticSnapshot.record(context, old,
++            "Video: configure rejected decoder=c2.qti.hevc.decoder phase=configure diagnostic=example")
++        DisplayDiagnosticSnapshot.record(context, old, "Video: recovery: budget exhausted")
++        assertTrue(DisplayDiagnosticSnapshot.report(context).contains("phase=configure diagnostic=example"))
++        DisplayDiagnosticSnapshot.begin(context, "new request", "capability", "effective")
++        DisplayDiagnosticSnapshot.record(context, old, "Video: no usable decoder mime=video/hevc")
++        assertFalse(DisplayDiagnosticSnapshot.report(context).contains("diagnostic=example"))
++        assertFalse(DisplayDiagnosticSnapshot.report(context).contains("no usable decoder"))
++    }
+ 
+     @Test fun requestedSizeSurvivesAFallbackAndSubsequentPreferenceReset() {
+         DisplayDiagnosticSnapshot.selection(context, 100, 75, true)
+@@ -57,4 +85,19 @@
+         assertFalse(report.contains("secret"))
+         assertTrue(report.lines().all { it.length <= 700 })
+     }
++
++    @Test fun installationAndLatestVideoHealthAreIncludedWithoutAcceptingAnOldSession() {
++        val old = DisplayDiagnosticSnapshot.begin(context, "old", "capability", "effective")
++        val current = DisplayDiagnosticSnapshot.begin(context, "new", "capability", "effective")
++        DisplayDiagnosticSnapshot.record(context, current, "Video: recovery: input stalled attempt=2/4")
++        DisplayDiagnosticSnapshot.record(context, current, "Video: first frame rendered")
++        DisplayDiagnosticSnapshot.record(context, current, "Video: video stats input=30fps presented=29fps ageP95Bucket input=33ms")
++        DisplayDiagnosticSnapshot.record(context, old, "Video: recovery: old failure")
++        val report = DisplayDiagnosticSnapshot.report(context)
++        assertTrue(report.contains("L7 installation package="))
++        assertTrue(report.contains("matchesE5Reference=false"))
++        assertTrue(report.contains("attempt=2/4"))
++        assertTrue(report.contains("presented=29fps"))
++        assertFalse(report.contains("old failure"))
++    }
+ }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/HostConnectionSettingsRefreshTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/HostConnectionSettingsRefreshTest.kt
+@@ -32,6 +32,7 @@
+     @Test fun projectionScreenUsesConnectionSettingsSavedWhileItWasInTheBackground() {
+         AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.MANUAL)
+         AirPlayPersistence.saveManualHotspotSsid(app, "Old car")
++        L7Agreement.accept(app)
+         val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).setup()
+         assertEquals(WirelessHotspotMode.MANUAL, runtimeConfig(host.get()).wirelessHotspotMode)
+ 
+--- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
+@@ -72,48 +72,6 @@
+         return encoded
+     }
+ 
+-    @Test fun manualChannelOverridesAlignmentWithoutReplacingAutomaticMemory() {
+-        val remembered = seedMemory()
+-        val logs = mutableListOf<String>()
+-        WifiP2pGroupManager(context, logs::add, preferredChannel = 149).use { manager ->
+-            val info = background { manager.start(5000) }
+-            assertEquals(149, info.channel)
+-            assertEquals(listOf(5745), radio.requests.map { it?.groupOwnerBand })
+-            manager.onCarPlayConfirmed()
+-            assertEquals(remembered, memory.getString("confirmed", null))
+-        }
+-        assertEquals(remembered, memory.getString("confirmed", null))
+-        assertTrue(logs.any { it.contains("preference=149 frequencyMHz=5745") })
+-        assertTrue(logs.any { it.contains("requestedMHz=5745 actualMHz=5745 matched=true") })
+-        radio.requests.clear()
+-        WifiP2pGroupManager(context).use { manager ->
+-            background { manager.start(5000) }
+-            assertEquals(listOf(2437), radio.requests.map { it?.groupOwnerBand })
+-            manager.onCarPlayConfirmed()
+-        }
+-    }
+-
+-    @Test fun rejectedManualChannelHasAnActionableErrorAndNoFallback() {
+-        radio.rejectCustom = true
+-        WifiP2pGroupManager(context, preferredChannel = 149).use { manager ->
+-            val error = failure { manager.start(5000) }
+-            assertTrue(error.message!!.contains("channel 149"))
+-            assertTrue(error.message!!.contains("Choose Auto"))
+-        }
+-        assertEquals(listOf(5745), radio.requests.map { it?.groupOwnerBand })
+-        assertNull(memory.getString("confirmed", null))
+-    }
+-
+-    @Test fun firmwareIgnoringManualChannelFailsAndRemovesItsOwnGroup() {
+-        radio.reportedFrequency = 5180
+-        WifiP2pGroupManager(context, preferredChannel = 149).use { manager ->
+-            assertTrue(failure { manager.start(5000) }.message!!.contains("selected channel 36 instead"))
+-        }
+-        assertEquals(listOf(5745), radio.requests.map { it?.groupOwnerBand })
+-        assertEquals(1, radio.removals)
+-        assertNull(memory.getString("confirmed", null))
+-    }
+-
+     @Test fun hotspotCreationAloneAndLateConfirmationAfterCloseAreNeverLearned() {
+         val manager = WifiP2pGroupManager(context)
+         background { manager.start(5000) }
+@@ -328,18 +286,6 @@
+         assertSame(replacement, radio.group)
+         assertEquals(0, radio.removals)
+         assertTrue(logs.any { it.contains("cleanup skipped=another_app_owns_group") })
+-    }
+-
+-    @Test fun connectionSnapshotDoesNotInterpretAnEmptyP2pListAsFailedIphoneAssociation() {
+-        val manager = WifiP2pGroupManager(context)
+-        background { manager.start(5000) }
+-        val snapshot = background { manager.connectionDiagnosticSnapshot() }
+-        assertTrue(snapshot.contains("p2pGroup=present owner=true sameGroup=true"))
+-        assertTrue(snapshot.contains("reportedP2pClients=0 association=unknown legacyClients=not_exposed"))
+-        radio.group = null
+-        assertEquals("p2pGroup=absent association=unknown", background { manager.connectionDiagnosticSnapshot() })
+-        background { manager.close() }
+-        assertEquals("p2pGroup=unavailable association=unknown", manager.connectionDiagnosticSnapshot())
+     }
+ 
+     @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
+--- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
+@@ -32,8 +32,9 @@
+         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
+         activity.setTheme(android.R.style.Theme_Material_NoActionBar)
+         ReflectionHelpers.setField(CarPlayBackgroundSession, "owner", activity)
+-        retry = Button(activity).apply { visibility = View.GONE }
+-        ReflectionHelpers.setField(activity, "startupRetryButton", retry)
++        val panel = L7ConnectionPanel(activity, true, {}, {}, {})
++        retry = panel.retryButton
++        ReflectionHelpers.setField(activity, "connectionPanel", panel)
+     }
+ 
+     @After fun cleanup() {
+@@ -45,7 +46,7 @@
+         ReflectionHelpers.callInstanceMethod<(CarPlayStatus) -> Unit>(activity, "createStatusReporter",
+             from(Int::class.javaPrimitiveType, generation))(status)
+     }
+-    private fun budget() = ReflectionHelpers.getField<WirelessStartupRetryBudget>(activity, "startupRetryBudget")
++    private fun budget() = ReflectionHelpers.getField<GalaxyWirelessRecovery>(activity, "startupRecovery")
+ 
+     @Test fun duplicateFailureAndCleanupErrorScheduleOnlyOneRetry() {
+         report()
+@@ -62,7 +63,7 @@
+             report(generation)
+         }
+         assertEquals(5, budget().retries)
+-        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
++        assertTrue(budget().stopped)
+         assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+         assertEquals(View.VISIBLE, retry.visibility)
+         report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
+@@ -159,7 +159,7 @@
+         setUp()
+     }
+ 
+-    @Test fun legacyFeaturesStayInactiveUntilAProbeIsCached() {
++    @Test fun cachedProbeCannotEnableOtherVehicleFeaturesOnL7() {
+         BydOutputSettings.setLegacyVehicleProbe(context, true)
+         BydOutputSettings.setBatteryToIphone(context, true)
+         BydOutputSettings.setWheelSpeedToIphone(context, true)
+@@ -170,12 +170,12 @@
+         assertFalse(BydOutputSettings.videoWhileParkedActive(context))
+ 
+         BydVehicleFieldStore.save(context, supportedCapabilities())
+-        // Model a killed/restarted app process: the persisted probe, not the singleton, must win.
++        // 模拟进程重启：探测结果可以持久化，但不能开启 L7 不支持的车型能力。
+         BydVehicleFieldStore.clearMemoryForTests()
+ 
+-        assertTrue(BydOutputSettings.batteryToIphoneActive(context))
+-        assertTrue(BydOutputSettings.wheelSpeedToIphoneActive(context))
+-        assertTrue(BydOutputSettings.videoWhileParkedActive(context))
++        assertFalse(BydOutputSettings.batteryToIphoneActive(context))
++        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
++        assertFalse(BydOutputSettings.videoWhileParkedActive(context))
+         assertEquals(-1176502256, BydVehicleFieldStore.address(context, BydVehicleField.SPEED).fid)
+         assertEquals(BydFieldSource.FIRMWARE, BydVehicleFieldStore.address(context, BydVehicleField.SPEED).source)
+     }
+@@ -196,7 +196,7 @@
+         assertNull(reading.remainingKwh)
+         assertTrue(reading.charging)
+         BydOutputSettings.setBatteryToIphone(context, true)
+-        assertTrue(BydOutputSettings.batteryToIphoneActive(context))
++        assertFalse(BydOutputSettings.batteryToIphoneActive(context))
+     }
+ 
+     @Test fun aConfirmedEnergyFieldMustRemainReadable() {
+@@ -214,7 +214,7 @@
+         })
+     }
+ 
+-    @Test fun freshInstallUsesTheDefaultDiLink5Commands() {
++    @Test fun defaultCommandsRemainAvailableWithoutEnablingVehicleOutputsOnL7() {
+         assertFalse(BydOutputSettings.legacyVehicleProbe(context))
+         assertEquals(BydWheelSpeed.SPEED, BydWheelSpeed.speedCommand(context))
+         assertEquals(BydWheelSpeed.GEAR, BydWheelSpeed.gearCommand(context))
+@@ -222,9 +222,9 @@
+         BydOutputSettings.setBatteryToIphone(context, true)
+         BydOutputSettings.setWheelSpeedToIphone(context, true)
+         BydOutputSettings.setVideoWhileParked(context, true)
+-        assertTrue(BydOutputSettings.batteryToIphoneActive(context))
+-        assertTrue(BydOutputSettings.wheelSpeedToIphoneActive(context))
+-        assertTrue(BydOutputSettings.videoWhileParkedActive(context))
++        assertFalse(BydOutputSettings.batteryToIphoneActive(context))
++        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
++        assertFalse(BydOutputSettings.videoWhileParkedActive(context))
+     }
+ 
+     @Test fun savedProbeMigratesToLegacyModeButCanSwitchBackWithoutDeletingIt() {
+@@ -252,19 +252,23 @@
+         assertTrue(loaded.batterySupported)
+     }
+ 
+-    @Test fun hiddenCapabilitiesDoNotEraseTheirSavedSwitches() {
++    @Test fun l7IsolationPreservesSavedSwitchesWithoutEnablingThem() {
+         BydOutputSettings.setWheelSpeedToIphone(context, true)
+         BydVehicleFieldStore.save(
+             context,
+             supportedCapabilities(without = setOf(BydVehicleField.SPEED, BydVehicleField.GEAR)),
+         )
+ 
+-        assertTrue(BydOutputSettings.wheelSpeedToIphone(context))
+-        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
+-
+-        BydVehicleFieldStore.save(context, supportedCapabilities())
+-        assertTrue(BydOutputSettings.wheelSpeedToIphone(context))
+-        assertTrue(BydOutputSettings.wheelSpeedToIphoneActive(context))
++        assertTrue(context.getSharedPreferences("diplay_byd_outputs", Context.MODE_PRIVATE)
++            .getBoolean("wheel_speed_to_iphone", false))
++        assertFalse(BydOutputSettings.wheelSpeedToIphone(context))
++        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
++
++        BydVehicleFieldStore.save(context, supportedCapabilities())
++        assertTrue(context.getSharedPreferences("diplay_byd_outputs", Context.MODE_PRIVATE)
++            .getBoolean("wheel_speed_to_iphone", false))
++        assertFalse(BydOutputSettings.wheelSpeedToIphone(context))
++        assertFalse(BydOutputSettings.wheelSpeedToIphoneActive(context))
+     }
+ 
+     @Test fun automaticReplacementCannotDropPreviouslyConfirmedFields() {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydCarPlayCallLifecycleTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydCarPlayCallLifecycleTest.kt
+@@ -19,7 +19,7 @@
+ import org.robolectric.util.ReflectionHelpers
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [29], manifest = Config.NONE, shadows = [BydCarPlayCallLifecycleTest.Shell::class])
++@Config(application = com.shilapi.xcertplay.UpstreamVehicleApplication::class, sdk = [29], manifest = Config.NONE, shadows = [BydCarPlayCallLifecycleTest.Shell::class])
+ class BydCarPlayCallLifecycleTest {
+     private val app get() = RuntimeEnvironment.getApplication()
+     private val writer get() = ReflectionHelpers.getField<ExecutorService>(BydCarPlayCall, "writer")
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterMapPauseTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterMapPauseTest.kt
+@@ -2,6 +2,7 @@
+ 
+ import org.junit.After
+ import org.junit.Assert.assertTrue
++import org.junit.Assert.assertFalse
+ import org.junit.Test
+ import org.junit.runner.RunWith
+ import org.robolectric.RobolectricTestRunner
+@@ -25,9 +26,9 @@
+     }
+ 
+     @Test
+-    fun initializationDoesNotWaitForAPendingAdbRead() {
++    fun legacySettingDoesNotStartBydAdbReadsOrBlockInitializationOnL7() {
+         val reading = CountDownLatch(1)
+-        // An adbd that accepted the read and has not answered yet.
++        // 旧 BYD 开关为真也不能在 L7 上读取车辆接口。
+         BydClusterMapPause.readMode = {
+             reading.countDown()
+             release.await()
+@@ -37,11 +38,11 @@
+         BydClusterMapPause.clusterMapShown = true
+         BydClusterMapPause.streamControl = {}
+         BydClusterMapPause.initialize(context)
+-        assertTrue("the ticker should start reading", reading.await(5, TimeUnit.SECONDS))
++        assertFalse("L7 不应启动 BYD ADB 读取", reading.await(2, TimeUnit.SECONDS))
+ 
+         val initialized = CountDownLatch(1)
+         thread { BydClusterMapPause.initialize(context); initialized.countDown() }
+ 
+-        assertTrue("initialize() waited for the adb read", initialized.await(1, TimeUnit.SECONDS))
++        assertTrue("L7 初始化不应被 BYD 读取阻塞", initialized.await(1, TimeUnit.SECONDS))
+     }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongNoteTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongNoteTest.kt
+@@ -13,7 +13,7 @@
+ import java.util.concurrent.TimeUnit
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(manifest = Config.NONE, sdk = [29])
++@Config(application = com.shilapi.xcertplay.UpstreamVehicleApplication::class, manifest = Config.NONE, sdk = [29])
+ class BydClusterSongNoteTest {
+     private val type = BydClusterSong::class.java
+     private fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongTimerTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongTimerTest.kt
+@@ -13,7 +13,7 @@
+ import java.util.concurrent.TimeUnit
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(manifest = Config.NONE, sdk = [29])
++@Config(application = com.shilapi.xcertplay.UpstreamVehicleApplication::class, manifest = Config.NONE, sdk = [29])
+ class BydClusterSongTimerTest {
+     private val type = BydClusterSong::class.java
+     private fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/DiLink3ClusterRecoveryTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/DiLink3ClusterRecoveryTest.kt
+@@ -17,7 +17,7 @@
+ import org.robolectric.util.ReflectionHelpers
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [29], manifest = Config.NONE, shadows = [DiLink3ClusterRecoveryTest.Shell::class])
++@Config(application = com.shilapi.xcertplay.UpstreamVehicleApplication::class, sdk = [29], manifest = Config.NONE, shadows = [DiLink3ClusterRecoveryTest.Shell::class])
+ class DiLink3ClusterRecoveryTest {
+     private val app get() = RuntimeEnvironment.getApplication()
+     private val output get() = BydDiLink3ClusterOutput
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt
+@@ -6,6 +6,15 @@
+ import org.junit.Test
+ 
+ class CarPlayPlaybackStatusTest {
++    @Test fun initialPausedStateIsPublishedAndResetForNextSession() {
++        val status = CarPlayPlaybackStatus()
++        val paused = update { group(1) { u8(0, 2) } }
++        assertEquals(false, status.accept(paused))
++        assertNull(status.accept(paused))
++        assertNull(status.clear())
++        assertEquals(false, status.accept(paused))
++    }
++
+     private fun update(block: com.shilapi.xcertplay.iap2.body.Iap2BodyBuilder.() -> Unit) =
+         Iap2Messages.buildRaw(CarPlayPlaybackStatus.NOW_PLAYING_UPDATE, block)
+ 
+@@ -59,6 +68,7 @@
+                 durationMillis = 257_000,
+                 elapsedMillis = 12_500,
+                 playing = true,
++                playbackKnown = true,
+             ),
+             status.acceptUpdate(update {
+                 group(1) {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt
+@@ -8,6 +8,25 @@
+ import org.junit.Assert.assertFalse
+ 
+ class MediaCodecSupportTest {
++    @Test fun annexBHevcConfigKeepsAllParameterSetsWithMixedStartCodes() {
++        val raw = byteArrayOf(0, 0, 1, 0x44, 1, 9) +
++            byteArrayOf(0, 0, 0, 1, 0x40, 1, 7) + byteArrayOf(0, 0, 1, 0x42, 1, 8)
++        val expected = byteArrayOf(0, 0, 0, 1, 0x40, 1, 7) +
++            byteArrayOf(0, 0, 0, 1, 0x42, 1, 8) + byteArrayOf(0, 0, 0, 1, 0x44, 1, 9)
++        assertArrayEquals(expected, MediaCodecSupport.hevcCodecSpecificData(raw))
++        assertArrayEquals(byteArrayOf(0, 0, 1, 0x26, 1, 9),
++            MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 1, 0x26, 1, 9)))
++    }
++
++    @Test fun incompleteOrWrongTypeHevcConfigCannotStartAnEmptyDecoder() {
++        assertEquals(0, MediaCodecSupport.hevcCodecSpecificData(
++            hevcRecord(byteArrayOf(0x40, 1), byteArrayOf(0x42, 1))).size)
++        assertEquals(0, MediaCodecSupport.hevcCodecSpecificData(
++            hevcRecord(byteArrayOf(0x40, 1), byteArrayOf(0x44, 1), byteArrayOf(0x42, 1))).size)
++        assertEquals(0, MediaCodecSupport.hevcCodecSpecificData(
++            byteArrayOf(0, 0, 1, 0x40, 1, 9, 0, 0, 1)).size)
++    }
++
+     @Test fun truncatedAccessUnitIsRejectedInsteadOfSubmittingItsValidPrefix() {
+         assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0, 0, 0, 9, 0x41)).size)
+         assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0)).size)
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/TelephonyMicrophoneTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/TelephonyMicrophoneTest.kt
+@@ -56,7 +56,7 @@
+             readStarted.countDown()
+             object : ShadowAudioRecord.AudioRecordSource {
+                 override fun readInByteArray(buffer: ByteArray, offset: Int, size: Int, blocking: Boolean): Int {
+-                    // Keep capture alive without sending packets or busy-spinning.
++                    // 保持录音线程存活，不发送数据包，也不进行忙循环。
+                     Thread.sleep(5)
+                     return 0
+                 }
+@@ -69,8 +69,17 @@
+         ShadowAudioRecord.clearSource()
+     }
+ 
++    @Test fun rejectedFactoryMicrophoneSourceFallsBackAndReleasesEffects() {
++        val uplink = MicrophoneUplink(config("telephony"), factorySource = Int.MAX_VALUE)
++        try {
++            assertTrue(uplink.start())
++            assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, awaitCapture().audioSource)
++        } finally { uplink.close() }
++        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
++    }
++
+     @Test fun telephonyEnablesEffectsOnItsRecorderAndRestoresThePreviousMode() {
+-        manager.mode = AudioManager.MODE_RINGTONE
++        manager.mode = AudioManager.MODE_NORMAL
+         sink.onMicrophoneStarted(telephony, config("telephony"))
+         val record = awaitCapture()
+ 
+@@ -85,7 +94,7 @@
+         }
+ 
+         sink.onMicrophoneStopped(telephony)
+-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+         assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
+     }
+@@ -112,6 +121,34 @@
+         assertFalse(microphone.joinToString("\n").contains("head="))
+     }
+ 
++    @Test fun callStopAndActualReleaseAreCorrelatedAfterRecorderAndModeAreReleased() {
++        sink.close()
++        val diagnostics = CopyOnWriteArrayList<String>()
++        sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
++        manager.mode = AudioManager.MODE_NORMAL
++        sink.onMicrophoneStarted(telephony, config("telephony"))
++        val record = awaitCapture()
++        sink.onMicrophoneStopped(telephony)
++        assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
++        val events = diagnostics.filter { it.contains("Audio: callLifecycle") }
++        val stop = events.indexOfFirst { it.contains("stage=STOP_REQUESTED") }
++        val released = events.indexOfFirst { it.contains("stage=RELEASED") }
++        assertTrue(stop >= 0 && released > stop)
++        assertTrue(events[stop].contains("callPhase=ACTIVE"))
++        assertTrue(events[released].contains("callPhase=AFTER_RELEASE"))
++        assertTrue(events[released].contains("audioMode=0"))
++        assertTrue(events[released].contains("callUplinks=0"))
++    }
++
++    @Test fun siriMicrophoneDoesNotCreateACallEpoch() {
++        sink.close()
++        val diagnostics = CopyOnWriteArrayList<String>()
++        sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
++        sink.onMicrophoneStarted(speechRecognition, config("speechrecognition")); awaitCapture()
++        sink.onMicrophoneStopped(speechRecognition)
++        assertFalse(diagnostics.any { it.contains("Audio: callLifecycle") })
++    }
++
+     @Test fun diagnosticCallbackFailureDoesNotStopSpeechRecognitionCapture() {
+         sink.close()
+         sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })
+@@ -127,7 +164,7 @@
+     @Test fun diagnosticCallbackFailureDoesNotStopCallCaptureOrChangeModeRestoration() {
+         sink.close()
+         sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })
+-        manager.mode = AudioManager.MODE_RINGTONE
++        manager.mode = AudioManager.MODE_NORMAL
+         sink.onMicrophoneStarted(telephony, config("telephony"))
+         val record = awaitCapture()
+         assertEquals(AudioRecord.RECORDSTATE_RECORDING, record.recordingState)
+@@ -135,7 +172,7 @@
+         assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
+         assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
+         sink.onMicrophoneStopped(telephony)
+-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+     }
+ 
+@@ -158,19 +195,19 @@
+     }
+ 
+     @Test fun duplicateStartDoesNotOverwriteTheOriginalModeOrCreateMoreEffects() {
+-        manager.mode = AudioManager.MODE_RINGTONE
++        manager.mode = AudioManager.MODE_NORMAL
+         sink.onMicrophoneStarted(telephony, config("telephony"))
+         awaitCapture()
+         sink.onMicrophoneStarted(telephony, config("telephony"))
+         assertEquals(microphoneLog(), 2, ShadowAudioEffect.getAudioEffects().size)
+         sink.onMicrophoneStopped(telephony)
+-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+     }
+ 
+     @Test fun failedRecorderInitializationRestoresThePreviousMode() {
+-        manager.mode = AudioManager.MODE_RINGTONE
++        manager.mode = AudioManager.MODE_NORMAL
+         sink.onMicrophoneStarted(telephony, config("telephony").copy(sampleRate = 1))
+-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+         assertNull(recorder.get())
+         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+     }
+@@ -207,9 +244,48 @@
+     @Config(shadows = [RejectingAudioManager::class])
+     fun modeFailureDoesNotEscapeTheDownlinkCallback() {
+         sink.onMicrophoneStarted(telephony, config("telephony"))
+-        assertNull(recorder.get())
+-        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+-        assertTrue(ShadowLog.getLogsForTag("xcertplay-usb").any { it.msg.contains("microphone start failed") })
++        assertEquals(AudioRecord.RECORDSTATE_RECORDING, awaitCapture().recordingState)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
++    }
++
++    @Test fun nativeCallModeRemainsUntouchedAndEffectsAreReleased() {
++        manager.mode = AudioManager.MODE_IN_CALL
++        sink.onMicrophoneStarted(telephony, config("telephony"))
++        awaitCapture()
++        assertEquals(AudioManager.MODE_IN_CALL, manager.mode)
++        sink.onMicrophoneStopped(telephony)
++        assertEquals(AudioManager.MODE_IN_CALL, manager.mode)
++        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
++    }
++
++    @Test fun anotherSourceChangingModeIsNotOverwrittenOnStop() {
++        sink.onMicrophoneStarted(telephony, config("telephony"))
++        awaitCapture()
++        assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
++        manager.mode = AudioManager.MODE_IN_CALL
++        sink.onMicrophoneStopped(telephony)
++        assertEquals(AudioManager.MODE_IN_CALL, manager.mode)
++    }
++
++    @Test fun disabledCallProcessingKeepsTheOriginalRecorderPath() {
++        sink.close()
++        sink = AndroidMediaSink(context = context, callProcessingEnabled = false)
++        sink.onMicrophoneStarted(telephony, config("telephony"))
++        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, awaitCapture().audioSource)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
++        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
++    }
++
++    @Test fun overlappingCallsRetainModeUntilTheLastStreamStops() {
++        val second = AudioStreamId(101, "telephony")
++        sink.onMicrophoneStarted(telephony, config("telephony"))
++        awaitCapture()
++        sink.onMicrophoneStarted(second, config("telephony"))
++        sink.onMicrophoneStopped(telephony)
++        assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
++        sink.onMicrophoneStopped(second)
++        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
++        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+     }
+ 
+     private fun awaitCapture(): AudioRecord {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoDecodeQueueTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoDecodeQueueTest.kt
+@@ -5,6 +5,22 @@
+ import org.junit.Test
+ 
+ class VideoDecodeQueueTest {
++    @Test fun resyncDiscardsPicturesButRetainsManualRetryAndSurfaceCompletionInOrder() {
++        val queue = VideoDecodeQueue()
++        val surface = VideoJob.SurfaceChanged(null)
++        val config = VideoJob.Config(VideoCodec.H264, byteArrayOf(1))
++        queue.offer(VideoJob.Frame(byteArrayOf(1)))
++        queue.offer(VideoJob.Retry)
++        queue.offer(VideoJob.Resync)
++        queue.offer(surface)
++        queue.offer(config)
++        assertEquals(1, queue.discardFrames())
++        assertEquals(VideoJob.Retry, queue.poll(0))
++        assertSame(surface, queue.poll(0))
++        assertSame(config, queue.poll(0))
++        assertNull(queue.poll(0))
++    }
++
+     @Test fun lostReferenceChainWaitsForSuccessfullyQueuedKeyframe() {
+         val chain = VideoReferenceChain()
+         val predicted = byteArrayOf(0, 0, 0, 1, 0x41, 1)
+@@ -70,7 +86,74 @@
+             running = { true }, drain = {}, dequeue = { attempts++; -1 },
+             nanoTime = { time.also { time += 10 } }, timeoutNs = 30,
+         ))
+-        assertEquals(3, attempts)
++        assertEquals(2, attempts)
+         assertEquals(-1, VideoInputPump.acquire(running = { false }, drain = { fail() }, dequeue = { fail(); 0 }))
+     }
++
++    @Test fun pollingReturnsFrameBudgetBeforeTheNextBurst() {
++        val queue = VideoDecodeQueue(maxFrames = 2, maxBytes = 6)
++        queue.offer(VideoJob.Frame(ByteArray(3)))
++        queue.offer(VideoJob.Frame(ByteArray(3)))
++        queue.poll(0)
++        assertEquals(1, queue.queuedFrames)
++        assertEquals(3L, queue.queuedBytes)
++        assertEquals(0, queue.offer(VideoJob.Frame(ByteArray(3))))
++        assertTrue(queue.poll(0) is VideoJob.Frame)
++        assertTrue(queue.poll(0) is VideoJob.Frame)
++        assertEquals(0, queue.queuedFrames)
++        assertEquals(0L, queue.queuedBytes)
++    }
++
++    @Test fun aNearlyExpiredFrameCannotWaitAnotherFiveHundredMillis() {
++        var now = 240_000_000L
++        var waits = 0
++        val remaining = VideoFrameBudget.remainingNs(0, now)
++        assertEquals(10_000_000L, remaining)
++        assertEquals(-1, VideoInputPump.acquire(
++            running = { true }, drain = {},
++            dequeue = { waits++; now += 5_000_000; -1 },
++            nanoTime = { now }, timeoutNs = remaining,
++        ))
++        assertEquals(2, waits)
++        assertEquals(250_000_000L, now)
++        assertEquals(0L, VideoFrameBudget.remainingNs(0, now))
++    }
++
++    @Test fun anExpiredFrameDoesNotEvenTryAnInputSlot() {
++        assertEquals(-1, VideoInputPump.acquire(
++            running = { true }, drain = { fail() }, dequeue = { fail(); 0 }, timeoutNs = 0,
++        ))
++    }
++
++    @Test fun shutdownDrainRetainsEverySurfaceCompletionAfterOverflow() {
++        var completed = 0
++        val queue = VideoDecodeQueue(maxFrames = 1)
++        queue.offer(VideoJob.SurfaceChanged(null) { completed++ })
++        queue.offer(VideoJob.Frame(byteArrayOf(1)))
++        queue.offer(VideoJob.SurfaceChanged(null) { completed++ })
++        queue.offer(VideoJob.Frame(byteArrayOf(2)))
++        queue.drain().filterIsInstance<VideoJob.SurfaceChanged>().forEach { it.onApplied() }
++        assertEquals(2, completed)
++        assertEquals(0, queue.queuedFrames)
++        assertEquals(0L, queue.queuedBytes)
++        assertNull(queue.poll(0))
++    }
++
++    @Test fun anOfferWakesTheWaitingWorkerWithoutPollingDelay() {
++        val queue = VideoDecodeQueue()
++        val ready = java.util.concurrent.CountDownLatch(1)
++        val completed = java.util.concurrent.CountDownLatch(1)
++        var result: VideoJob? = null
++        val worker = Thread {
++            ready.countDown()
++            result = queue.poll(1000)
++            completed.countDown()
++        }.apply { isDaemon = true; start() }
++        assertTrue(ready.await(1, java.util.concurrent.TimeUnit.SECONDS))
++        val frame = VideoJob.Frame(byteArrayOf(1))
++        queue.offer(frame)
++        assertTrue(completed.await(1, java.util.concurrent.TimeUnit.SECONDS))
++        assertSame(frame, result)
++        worker.join(100)
++    }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/AirPlayPortSelectorTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/AirPlayPortSelectorTest.kt
+@@ -20,12 +20,11 @@
+     }
+ 
+     @Test fun fallsBackWhenAnotherListenerOwnsTheWildcardPort() {
+-        // A factory daemon listening on 0.0.0.0 blocks a later bind to a specific address on that port.
++        // 模拟原厂服务监听所有地址，验证同端口的指定地址监听发生冲突。
+         ServerSocket().use { factory ->
+             factory.bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0))
+             val busy = factory.localPort
+-            // Some BSD/JDK combinations allow this overlap with the default SO_REUSEADDR value.
+-            // Keep the Android/Linux conflict assertion, but only run it where the host enforces it.
++            // 部分 BSD/JDK 允许地址重叠，仅在系统实际禁止重叠时检查 Android/Linux 的冲突回退。
+             val wildcardBlocksLoopback = try {
+                 ServerSocket().use { it.bind(InetSocketAddress(loopback, busy)) }
+                 false
+@@ -90,7 +89,7 @@
+             }
+             assertSame(failure, caught)
+             assertTrue(selectedPort in 1..65535)
+-            // A leaked listener still owns this exact address/port and prevents the next bind.
++            // 泄漏的监听会阻止再次绑定同一地址和端口。
+             ServerSocket().use { replacement ->
+                 replacement.bind(InetSocketAddress(loopback, selectedPort))
+             }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/CarHotspotTetheringTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/CarHotspotTetheringTest.kt
+@@ -53,6 +53,11 @@
+         assertEquals(Result.FAILED, enable(start = { it.send(1, null) }))
+     }
+ 
++    @Test fun android11PermissionFailureCallbackIsNotReportedAsGenericFailure() {
++        assertEquals(Result.PERMISSION_REQUIRED, enable(start = { it.send(14, null) }))
++        assertEquals(Result.PERMISSION_REQUIRED, enable(start = { it.send(15, null) }))
++    }
++
+     @Test fun missingBinderMethodIsUnsupported() {
+         assertEquals(Result.UNSUPPORTED, enable(start = { throw NoSuchMethodException() }))
+     }
+@@ -220,10 +225,37 @@
+         assertEquals(1, calls.get())
+     }
+ 
++    @Test fun diagnosticsSeparateExistingHotspotFromStartupAndCallbackFromState() {
++        val events = mutableListOf<String>()
++        assertEquals(Result.READY, CarHotspotTethering.enable(20, { false }, { false }, { true }, events::add) {
++            fail("已开热点不应重启")
++        })
++        assertTrue(events.any { it.contains("alreadyEnabled=true") })
++        assertFalse(events.any { it.contains("startRequested") })
++        events.clear()
++        assertEquals(Result.TIMED_OUT, CarHotspotTethering.enable(20, { false }, { true }, { false }, events::add) {
++            it.send(0, null)
++        })
++        assertTrue(events.any { it.contains("startRequested") })
++        assertTrue(events.any { it.contains("rawCode=0") })
++        assertFalse(events.any { it.contains("stateConfirmed") })
++        assertTrue(events.last().contains("TIMED_OUT"))
++    }
++
++    @Test fun diagnosticDenialKeepsOnlyExceptionType() {
++        val events = mutableListOf<String>()
++        assertEquals(Result.PERMISSION_REQUIRED,
++            CarHotspotTethering.enable(20, { false }, { true }, { false }, events::add) {
++                throw InvocationTargetException(SecurityException("PrivateCredentialExample"))
++            })
++        assertTrue(events.any { it.contains("exceptionType=SecurityException") })
++        assertFalse(events.joinToString().contains("PrivateCredentialExample"))
++    }
++
+     private fun enable(
+         canWrite: Boolean = true,
+         state: () -> Boolean? = { false },
+         cancelled: () -> Boolean = { false },
+         start: (ResultReceiver) -> Unit = { fail("Unexpected hotspot mutation") },
+-    ): Result = CarHotspotTethering.enable(20, cancelled, { canWrite }, state, start)
++    ): Result = CarHotspotTethering.enable(20, cancelled, { canWrite }, state, start = start)
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/CarPlayVpnScopeTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/CarPlayVpnScopeTest.kt
+@@ -32,7 +32,7 @@
+ import org.robolectric.util.ReflectionHelpers
+ import org.robolectric.util.ReflectionHelpers.ClassParameter
+ 
+-/** Exercise the real attachment transaction while controlling only the Android VPN boundary. */
++/** 执行真实接入流程，仅替换 Android VPN 系统边界。 */
+ @RunWith(RobolectricTestRunner::class)
+ @Config(sdk = [28, 33], manifest = Config.NONE, shadows = [VpnScopeBuilderShadow::class])
+ class CarPlayVpnScopeTest {
+@@ -131,7 +131,7 @@
+     private val identity = AirPlayIdentity(ByteArray(32), ByteArray(32), "test")
+ }
+ 
+-/** No TUN can be created here: rejected scoping must stop before this boundary is reached. */
++/** 拒绝应用白名单后必须停止，不能继续创建 TUN。 */
+ object VpnScopeBoundary {
+     val calls = mutableListOf<String>()
+     var allowFailure: Exception? = null
+@@ -148,8 +148,7 @@
+ class VpnScopeBuilderShadow {
+     @RealObject private lateinit var builder: VpnService.Builder
+ 
+-    // The Android implementation calls InetAddress.parseNumericAddress, which the host JVM lacks.
+-    // Control that platform plumbing while keeping scope/establish ordering in the real service.
++    // JVM 不提供 Android 的地址解析方法，仅替换系统边界，服务内部的白名单顺序保持真实。
+     @Implementation fun addAddress(address: String, prefixLength: Int): VpnService.Builder = builder
+ 
+     @Implementation fun addRoute(address: String, prefixLength: Int): VpnService.Builder = builder
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
+@@ -34,7 +34,7 @@
+         assertTrue(diagnostics.summary().contains("startRequestAgeMs=none firstTcpAfterStartMs=none"))
+         diagnostics.controlProgress("iap2 tx=0x4301 carplay-start-session")
+         clock += 20_000_000_000L
+-        // A repeated request must not hide how long the original handoff has been stalled.
++        // 重复请求不能掩盖首次交接已停滞的时间。
+         diagnostics.controlProgress("iap2 tx=0x4301 carplay-start-session")
+         assertTrue(diagnostics.summary().contains("startRequestAgeMs=20000 firstTcpAfterStartMs=none"))
+         diagnostics.connectionAccepted()
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
+@@ -24,7 +24,7 @@
+ 
+     @Test
+     fun wiredSessionIgnoresAnUnfinishedManualHotspot() {
+-        // Manual hotspot chosen for wireless, but its name never entered: USB must still start.
++        // 无线选择手动热点但尚未填名称时，有线配置仍然有效。
+         val config = config(CarPlayTransport.WIRED, ssid = "")
+ 
+         assertEquals(CarPlayTransport.WIRED, config.transport)
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/WirelessConnectionProofTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/WirelessConnectionProofTest.kt
+@@ -6,6 +6,31 @@
+ import org.junit.Test
+ 
+ class WirelessConnectionProofTest {
++    @Test fun renderedSessionSurvivesMissingTunnelButNotReplacementOrDisconnect() {
++        val proof = WirelessConnectionProof<Any>()
++        val first = Any()
++        val replacement = Any()
++        proof.begin(1) {}
++        proof.activate(1, first)
++        assertFalse(proof.hasRenderedFrame(1))
++        proof.rendered(1, first)
++        // 已显示画面可用于隧道超时保护，无需等待隧道认证完成。
++        assertTrue(proof.hasRenderedFrame(1))
++        assertFalse(proof.hasRenderedFrame(2))
++        proof.activate(1, replacement)
++        assertFalse(proof.hasRenderedFrame(1))
++        proof.rendered(1, first)
++        assertFalse(proof.hasRenderedFrame(1))
++        proof.rendered(1, replacement)
++        assertTrue(proof.hasRenderedFrame(1))
++        proof.end(1, replacement)
++        assertFalse(proof.hasRenderedFrame(1))
++        proof.begin(2) {}
++        proof.activate(2, Any())
++        proof.rendered(1, replacement)
++        assertFalse(proof.hasRenderedFrame(2))
++    }
++
+ 
+     @Test fun activeSessionEvidenceIsScopedToGenerationAndClearedOnEnd() {
+         val session = Any()
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2LocationReporterTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2LocationReporterTest.kt
+@@ -49,7 +49,7 @@
+     fun aSeparateLinkDoesNotInheritAnotherLinksRequest() {
+         val bluetoothProvider = FakeProvider()
+         link(bluetoothProvider).handle(start) { }
+-        bluetoothProvider.stop() // Bluetooth closed without 0xFFFC.
++        bluetoothProvider.stop() // 蓝牙未收到 0xFFFC 就关闭。
+ 
+         val wifiProvider = FakeProvider()
+         val wifi = link(wifiProvider)
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2WirelessLinkRoleTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2WirelessLinkRoleTest.kt
+@@ -38,7 +38,7 @@
+         assertFalse(Iap2LocationMessages.START_LOCATION_INFORMATION in received)
+         assertFalse(Iap2VehicleStatus.VEHICLE_STATUS_UPDATE in sent)
+         assertFalse(Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES in received)
+-        assertTrue(0x5703 in sent) // Wi-Fi bootstrap remains advertised.
++        assertTrue(0x5703 in sent) // 保留 Wi-Fi 引导能力声明。
+     }
+ 
+     @Test
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxIssue100RegressionTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxIssue100RegressionTest.kt
+@@ -22,7 +22,7 @@
+ import org.robolectric.util.ReflectionHelpers
+ import org.robolectric.util.ReflectionHelpers.ClassParameter
+ 
+-/** Replays USB completion boundaries through the real UsbSession read and USBMUX frame parser. */
++/** 使用真实 USB 会话读取和组帧器回放不同 USB 完成边界。 */
+ @RunWith(RobolectricTestRunner::class)
+ @Config(sdk = [33], manifest = Config.NONE,
+     shadows = [EvidenceUsbConnectionShadow::class, EvidenceUsbRequestShadow::class])
+@@ -205,10 +205,10 @@
+     private fun framePayload(frame: Any?): ByteArray = ReflectionHelpers.getField(frame!!, "payload")
+ 
+     private companion object {
+-        // Issue 100 attachment line 12: 24 received bytes, declared length 20.
++        // 上游 #100 的 VERSION 边界：接收 24 字节，声明长度 20。
+         val versionReplyWithPadding = hex(
+             "00 00 00 00 00 00 00 14 00 00 00 02 00 00 00 00 49 28 73 00 00 00 00 00")
+-        // Attachment lines 59-61: actual_length 40, declared length 36; no invented payloads.
++        // 上游 #100 的 SYN-ACK 边界：接收 40 字节，声明长度 36，不添加业务载荷。
+         val capturedSynAckWithPadding = hex(
+             "00 00 00 06 00 00 00 24 fa ce fa ce 00 00 00 01 " +
+                 "f2 7e 00 01 00 00 00 00 00 00 00 01 5f 12 02 00 7f 00 00 01 6d 43 6f 6e")
+@@ -225,7 +225,7 @@
+     }
+ }
+ 
+-/** Supplies exact USB completion chunks; framing remains entirely in production code. */
++/** 按原边界提供 USB 完成块，组帧仍由正式代码完成。 */
+ object UsbEvidenceReplay {
+     val transfers = ArrayDeque<ByteArray>()
+     val writes = mutableListOf<ByteArray>()
