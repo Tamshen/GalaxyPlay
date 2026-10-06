@@ -11,6 +11,10 @@ import java.io.Closeable
 /** 页面只展示与派发显式动作；离开页面可观察原车显示，测试由独立组件持有并限时。 */
 internal class L7ReportingTestPage(private val activity: Activity, parent: LinearLayout,
     private val kind: L7ReportingKind, onLogs: () -> Unit) : Closeable {
+    private lateinit var guide: L7DebugGuide
+    private var guideBaseline: Long
+        get() = guide.memory.getLong("baseline")
+        set(value) { guide.memory.putLong("baseline", value) }
     private var disposed = false
     private var dialog: AlertDialog? = null
     private var previous: Pair<Long, Boolean>? = null
@@ -26,6 +30,25 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
     private fun text(id: Int) = activity.getString(id)
 
     init {
+        guide = L7DebugGuide(activity, parent, kind.name, listOf(
+            L7DebugGuide.Step(R.string.debug_guide_prepare, R.string.debug_guide_prepare_body),
+            L7DebugGuide.Step(R.string.debug_guide_report, R.string.debug_guide_report_body, { start }, {
+                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && it.phase == L7ReportingTestController.Phase.RUNNING && it.preview != null }
+            }, { guideBaseline = L7ReportingTests.snapshot().run }),
+            L7DebugGuide.Step(R.string.debug_guide_observe, R.string.debug_guide_observe_body, { evidence }, {
+                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && it.observation != null }
+            }),
+        ) + guidedActions().mapIndexed { index, (title, action) ->
+            L7DebugGuide.Step(title, R.string.debug_guide_field_body, { controls.getOrNull(index) }, {
+                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline &&
+                    it.phase == L7ReportingTestController.Phase.RUNNING && it.step > guide.memory.getLong("actionBaseline") && it.lastAction == action && it.observation != null }
+            }, { guide.memory.putLong("actionBaseline", L7ReportingTests.snapshot().step) })
+        } + listOf(
+            L7DebugGuide.Step(R.string.debug_guide_cleanup, R.string.debug_guide_cleanup_body, { if (end.visibility == View.VISIBLE) end else evidence }, {
+                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && it.phase == L7ReportingTestController.Phase.STOPPED && it.cleanupObservation != null }
+            }),
+            L7DebugGuide.Step(R.string.debug_guide_logs, R.string.debug_guide_logs_body)
+        ), { L7ReportingTests.snapshot().let { longArrayOf(it.run, it.step, it.phase.ordinal.toLong()) } })
         L7SettingsSection.add(parent, text(R.string.l7_report_status),
             description = text(if (kind == L7ReportingKind.MEDIA) R.string.l7_report_media_hint else R.string.l7_report_navigation_hint)) { card ->
             status = L7SettingRow(activity, text(R.string.l7_listen_status)).also(card::addView)
@@ -47,12 +70,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         }
         parent.addView(actionsSection)
         L7SettingsSection.add(actionsSection, text(R.string.l7_report_actions), footer = text(R.string.l7_report_lifetime)) { card ->
-            val actions = if (kind == L7ReportingKind.MEDIA) listOf(
-                R.string.l7_report_track to L7ReportingAction.TRACK,
-                R.string.l7_report_play_pause to L7ReportingAction.PLAY_PAUSE,
-                R.string.l7_report_progress to L7ReportingAction.PROGRESS,
-                R.string.l7_report_cover to L7ReportingAction.COVER,
-            ) else listOf(R.string.l7_report_road to L7ReportingAction.ROAD, R.string.l7_report_refresh to L7ReportingAction.REFRESH)
+            val actions = guidedActions()
             actions.forEach { (label, action) ->
                 controls.add(L7Components.actionRow(activity, text(label)) {
                     L7ReportingTests.action(kind, action); update()
@@ -62,6 +80,13 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         details = L7DebugDetails(activity, parent)
         update()
     }
+
+    private fun guidedActions(): List<Pair<Int, L7ReportingAction>> = if (kind == L7ReportingKind.MEDIA) listOf(
+        R.string.l7_report_track to L7ReportingAction.TRACK,
+        R.string.l7_report_play_pause to L7ReportingAction.PLAY_PAUSE,
+        R.string.l7_report_progress to L7ReportingAction.PROGRESS,
+        R.string.l7_report_cover to L7ReportingAction.COVER,
+    ) else listOf(R.string.l7_report_road to L7ReportingAction.ROAD, R.string.l7_report_refresh to L7ReportingAction.REFRESH)
 
     private fun confirm() {
         if (disposed || !L7Agreement.canUse(activity) || CarPlayBackgroundSession.hasSession()) return
@@ -79,6 +104,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
 
     fun update() {
         if (disposed) return
+        guide.update()
         val value = L7ReportingTests.snapshot()
         val phone = CarPlayBackgroundSession.hasSession()
         val revision = value.revision to phone
@@ -134,6 +160,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         update()
     }
 
-    fun background() { dialog?.dismiss(); dialog = null }
-    override fun close() { disposed = true; background() }
+    fun resume() { guide.resume() }
+    fun background() { guide.background(); dialog?.dismiss(); dialog = null }
+    override fun close() { guide.close(); disposed = true; background() }
 }

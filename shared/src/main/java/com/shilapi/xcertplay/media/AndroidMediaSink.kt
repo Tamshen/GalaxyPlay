@@ -96,6 +96,7 @@ class AndroidMediaSink(
             }
         },
         finish = callMode::close,
+        report = onAudioDiagnostic,
     )
 
     private fun audioRecoveryState(): String {

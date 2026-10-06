@@ -406,4 +406,16 @@ class L7MediaCenterSessionTest {
         assertFalse(port.calls.contains("request"))
         assertFalse(port.updates.single().playing)
     }
+    @Test fun registrationBeginPrecedesSdkAndBrokenDiagnosticSinkDoesNotChangeRegistration() {
+        port.duringRegister = { assertTrue(logs.any { "stage=register" in it && "phase=BEFORE" in it }) }
+        connect()
+        assertTrue(logs.any { "stage=register" in it && "phase=AFTER" in it && "durationMs=" in it })
+        val other = Port()
+        val safe = L7MediaCenterSession(other, "own", { true }, { _, _ -> }, worker, main,
+            { throw IllegalStateException("private-log-error") })
+        safe.start(); worker.drain(); other.ready(true); worker.drain()
+        assertTrue("register" in other.calls)
+        assertTrue(other.calls.any { it.startsWith("sources:") })
+        safe.close(); worker.drain()
+    }
 }

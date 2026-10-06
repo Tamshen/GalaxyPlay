@@ -20,7 +20,7 @@ internal class L7ReportingTestController(
     data class Snapshot(val run: Long = 0, val kind: L7ReportingKind? = null,
         val phase: Phase = Phase.IDLE, val deadline: Long = 0, val lines: List<String> = emptyList(),
         val revision: Long = 0, val firstIssue: String? = null, val step: Long = 0,
-        val preview: L7ReportingPreview? = null, val observation: Boolean? = null, val cleanupObservation: Boolean? = null)
+        val preview: L7ReportingPreview? = null, val observation: Boolean? = null, val cleanupObservation: Boolean? = null, val lastAction: L7ReportingAction? = null)
     private var state = Snapshot()
     private var session: L7ReportingSession? = null
 
@@ -28,7 +28,7 @@ internal class L7ReportingTestController(
     @Synchronized private fun current(run: Long) = state.run == run && state.phase == Phase.RUNNING && clock() < state.deadline
     private fun event(run: Long, kind: L7ReportingKind, value: String) {
         val line = "ReportTest: run=$run kind=$kind monoMs=${clock()} $value"
-        log(line)
+        runCatching { log(line) }
         synchronized(this) {
             if (state.run == run) {
                 val preview = L7ReportingPreview.parse(kind, value)?.takeIf { state.phase == Phase.RUNNING }
@@ -74,7 +74,7 @@ internal class L7ReportingTestController(
     fun action(kind: L7ReportingKind, value: L7ReportingAction) {
         val target = synchronized(this) {
             if (state.kind != kind || state.phase != Phase.RUNNING) return
-            state = state.copy(step = state.step + 1, observation = null, revision = state.revision + 1)
+            state = state.copy(step = state.step + 1, observation = null, revision = state.revision + 1, lastAction = value)
             session
         }
         if (blocked()) { stop("CARPLAY_OR_AGREEMENT"); return }

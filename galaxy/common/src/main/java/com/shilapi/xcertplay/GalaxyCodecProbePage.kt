@@ -12,6 +12,10 @@ import java.io.Closeable
 internal class GalaxyCodecProbePage(private val activity: Activity, parent: LinearLayout,
     private val controller: GalaxyCodecProbeController, private val occupied: () -> Boolean,
     onLogs: () -> Unit) : Closeable, SurfaceHolder.Callback {
+    private lateinit var guide: L7DebugGuide
+    private var guideBaseline: Long
+        get() = guide.memory.getLong("baseline")
+        set(value) { guide.memory.putLong("baseline", value) }
     private var foreground = true
     private var closed = false
     private lateinit var sample: L7SettingRow
@@ -34,6 +38,15 @@ internal class GalaxyCodecProbePage(private val activity: Activity, parent: Line
         }
     }
     init {
+        guide = L7DebugGuide(activity, parent, "CODEC", listOf(
+            L7DebugGuide.Step(R.string.debug_guide_prepare, R.string.debug_guide_prepare_body),
+            L7DebugGuide.Step(R.string.debug_guide_codec, R.string.debug_guide_codec_body, { start },
+                { controller.results.lastOrNull()?.run?.let { it > guideBaseline } == true },
+                { guideBaseline = controller.results.lastOrNull()?.run ?: 0 }),
+            L7DebugGuide.Step(R.string.debug_guide_codec_result, R.string.debug_guide_codec_result_body, { visible },
+                { controller.results.lastOrNull()?.let { it.run > guideBaseline && controller.observed != null } == true }),
+            L7DebugGuide.Step(R.string.debug_guide_logs, R.string.debug_guide_logs_body)
+        ), { longArrayOf(controller.results.lastOrNull()?.run ?: 0) })
         L7SettingsSection.add(parent, text(R.string.codec_probe_choose), footer = text(R.string.codec_probe_scope)) { card ->
             sample = L7Components.actionRow(activity, text(R.string.codec_probe_sample)) {
                 choose(text(R.string.codec_probe_sample), CodecProbeVideo.entries.map { it.title }, controller.video.ordinal) {
@@ -95,6 +108,7 @@ internal class GalaxyCodecProbePage(private val activity: Activity, parent: Line
     }
     fun update() {
         if (closed) return
+        guide.update()
         if (occupied() && controller.busy && controller.notice != "CONNECT_REQUEST") {
             controller.stop("CONNECT_REQUEST")
             return
@@ -139,9 +153,10 @@ internal class GalaxyCodecProbePage(private val activity: Activity, parent: Line
     override fun surfaceCreated(holder: SurfaceHolder) { update() }
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) { update() }
     override fun surfaceDestroyed(holder: SurfaceHolder) { controller.stop("SURFACE_LOST") }
-    fun background() { foreground = false; controller.stop("BACKGROUND"); update() }
-    fun resume() { foreground = true; update() }
+    fun background() { guide.background(); foreground = false; controller.stop("BACKGROUND"); update() }
+    fun resume() { guide.resume(); foreground = true; update() }
     override fun close() {
+        guide.close()
         closed = true
         controller.changed = null
         controller.stop("SURFACE_LOST")

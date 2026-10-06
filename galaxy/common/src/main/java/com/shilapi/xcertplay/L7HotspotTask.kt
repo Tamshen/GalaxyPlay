@@ -102,11 +102,19 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
         }
         val token = ++generation
         status = Status(message, true)
+        trace(token, "REQUESTED", message)
         executor.purge()
         try {
             work = executor.submit {
-                try { if (!cancelled(token)) action(token) }
-                catch (_: Exception) { finish(token, null, R.string.l7_hotspot_failed) }
+                try {
+                    if (!cancelled(token)) {
+                        trace(token, "BEFORE", message)
+                        action(token)
+                    }
+                } catch (error: Exception) {
+                    runCatching { L7DebugLog.record("HotspotTask: run=$token phase=FAILED exceptionType=${error.javaClass.simpleName}") }
+                    finish(token, null, R.string.l7_hotspot_failed)
+                } finally { trace(token, "WORKER_RELEASED", message) }
             }
         } catch (_: RejectedExecutionException) {
             status = Status(R.string.l7_hotspot_busy)
@@ -123,14 +131,18 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
     }
 
     @Synchronized private fun finish(token: Int, credentials: NativeHotspotCredentials?, message: Int, enabled: Boolean? = null) {
-        if (cancelled(token)) return
+        if (cancelled(token)) { trace(token, "STALE_RESULT", message); return }
         credentials?.let { save(token, it) }
         status = status.copy(message = message, busy = false, hotspotEnabled = enabled)
         // 仅记结果码；不记录名称、密码或接口异常正文。
-        L7DebugLog.record("原生热点操作结果=${app.resources.getResourceEntryName(message)}")
+        trace(token, "AFTER", message)
     }
 
+    private fun trace(token: Int, phase: String, message: Int) {
+        runCatching { L7DebugLog.record("HotspotTask: run=$token phase=$phase monoMs=${android.os.SystemClock.elapsedRealtime()} result=${app.resources.getResourceEntryName(message)} current=${token == generation}") }
+    }
     @Synchronized fun cancel() {
+        if (status.busy) trace(generation, "STOP_REQUESTED", status.message)
         generation++
         work?.cancel(true)
         if (status.busy) status = status.copy(message = R.string.l7_hotspot_cancelled, busy = false, hotspotEnabled = null)

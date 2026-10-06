@@ -159,4 +159,30 @@ class L7ReportingTestControllerTest {
             "stage=androidMedia result=RETURNED track=A playing=false elapsedMs=999999999999999999999999 cover=1"))
     }
 
+    @Test fun fieldGuideCannotReuseObservationAfterAnotherActionOrNewRun() {
+        engine.start(L7ReportingKind.MEDIA)
+        engine.action(L7ReportingKind.MEDIA, L7ReportingAction.TRACK)
+        engine.observe(L7ReportingKind.MEDIA, true)
+        assertEquals(L7ReportingAction.TRACK, engine.snapshot().lastAction)
+        assertEquals(true, engine.snapshot().observation)
+        engine.action(L7ReportingKind.MEDIA, L7ReportingAction.COVER)
+        assertEquals(L7ReportingAction.COVER, engine.snapshot().lastAction)
+        assertNull(engine.snapshot().observation)
+        engine.stop("USER"); sessions.single().released()
+        engine.start(L7ReportingKind.MEDIA)
+        assertNull(engine.snapshot().lastAction)
+        assertNull(engine.snapshot().observation)
+    }
+    @Test fun diagnosticFailureCannotPreventStartActionObservationOrRelease() {
+        lateinit var session: Session
+        val safe = L7ReportingTestController({ _, log, released, current ->
+            Session(log, released, current).also { session = it }
+        }, { false }, { now }, { throw IllegalStateException("private-log-error") })
+        assertTrue(safe.start(L7ReportingKind.MEDIA))
+        assertEquals(1, session.starts)
+        safe.action(L7ReportingKind.MEDIA, L7ReportingAction.TRACK)
+        assertTrue(safe.observe(L7ReportingKind.MEDIA, false))
+        safe.stop("USER"); session.released()
+        assertEquals(L7ReportingTestController.Phase.STOPPED, safe.snapshot().phase)
+    }
 }

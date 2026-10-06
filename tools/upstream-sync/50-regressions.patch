@@ -1128,7 +1128,7 @@
  @RunWith(RobolectricTestRunner::class)
  @Config(sdk = [28, 33], manifest = Config.NONE, shadows = [VpnScopeBuilderShadow::class])
  class CarPlayVpnScopeTest {
-@@ -86,6 +86,7 @@
+@@ -86,9 +86,23 @@
              assertTrue(service.isAttached())
              val newServer = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
              service.detach()
@@ -1136,7 +1136,23 @@
              service.detach()
              assertTrue(newServer.isClosed)
              assertReleased(service)
-@@ -131,7 +132,7 @@
++        }
++    }
++
++    @Test fun repeatedListenerReplacementWaitsSafelyWhileAcceptWorkersExit() {
++        withService { service ->
++            repeat(20) {
++                assertEquals(CarPlayVpnService.AttachResult.Started, attachWireless(service))
++                val listener = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
++                service.detach()
++                assertTrue(listener.isClosed)
++                assertTrue(service.awaitDetached(2000))
++                assertReleased(service)
++            }
+         }
+     }
+ 
+@@ -131,7 +145,7 @@
      private val identity = AirPlayIdentity(ByteArray(32), ByteArray(32), "test")
  }
  
@@ -1145,7 +1161,7 @@
  object VpnScopeBoundary {
      val calls = mutableListOf<String>()
      var allowFailure: Exception? = null
-@@ -148,8 +149,7 @@
+@@ -148,8 +162,7 @@
  class VpnScopeBuilderShadow {
      @RealObject private lateinit var builder: VpnService.Builder
  

@@ -15,6 +15,13 @@ import java.io.Closeable
 internal class L7VoiceInputDebugPage(private val activity: Activity, parent: LinearLayout,
     private val grant: () -> Unit, onLogs: () -> Unit,
     private val test: L7VoiceInputTest = L7VoiceInputTest(L7VoiceInputTest.SystemAccess(activity))) : Closeable {
+    private lateinit var guide: L7DebugGuide
+    private var guideLocalStarted: Boolean
+        get() = guide.memory.getBoolean("localStarted")
+        set(value) { guide.memory.putBoolean("localStarted", value) }
+    private var guideRequest: String?
+        get() = guide.memory.getString("request")
+        set(value) { guide.memory.putString("request", value) }
     private val handler = Handler(Looper.getMainLooper())
     private var foreground = true
     private var disposed = false
@@ -37,6 +44,14 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
     }
 
     init {
+        guide = L7DebugGuide(activity, parent, "VOICE", listOf(
+            L7DebugGuide.Step(R.string.debug_guide_prepare, R.string.debug_guide_prepare_body),
+            L7DebugGuide.Step(R.string.debug_guide_local, R.string.debug_guide_local_body, { if (permitted()) toggle else permission },
+                { guideLocalStarted && !test.snapshot.busy && test.snapshot.bytes > 0 }, { guideLocalStarted = false }),
+            L7DebugGuide.Step(R.string.debug_guide_siri, R.string.debug_guide_siri_body, { siri },
+                { requestId != null && requestId != guideRequest && phoneOutcome != null }, { guideRequest = requestId }),
+            L7DebugGuide.Step(R.string.debug_guide_logs, R.string.debug_guide_logs_body)
+        ))
         L7VoiceDiagnostics.initialize(activity)
         var permissionRow: L7SettingRow? = null
         L7SettingsSection.add(parent, text(R.string.l7_voice_permission), footer = text(R.string.l7_voice_privacy)) { card ->
@@ -80,7 +95,7 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
     private fun toggleTest() {
         if (!foreground || disposed || !L7Agreement.canUse(activity)) return
         if (test.snapshot.busy) test.stop()
-        else if (test.start(SOURCES[sourceIndex].second)) { requestId = null; requestOwner = null }
+        else if (test.start(SOURCES[sourceIndex].second)) { guideLocalStarted = true; requestId = null; requestOwner = null }
         update()
     }
 
@@ -108,6 +123,7 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
 
     fun update() {
         if (disposed) return
+        guide.update()
         val state = test.snapshot
         val session = CarPlayBackgroundSession.snapshot()
         val owner = session?.controller?.activeMediaSessionOwner()
@@ -174,9 +190,9 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
         update()
     }
 
-    fun background() { foreground = false; handler.removeCallbacks(tick); test.stop() }
-    fun resume() { if (!disposed) { foreground = true; handler.removeCallbacks(tick); handler.post(tick) } }
-    override fun close() { disposed = true; foreground = false; handler.removeCallbacks(tick); test.close() }
+    fun background() { guide.background(); foreground = false; handler.removeCallbacks(tick); test.stop() }
+    fun resume() { if (!disposed) { guide.resume(); foreground = true; handler.removeCallbacks(tick); handler.post(tick) } }
+    override fun close() { guide.close(); disposed = true; foreground = false; handler.removeCallbacks(tick); test.close() }
     private fun permitted() = activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     private fun text(id: Int) = activity.getString(id)
 
