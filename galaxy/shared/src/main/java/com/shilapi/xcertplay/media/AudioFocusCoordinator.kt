@@ -29,6 +29,7 @@ internal class AudioFocusCoordinator(
     private var mediaAttributes: AudioAttributes? = null
     private var mediaSuppressed = false
     private var closed = false
+    private var communicationActive = false
 
     private fun onFocusChanged(generation: Int, change: Int) {
         synchronized(this) {
@@ -70,6 +71,25 @@ internal class AudioFocusCoordinator(
 
     fun resumeMedia() = onMediaPlaying(true)
 
+    @Synchronized fun communicationStarted() {
+        if (closed) return
+        communicationActive = true
+        refreshRequest()
+    }
+
+    @Synchronized fun communicationEnded() {
+        if (closed) return
+        communicationActive = false
+        requestGeneration++
+        request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
+        request = null
+        requestedChannel = null
+        focusHeld = false
+        focusVolume = FULL_VOLUME
+        mediaSuppressed = false
+        refreshRequest()
+    }
+
     /** 读取当前状态不会请求或放弃焦点，用于通话结束后的统计关联。 */
     @Synchronized fun diagnosticState(): String =
         "focusEnabled=$enabled focusGeneration=$requestGeneration focusChannel=${requestedChannel ?: "none"} " +
@@ -89,8 +109,8 @@ internal class AudioFocusCoordinator(
     }
 
     private fun refreshRequest() {
-        val primary = active.values.maxByOrNull { it.channel.focusPriority() }
-            ?: mediaAttributes?.takeIf { !mediaSuppressed }?.let { Entry(AudioChannel.MEDIA, it) }
+        val primary = active.values.filter { !communicationActive || it.channel != AudioChannel.MEDIA }.maxByOrNull { it.channel.focusPriority() }
+            ?: mediaAttributes?.takeIf { !mediaSuppressed && !communicationActive }?.let { Entry(AudioChannel.MEDIA, it) }
         if (primary == null) {
             requestGeneration++
             request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
@@ -98,6 +118,7 @@ internal class AudioFocusCoordinator(
             requestedChannel = null
             focusHeld = false
             focusVolume = FULL_VOLUME
+            applyVolumes()
             return
         }
         if (request != null && requestedChannel == primary.channel) { applyVolumes(); return }
@@ -141,7 +162,7 @@ internal class AudioFocusCoordinator(
             val localVolume = if (!factoryRouting || entry.channel == requestedChannel || requestedChannel == AudioChannel.MEDIA) FULL_VOLUME
                 else if (requestedChannel == AudioChannel.NAVIGATION && entry.channel == AudioChannel.MEDIA) DUCKED_VOLUME
                 else 0f
-            val volume = if (factoryRouting && mediaSuppressed && entry.channel == AudioChannel.MEDIA) 0f else focusVolume * localVolume
+            val volume = if ((communicationActive || factoryRouting && mediaSuppressed) && entry.channel == AudioChannel.MEDIA) 0f else focusVolume * localVolume
             runCatching { track.setVolume(volume) }
         }
     }

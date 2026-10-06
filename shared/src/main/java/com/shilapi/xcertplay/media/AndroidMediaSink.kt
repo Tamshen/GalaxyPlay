@@ -66,7 +66,7 @@ class AndroidMediaSink(
     /** 回调绑定控制器归属，旧渲染线程不得改变新会话的媒体按键状态。 */
     fun setMediaAudioChangedListener(listener: (Boolean) -> Unit) { mediaAudioChanged = listener }
 
-    fun resumeMediaAudioFocus() = audioFocusCoordinator.resumeMedia()
+    fun resumeMediaAudioFocus() { communicationResources.retry(); audioFocusCoordinator.resumeMedia() }
     @Volatile private var videoRecovered = onVideoRecovered
     @Volatile private var videoFailure = onVideoFailure
     @Volatile private var mainVideoFailure: Pair<VideoCodec, String>? = null
@@ -84,6 +84,19 @@ class AndroidMediaSink(
     )
     private val callMode = TelephonyAudioMode(appContext?.getSystemService(AudioManager::class.java), onAudioDiagnostic)
     private val callTimeline = CallAudioTimeline(onAudioDiagnostic, ::audioRecoveryState)
+    private val communicationModeOwner = AudioStreamId(-1, "telephony")
+    private val communicationResources = CommunicationResources(
+        enter = { if (callProcessingEnabled) callMode.acquire(communicationModeOwner) },
+        restore = { !callProcessingEnabled || callMode.release(communicationModeOwner) },
+        suspendMedia = audioFocusCoordinator::communicationStarted,
+        recoverMedia = {
+            audioFocusCoordinator.communicationEnded()
+            if (!closed) audioRenderers.forEach { (id, renderer) ->
+                if (LocalMediaAudioPolicy.isMusic(id, renderer.format)) renderer.resumeAfterCommunication()
+            }
+        },
+        finish = callMode::close,
+    )
 
     private fun audioRecoveryState(): String {
         val mode = runCatching { appContext?.getSystemService(AudioManager::class.java)?.mode }.getOrNull()
@@ -261,14 +274,14 @@ class AndroidMediaSink(
     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
         if (closed) return
         try {
-            if (callProcessingEnabled && config.audioType.equals("telephony", ignoreCase = true)) callMode.acquire(id)
             if (config.audioType.equals("speechrecognition", ignoreCase = true)) assistantMicrophoneTypes.add(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
                 val ticket = if (config.audioType.equals("telephony", true)) callTimeline.start(CallAudioTimeline.Leg.UPLINK) else null
+                ticket?.let(communicationResources::started)
                 MicrophoneUplink(config, audioRouting, onAudioDiagnostic, callProcessingEnabled,
                     factorySource = factoryAudio?.microphoneSource(config.audioType, config.sampleRate, wirelessAudio),
                     onStopRequested = { callTimeline.stopRequested(ticket) }) {
-                    try { callMode.release(id) } finally { callTimeline.released(ticket) }
+                    try { ticket?.let(communicationResources::released) } finally { callTimeline.released(ticket) }
                 }
             }
             if (!uplink.start()) onMicrophoneStopped(id)
@@ -284,7 +297,6 @@ class AndroidMediaSink(
         try { microphoneUplinks.remove(id)?.close() }
         finally {
             assistantMicrophoneTypes.remove(id)
-            callMode.release(id)
         }
     }
 
@@ -307,13 +319,14 @@ class AndroidMediaSink(
         videoDiagnosticHandlers.clear()
         recoveryExecutor.shutdownNow()
         synchronized(this) {
+            communicationResources.close()
             callTimeline.close()
             audioFocusCoordinator.close()
             audioRouting?.close()
             audioRenderers.values.forEach(AudioRenderer::close)
             audioRenderers.clear()
             try { microphoneUplinks.values.forEach { runCatching { it.close() } } }
-            finally { microphoneUplinks.clear(); callMode.close() }
+            finally { microphoneUplinks.clear() }
             assistantAudioTypes.clear()
             assistantMicrophoneTypes.clear()
         }
@@ -387,6 +400,8 @@ class AndroidMediaSink(
             wirelessAudio,
             callTimeline,
             ::audioRecoveryState,
+            communicationResources::started,
+            communicationResources::released,
         ).also { audioRenderers[id] = it }
     }
 }
@@ -976,6 +991,8 @@ private class AudioRenderer(
     private val wirelessAudio: Boolean,
     private val callTimeline: CallAudioTimeline,
     private val audioRecoveryState: () -> String,
+    private val onCallStarted: (Any) -> Unit,
+    private val onCallReleased: (Any) -> Unit,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
 
@@ -1032,11 +1049,25 @@ private class AudioRenderer(
     private var decoderOutputReports = 0
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
     private var callTicket: CallAudioTimeline.Ticket? = null
+    private val resumeRequested = AtomicBoolean(false)
+
+    fun resumeAfterCommunication() { if (running) resumeRequested.set(true) }
+
+    private fun restorePlayback() {
+        if (!resumeRequested.getAndSet(false) || !running || !playbackStarted) return
+        track?.takeIf { it.playState == AudioTrack.PLAYSTATE_PLAYING }?.let {
+            it.pause(); it.play()
+            underrunsAtPlaybackStart = it.underrunCount
+        }
+    }
 
     fun start() {
         if (started) return
         started = true
-        if (format.audioType.equals("telephony", true)) callTicket = callTimeline.start(CallAudioTimeline.Leg.DOWNLINK)
+        if (format.audioType.equals("telephony", true)) {
+            callTicket = callTimeline.start(CallAudioTimeline.Leg.DOWNLINK)
+            onCallStarted(this)
+        }
         thread.start()
     }
 
@@ -1079,6 +1110,7 @@ private class AudioRenderer(
             diagnosticStage = "focus"
             requestAudioFocus()
             while (running) {
+                restorePlayback()
                 diagnosticStage = "packet"
                 nextPacket()?.let(::handle)
                 // 尾包之后仍需轮询解码输出，避免短句等待下一个网络包才播放。
@@ -1102,7 +1134,10 @@ private class AudioRenderer(
             throw error
         } finally {
             runCatching { logStatsIfDue(force = true) }
-            try { release() } finally { callTimeline.released(callTicket) }
+            try { release() } finally {
+                if (format.audioType.equals("telephony", true)) onCallReleased(this)
+                callTimeline.released(callTicket)
+            }
         }
     }
 
@@ -1224,7 +1259,7 @@ private class AudioRenderer(
         track = built
         diagnosticStage = "track-attributes"
         trackAttributes = audioTrackAttributesForFocus(built, attributes)
-        routeBinding = audioRouting?.bind(built, AudioOutputPolicy.routingChannel(selection.channel, streamOverride),
+        routeBinding = audioRouting?.bind(built, if (selection.channel == AudioChannel.NAVIGATION) selection.channel else AudioOutputPolicy.routingChannel(selection.channel, streamOverride),
             false, format.sampleRate, format.channels, useBus = !AudioOutputPolicy.isLegacy(streamOverride))
         diagnosticStage = "track-capacity"
         val capacityBytes = built.bufferSizeInFrames * frameBytes
@@ -1535,6 +1570,7 @@ private class AudioRenderer(
         }
         var written = 0
         while (written < length && running) {
+            restorePlayback()
             val writeLength = if (playbackStarted) {
                 length - written
             } else {
@@ -1542,7 +1578,8 @@ private class AudioRenderer(
             }
             val writeStarted = System.nanoTime()
             diagnosticStage = "track-write"
-            val count = track.write(data, offset + written, writeLength, AudioTrack.WRITE_BLOCKING)
+            val count = track.write(data, offset + written, writeLength,
+                if (mappedChannel == AudioChannel.MEDIA) AudioTrack.WRITE_NON_BLOCKING else AudioTrack.WRITE_BLOCKING)
             maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
             if (count < 0) {
                 writeErrorsThisWindow++
@@ -1551,6 +1588,7 @@ private class AudioRenderer(
             }
             if (count == 0) {
                 zeroWritesThisWindow++
+                if (mappedChannel == AudioChannel.MEDIA) { Thread.sleep(AUDIO_POLL_MILLIS); continue }
                 break
             }
             if (count < writeLength) partialWritesThisWindow++
@@ -1682,7 +1720,6 @@ private class AudioRenderer(
 
     @Synchronized
     private fun release() {
-        abandonAudioFocus()
         routeBinding?.close()
         routeBinding = null
         val codec = codec
@@ -1718,6 +1755,7 @@ private class AudioRenderer(
                 // Best effort.
             }
         }
+        track?.let(audioFocusCoordinator::release)
     }
 
     private companion object {

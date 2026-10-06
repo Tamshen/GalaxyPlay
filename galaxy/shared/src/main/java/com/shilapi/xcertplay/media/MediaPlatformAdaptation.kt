@@ -33,8 +33,9 @@ class GalaxyMediaPolicy(
     private val factoryProfile: Boolean,
     private val preferBus: Boolean,
     override val template: AudioRoutingTemplate? = null,
+    private val navigationDevice: NavigationOutputDevice? = null,
 ) : MediaPlatformAdaptation {
     override val profile: PlatformAudioProfile? = if (factoryProfile) L7FactoryAudioProfile.load() else null
     override fun audioRoutes(context: Context?, report: (String) -> Unit): AudioRouteProvider? =
-        context?.let { L7AudioRouting(it, template?.preferBus ?: preferBus, template, report) }
+        context?.let { L7AudioRouting(it, template?.preferBus ?: preferBus, template, navigationDevice, report) }
 }

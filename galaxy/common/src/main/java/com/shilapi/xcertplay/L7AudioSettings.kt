@@ -57,6 +57,7 @@ internal object L7AudioSettings {
                     }.show()
             })
         }
+        L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
         if (custom) L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
             description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
             add(context, card, custom = true, open = open)
