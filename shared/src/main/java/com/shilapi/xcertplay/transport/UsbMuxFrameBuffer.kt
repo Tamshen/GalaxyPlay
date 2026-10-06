@@ -26,13 +26,13 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
         var length = readU32(bytes, 4)
         if (length !in HEADER_BYTES..MAX_FRAME_BYTES) {
             val previous = optionalReplyPadding
-            // The captured iOS 27 VERSION and valid RX TCP replies, including payload-bearing
-            // replies, have four extra bytes. Do not scan or discard a USB completion:
-            // only this single four-byte boundary is eligible, before validated TCP or the
-            // captured protocol-1 diagnostic shape.
-            // A normal or split next header at offset zero is always preserved.
-            // Wait for the candidate MUX/TCP headers or complete diagnostic payload. A timeout
-            // leaves these bytes in place; a legitimate split frame must never be lost.
+            // 已捕获的 iOS 27 VERSION 和合法 RX TCP 回复，包括带载荷的回复，
+            // 具有四字节尾部；不能扫描或丢弃整个 USB completion：
+            // 只允许这一处四字节边界，后续必须是校验过的 TCP 或已捕获的
+            // protocol-1 诊断形态。
+            // 始于零偏移的正常或分片帧头始终保留。
+            // 等待候选 MUX／TCP 帧头或完整诊断载荷；超时保持原有字节，
+            // 不能丢失合法分片帧。
             if (previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
                 bytes.size < PADDING_BYTES + HEADER_BYTES) return null
             val followingProtocol = readU32(bytes, PADDING_BYTES)
@@ -50,9 +50,9 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
                 }
                 candidateHeader && followingProtocol == PROTOCOL_DIAGNOSTIC &&
                     followingLength in (HEADER_BYTES + 2)..(HEADER_BYTES + MAX_DIAGNOSTIC_PAYLOAD_BYTES) -> {
-                    // Issue #100 also captures four extra bytes before/after protocol 1.
-                    // Validate its entire bounded subtype/text payload before recovering.
-                    // A timeout leaves the trailer and incomplete frame untouched.
+                    // Issue #100 同时捕获了 protocol 1 前后的四字节尾部。
+                    // 恢复前校验完整且有界的子类型／文本载荷。
+                    // 超时不修改尾部和不完整帧。
                     if (bytes.size < PADDING_BYTES + followingLength) return null
                     isCapturedDiagnosticPayload(bytes, PADDING_BYTES + HEADER_BYTES, followingLength - HEADER_BYTES)
                 }
@@ -97,7 +97,7 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
             readU16(frame.payload, 0) != 0 && readU16(frame.payload, 2) != 0
     }
 
-    /** Only the captured diagnostic subtype followed by bounded printable ASCII qualifies. */
+    /** 只接受已捕获的诊断子类型及有界可打印 ASCII。 */
     private fun isCapturedDiagnosticPayload(source: ByteArray, offset: Int, length: Int): Boolean =
         length in 2..MAX_DIAGNOSTIC_PAYLOAD_BYTES && source[offset].toInt() == DIAGNOSTIC_TEXT_SUBTYPE &&
             (offset + 1 until offset + length).all { source[it].toInt() in 0x20..0x7e }

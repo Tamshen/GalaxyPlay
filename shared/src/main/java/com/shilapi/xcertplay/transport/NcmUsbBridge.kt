@@ -251,7 +251,7 @@ class NcmUsbBridge internal constructor(
         } catch (error: RuntimeException) {
             throw failSession("NCM read failed", error)
         }
-        // Emit outside stateLock; diagnostic callbacks must not affect queue or close behavior.
+        // 在 stateLock 外记录诊断，回调不得影响排队或关闭。
         acceptedFallback?.let { queued ->
             runCatching {
                 onDiagnostic(
