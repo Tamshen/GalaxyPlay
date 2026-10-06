@@ -3,7 +3,9 @@
     <string name="l7_rail_expand">Expand menu</string>
     <string name="l7_nav_picture">Display</string>
     <string name="l7_nav_connect">Connect</string>
-    <string name="l7_nav_disconnect">Disconnect</string>
+    <string name="l7_nav_reconnect">Reconnect</string>
+    <string name="l7_menu_reconnect_confirm">Briefly interrupt the current CarPlay session and reconnect using the same wireless or wired connection?</string>
+    <string name="l7_menu_reconnect_failed">Could not reconnect. Check connection settings.</string>
     <string name="l7_nav_picture_connected">Display, iPhone connected</string>
     <string name="l7_nav_car_home">Vehicle</string>
     <string name="l7_nav_exit">Exit</string>

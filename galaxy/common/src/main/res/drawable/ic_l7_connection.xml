@@ -1,7 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flyme Auto 连接图标；保留 80 单位原几何与菜单相同留白，颜色随主题和状态变化。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M10,13a5,5 0,0 0,7 0l3,-3a5,5 0,0 0,-7 -7l-2,2M14,11a5,5 0,0 0,-7 0l-3,3a5,5 0,0 0,7 7l2,-2" />
+    android:width="80dp" android:height="80dp"
+    android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@color/product_ui_text" android:pathData="M49.1922 13.8369L27.2719 35.7572L37.8785 46.3638L40.7069 43.5354L32.9287 35.7572L49.1922 19.4938L59.7988 30.1004L54.1419 35.7572L56.9704 38.5857L65.4556 30.1004L49.1922 13.8369Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M39.2927 36.4643L47.0709 44.2425L30.8074 60.506L20.2008 49.8994L25.8577 44.2425L23.0292 41.4141L14.5439 49.8994L30.8074 66.1628L52.7277 44.2425L42.1211 33.6359L39.2927 36.4643Z" />
 </vector>

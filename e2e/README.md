@@ -118,7 +118,7 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 ## 连接分步引导与失败提示
 
-[GalaxyConnectionMenuTest](common/test/java/com/shilapi/xcertplay/GalaxyConnectionMenuTest.kt) 在 API 29／30 验证连接项未连接时只打开设置、等待尝试不取消、已连接必须确认、取消保持、重复确认只停止一次，以及弹窗期间会话结束／替换不能误断开。只使用控制器替身，不建立手机链路。
+[GalaxyConnectionMenuTest](common/test/java/com/shilapi/xcertplay/GalaxyConnectionMenuTest.kt) 在 API 29／30 验证连接项未连接时只打开设置、等待尝试不取消、已连接必须确认、取消保持、重复确认只重连一次、无线／USB 沿用实际传输方式、释放完成前不拉起宿主、退休宿主不阻断已确认重连，以及会话替换／退出期间拒绝迟到重连。只使用控制器替身，不建立手机链路。
 
 `L7VoiceInputTestTest`／`L7VoiceInputDebugPageTest`／`L7VoiceTraceStoreTest` 覆盖显式授权、十秒限时、重复启动、后台／关闭、迟到创建、通话接管、错误释放、技术摘要与旧会话隔离。`python3 e2e/device/voice_input_smoke.py` 仅在 AVD 检查权限拒绝、授权后不自动采集、手动停止、后台停止、限时完成、中英文昼夜与返回；本地生成摘要日志，不连接手机或上传。真实 Siri 识别与听感另行验收。
 

@@ -48,7 +48,7 @@ def tap(label):
             node = find(label)
             if node is not None:
                 x1, y1, x2, y2 = bounds(node)
-                if label in ('画面', '连接', '断开连接', '设置', '车机', '退出'):
+                if label in ('画面', '连接', '重连', '设置', '车机', '退出'):
                     print(f'点击导航：{label}，入口={node.attrib.get("content-desc") or node.attrib.get("text")}，坐标={node.attrib["bounds"]}', flush=True)
                 adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
                 time.sleep(.3)
@@ -62,7 +62,7 @@ def screenshot(name):
 
 def menu_bounds():
     return [(n.attrib['content-desc'], bounds(n)) for n in nodes()
-            if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc') in ('画面', '连接', '断开连接', '设置', '车机', '退出')]
+            if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc') in ('画面', '连接', '重连', '设置', '车机', '退出')]
 
 def menu_labels():
     expected = ['画面', '连接', '设置', '车机', '退出']
