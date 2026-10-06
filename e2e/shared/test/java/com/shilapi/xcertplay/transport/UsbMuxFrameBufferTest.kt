@@ -266,8 +266,8 @@ class UsbMuxFrameBufferTest {
     }
 
     @Test fun capturedProtocolOneBoundaryWorksAcrossEveryTransferSplit() {
-        // Issue #100's complete 187-byte TCP transfer and 73-byte diagnostic transfer.
-        // The declared frames are 183 and 69 bytes, each followed by four extra bytes.
+        // Issue #100 中完整的 187 字节 TCP 传输和 73 字节诊断传输。
+        // 声明帧长分别为 183 和 69，每帧后有四字节尾部。
         assertEquals(187, capturedTcpTransfer.size)
         assertEquals(73, capturedDiagnosticTransfer.size)
         assertEverySplitPreservesFrames(capturedTcpTransfer.copyOfRange(0, 183),
@@ -422,8 +422,8 @@ class UsbMuxFrameBufferTest {
         val data = "private-sample payload mCon".toByteArray()
         val version = mux(0, byteArrayOf(0x49, 0x28, 0x73, 0), magic = 2)
         val synAck = tcp(flags = 0x12)
-        // Verbatim first TCP completion from issue-100-proto1.txt, lines 39–44.
-        // TLS bytes are opaque to framing; the last four bytes (38343134) are outside length 183.
+        // 逐字节使用 issue-100-proto1.txt 第 39～44 行的首次 TCP completion。
+        // 组帧不解释 TLS 字节；最后四字节（38343134）在声明长度 183 之外。
         val capturedTcpTransfer = hex("""
             00000006000000b7faceface01840197e05600020005015d0000051650100200
             00000000170303008ee0f6cf38b2e09782cb37c255c64a1cc0941687c920f807

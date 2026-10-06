@@ -22,7 +22,7 @@ import org.robolectric.annotation.RealObject
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
 
-/** Exercises the actual two read paths; queue rejection is a compatibility hypothesis. */
+/** 验证两条真实读取路径；queue 拒绝只作为兼容假设。 */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE,
     shadows = [CompatibilityUsbConnectionShadow::class, CompatibilityUsbRequestShadow::class])
@@ -67,7 +67,7 @@ class UsbReadQueueCompatibilityTest {
         val frame = ByteArray(32_740) { (it * 31).toByte() }
         val followingFrame = byteArrayOf(0x33, 0x33, 0, 0, 0, 1, 0x86.toByte(), 0xdd.toByte())
         val block = Ntb16Codec.build(frame, 7)
-        assertEquals(32_769, block.size) // Two 16 KiB reads, then the required short-packet pad.
+        assertEquals(32_769, block.size) // 两次 16 KiB 读取后保留必需的短包填充。
         UsbQueueReplay.transfer = block + Ntb16Codec.build(followingFrame, 8)
         UsbQueueReplay.outcomes.addAll(listOf(false, true))
         val diagnostics = mutableListOf<String>()

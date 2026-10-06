@@ -5,10 +5,10 @@ import java.nio.ByteBuffer
 internal data class UsbReadQueueResult(val queued: Boolean, val firstBytes: Int, val fallbackBytes: Int? = null)
 
 /**
- * A size-compatibility hypothesis for explicit vendor queue rejection, not an API 28 size limit.
- * Android 9 UsbRequest.queue(ByteBuffer) accepts any size and clears its queued state on false:
+ * 仅针对厂商明确拒绝 queue 的尺寸兼容假设，不解释为 API 28 尺寸限制。
+ * Android 9 的 UsbRequest.queue(ByteBuffer) 接受任意尺寸，返回 false 会清理排队状态：
  * https://android.googlesource.com/platform/frameworks/base/+/android-9.0.0_r1/core/java/android/hardware/usb/UsbRequest.java
- * Call under the pipe's state lock, including publication, queueing and the open-state checks.
+ * 在管道状态锁内调用，覆盖发布、排队及打开状态检查。
  */
 internal class UsbReadQueuePolicy {
     private var successfulLimit: Int? = null
@@ -21,8 +21,8 @@ internal class UsbReadQueuePolicy {
         val firstBytes = minOf(buffer.remaining(), successfulLimit ?: buffer.remaining())
         buffer.limit(position + firstBytes)
         if (submit(buffer)) return UsbReadQueueResult(true, firstBytes)
-        // AOSP guarantees an unchanged buffer on explicit false. Do not retry an ambiguous
-        // request that threw or unexpectedly changed its buffer state.
+        // AOSP 保证明确返回 false 时缓冲区不变；若请求抛异常或意外改变缓冲区，
+        // 状态不明确，不能重试。
         check(buffer.position() == position && buffer.limit() == position + firstBytes) {
             "Rejected USB queue changed its buffer state"
         }

@@ -192,7 +192,7 @@ class BluetoothRfcommDuplexStreamTest {
             assertEquals("reader exceeded the bounded queue", 1L, input.ninthRead.count)
 
             val received = ByteArrayOutputStream()
-            // Drain only part of the first chunk: the reader must wake even when its tail remains.
+            // 只消费第一块的一部分，保留尾部时 reader 也必须被唤醒。
             received.write(stream.recv(64, 2_000)!!)
             assertTrue("reader remained blocked after recv freed capacity", input.ninthRead.await(2, TimeUnit.SECONDS))
             while (true) {

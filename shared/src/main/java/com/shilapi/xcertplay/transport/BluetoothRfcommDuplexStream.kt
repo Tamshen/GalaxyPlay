@@ -7,7 +7,7 @@ import java.io.OutputStream
 import java.util.ArrayDeque
 import kotlin.math.min
 
-/** Nullable platform getters matter on head units that expose a socket without usable streams. */
+/** 部分车机虽建立 socket，但平台 getter 可能返回不可用的空流。 */
 internal interface BluetoothRfcommSocketAccess {
     fun inputStream(): InputStream?
     fun outputStream(): OutputStream?
@@ -53,8 +53,8 @@ class BluetoothRfcommDuplexStream internal constructor(
     private var readCalls = 0L
     private var receivedBytes = 0L
 
-    // Acquire both streams before starting any reader or iAP2 protocol thread. Android getters
-    // have platform-nullability, and some vendor sockets return null after connect() succeeds.
+    // 读取线程或 iAP2 协议启动前先取得两条流。Android getter 为平台可空类型，
+    // 部分厂商 socket 即使 connect() 成功也会返回空流。
     private val input = acquireStream(BluetoothRfcommStreamException.Operation.INPUT_STREAM, socket::inputStream)
     private val output = acquireStream(BluetoothRfcommStreamException.Operation.OUTPUT_STREAM, socket::outputStream)
 
@@ -230,8 +230,8 @@ class BluetoothRfcommDuplexStream internal constructor(
     private fun fail(io: IOException): IOException {
         synchronized(lock) {
             failure?.let { return it }
-            // Closing a socket intentionally unblocks both read and write/flush. Such a write
-            // exception during bootstrap handoff is cancellation, not a new transport failure.
+            // 关闭 socket 会主动打断读写和 flush；bootstrap 交接期间由此引起的写入
+            // 异常归为取消，不产生新的传输故障。
             if (closed) return IOException("Bluetooth RFCOMM stream is closed")
             failure = io
             lock.notifyAll()
@@ -274,7 +274,7 @@ class BluetoothRfcommDuplexStream internal constructor(
 
     private fun report(message: String) {
         try { onDiagnostic(message) } catch (_: Exception) {
-            // A diagnostic callback cannot prevent transport setup or owned-socket cleanup.
+            // 诊断回调失败不能阻止建链或释放所拥有的 socket。
         }
     }
 

@@ -402,7 +402,7 @@ class Iap2UsbSession internal constructor(
                         "firstBytes=${queueResult.firstBytes} fallbackBytes=${queueResult.fallbackBytes ?: "not_attempted"})",
                 )
             }
-            // The policy remembers an accepted fallback, so this event occurs once per pipe.
+            // 策略记住已接受的回退，每条管道只记录一次。
             if (queueResult.fallbackBytes != null) runCatching {
                 onDiagnostic(
                     "USBMUX read queue compatibility fallback api=${Build.VERSION.SDK_INT} " +
