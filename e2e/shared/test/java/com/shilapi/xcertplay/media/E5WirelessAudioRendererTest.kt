@@ -5,6 +5,7 @@ import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.AudioStreamId
 import org.junit.Assert.*
+import org.mockito.Mockito.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,6 +22,42 @@ class E5WirelessAudioRendererTest {
         val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
         while (!condition() && System.nanoTime() < until) Thread.sleep(5)
         assertTrue("音频 worker 未达到预期状态", condition())
+    }
+
+    @Test fun mediaWorkerPreservesPcmAcrossZeroWriteAndRestartsPlayingTrackWithoutFlush() {
+        val logs = CopyOnWriteArrayList<String>()
+        val sink = AndroidMediaSink(wirelessAudio = true, audioFocusEnabled = false, onAudioDiagnostic = logs::add)
+        val id = AudioStreamId(102, "media")
+        val format = AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 102, "media")
+        var original: AudioTrack? = null
+        try {
+            sink.onAudioStarted(id, format, 0)
+            await { logs.any { it.startsWith("Audio: ready") } }
+            val renderer = ReflectionHelpers.getField<Map<AudioStreamId, Any>>(sink, "audioRenderers").getValue(id)
+            original = ReflectionHelpers.getField(renderer, "track")
+            val track = mock(AudioTrack::class.java)
+            `when`(track.playState).thenReturn(AudioTrack.PLAYSTATE_PLAYING)
+            val writes = CopyOnWriteArrayList<Pair<Int, ByteArray>>()
+            `when`(track.write(any(ByteArray::class.java), anyInt(), anyInt(), anyInt())).thenAnswer { call ->
+                val offset = call.getArgument<Int>(1); val length = call.getArgument<Int>(2)
+                assertEquals(AudioTrack.WRITE_NON_BLOCKING, call.getArgument<Int>(3))
+                writes.add(offset to call.getArgument<ByteArray>(0).copyOfRange(offset, offset + length))
+                if (writes.size == 1) 0 else length
+            }
+            ReflectionHelpers.setField(renderer, "track", track)
+            ReflectionHelpers.setField(renderer, "playbackStarted", true)
+            ReflectionHelpers.setField(renderer, "fadeApplied", true)
+            ReflectionHelpers.callInstanceMethod<Unit>(renderer, "resumeAfterCommunication")
+            sink.onAudioRtp(id, format, ByteArray(16).also { it[12] = 1; it[13] = 2; it[14] = 3; it[15] = 4 }, 0)
+            await { writes.size >= 2 }
+            assertEquals(0, writes[0].first)
+            assertEquals(0, writes[1].first)
+            assertArrayEquals(writes[0].second, writes[1].second)
+            assertArrayEquals(byteArrayOf(2, 1, 4, 3), writes[1].second)
+            verify(track).pause(); verify(track).play()
+            verify(track, never()).flush()
+            assertFalse(logs.any { "renderer failed" in it })
+        } finally { sink.close(); original?.release() }
     }
 
     @Test fun stoppedCallRendererIsReleasedBeforeMusicRecoveryStatistics() {

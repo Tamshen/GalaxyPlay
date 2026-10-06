@@ -186,6 +186,25 @@ class AudioFocusCoordinatorTest {
         } finally { focus.close(); navigation.release(); assistant.release() }
     }
 
+    @Test fun communicationResourcesSuppressMediaUntilEndedAndIgnoreOldFocusListener() {
+        val media = track()
+        val focus = AudioFocusCoordinator(context, true, factoryRouting = true)
+        try {
+            focus.acquire(media, AudioChannel.MEDIA, attributes())
+            val old = shadow.lastAudioFocusRequest
+            focus.communicationStarted()
+            assertEquals(0f, volume(media), 0f)
+            focus.resumeMedia()
+            assertTrue(focus.diagnosticState().contains("focusChannel=none"))
+            old.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+            assertEquals(0f, volume(media), 0f)
+            focus.communicationEnded()
+            assertEquals(1f, volume(media), 0f)
+            old.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+            assertEquals(1f, volume(media), 0f)
+        } finally { focus.close(); media.release() }
+    }
+
     private fun volume(track: AudioTrack) = Shadow.extract<VolumeTrack>(track).outputVolume
 
     // 观察实际传给 AudioTrack 的音量，避免只验证焦点日志而漏掉静音回归。

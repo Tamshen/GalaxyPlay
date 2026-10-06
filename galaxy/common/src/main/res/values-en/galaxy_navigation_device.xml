@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_navigation_device">Navigation output device</string>
+    <string name="galaxy_navigation_device_auto">Automatic (system usage routing)</string>
+    <string name="galaxy_navigation_device_note_title">Device selection</string>
+    <string name="galaxy_navigation_device_note">Listed outputs do not identify headrest speakers. Missing, ambiguous or rejected devices fall back to system routing. Reconnect after saving; navigation preview and playback share this preference. Existing usage and legacy stream settings are preserved.</string>
+</resources>

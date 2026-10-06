@@ -41,6 +41,7 @@ internal class GalaxyAudioChannelPreview(
         if (closed) return
         require(AudioOutputPolicy.valid(channel))
         val template = context?.let { L7AudioTemplates.load(it) }
+        val navigationDevice = context?.let { GalaxyNavigationOutput.load(it) }
         val focusEnabled = context?.let { AirPlayPersistence.loadAudioFocusEnabled(it) } ?: true
         val request = generation.incrementAndGet()
         pending?.cancel(true)
@@ -60,7 +61,7 @@ internal class GalaxyAudioChannelPreview(
                 built.setVolume(0.6f)
                 context?.let {
                     route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel,
-                        template = template, focusEnabled = focusEnabled) { line ->
+                        template = template, focusEnabled = focusEnabled, navigationDevice = navigationDevice) { line ->
                         L7DebugLog.record("Audio preview stream=$channel $line")
                     }
                 }

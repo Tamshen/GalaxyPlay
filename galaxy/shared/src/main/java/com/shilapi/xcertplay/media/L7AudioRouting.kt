@@ -13,6 +13,7 @@ import java.io.Closeable
 /** 会话拥有监听器；关闭绑定后，迟到回调不能操作已释放的播放/录音对象。 */
 internal class L7AudioRouting(context: Context?, private val preferBus: Boolean = false,
                               private val template: AudioRoutingTemplate? = null,
+                              private val navigationDevice: NavigationOutputDevice? = null,
                               private val report: (String) -> Unit) : AudioRouteProvider {
     private val manager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val handler = Handler(Looper.getMainLooper())
@@ -45,7 +46,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
 
         internal fun select() {
             if (released || closed) return
-            if (!preferBus || !useBus || input) {
+            if ((navigationDevice == null || channel != AudioChannel.NAVIGATION) && (!preferBus || !useBus || input) || input) {
                 // 默认、传统流与录音只观察实际路由，不向系统写入首选设备。
                 emit("Audio: route policy=system channel=$channel direction=${if (input) "input" else "output"}")
                 reportActual()
@@ -55,10 +56,14 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
                 manager?.getDevices(if (input) AudioManager.GET_DEVICES_INPUTS else AudioManager.GET_DEVICES_OUTPUTS)
                     ?.toList().orEmpty()
             }.getOrElse { emptyList() }
-            val selected = if (useBus) runCatching { L7AudioRoutePolicy.select(devices.map {
+            val preferred = navigationDevice?.takeIf { channel == AudioChannel.NAVIGATION }?.match(devices.map {
+                NavigationOutputDevice(it.id, it.type, it.address, it.productName.toString())
+            })
+            val selected = if ((navigationDevice == null || channel != AudioChannel.NAVIGATION) && useBus) runCatching { L7AudioRoutePolicy.select(devices.map {
                 L7AudioDevice(it.id, it.address, input, it.sampleRates.toList(), it.channelCounts.toList())
             }, channel, input, sampleRate, channels, template) }.getOrNull() else null
-            val target = selected?.let { match -> devices.firstOrNull { it.id == match.id } }
+            val target = preferred?.let { match -> devices.firstOrNull { it.id == match.id } }
+                ?: selected?.let { match -> devices.firstOrNull { it.id == match.id } }
             val accepted = runCatching { routing.setPreferredDevice(target) }.getOrDefault(false)
             // 请求被拒绝时清除旧偏好，不能带着失效设备 ID 继续播放。
             val fallback = if (!accepted && target != null) {

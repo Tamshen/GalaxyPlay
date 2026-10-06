@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_navigation_device">导航输出设备</string>
+    <string name="galaxy_navigation_device_auto">自动（按系统用途路由）</string>
+    <string name="galaxy_navigation_device_note_title">设备选择说明</string>
+    <string name="galaxy_navigation_device_note">枚举当前输出设备，不代表头枕映射。设备消失、匹配不唯一或系统拒绝时回到自动路由。保存后重连生效，导航试听与正式播放共用；保留原有用途与传统流设置。</string>
+</resources>
