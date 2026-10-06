@@ -64,6 +64,18 @@ def menu_bounds():
     return [(n.attrib['content-desc'], bounds(n)) for n in nodes()
             if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc') in ('画面', '设置', '车机', '退出')]
 
+def menu_labels():
+    expected = ['画面', '设置', '车机', '退出']
+    # 返回键交给 Activity 后再等布局完成，不重复发键或把动画中的空树当最终结果。
+    actual = []
+    for _ in range(4):
+        actual = [n.get('content-desc') for n in nodes()
+                  if n.get('clickable') == 'true' and n.get('content-desc')]
+        if actual == expected:
+            return actual
+        time.sleep(.5)
+    return actual
+
 def require_menu(expected, message):
     # Activity 切换时允许等待窗口完成交接，最终仍逐项比较完整坐标，不放宽位置误差。
     for _ in range(3):
@@ -140,7 +152,7 @@ def check_home():
         assert abs(x1 + x2 - window[0] - window[2]) <= 4, '首页内容未在完整窗口水平居中'
     screenshot('home')
     adb('shell', 'input', 'keyevent', '4')
-    menu = [n.attrib.get('content-desc') for n in nodes() if n.attrib.get('clickable') == 'true' and n.attrib.get('content-desc')]
+    menu = menu_labels()
     assert menu == ['画面', '设置', '车机', '退出'], '首页返回没有展开四项菜单：' + str(menu)
     screenshot('home-menu')
     fixed_menu = menu_bounds()
@@ -164,7 +176,7 @@ def check_home():
         adb('shell', 'input', 'swipe', str((x1+x2)//2), str((y1+y2)//2), str((ox1+ox2)//2), str((oy1+oy2)//2), '650')
     tap('展开菜单')
     tap('设置')
-    assert find('关于') is not None, '首页菜单无法进入设置'
+    assert find('车型设置') is not None, '首页菜单无法进入设置'
     assert menu_bounds() == fixed_menu, '进入设置后菜单位置变化或重复建立'
     assert find('设置').attrib.get('selected') == 'true', '设置菜单没有选中当前分类'
     require_no_connection_footer()
@@ -181,14 +193,14 @@ def check_home():
     screenshot('settings-child-menu-night')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
     tap('设置')
-    assert find('关于') is not None, '重新点击设置没有返回分类首页'
+    assert find('车型设置') is not None, '重新点击设置没有返回分类首页'
     adb('shell', 'input', 'keyevent', '4')
     assert find('无线连接') is not None and find('展开菜单') is not None, '设置返回没有恢复首页'
     tap('展开菜单')
     tap('画面')
     assert find('展开菜单') is not None and find('画面') is None
     tap('设置')
-    assert find('关于') is not None, '首页设置按钮没有进入统一分类页'
+    assert find('车型设置') is not None, '首页设置按钮没有进入统一分类页'
     require_menu(fixed_menu, '首页设置按钮进入后菜单位置变化')
     adb('shell', 'input', 'keyevent', '4')
     tap('无线连接')
@@ -201,7 +213,7 @@ def check_home():
 
 def check_settings():
     launch('settings')
-    assert find('返回画面') is not None, '未进入设置首页，请先在 AVD 确认协议'
+    assert find('车型设置') is not None and find('返回设置') is None, '设置首页入口或 Header 不符合约定'
     fixed_menu = menu_bounds()
     assert len(fixed_menu) == 4
     screenshot('settings-day')
@@ -224,9 +236,9 @@ def check_settings():
     assert bounds(find('返回设置')) == header
     screenshot('settings-scrolled-night')
     tap('返回设置')
-    assert find('返回画面') is not None
+    assert find('车型设置') is not None and find('返回设置') is None
     screenshot('settings-night')
-    tap('返回画面')
+    tap('画面')
     assert find('无线连接') is not None and find('展开菜单') is not None
     screenshot('home-handle-restored')
     tap('展开菜单')
@@ -235,6 +247,25 @@ def check_settings():
     tap('设置')
     require_menu(fixed_menu, '再次进入设置时按钮位置变化')
     print('设置双栏检查通过：正文独立滚动、左栏与 Header 固定、昼夜选中态、两级返回和首页菜单恢复。', flush=True)
+
+def check_idle_exit():
+    # 无 USB Host 的模拟器仍执行真实退出交互；不把空闲退出当等待会话释放。
+    launch()
+    tap('展开菜单')
+    before = adb('shell', 'pidof', package).strip()
+    tap('退出')
+    tap('取消')
+    assert before == adb('shell', 'pidof', package).strip()
+    tap('退出')
+    screenshot('idle-exit-confirmation')
+    tap('退出应用')
+    deadline = time.monotonic() + 9
+    while adb('shell', 'pidof', package, check=False).strip() and time.monotonic() < deadline:
+        time.sleep(.3)
+    assert not adb('shell', 'pidof', package, check=False).strip(), '退出后主进程仍在'
+    services = adb('shell', 'dumpsys', 'activity', 'services', package)
+    assert not re.search(r'ServiceRecord.*(?:DiPlaySessionService|L7DebugOverlayService|CarPlayVpnService)', services)
+    print('空闲退出通过：取消保留进程、确认关闭进程及服务；未建立等待会话。', flush=True)
 
 original_transparency = int(preferences().get('transparency', 50))
 original_night = adb('shell', 'settings', 'get', 'secure', 'ui_night_mode').strip()
@@ -253,6 +284,10 @@ try:
     else:
         expected_menu = check_home()
     if args.home_only:
+        raise SystemExit(0)
+    if 'android.hardware.usb.host' not in adb('shell', 'pm', 'list', 'features'):
+        check_idle_exit()
+        print('跳过 USB 等待／投屏态检查：当前 AVD 未声明 USB Host；首页与空闲退出已验证。', flush=True)
         raise SystemExit(0)
     start_waiting()
     assert find('画面') is not None
@@ -335,6 +370,13 @@ try:
     services = adb('shell', 'dumpsys', 'activity', 'services', package)
     assert not re.search(r'ServiceRecord.*(?:DiPlaySessionService|L7DebugOverlayService|CarPlayVpnService)', services)
     print('完整退出检查通过：取消保留进程，确认后应用进程及三个服务均未运行。', flush=True)
+except Exception:
+    try:
+        screenshot('failure')
+        (out / 'failure.xml').write_text(adb('shell', 'cat', '/sdcard/l7-floating.xml'))
+    except Exception as capture_error:
+        print(f'补充取证失败：{type(capture_error).__name__}；保留原失败', flush=True)
+    raise
 finally:
     if int(preferences().get('transparency', 50)) != original_transparency:
         set_transparency(original_transparency)

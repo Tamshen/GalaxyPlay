@@ -64,7 +64,17 @@ def tap(text):
     # 前一项检查可能已滚到页底，查找也必须覆盖上方入口，不能只向下翻页。
     for start, end in ((1600, 700), (700, 1600)):
         for _ in range(5):
-            matches = [n for n in nodes() if n.attrib.get('text') == text or n.attrib.get('content-desc') == text]
+            current = nodes()
+            parents = {child: parent for parent in current for child in parent}
+            matches = []
+            for node in current:
+                if text not in (node.get('text'), node.get('content-desc')):
+                    continue
+                # 同名 Header 不是动作；文字须属于已启用的可点击行。
+                while node.get('clickable') != 'true' and node.get('checkable') != 'true' and node in parents:
+                    node = parents[node]
+                if (node.get('clickable') == 'true' or node.get('checkable') == 'true') and node.get('enabled') == 'true':
+                    matches.append(node)
             if matches:
                 matches.sort(key=lambda n: n.attrib.get('content-desc') != text)
                 tap_node(matches[0])
@@ -209,15 +219,16 @@ def navigation_smoke():
 def audio_smoke():
     tap('音频路由')
     tap('媒体音乐')
-    route_names = {item.text for item in ET.parse(root / 'galaxy/common/src/main/res/values/l7_media_diagnostics.xml').getroot().find('string-array').findall('item')}
+    route_list = [item.text for item in ET.parse(root / 'galaxy/common/src/main/res/values/l7_media_diagnostics.xml').getroot().find("string-array[@name='l7_audio_stream_names']").findall('item')]
+    route_names = set(route_list)
     current = next(n.attrib['text'] for n in nodes() if n.attrib.get('text') in route_names)
     stop = next(n for n in nodes() if n.attrib.get('text') == '停止试听')
     tap('试听此声道（2 秒）')
     # 使用试听前的按钮坐标立即停止，不能等待 UI 稳定至声音自行播放完再冒充停止检查。
     tap_node(stop)
     assert any(n.attrib.get('text') == '试听已停止，设置未保存。' for n in nodes())
-    tap('高级输出策略')
-    alternate = '语音助手策略（ASSISTANT）' if current != '语音助手策略（ASSISTANT）' else '导航提示策略（NAVIGATION）'
+    tap('输出路由')
+    alternate = route_list[2] if current != route_list[2] else route_list[1]
     tap(alternate)
     tap('选择')
     assert any(n.attrib.get('text') == '保存，下次连接生效' and n.attrib.get('enabled') == 'true' for n in nodes())
@@ -313,10 +324,44 @@ def connection_smoke():
 original_font = adb('shell', 'settings', 'get', 'system', 'font_scale').strip()
 original_night = adb('shell', 'cmd', 'uimode', 'night').strip().split()[-1]
 frame_changed = False
+audio_fixture = {}
+
+
+def write_audio_fixture(path, data):
+    assert path in ('shared_prefs/l7_audio_templates.xml', 'files/audio-template.json', 'files/audio-template.json.bak')
+    if data is None:
+        adb('shell', 'run-as', 'com.ecarx.carplay', 'rm', '-f', path)
+    else:
+        subprocess.run([args.adb, '-s', args.serial, 'shell', 'run-as', 'com.ecarx.carplay',
+                        'sh', '-c', "'cat > " + path + "'"], input=data, check=True, capture_output=True)
+
+
+def prepare_audio_fixture():
+    # 内置方案隐藏逐用途编辑；本场景使用 L7 自定义模式，结束原样恢复偏好。
+    adb('shell', 'am', 'force-stop', 'com.ecarx.carplay')
+    path = 'shared_prefs/l7_audio_templates.xml'
+    for candidate in (path, 'files/audio-template.json', 'files/audio-template.json.bak'):
+        original = subprocess.run([args.adb, '-s', args.serial, 'exec-out', 'run-as',
+                                   'com.ecarx.carplay', 'cat', candidate], capture_output=True)
+        if original.returncode and b'No such file' not in original.stderr:
+            raise AssertionError('不能备份音频方案')
+        audio_fixture[candidate] = original.stdout if original.returncode == 0 else None
+    data = audio_fixture[path]
+    prefs = ET.fromstring(data or b'<map/>')
+    for child in list(prefs):
+        if child.get('name') in ('model', 'mode'):
+            prefs.remove(child)
+    ET.SubElement(prefs, 'string', name='model').text = 'l7'
+    ET.SubElement(prefs, 'string', name='mode').text = 'custom'
+    write_audio_fixture(path, ET.tostring(prefs))
+
+
 try:
     assert adb('shell', 'getprop', 'ro.build.version.sdk').strip() == '30'
     assert '1440x1920' in adb('shell', 'wm', 'size')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
+    if args.audio_only:
+        prepare_audio_fixture()
     if args.connection_only:
         adb('shell', 'am', 'force-stop', 'com.ecarx.carplay')
     launch('settings')
@@ -364,8 +409,8 @@ try:
     tap('连接设置')
     tap('无线连接')
     settings_selected()
-    tap('车机热点详情')
-    screenshot('hotspot-modal-day')
+    tap('生成 CarPlay 热点配置')
+    screenshot('hotspot-config-cancel-day')
     tap('取消')
     settings_selected()
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
@@ -455,6 +500,13 @@ try:
     screenshot('cancelled-home-day')
     print('AVD 检查通过：设置归属/恢复、热点/认证/语言弹窗、输入错误、选择取消、昼夜与大字截图、USB 等待取消。')
     print(f'截图：{output}')
+except Exception:
+    try:
+        screenshot('failure')
+        (output / 'failure.xml').write_text(adb('shell', 'cat', '/sdcard/l7-ux.xml'))
+    except Exception as capture_error:
+        print(f'补充取证失败：{type(capture_error).__name__}；保留原失败', flush=True)
+    raise
 finally:
     try:
         if frame_changed:
@@ -475,3 +527,11 @@ finally:
             adb('shell', 'settings', 'put', 'system', 'font_scale', original_font)
         if original_night in ('yes', 'no', 'auto'):
             adb('shell', 'cmd', 'uimode', 'night', original_night)
+        if audio_fixture:
+            adb('shell', 'am', 'force-stop', 'com.ecarx.carplay')
+            for path, data in audio_fixture.items():
+                write_audio_fixture(path, data)
+                restored = subprocess.run([args.adb, '-s', args.serial, 'exec-out', 'run-as',
+                                           'com.ecarx.carplay', 'cat', path], capture_output=True)
+                assert (restored.stdout if restored.returncode == 0 else None) == data, '音频偏好恢复失败'
+            launch('settings-audio')

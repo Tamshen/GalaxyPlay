@@ -44,7 +44,7 @@ def entry(label, root=None):
 
 
 def tap(label):
-    node = entry(label)
+    node = reachable(label)
     assert node.get('enabled') == 'true' and (node.get('clickable') == 'true' or node.get('checkable') == 'true'), label
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
     adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
@@ -52,6 +52,25 @@ def tap(label):
 
 def has(text):
     return any(n.get('text') == text for n in nodes().iter('node'))
+
+
+def reachable(label):
+    # 320 dpi 下英文分类说明会换行；滚动正文再查找，不能把屏外入口判为缺失。
+    for _ in range(6):
+        try:
+            return entry(label)
+        except AssertionError:
+            adb('shell', 'input', 'swipe', '1080', '1700', '1080', '650', '250')
+    raise AssertionError('滚动后入口仍不可达：' + label)
+
+
+def settings_entries(debug, logs):
+    for _ in range(6):
+        texts = {n.get('text') for n in nodes().iter('node')}
+        if debug in texts and logs in texts:
+            return
+        adb('shell', 'input', 'swipe', '1080', '1700', '1080', '650', '250')
+    raise AssertionError('设置缺少独立调试／日志入口')
 
 
 def language(english):
@@ -83,7 +102,7 @@ try:
         for night in ('no', 'yes'):
             adb('shell', 'cmd', 'uimode', 'night', night)
             launch('settings')
-            assert has(debug) and has(logs)
+            settings_entries(debug, logs)
             (output / (('en' if mode else 'zh') + '-' + night + '-settings.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
             tap(debug)
             root = nodes()
@@ -98,7 +117,7 @@ try:
             assert not has('Voice input test' if mode else '语音输入测试')
             (output / (('en' if mode else 'zh') + '-' + night + '-logs.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
             adb('shell', 'input', 'keyevent', '4')
-            assert has(debug) and has(logs)
+            settings_entries(debug, logs)
         launch('settings-debug-logs')
         assert has('Upload logs' if mode else '上传日志'), '旧日志路由不可达'
         launch('settings-debug-voice')
@@ -140,6 +159,13 @@ try:
     assert batch in debug_log, '逐项事实未进入默认持久日志'
     scope = '逐项事实默认落盘' if args.evidence_only else '独立调试／日志、中英文昼夜、父级返回、旧路由与逐项事实默认落盘'
     print('AVD ' + scope + '通过；未上传。')
+except Exception:
+    try:
+        (output / 'failure.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+        (output / 'failure.xml').write_bytes(adb('shell', 'cat', '/sdcard/l7-debug-module.xml'))
+    except Exception as capture_error:
+        print(f'补充取证失败：{type(capture_error).__name__}；保留原失败', flush=True)
+    raise
 finally:
     if has('关闭'):
         tap('关闭')
