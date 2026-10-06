@@ -65,4 +65,20 @@ class StreamReceiveStatsTest {
         assertTrue(output.last().contains("packets=1 bytes=20 readMaxMs=0"))
         assertTrue(output.last().contains("seqForwardGaps=1"))
     }
+    @Test fun separatesStageTimingEvenOnFailureAndResetsAfterBrokenReporter() {
+        var clock = 0L
+        val output = mutableListOf<String>()
+        var failReport = false
+        val stats = StreamReceiveStats("video", { output.add(it); if (failReport) error("report") }) { clock }
+        assertEquals(7, stats.measure(StreamReceiveStats.Stage.HEADER) { clock += 500_000_000; 7 })
+        stats.measure(StreamReceiveStats.Stage.BODY) { clock += 20_000_000 }
+        try { stats.measure(StreamReceiveStats.Stage.DECRYPT) { clock += 200_000; error("decode") }; fail() } catch (_: IllegalStateException) { }
+        stats.measure(StreamReceiveStats.Stage.DISPATCH) { clock += 100_000 }
+        failReport = true
+        stats.flush(true)
+        assertTrue(output.last().contains("headerMaxUs=500000 headerCalls=1 bodyMaxUs=20000 bodyCalls=1 decryptMaxUs=200 decryptCalls=1 dispatchMaxUs=100 dispatchCalls=1"))
+        failReport = false
+        stats.flush(true)
+        assertTrue(output.last().contains("headerMaxUs=0 headerCalls=0"))
+    }
 }

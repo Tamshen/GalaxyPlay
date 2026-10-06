@@ -1,11 +1,24 @@
 package com.shilapi.xcertplay.airplay
 
-/** Receive-thread timing only: no payloads, endpoint addresses, or route data. */
+/** 只统计接收线程耗时，不记录载荷、端点地址或路由数据。 */
 internal class StreamReceiveStats(
     private val label: String,
     private val report: (String) -> Unit,
     private val nowNs: () -> Long = System::nanoTime,
 ) {
+    enum class Stage(val field: String) { HEADER("header"), BODY("body"), DECRYPT("decrypt"), DISPATCH("dispatch") }
+    private val stageMaxNs = LongArray(Stage.entries.size)
+    private val stageCalls = IntArray(Stage.entries.size)
+
+    fun <T> measure(stage: Stage, block: () -> T): T {
+        val start = nowNs()
+        try { return block() } finally {
+            val index = stage.ordinal
+            stageMaxNs[index] = maxOf(stageMaxNs[index], (nowNs() - start).coerceAtLeast(0))
+            stageCalls[index]++
+        }
+    }
+
     private var windowStart = nowNs()
     private var readStart = windowStart
     private var processingStart = windowStart
@@ -78,7 +91,10 @@ internal class StreamReceiveStats(
             "seqGapLast=[$lastSequenceGap] seqGapAtMs=$lastSequenceGapAtMs ended=$ended " +
             "windowMs=${(now - windowStart).coerceAtLeast(0) / 1_000_000} " +
             "readsOver250Ms=$readsOver250Ms seqGapAfterReadOver250Ms=$seqGapAfterReadOver250Ms " +
-            "seqMissingAfterReadOver250Ms=$seqMissingAfterReadOver250Ms") }
+            "seqMissingAfterReadOver250Ms=$seqMissingAfterReadOver250Ms" +
+            Stage.entries.joinToString("") { " ${it.field}MaxUs=${stageMaxNs[it.ordinal] / 1000} ${it.field}Calls=${stageCalls[it.ordinal]}" }) }
+        stageMaxNs.fill(0)
+        stageCalls.fill(0)
         windowStart = now
         packets = 0
         bytes = 0
