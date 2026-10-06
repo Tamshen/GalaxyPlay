@@ -331,3 +331,5 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 `python3 e2e/device/codec_probe_smoke.py --serial emulator-5556` 在已安装内置认证 APK 的 AVD 真实调用 Java MediaCodec／JNI AMediaCodec，覆盖中英文昼夜 H.264 五路径、所选语言 HEVC 五路径、人工标注、后台停止与子进程退出。AVD 仅软件对照，硬件通过必须为 false；不连接手机、不上传，结束恢复偏好、协议及昼夜。`--cases zh-day zh-night en-day en-night` 可选择补跑范围，日志按运行编号核对当前与轮转文件，输出默认留在忽略目录 `build/e2e/avd-0.1.76/codec-probe/`。画面判断动作在脚本中为交互夹具，不能替代实车用户观察；采样截图需另行检阅。
 
 两段固定样例可在已安装 FFmpeg 的辅助容器内运行 `bash e2e/runtime/generate_codec_samples.sh` 重建；不得用真实手机视频替换公共测试资产。正式投屏解码器不调用本页 native 接口，libopus 软件音频不列为硬件视频测试。
+
+分步调试回归：`L7DebugGuideTest` 在 API 29／30 核对显式启动、未完成步骤阻止通过、缺失记录、后台迟到窗口拒绝、重绘／Bundle 进度恢复与人工现象前置操作；`DiagnosticOperationTest` 核对阻塞前锚点、耗时、原结果／异常保持、私有返回值不入日志及诊断失败隔离。`CommunicationResourcesTest` 覆盖上下行真实释放后才恢复及失败／成功前后锚点。AVD 使用 `python3 e2e/device/debug_guide_smoke.py` 验证六类入口的中英文昼夜、模态步骤、控件定位、缺失与返回进度，恢复原偏好／协议／昼夜；不连接手机或上传，模拟操作不算实车通过。

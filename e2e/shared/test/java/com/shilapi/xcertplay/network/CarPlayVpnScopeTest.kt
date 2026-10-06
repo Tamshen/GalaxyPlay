@@ -93,6 +93,19 @@ class CarPlayVpnScopeTest {
         }
     }
 
+    @Test fun repeatedListenerReplacementWaitsSafelyWhileAcceptWorkersExit() {
+        withService { service ->
+            repeat(20) {
+                assertEquals(CarPlayVpnService.AttachResult.Started, attachWireless(service))
+                val listener = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
+                service.detach()
+                assertTrue(listener.isClosed)
+                assertTrue(service.awaitDetached(2000))
+                assertReleased(service)
+            }
+        }
+    }
+
     private fun withService(check: (CarPlayVpnService) -> Unit) {
         val controller = Robolectric.buildService(CarPlayVpnService::class.java).create()
         try { check(controller.get()) } finally { controller.destroy() }

@@ -21,8 +21,14 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
     private var listening = false
     private var closed = false
     private val callback = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = refresh()
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = refresh()
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            if (!closed) emit("Audio: route devicesAdded=${addedDevices.size} bindings=${bindings.size}")
+            refresh()
+        }
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            if (!closed) emit("Audio: route devicesRemoved=${removedDevices.size} bindings=${bindings.size}")
+            refresh()
+        }
     }
 
     inner class Binding internal constructor(
@@ -55,7 +61,10 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
             val devices = runCatching {
                 manager?.getDevices(if (input) AudioManager.GET_DEVICES_INPUTS else AudioManager.GET_DEVICES_OUTPUTS)
                     ?.toList().orEmpty()
-            }.getOrElse { emptyList() }
+            }.getOrElse {
+                emit("Audio: route deviceQuery exceptionType=${it.javaClass.simpleName}")
+                emptyList()
+            }
             val preferred = navigationDevice?.takeIf { channel == AudioChannel.NAVIGATION }?.match(devices.map {
                 NavigationOutputDevice(it.id, it.type, it.address, it.productName.toString())
             })
@@ -64,6 +73,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
             }, channel, input, sampleRate, channels, template) }.getOrNull() else null
             val target = preferred?.let { match -> devices.firstOrNull { it.id == match.id } }
                 ?: selected?.let { match -> devices.firstOrNull { it.id == match.id } }
+            emit("Audio: route selection channel=$channel devices=${devices.size} savedPreference=${navigationDevice != null && channel == AudioChannel.NAVIGATION} matched=${preferred != null} rate=$sampleRate channels=$channels")
             val accepted = runCatching { routing.setPreferredDevice(target) }.getOrDefault(false)
             // 请求被拒绝时清除旧偏好，不能带着失效设备 ID 继续播放。
             val fallback = if (!accepted && target != null) {
@@ -95,6 +105,7 @@ internal class L7AudioRouting(context: Context?, private val preferBus: Boolean 
             bindings.remove(this)
             if (attached) runCatching { routing.removeOnRoutingChangedListener(listener) }
             attached = false
+            emit("Audio: route bindingReleased channel=$channel remaining=${bindings.size}")
             if (bindings.isEmpty()) stopListening()
         }
     }

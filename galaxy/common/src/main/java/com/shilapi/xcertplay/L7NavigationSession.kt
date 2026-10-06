@@ -14,6 +14,12 @@ internal class L7NavigationSession(
     private val worker: Executor = workers,
     private val log: (String) -> Unit = L7DebugLog::record,
 ) : Closeable {
+    private val generation = generations.incrementAndGet()
+    private val sequence = java.util.concurrent.atomic.AtomicLong()
+    private val operations = com.shilapi.xcertplay.diagnostics.DiagnosticOperation({ event(it) })
+    private fun event(body: String) {
+        runCatching { log("Navigation: generation=$generation event=${sequence.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body") }
+    }
     private val scheduled = AtomicBoolean()
     @Volatile private var latest = CarPlayNavigationSnapshot()
     @Volatile private var closed = false
@@ -74,16 +80,16 @@ internal class L7NavigationSession(
         }
     }
     private fun refreshConnection(active: Boolean): Boolean {
-        val token = try { port.connectionToken() } catch (error: Throwable) {
+        val token = try { operations.run("serviceReady") { port.connectionToken() } } catch (error: Throwable) {
             if (error !is Exception && error !is LinkageError) throw error
             val cause = if (error is InvocationTargetException) error.targetException else error
-            log("Navigation: stage=serviceReady exceptionType=${cause.javaClass.simpleName}"); null
+            event("stage=serviceReady exceptionType=${cause.javaClass.simpleName}"); null
         }
         if (closed || !current()) return false
         val available = token != null
         if (reportedAvailability != available) {
             reportedAvailability = available
-            log("Navigation: stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
+            event("stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
         }
         if (!available) {
             if (connectionToken != null) publishedRoad = null
@@ -95,7 +101,7 @@ internal class L7NavigationSession(
             publishedRoad = null
             if (active) started = false
             failures = 0
-            log("Navigation: stage=serviceConnection result=$result replayLatest=$active display=NOT_VERIFIED")
+            event("stage=serviceConnection result=$result replayLatest=$active display=NOT_VERIFIED")
         }
         connectionToken = token
         return true
@@ -105,13 +111,13 @@ internal class L7NavigationSession(
         publishedRoad = null
     }
     private fun call(stage: String, action: () -> Unit): Boolean = try {
-        action()
-        log("Navigation: monoMs=${SystemClock.elapsedRealtime()} stage=$stage result=RETURNED display=NOT_VERIFIED")
+        operations.run(stage, action)
+        event("stage=$stage result=RETURNED display=NOT_VERIFIED")
         true
     } catch (error: Throwable) {
         if (error !is Exception && error !is LinkageError) throw error
         val cause = if (error is InvocationTargetException) error.targetException else error
-        log("Navigation: stage=$stage exceptionType=${cause.javaClass.simpleName}")
+        event("stage=$stage exceptionType=${cause.javaClass.simpleName}")
         false
     }
     @Synchronized override fun close() {
@@ -125,10 +131,11 @@ internal class L7NavigationSession(
         try { worker.execute(action) }
         catch (error: RuntimeException) {
             scheduled.set(false)
-            log("Navigation: stage=queue exceptionType=${error.javaClass.simpleName}")
+            event("stage=queue exceptionType=${error.javaClass.simpleName}")
         }
     }
     private companion object {
+        val generations = java.util.concurrent.atomic.AtomicLong()
         val workers = java.util.concurrent.ThreadPoolExecutor(1, 1, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
             java.util.concurrent.ArrayBlockingQueue(32), { Thread(it, "l7-navigation").apply { isDaemon = true } })
     }

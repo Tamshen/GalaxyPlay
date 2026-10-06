@@ -8,11 +8,14 @@ import java.io.File
 internal class L7VoiceTraceStore(private val log: (String) -> Unit = {}) {
     data class Snapshot(val revision: Long, val lines: List<String>, val microphone: Map<String, String>)
     private var owner: Any? = null
+    private var generation = 0
     private var revision = 0L
     private val lines = ArrayDeque<String>()
     private var microphone = emptyMap<String, String>()
 
-    @Synchronized fun session(): Any = Any().also { owner = it; microphone = emptyMap(); revision++ }
+    @Synchronized fun session(generation: Int = 0): Any = Any().also {
+        owner = it; this.generation = generation; microphone = emptyMap(); revision++
+    }
 
     @Synchronized fun observe(expected: Any, message: String) {
         if (expected !== owner || !(message.startsWith("Microphone:") || message.startsWith("Audio: microphone "))) return
@@ -27,7 +30,7 @@ internal class L7VoiceTraceStore(private val log: (String) -> Unit = {}) {
         }
         microphone = if (phase != "START" && microphone["type"] == fields["type"]) microphone + fields + ("phase" to phase)
             else fields + ("phase" to phase)
-        append("VOICE_UPLINK monoMs=${SystemClock.elapsedRealtime()} phase=$phase " +
+        append("VOICE_UPLINK generation=$generation monoMs=${SystemClock.elapsedRealtime()} phase=$phase " +
             fields.entries.joinToString(" ") { "${it.key}=${it.value}" })
     }
 

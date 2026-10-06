@@ -248,7 +248,7 @@ class CarPlayController(
 
     /** Told when the iPhone starts or stops playing media; may run on any thread. */
     /** 媒体控制注册以真实 AirPlay 会话为准，不等待首次声音。 */
-    private val navigationInput = com.shilapi.xcertplay.hud.CarPlayNavigationInput()
+    private val navigationInput = com.shilapi.xcertplay.hud.CarPlayNavigationInput(report = ::connectionDiagnostic)
     @Volatile var navigationListener: ((com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot) -> Unit)? = null
     fun navigationSnapshot() = navigationInput.snapshot()
     @Volatile var sessionStateListener: ((Boolean) -> Unit)? = null
@@ -1795,9 +1795,9 @@ class CarPlayController(
             onStatus(CarPlayStatus.Failed("Previous USB resources could not be released"))
             return
         }
-        wiredResources = newWiredResources()
         invalidateIphonePermission()
         diagnosticRun.incrementAndGet()
+        wiredResources = newWiredResources()
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.IPHONE
         reenumerationAttempts = 0
@@ -2048,9 +2048,15 @@ class CarPlayController(
         )
     }
 
-    private fun newWiredResources() = WiredResources { name, error ->
-        closeFailures.incrementAndGet()
-        connectionDiagnostic("wired resource close failed component=$name error=${error.javaClass.simpleName}")
+    private fun newWiredResources(): WiredResources {
+        // 捕获资源创建时的代次，旧驱动迟到关闭不能被归入新一次连接。
+        val run = diagnosticRun.get()
+        return WiredResources(report = { body ->
+            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=$run monoMs=${android.os.SystemClock.elapsedRealtime()} component=WIRED_RESOURCE $body")
+        }) { name, error ->
+            closeFailures.incrementAndGet()
+            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=$run component=WIRED_RESOURCE closeFailed=$name exceptionType=${error.javaClass.simpleName}")
+        }
     }
 
     private fun openDataPaths(device: UsbDevice) {
@@ -2758,7 +2764,7 @@ class CarPlayController(
         try {
             // 脱敏器将 PHONE 前缀保留给私有手机端日志，因此使用 USB_DISCOVERY。
             val diagnosticPhase = if (phase == Phase.IPHONE) "USB_DISCOVERY" else phase.name
-            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=${diagnosticRun.get()} phase=$diagnosticPhase $message")
+            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=${diagnosticRun.get()} monoMs=${android.os.SystemClock.elapsedRealtime()} phase=$diagnosticPhase $message")
         } catch (_: Exception) {
             // 可选诊断不能影响传输或关闭。
         }

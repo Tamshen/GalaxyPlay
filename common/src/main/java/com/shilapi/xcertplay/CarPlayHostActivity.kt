@@ -319,6 +319,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var activeDisplaySize: DisplaySize? = null
     private var pendingDisplaySize: DisplaySize? = null
     private var sessionDisplay: CarPlaySessionDisplay? = null
+    private val displayTrace = GalaxyDisplayTrace(::appendLog)
     private var displayScaleTenths = CarPlayDisplayScale.DEFAULT_TENTHS
     private var uiScalePercent = CarPlayUiScale.DEFAULT
     private var displayDiagnosticAttempt: String? = null
@@ -3873,6 +3874,8 @@ class CarPlayHostActivity : ComponentActivity() {
             ?: DisplaySize(width, height)
         val viewport = VideoViewport.fit(width, height, canvas.width, canvas.height)
         videoViewport = viewport
+        displayTrace.observe(restartGeneration, width, height, canvas.width, canvas.height,
+            viewport.left.toInt(), viewport.top.toInt(), viewport.width.toInt(), viewport.height.toInt(), video.isHardwareAccelerated)
         softwareVideo?.layout(viewport)
         (video as? TextureView)?.isOpaque = viewport.left == 0.0 && viewport.top == 0.0
         (video as? TextureView)?.setTransform(Matrix().apply {
@@ -3884,8 +3887,15 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun retireVideoSurface(surface: Surface, texture: SurfaceTexture?, releaseSurface: Boolean = true) {
         if (texture != null) retiringTextures.add(texture)
         val owners = surfaceOwners.remove(surface).orEmpty().toList()
+        val generation = restartGeneration
+        val report = GalaxySessionDiagnostics.scoped(sessionLog, generation, l7DebugLogs)
+        report("ProjectionSurface: requestGeneration=$generation phase=DETACH_REQUESTED owners=${owners.size} releaseSurface=$releaseSurface monoMs=${android.os.SystemClock.elapsedRealtime()}")
         val release = {
-            mainHandler.post { if (releaseSurface) surface.release(); texture?.release() }
+            mainHandler.post {
+                if (releaseSurface) surface.release()
+                texture?.release()
+                report("ProjectionSurface: requestGeneration=$generation phase=RELEASED owners=0 releaseSurface=$releaseSurface monoMs=${android.os.SystemClock.elapsedRealtime()}")
+            }
             Unit
         }
         if (owners.isEmpty()) { release(); return }

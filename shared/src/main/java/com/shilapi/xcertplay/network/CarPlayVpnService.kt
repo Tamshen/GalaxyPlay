@@ -172,7 +172,9 @@ class CarPlayVpnService : VpnService() {
     fun awaitDetached(timeoutMillis: Long): Boolean {
         require(timeoutMillis >= 0)
         val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        for (worker in acceptWorkers.toList()) {
+        // Kotlin 小集合转换会先读 size 再取首项；并发退出可使该首项已经消失。
+        // ConcurrentHashMap 的数组快照容忍并发删除，再按同一总预算等待。
+        for (worker in acceptWorkers.toTypedArray()) {
             if (worker === Thread.currentThread()) return false
             val remaining = deadline - System.nanoTime()
             if (remaining <= 0) return acceptWorkers.none { it.isAlive }

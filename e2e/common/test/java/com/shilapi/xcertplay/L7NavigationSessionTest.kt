@@ -147,4 +147,14 @@ class L7NavigationSessionTest {
         assertEquals(1, port.calls.count { it == "close" })
         assertTrue(logs.any { "stage=stop exceptionType=SecurityException" in it })
     }
+    @Test fun beginAnchorPrecedesBinderAndDiagnosticFailureCannotStopNavigation() {
+        port.duringStart = { assertTrue(logs.any { "stage=start" in it && "phase=BEFORE" in it }) }
+        session.update(route()); drain()
+        assertTrue(logs.any { "stage=start" in it && "phase=AFTER" in it && "durationMs=" in it })
+        val other = Port()
+        val safe = L7NavigationSession(other, { true }, worker, { throw IllegalStateException("private-log-error") })
+        safe.update(route()); drain()
+        assertEquals(listOf("init", "start", "road:private-road"), other.calls)
+        safe.close(); drain()
+    }
 }

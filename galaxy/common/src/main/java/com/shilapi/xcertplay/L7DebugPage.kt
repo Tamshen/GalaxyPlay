@@ -20,6 +20,13 @@ internal class L7DebugPage(
     private var start: L7SettingRow? = null
     private var view: L7SettingRow? = null
     private var revision = -1L
+    private var guide: L7DebugGuide? = null
+    private var guideBaseline: String?
+        get() = guide?.memory?.getString("baseline")
+        set(value) { guide?.memory?.putString("baseline", value) }
+    fun background() { guide?.background() }
+    fun resume() { guide?.resume() }
+    fun close() { guide?.close() }
 
     init {
         L7ProbeRunner.load(activity)
@@ -32,8 +39,16 @@ internal class L7DebugPage(
     }
 
     private fun home() {
+        guide = L7DebugGuide(activity, parent, "ENVIRONMENT", listOf(
+            L7DebugGuide.Step(R.string.debug_guide_prepare, R.string.debug_guide_prepare_body),
+            L7DebugGuide.Step(R.string.debug_guide_collect, R.string.debug_guide_collect_body, { start }, {
+                L7ProbeRunner.current?.let { it.id != guideBaseline && it.phase != L7ProbePhase.RUNNING && !L7ProbeRunner.busy } == true
+            }, { guideBaseline = L7ProbeRunner.current?.id }),
+            L7DebugGuide.Step(R.string.debug_guide_logs, R.string.debug_guide_logs_body)
+        ))
         L7SettingsSection.add(parent, labels.text(R.string.l7_debug_choose), description = labels.text(R.string.l7_debug_choose_hint)) { card ->
             listOf(
+                Triple(R.string.debug_guide_scenario, R.string.debug_guide_scenario_hint, "settings-debug-scenario"),
                 Triple(R.string.l7_steering_title, R.string.l7_debug_goal_steering, "settings-debug-steering"),
                 Triple(R.string.codec_probe_title, R.string.codec_probe_hint, "settings-debug-codec"),
                 Triple(R.string.l7_voice_title, R.string.l7_debug_goal_voice, "settings-debug-voice"),
@@ -62,6 +77,7 @@ internal class L7DebugPage(
     }
 
     fun update() {
+        guide?.update()
         results?.update()
         if (page == "settings-debug-history" && revision != L7ProbeRunner.revision) history()
         revision = L7ProbeRunner.revision

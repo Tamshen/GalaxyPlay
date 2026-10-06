@@ -43,6 +43,7 @@ import kotlin.math.roundToInt
 
 /** 接入接收端会话与页面生命周期，L7 页面由本项目原生组件组合。 */
 class GalaxySettingsActivity : ComponentActivity() {
+    internal val debugGuides = L7DebugGuideStore()
     private val l7Ui = true
     private val BG get() = getColor(R.color.product_ui_background)
     private val SURFACE get() = getColor(R.color.product_ui_surface)
@@ -89,6 +90,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private var steeringDebugPage: L7SteeringDebugPage? = null
     private var reportingTestPage: L7ReportingTestPage? = null
     private var codecProbePage: GalaxyCodecProbePage? = null
+    private var scenarioDebugPage: GalaxyScenarioDebugPage? = null
     private fun codecProbeOccupied() = CarPlayBackgroundSession.hasSession() || CarPlayBackgroundSession.isStopping()
     private val codecProbeController by lazy { GalaxyCodecProbeController(applicationContext, ::codecProbeOccupied) }
     private var voiceDebugPage: L7VoiceInputDebugPage? = null
@@ -151,6 +153,7 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        debugGuides.restore(savedInstanceState)
         L7SteeringDiagnostics.initialize(applicationContext)
         L7VoiceDiagnostics.initialize(applicationContext)
         if (L7AppExit.exiting) { finish(); return }
@@ -202,6 +205,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         handleWirelessRecovery()
     }
     override fun onSaveInstanceState(outState: Bundle) {
+        debugGuides.save(outState)
         renderedPage?.let { scrollPositions[it] = contentScroll?.scrollY ?: 0 }
         outState.putBundle("scroll_positions", Bundle().apply { scrollPositions.forEach { (key, value) -> putInt(key, value) } })
         outState.putString("settings_page", lastSettingsPage)
@@ -232,6 +236,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         steeringDebugPage?.resume()
+        reportingTestPage?.resume(); debugPage?.resume(); scenarioDebugPage?.resume()
         if (!L7Agreement.require(this)) return
         voiceDebugPage?.resume()
         codecProbePage?.resume()
@@ -278,6 +283,7 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     override fun onPause() {
         steeringDebugPage?.background()
+        debugPage?.background(); scenarioDebugPage?.background()
         reportingTestPage?.background()
         voiceDebugPage?.background()
         codecProbePage?.background()
@@ -302,6 +308,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     override fun onDestroy() {
         codecProbeController.close()
         steeringDebugPage?.close(); steeringDebugPage = null
+        debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
         audioModelConfirmation.close()
         audioTemplateFiles.close()
         reportingTestPage?.close(); reportingTestPage = null
@@ -318,6 +325,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun render() {
         if (!L7Agreement.require(this)) return
         steeringDebugPage?.close(); steeringDebugPage = null
+        debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         codecProbePage?.close(); codecProbePage = null
@@ -369,6 +377,7 @@ class GalaxySettingsActivity : ComponentActivity() {
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
                 { if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(false) }, ::stopFromHome)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
+            "settings-debug-scenario" -> scenarioDebugPage = GalaxyScenarioDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-codec" -> codecProbePage = GalaxyCodecProbePage(this, content, codecProbeController, ::codecProbeOccupied) { page = "settings-logs"; render() }
             "settings-debug-voice" -> voiceDebugPage = L7VoiceInputDebugPage(this, content,
@@ -461,6 +470,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         "settings-debug" -> R.string.l7_probe_title
         "settings-debug-results" -> R.string.l7_probe_environment
         "settings-debug-history" -> R.string.l7_probe_history
+        "settings-debug-scenario" -> R.string.debug_guide_scenario
         "settings-debug-steering" -> R.string.l7_steering_title
         "settings-debug-codec" -> R.string.codec_probe_title
         "settings-debug-voice" -> R.string.l7_voice_title

@@ -30,6 +30,7 @@ internal class L7MediaCenterSession(
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val events = AtomicLong()
+    private val operations = com.shilapi.xcertplay.diagnostics.DiagnosticOperation({ event("ipc $it") })
     private val scheduled = AtomicBoolean()
     @Volatile private var closed = false
     @Volatile private var registered = false
@@ -57,7 +58,7 @@ internal class L7MediaCenterSession(
         enqueue {
             event("initialize")
             try {
-                port.initialize(::apiReady, ::command, ::focus, ::selected)
+                operations.run("initialize") { port.initialize(::apiReady, ::command, ::focus, ::selected) }
                 event("initialize result=RETURNED_WAITING_CALLBACK")
             }
             catch (error: Exception) { failure("initialize", error) }
@@ -84,13 +85,13 @@ internal class L7MediaCenterSession(
         if (attempts >= 3) { event("registerLimit"); return@enqueue }
         attempts++
         try {
-            snapshot.let { port.prepare(it.value, it.artwork) }
-            val valid = port.register()
+            snapshot.let { value -> operations.run("registrationPrepare") { port.prepare(value.value, value.artwork) } }
+            val valid = operations.run("register") { port.register() }
             if (closed || !current()) return@enqueue
             registered = valid
             event("register tokenValid=$registered attempt=$attempts")
             if (!registered) { retryRegistration(); return@enqueue }
-            val accepted = port.sources(intArrayOf(port.source))
+            val accepted = operations.run("sourceList") { port.sources(intArrayOf(port.source)) }
             event("sourceList accepted=$accepted source=${port.source} origin=L7_SDK_POLICY")
             if (closed || !current()) return@enqueue
             if (!accepted) {
@@ -115,7 +116,11 @@ internal class L7MediaCenterSession(
         if (it.value.artworkTransferId == value.artworkTransferId) it.artwork else null
     }) {
         if (closed) return
+        val previous = snapshot
         snapshot = Snapshot(value, uri)
+        if (previous.value.copy(elapsedMillis = null) != value.copy(elapsedMillis = null) || previous.artwork != uri) {
+            event("snapshot titlePresent=${!value.title.isNullOrBlank()} artistPresent=${!value.artist.isNullOrBlank()} albumPresent=${!value.album.isNullOrBlank()} durationKnown=${value.durationMillis != null} progressKnown=${value.elapsedMillis != null} playingKnown=${value.playbackKnown} playing=${value.playing} artworkAvailable=${uri != null} coalesced=${scheduled.get()} localPlayback=$localPlayback")
+        }
         if (scheduled.compareAndSet(false, true)) enqueue {
             scheduled.set(false)
             if (registered) publishLatest()
@@ -258,7 +263,7 @@ internal class L7MediaCenterSession(
         catch (error: RuntimeException) { scheduled.set(false); failure("queue", error) }
     }
     private fun safely(stage: String, action: () -> Any?): Boolean = try {
-        val result = action()
+        val result = operations.run(stage, action)
         event("$stage result=$result")
         result != false
     } catch (error: Exception) { failure(stage, error); false }
@@ -272,7 +277,7 @@ internal class L7MediaCenterSession(
             L7SteeringDiagnostics.store.state("oemRegistration", "registered=$registered foreignFocus=$foreignFocus ready=$ready")
             L7SteeringDiagnostics.store.state("mediaCenter", "generation=$generation $body")
         }
-        log("MediaCenter: generation=$generation event=${events.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body")
+        runCatching { log("MediaCenter: generation=$generation event=${events.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body") }
     }
     @Synchronized override fun close() {
         if (closed) return

@@ -5,7 +5,11 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /** 每次有线尝试独立持有打开中的基础管道；迟到包装对象只能交回旧拥有者。 */
-internal class WiredResources(private val failure: (String, Throwable) -> Unit = { _, _ -> }) : Closeable {
+internal class WiredResources(
+    private val report: (String) -> Unit = {},
+    private val failure: (String, Throwable) -> Unit = { _, _ -> },
+) : Closeable {
+    private val operations = com.shilapi.xcertplay.diagnostics.DiagnosticOperation(report)
     private val lock = Any()
     private val active = LinkedHashMap<AutoCloseable, String>()
     private var closed = false
@@ -51,6 +55,9 @@ internal class WiredResources(private val failure: (String, Throwable) -> Unit =
         released.await(timeoutMillis, TimeUnit.MILLISECONDS)
     } catch (_: InterruptedException) { Thread.currentThread().interrupt(); false }
     private fun dispose(name: String, resource: AutoCloseable) {
-        try { resource.close() } catch (error: Throwable) { runCatching { failure(name, error) } }
+        // 标签来自固定资源种类，不记录设备实例或驱动错误原文。
+        val component = name.replace(Regex("[^A-Za-z0-9_]"), "_").take(20)
+        try { operations.run("close_$component") { resource.close() } }
+        catch (error: Throwable) { runCatching { failure(name, error) } }
     }
 }
