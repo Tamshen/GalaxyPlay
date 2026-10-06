@@ -62,4 +62,10 @@
     <string name="l7_audio_phone">Phone calls</string>
     <string name="l7_audio_phone_usage">Calls · usage 2</string>
     <string name="l7_audio_phone_note">Uses system communication usage. Verify headrest output during a real call.</string>
+    <string name="l7_video_failed_title">Video is temporarily unavailable</string>
+    <string name="l7_video_failed_message">The connection is retained. Retry video without restarting existing audio. Confirm recovery from the actual picture. If it does not recover, reconnect manually from connection settings.</string>
+    <string name="l7_video_retry">Retry video</string>
+    <string name="l7_video_retrying">Retry requested. Waiting for video.</string>
+    <string name="l7_video_retry_unavailable">Retry was not started or is already pending. Try later or open connection settings.</string>
+    <string name="l7_video_settings">Open connection settings</string>
 </resources>

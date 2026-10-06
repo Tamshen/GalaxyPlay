@@ -5,6 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VideoDecodeQueueTest {
+    @Test fun resyncDiscardsPicturesButRetainsManualRetryAndSurfaceCompletionInOrder() {
+        val queue = VideoDecodeQueue()
+        val surface = VideoJob.SurfaceChanged(null)
+        val config = VideoJob.Config(VideoCodec.H264, byteArrayOf(1))
+        queue.offer(VideoJob.Frame(byteArrayOf(1)))
+        queue.offer(VideoJob.Retry)
+        queue.offer(VideoJob.Resync)
+        queue.offer(surface)
+        queue.offer(config)
+        assertEquals(1, queue.discardFrames())
+        assertEquals(VideoJob.Retry, queue.poll(0))
+        assertSame(surface, queue.poll(0))
+        assertSame(config, queue.poll(0))
+        assertNull(queue.poll(0))
+    }
+
     @Test fun lostReferenceChainWaitsForSuccessfullyQueuedKeyframe() {
         val chain = VideoReferenceChain()
         val predicted = byteArrayOf(0, 0, 0, 1, 0x41, 1)

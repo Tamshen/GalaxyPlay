@@ -60,6 +60,7 @@ class AndroidMediaSink(
     enableL7AudioProfile: Boolean = false,
     private val wirelessAudio: Boolean = false,
     private val audioRoutingTemplate: AudioRoutingTemplate? = null,
+    onVideoRecovered: (() -> Unit)? = null,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -67,6 +68,7 @@ class AndroidMediaSink(
     fun setMediaAudioChangedListener(listener: (Boolean) -> Unit) { mediaAudioChanged = listener }
 
     fun resumeMediaAudioFocus() = audioFocusCoordinator.resumeMedia()
+    @Volatile private var videoRecovered = onVideoRecovered
     @Volatile private var videoFailure = onVideoFailure
     @Volatile private var mainVideoFailure: Pair<VideoCodec, String>? = null
     @Volatile private var videoSizeChanged = onVideoSizeChanged
@@ -184,6 +186,17 @@ class AndroidMediaSink(
     fun setVideoFailureListener(listener: ((VideoCodec, String) -> Unit)?) {
         videoFailure = listener
         mainVideoFailure?.let { listener?.invoke(it.first, it.second) }
+    }
+
+    fun setVideoRecoveredListener(listener: (() -> Unit)?) { videoRecovered = listener }
+
+    /** 宿主执行排队回调时再核对状态，不能让已退休 worker 清除新视频的失败提示。 */
+    fun currentVideoFailure(): Pair<VideoCodec, String>? = mainVideoFailure
+
+    /** 用户只重试主屏解码与关键帧，不关闭连接、音频或麦克风通道。 */
+    fun retryMainVideo(): Boolean = synchronized(videoLifecycleLock) {
+        if (closed) return@synchronized false
+        videoDecoders[110]?.retry() ?: false
     }
 
     override fun onVideoCodec(type: Int, codec: VideoCodec) {
@@ -320,14 +333,23 @@ class AndroidMediaSink(
                 preferSoftwareHevcDecoder,
                 requestKeyFrame = { requestVideoRecovery(type) },
                 report = {
-                    if (type == 110 && it == "first frame rendered") mainVideoFailure = null
                     videoDiagnosticHandlers[type]?.invoke(it)
                 },
-                onFailure = { codec, reason ->
-                    if (type == 110 && !closed) {
-                        mainVideoFailure = codec to reason
-                        videoFailure?.invoke(codec, reason)
+                onFailure = { source, codec, reason ->
+                    val current = synchronized(videoLifecycleLock) {
+                        (type == 110 && !closed && videoDecoders[type] === source).also {
+                            if (it) mainVideoFailure = codec to reason
+                        }
                     }
+                    if (current) videoFailure?.invoke(codec, reason)
+                },
+                onRecovered = { source ->
+                    val current = synchronized(videoLifecycleLock) {
+                        (type == 110 && !closed && videoDecoders[type] === source).also {
+                            if (it) mainVideoFailure = null
+                        }
+                    }
+                    if (current) videoRecovered?.invoke()
                 },
                 onClosed = { decoder -> synchronized(videoLifecycleLock) { retiringVideoDecoders.remove(decoder) } },
                 onOutputSize = { width, height ->
@@ -375,9 +397,12 @@ private class VideoDecoder(
     private val preferSoftwareHevcDecoder: Boolean,
     private val requestKeyFrame: () -> Unit,
     private val report: (String) -> Unit,
-    private val onFailure: (VideoCodec, String) -> Unit,
+    private val onFailure: (VideoDecoder, VideoCodec, String) -> Unit,
+    private val onRecovered: (VideoDecoder) -> Unit,
     private val onClosed: (VideoDecoder) -> Unit,
     private val onOutputSize: (Int, Int) -> Unit,
+    // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
+    private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
 ) : Closeable {
     @Volatile private var running = true
     @Volatile private var decoder: MediaCodec? = null
@@ -387,8 +412,12 @@ private class VideoDecoder(
     private var terminated = false
     private val exitCallbacks = mutableListOf<() -> Unit>()
     private val recoveryGate = VideoRecoveryGate()
+    private val inputSlot = VideoInputSlot()
+    private val inputProgress = VideoInputProgress()
+    private val manualRetryPending = AtomicBoolean(false)
     private val startupWatchdog = VideoStartupWatchdog()
-    private var failureReported = false
+    private val playbackWatchdog = VideoPlaybackWatchdog()
+    @Volatile private var failureReported = false
     private val decoderCandidateCache = mutableMapOf<String, List<VideoDecoderCandidate>>()
     private val outputInfo = MediaCodec.BufferInfo()
     private val inputTiming = VideoInputTiming()
@@ -413,9 +442,16 @@ private class VideoDecoder(
         synchronized(lifecycleLock) {
             if (!running) return
             val frame = VideoJob.Frame(nalus)
+            playbackWatchdog.received(frame.receivedNs)
             stats.onReceived(nalus.size)
             queue.offer(frame)
         }
+    }
+
+    fun retry(): Boolean = synchronized(lifecycleLock) {
+        if (!running || !manualRetryPending.compareAndSet(false, true)) return@synchronized false
+        queue.offer(VideoJob.Retry)
+        true
     }
 
     fun setSurface(surface: Surface?) {
@@ -453,7 +489,7 @@ private class VideoDecoder(
                         is VideoJob.Frame -> {
                             if (VideoFrameBudget.remainingNs(job.receivedNs, System.nanoTime()) == 0L) {
                                 stats.onDropped(1 + queue.discardFrames(), VideoDropReason.EXPIRED)
-                                recover("video backlog exceeded 250 ms")
+                                resync("video backlog exceeded 250 ms")
                             } else feed(job)
                         }
                         is VideoJob.SurfaceChanged -> {
@@ -461,18 +497,31 @@ private class VideoDecoder(
                             catch (error: Exception) { releaseDecoder(); throw error }
                             finally { job.onApplied() }
                         }
-                        is VideoJob.Resync -> recover("video queue overflow")
+                        is VideoJob.Resync -> resync("video queue overflow")
+                        is VideoJob.Retry -> {
+                            try {
+                                recoveryGate.reset(); failureReported = false
+                                releaseDecoder()
+                                resync("manual video retry")
+                                lastConfig?.let(::configureDecoder)
+                            } finally { manualRetryPending.set(false) }
+                        }
                         null -> Unit
                     }
                     decoder?.let(::drainOutput)
                     if (outputSurface?.isValid == true && outputSurface === desiredSurface) {
+                        if (playbackWatchdog.failure(System.nanoTime())) {
+                            resync("no fresh presentation for 8s")
+                            reportFailure("received video without fresh presentation for 8s")
+                        }
                         startupWatchdog.failure(System.nanoTime())?.let {
                             report("startup stalled: $it")
+                            recover("startup stalled: $it")
                             reportFailure(it)
                         }
                     }
                     stats.logIfDue()?.let(report)
-                    if (!recoveryGate.exhausted && referenceChain.needsKeyFrame &&
+                    if (recoveryGate.canRetry(System.nanoTime()) && referenceChain.needsKeyFrame &&
                         lastConfig != null && outputSurface != null) requestKeyFrameIfDue()
                 } catch (error: Exception) {
                     if (running) Log.e(TAG, "video decoder job failed: ${job?.javaClass?.simpleName}", error)
@@ -515,6 +564,8 @@ private class VideoDecoder(
         releaseDecoder()
         referenceChain.reset()
         val surface = outputSurface?.takeIf { it.isValid && it === desiredSurface } ?: return
+        if (!recoveryGate.beginAttempt(System.nanoTime())) return
+        val setupStartedNs = System.nanoTime()
         val codec = config.codec
         val codecData = config.codecData
         val mime = if (codec == VideoCodec.H265) MediaFormat.MIMETYPE_VIDEO_HEVC
@@ -544,6 +595,8 @@ private class VideoDecoder(
         }
         var next: MediaCodec? = null
         for (attempt in attempts) {
+            // 系统 create/configure/start 为同步调用；只约束后续候选，不用第二个线程争抢 codec。
+            if (!running || System.nanoTime() - setupStartedNs >= 3_000_000_000L) break
             next = tryConfigure(mime, csd, surface, attempt)
             if (next != null) break
         }
@@ -554,6 +607,8 @@ private class VideoDecoder(
         renderedFrameLogged = false
         submittedFrameLogged = false
         if (next != null) {
+            playbackWatchdog.ready()
+            resync("decoder ready setupMs=${(System.nanoTime() - setupStartedNs) / 1_000_000}", VideoDropReason.REBUILD_WAIT)
             val info = next.codecInfo
             val hardware = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isHardwareAccelerated
             val software = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly
@@ -586,7 +641,7 @@ private class VideoDecoder(
         var phase = "create"
         return try {
             val format = buildFormat(mime, csd, attempt.tuned)
-            val codec = MediaCodec.createByCodecName(attempt.candidate.name)
+            val codec = createCodec(attempt.candidate.name)
             candidate = codec
             if (attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                 attempt.candidate.lowLatency) {
@@ -598,11 +653,22 @@ private class VideoDecoder(
                 if (running && decoder === source && outputSurface === desiredSurface &&
                     desiredSurface != null && presentationUs >= surfaceChangedUs) {
                     stats.onPresented(presentationUs, renderedNs)
-                    if (!renderedFrameLogged) {
-                        renderedFrameLogged = true
-                        startupWatchdog.rendered()
-                        report("first frame rendered")
-                        Log.i(TAG, "video decoder first Surface presentation callback")
+                    val now = System.nanoTime()
+                    // 迟到的实际呈现仍记统计，但不能把旧画面当作本次恢复成功。
+                    if (VideoFrameBudget.remainingNs(presentationUs * 1000, now) > 0) {
+                        playbackWatchdog.presented(now)
+                        val recovering = failureReported
+                        failureReported = false
+                        if (!renderedFrameLogged) {
+                            renderedFrameLogged = true
+                            startupWatchdog.rendered()
+                            report("first frame rendered")
+                            Log.i(TAG, "video decoder first Surface presentation callback")
+                            onRecovered(this@VideoDecoder)
+                        } else if (recovering) {
+                            report("video presentation resumed")
+                            onRecovered(this@VideoDecoder)
+                        }
                     }
                 }
             }, renderHandler)
@@ -679,6 +745,7 @@ private class VideoDecoder(
         if (codec != null) {
             try {
                 codec.setOutputSurface(surface)
+                playbackWatchdog.ready()
                 Log.i(TAG, "video decoder output surface updated")
                 return
             } catch (error: Exception) {
@@ -700,13 +767,18 @@ private class VideoDecoder(
             stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return
         }
         val annexB = MediaCodecSupport.toAnnexB(nalus)
-        if (annexB.isEmpty()) { stats.onDropped(); recover("invalid video access unit"); return }
+        if (annexB.isEmpty()) { stats.onDropped(); resync("invalid video access unit"); return }
         if (!referenceChain.accepts(annexB, config.codec)) {
             stats.onDropped(reason = VideoDropReason.WAIT_KEYFRAME)
             requestKeyFrameIfDue()
             return
         }
-        if (decoder == null) configureDecoder(config)
+        if (decoder == null) {
+            configureDecoder(config)
+            // 重建期间收到的压缩帧已失去时效，等下一份新关键帧；不把创建时间计成输入失败。
+            stats.onDropped(reason = VideoDropReason.REBUILD_WAIT)
+            return
+        }
         val codec = decoder ?: run { stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return }
         if (!submittedFrameLogged) {
             submittedFrameLogged = true
@@ -716,33 +788,42 @@ private class VideoDecoder(
                     "head=${annexB.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
             )
         }
-        val index = VideoInputPump.acquire(
+        val index = inputSlot.acquire { VideoInputPump.acquire(
             running = { running && outputSurface === desiredSurface }, drain = { drainOutput(codec) },
             dequeue = {
                 val remaining = VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime())
                 if (remaining == 0L) -1 else codec.dequeueInputBuffer(minOf(INPUT_TIMEOUT_US, remaining / 1000))
             },
             timeoutNs = VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()),
-        )
+        ) }
         if (!running) return
         if (outputSurface !== desiredSurface) {
             stats.onDropped(reason = VideoDropReason.NO_TARGET); releaseDecoder(); referenceChain.reset(); return
         }
-        if (index < 0 || VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
-            stats.onDropped(1 + queue.discardFrames(), VideoDropReason.EXPIRED)
-            recover("video decoder input exceeded frame age budget"); return
+        if (index < 0) {
+            stats.onDropped(reason = VideoDropReason.INPUT_WAIT)
+            if (inputProgress.timedOut(System.nanoTime())) recover("video decoder input stalled for 2s")
+            else resync("video input temporarily unavailable")
+            return
+        }
+        if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
+            stats.onDropped(reason = VideoDropReason.EXPIRED)
+            resync("video input frame expired; retaining input slot")
+            return
         }
         val input = checkNotNull(codec.getInputBuffer(index)) { "Decoder input buffer unavailable" }
         input.clear()
         if (annexB.size <= input.remaining()) {
             input.put(annexB)
             if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
-                stats.onDropped(1 + queue.discardFrames(), VideoDropReason.EXPIRED)
-                recover("video input copy exceeded frame age budget"); return
+                stats.onDropped(reason = VideoDropReason.EXPIRED)
+                resync("video input copy expired; retaining input slot"); return
             }
             // 本地接收时刻作为 PTS，可关联输入、输出和 Surface 回调的帧龄。
             val inputNs = System.nanoTime()
             codec.queueInputBuffer(index, 0, annexB.size, frame.receivedNs / 1000, 0)
+            inputSlot.queued()
+            inputProgress.reset()
             inputTiming.record(frame.receivedNs / 1000, inputNs)
             stats.onInput(frame.receivedNs)
             startupWatchdog.input(inputNs)
@@ -755,18 +836,29 @@ private class VideoDecoder(
         drainOutput(codec)
     }
 
+    /** 积压只丢压缩参考链并请求新关键帧；健康 codec 保留，不消耗故障重建额度。 */
+    private fun resync(reason: String, dropReason: VideoDropReason = VideoDropReason.EXPIRED) {
+        val dropped = queue.discardFrames()
+        if (dropped > 0) stats.onDropped(dropped, dropReason)
+        referenceChain.reset()
+        if (dropped > 0 || dropReason == VideoDropReason.REBUILD_WAIT) report("resync: $reason dropped=$dropped")
+        requestKeyFrameIfDue()
+    }
+
     private fun recover(reason: String) {
-        if (recoveryGate.exhausted || (decoder == null && !recoveryGate.canRetry(System.nanoTime()))) return
+        if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) return
         Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
         stats.onRecovery()
         recoveryGate.onFailure(System.nanoTime())
         report("recovery: $reason attempt=${recoveryGate.failures}/4 " +
-            "${if (recoveryGate.exhausted) "budget exhausted; restart session to retry" else "waiting for keyframe"}")
+            "probes=${recoveryGate.probes}/2 " +
+            "${if (recoveryGate.terminal) "automatic retries exhausted; manual video retry available"
+                else if (recoveryGate.exhausted) "cooldown; bounded probe available after 15s" else "waiting for keyframe"}")
         if (recoveryGate.exhausted) reportFailure(reason)
         // 重建时重新提交初始化数据，不能 flush 后丢失首帧参数。
         releaseDecoder()
         referenceChain.reset()
-        if (!recoveryGate.exhausted) requestKeyFrameIfDue()
+        requestKeyFrameIfDue()
     }
 
     private fun reportFailure(reason: String) {
@@ -774,12 +866,13 @@ private class VideoDecoder(
         val config = lastConfig ?: return
         failureReported = true
         report("video unavailable codec=${config.codec} reason=$reason")
-        onFailure(config.codec, reason)
+        onFailure(this, config.codec, reason)
     }
 
     private fun requestKeyFrameIfDue() {
-        if (!running || recoveryGate.exhausted || desiredSurface == null) return
+        if (!running || desiredSurface == null) return
         val now = System.nanoTime()
+        if (!recoveryGate.canRetry(now)) return
         if (lastKeyFrameRequestNs != 0L && now - lastKeyFrameRequestNs < 1_000_000_000L) return
         lastKeyFrameRequestNs = now
         requestKeyFrame()
@@ -794,6 +887,7 @@ private class VideoDecoder(
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> logOutputFormat(codec.outputFormat)
                 index >= 0 -> {
                     startupWatchdog.output()
+                    inputProgress.output()
                     val now = System.nanoTime()
                     val expired = VideoFrameBudget.remainingNs(info.presentationTimeUs * 1000, now) == 0L
                     val render = running && !expired && outputSurface != null && outputSurface === desiredSurface
@@ -842,7 +936,9 @@ private class VideoDecoder(
         val codec = decoder
         decoder = null
         inputTiming.clear()
+        inputSlot.clear(); inputProgress.reset()
         startupWatchdog.reset()
+        playbackWatchdog.ready()
         if (codec != null) {
             runCatching { codec.setOnFrameRenderedListener(null, null) }
             try {

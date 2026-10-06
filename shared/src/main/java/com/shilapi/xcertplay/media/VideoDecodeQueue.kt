@@ -13,6 +13,7 @@ internal sealed interface VideoJob {
     // 完成信号只在 worker 解除旧目标后调用，宿主据此释放 Surface。
     data class SurfaceChanged(val surface: Surface?, val onApplied: () -> Unit = {}) : VideoJob
     data object Resync : VideoJob
+    data object Retry : VideoJob
 }
 
 /** Do not resume dependent pictures after losing a reference frame. */
