@@ -16,7 +16,7 @@ args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 base = [args.adb, '-s', args.serial]
 package = 'com.ecarx.carplay'
-component = package+'/com.shilapi.xcertplay.DiPlayActivity'
+component = package+'/com.shilapi.xcertplay.GalaxySettingsActivity'
 output = Path('build/previews/reset-settings')
 output.mkdir(parents=True, exist_ok=True)
 

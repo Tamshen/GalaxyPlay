@@ -57,7 +57,7 @@ def tap(label):
     adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
 
 def launch(page):
-    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
 
 def screenshot(name):
     (args.output_dir / (name + '.png')).write_bytes(adb('exec-out', 'screencap', '-p', binary=True))

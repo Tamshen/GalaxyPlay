@@ -37,15 +37,27 @@ internal object P2pStartupRecovery {
         fun channel(mode: P2pCreationMode, frequency: Int) {
             if (frequencies.add(frequency)) add(P2pCreationRequest(mode, frequency))
         }
-        if (preferred?.mode == P2pCreationMode.SYSTEM_DEFAULT && preferred.frequencyMHz == null) add(preferred)
-        else preferred?.frequencyMHz?.let(::rememberedFrequency)?.let { channel(it.mode, it.frequencyMHz!!) }
+        // A station on 5 GHz shares the radio with the group: another 5 GHz channel makes the radio
+        // switch between the two, which on a BYD Tang (station 5200, group 5745) stalled video
+        // for 0.6-2 s and starved music. A 2.4 GHz group runs alongside without switching.
+        val stationOnFiveGhz = stationFrequency != null && stationFrequency in 5150..5895
+        val remembered = preferred?.frequencyMHz?.let(::rememberedFrequency)
+        val rememberedSwitches = stationOnFiveGhz && remembered != null &&
+            remembered.frequencyMHz!! in 5150..5895 && remembered.frequencyMHz != stationFrequency
+        // The default API does not pin a channel. A cached success cannot prove it will avoid
+        // hopping beside the current 5 GHz station, so keep it behind explicit channels there.
+        if (preferred?.mode == P2pCreationMode.SYSTEM_DEFAULT && preferred.frequencyMHz == null &&
+            !stationOnFiveGhz) add(preferred)
+        else if (remembered != null && !rememberedSwitches) channel(remembered.mode, remembered.frequencyMHz!!)
         if (aligned24) channel(P2pCreationMode.ALIGNED_2_GHZ, requireNotNull(stationFrequency))
         if (aligned5) channel(P2pCreationMode.ALIGNED_5_GHZ, requireNotNull(stationFrequency))
         fun twoGhz() = listOf(2437, 2412, 2462).forEach { channel(P2pCreationMode.FIXED_2_GHZ, it) }
         fun fiveGhz() = listOf(5180, 5745).forEach { channel(P2pCreationMode.FIXED_5_GHZ, it) }
         // Keep a shared radio on its existing station channel when possible. Otherwise prefer
-        // explicit non-DFS 5 GHz, then channels 6/1/11. The platform enforces regulatory limits.
-        if (aligned24) { twoGhz(); fiveGhz() } else { fiveGhz(); twoGhz() }
+        // explicit non-DFS 5 GHz, then channels 6/1/11, except next to a 5 GHz station, where
+        // 2.4 GHz comes first (see above). The platform enforces regulatory limits.
+        if (aligned24 || stationOnFiveGhz) { twoGhz(); fiveGhz() } else { fiveGhz(); twoGhz() }
+        if (rememberedSwitches) channel(remembered!!.mode, remembered.frequencyMHz!!)
         // Some vendors only implement the default-configuration API. Use it last, after every
         // explicit-frequency option has been rejected, never before the 2.4 GHz attempts.
         if (none { it.mode == P2pCreationMode.SYSTEM_DEFAULT }) add(P2pCreationRequest(P2pCreationMode.SYSTEM_DEFAULT))

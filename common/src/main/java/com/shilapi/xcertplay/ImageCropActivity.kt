@@ -27,6 +27,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** Loads one local image and writes a user-positioned 1:1 PNG into the AirPlay icon slot. */
 class ImageCropActivity : Activity() {
@@ -183,7 +184,7 @@ class ImageCropActivity : Activity() {
         }
     }
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
     private class SquareCropView(context: android.content.Context) : View(context) {
         private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)

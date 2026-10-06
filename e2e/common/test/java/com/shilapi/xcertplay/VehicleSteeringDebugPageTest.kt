@@ -19,7 +19,7 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30])
 class VehicleSteeringDebugPageTest {
-    private val activity = Robolectric.buildActivity(DiPlayActivity::class.java).get().apply { setTheme(R.style.Theme_Xcertplay) }
+    private val activity = Robolectric.buildActivity(GalaxySettingsActivity::class.java).get().apply { setTheme(R.style.Theme_Xcertplay) }
     private lateinit var page: L7SteeringDebugPage
     @Before fun setup() {
         SteeringListening.stop("TEST_RESET")

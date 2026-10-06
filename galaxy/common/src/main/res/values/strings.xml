@@ -561,4 +561,6 @@
     <string name="l7_debug_goal_hud">发送测试路名，查看 HUD 或仪表的变化。</string>
     <string name="l7_debug_details_hide">收起技术明细</string>
     <string name="l7_report_current_sample">本次样例</string>
+    <string name="galaxy_wireless_retry">重新连接</string>
+    <string name="wireless_startup_retries_exhausted">自动重试已停止，请检查连接后手动重试。</string>
 </resources>

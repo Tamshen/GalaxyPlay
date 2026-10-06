@@ -73,7 +73,7 @@ def tap(label):
     tap_node(find(label)); time.sleep(.15)
 
 def launch(page='settings-debug-codec'):
-    adb('shell', 'am', 'start', '-W', '-n', package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '-n', package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
     time.sleep(.4)
 
 def logs():

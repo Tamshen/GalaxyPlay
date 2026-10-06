@@ -106,4 +106,6 @@
     <string name="l7_debug_goal_hud">Publish a test road and check the HUD or cluster.</string>
     <string name="l7_debug_details_hide">Hide technical details</string>
     <string name="l7_report_current_sample">Current sample</string>
+    <string name="galaxy_wireless_retry">Retry connection</string>
+    <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
 </resources>

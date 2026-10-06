@@ -9,6 +9,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.security.KeyPair
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * A shell on the head unit's own adbd ("ADB over network", 127.0.0.1:5555), for the few commands an
@@ -27,17 +28,20 @@ class LocalAdb(
 ) : Closeable {
     enum class Access { READY, NOT_APPROVED, UNREACHABLE, UNSUPPORTED }
 
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
+    private val cancelled = AtomicBoolean(false)
     private var input: InputStream? = null
     private var output: OutputStream? = null
     private var nextStreamId = 1
 
     @Synchronized
     fun connect(mayAsk: Boolean): Access {
+        if (cancelled.get()) return Access.UNREACHABLE
         if (socket?.isClosed == false) return Access.READY
         return try {
             val address = InetSocketAddress(host, port)
-            val opened = Socket().apply {
+            val opened = Socket().also { socket = it }.apply {
+                if (cancelled.get()) throw IOException("ADB operation cancelled")
                 connect(address, CONNECT_TIMEOUT_MS)
                 soTimeout = READ_TIMEOUT_MS
                 tcpNoDelay = true
@@ -62,6 +66,7 @@ class LocalAdb(
     /** Same as [shell], with a larger bounded read window for a one-shot slow command. */
     @Synchronized
     fun shell(command: String, readTimeoutMillis: Int): String? {
+        if (cancelled.get()) return null
         if (socket?.isClosed != false && connect(mayAsk = false) != Access.READY) return null
         return try {
             require(readTimeoutMillis in 1..MAX_COMMAND_TIMEOUT_MS)
@@ -97,6 +102,12 @@ class LocalAdb(
 
     @Synchronized
     override fun close() = closeQuietly()
+
+    /** Retires this client and unblocks pending I/O without waiting for its synchronized operation. */
+    fun cancelPendingOperations() {
+        cancelled.set(true)
+        runCatching { socket?.close() }
+    }
 
     private fun handshake(mayAsk: Boolean): Access {
         var packet = receive()

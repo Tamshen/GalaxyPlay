@@ -114,7 +114,7 @@ def tap(label):
 
 def launch(page='settings-debug'):
     adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n',
-        package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+        package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
 
 
 def screenshot(name):

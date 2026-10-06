@@ -93,10 +93,14 @@ class IphoneUsbCallbackTest {
         assertNotNull(gate(controller).begin("device-a"))
     }
 
+    private fun iphoneHost(controller: CarPlayController): IphoneUsbHost =
+        CarPlayController::class.java.getDeclaredMethod("getIphoneHost")
+            .apply { isAccessible = true }.invoke(controller) as IphoneUsbHost
+
     @Test fun recreatedControllerUsesDifferentPermissionAction() = withController { first, _ ->
         withController { second, _ ->
-            val firstHost = ReflectionHelpers.getField<IphoneUsbHost>(first, "iphoneHost")
-            val secondHost = ReflectionHelpers.getField<IphoneUsbHost>(second, "iphoneHost")
+            val firstHost = iphoneHost(first)
+            val secondHost = iphoneHost(second)
             assertNotEquals(ReflectionHelpers.getField<String>(firstHost, "permissionAction"),
                 ReflectionHelpers.getField<String>(secondHost, "permissionAction"))
         }

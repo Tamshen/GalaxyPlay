@@ -72,7 +72,7 @@ def tap(label):
 
 
 def launch():
-    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-debug-steering')
+    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-debug-steering')
 
 
 paths = ('shared_prefs/diplay.xml', 'shared_prefs/l7_audio_templates.xml', 'shared_prefs/l7_agreement.xml',

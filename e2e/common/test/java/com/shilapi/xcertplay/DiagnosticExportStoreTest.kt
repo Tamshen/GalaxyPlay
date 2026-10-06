@@ -37,7 +37,7 @@ class DiagnosticExportStoreTest {
         val uri = DiagnosticExportStore.saveToDownloads(resolver, "DiPlay-test.txt", report)
         assertEquals(provider.uri, uri)
         assertEquals(report, provider.file.readText())
-        assertEquals("Download/DiPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
+        assertEquals("Download/GalaxyPlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
         assertEquals("text/plain", provider.insertValues!!.getAsString(MediaStore.Downloads.MIME_TYPE))
         assertEquals(1, provider.insertValues!!.getAsInteger(MediaStore.Downloads.IS_PENDING))
         assertEquals(0, provider.publishValues!!.getAsInteger(MediaStore.Downloads.IS_PENDING))

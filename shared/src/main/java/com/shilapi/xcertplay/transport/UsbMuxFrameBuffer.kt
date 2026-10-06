@@ -26,9 +26,12 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
         var length = readU32(bytes, 4)
         if (length !in HEADER_BYTES..MAX_FRAME_BYTES) {
             val previous = optionalReplyPadding
-            // 仅处理上游已确认的 VERSION / 无载荷 SYN-ACK 后四字节填充，且下一帧必须是合法 TCP。
-            // 不扫描任意位置，也不清空整个 USB 接收批次；正常帧和分片始终保留。
-            // 候选 MUX 与 TCP 头尚未收齐时继续等待，超时不能丢弃已收到的合法分片。
+            // The captured iOS 27 VERSION and valid RX TCP replies, including payload-bearing
+            // replies, have four extra bytes. Do not scan or discard a USB completion:
+            // only this single four-byte boundary is eligible, and only before a TCP frame.
+            // A normal or split next header at offset zero is always preserved.
+            // Wait for the complete candidate MUX header and base TCP header. A timeout
+            // leaves these bytes in place; a legitimate split frame must never be lost.
             if (previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
                 bytes.size < PADDING_BYTES + HEADER_BYTES) return null
             val followingLength = readU32(bytes, PADDING_BYTES + 4)
@@ -69,13 +72,14 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
         return frame
     }
 
-    private fun canHaveOptionalReplyPadding(frame: UsbMuxFrame): Boolean =
-        (frame.protocol == PROTOCOL_VERSION && frame.length == VERSION_BYTES && frame.word8 == 2) ||
-            (frame.protocol == PROTOCOL_TCP && frame.word8 == CAPTURED_REPLY_MAGIC &&
-                frame.length == HEADER_BYTES + TCP_HEADER_BYTES &&
-                ((frame.payload[12].toInt() ushr 4) and 0x0f) == 5 &&
-                (frame.payload[13].toInt() and 0xff) == SYN_ACK &&
-                readU16(frame.payload, 0) != 0 && readU16(frame.payload, 2) != 0)
+    private fun canHaveOptionalReplyPadding(frame: UsbMuxFrame): Boolean {
+        if (frame.protocol == PROTOCOL_VERSION && frame.length == VERSION_BYTES && frame.word8 == 2) return true
+        if (frame.protocol != PROTOCOL_TCP || frame.word8 != CAPTURED_REPLY_MAGIC ||
+            frame.payload.size < TCP_HEADER_BYTES) return false
+        val tcpHeaderBytes = ((frame.payload[12].toInt() ushr 4) and 0x0f) * 4
+        return tcpHeaderBytes in TCP_HEADER_BYTES..frame.payload.size &&
+            readU16(frame.payload, 0) != 0 && readU16(frame.payload, 2) != 0
+    }
 
     private fun report(line: String) { runCatching { diagnostic(line) } }
 
@@ -97,7 +101,6 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
         const val MAX_PADDING_REPORTS = 4
         const val PROTOCOL_VERSION = 0
         const val PROTOCOL_TCP = 6
-        const val SYN_ACK = 0x12
         val CAPTURED_REPLY_MAGIC = 0xfaceface.toInt()
     }
 }

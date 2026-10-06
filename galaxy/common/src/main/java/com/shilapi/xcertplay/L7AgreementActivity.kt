@@ -65,7 +65,7 @@ class L7AgreementActivity : ComponentActivity() {
             return
         }
         // 确认后进入首页，由用户选择连接；不恢复确认之前的 USB 或自动连接请求。
-        startActivity(Intent(this, DiPlayActivity::class.java).putExtra("page", "home")
+        startActivity(Intent(this, GalaxySettingsActivity::class.java).putExtra("page", "home")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         finish()
     }

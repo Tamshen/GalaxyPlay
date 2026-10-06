@@ -83,7 +83,7 @@ internal object L7StartupGuard {
         val state = state(activity)
         if (!state.arm(System.currentTimeMillis(), Process.myPid())) writeFailed = true
         if ((state.blocked || writeFailed) && !hostAuthorized) {
-            activity.startActivity(Intent(activity, DiPlayActivity::class.java).putExtra("page", "home")
+            activity.startActivity(Intent(activity, GalaxySettingsActivity::class.java).putExtra("page", "home")
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
             activity.finish()
             return false

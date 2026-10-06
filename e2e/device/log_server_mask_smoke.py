@@ -51,7 +51,7 @@ def masked_fields():
 def screenshot(name):
     (output/(name+'.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
 
-adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package+'/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-debug-logs')
+adb('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-debug-logs')
 server = row('OpenObserve 日志服务器')
 assert any(n.get('text') == '*****' for n in server.iter('node')), '当前服务器未遮蔽；请确认 AVD 使用内置默认配置'
 screenshot('server-row')

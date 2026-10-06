@@ -19,7 +19,8 @@ enum class VideoCodec { H264, H265 }
  * (avcC/hvcC) or a ChaCha20-Poly1305 sealed VideoFrame. The key is the DataStream output key
  * and the per-frame nonce is an 8-byte little-endian counter.
  */
-class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String) -> Unit = {}) : Closeable {
+class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String) -> Unit = {},
+                   private val acceptConnection: (ServerSocket) -> Socket = { it.accept() }) : Closeable {
     interface Listener {
         fun onCodec(codec: VideoCodec) {}
         fun onConfig(codecData: ByteArray) {}
@@ -30,32 +31,49 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
     private val closed = AtomicBoolean(false)
     private val frameCounter = AtomicLong(0)
     private val firstFrameLogged = AtomicBoolean(false)
+    private val resourceLock = Any()
     private var server: ServerSocket? = null
     private var socket: Socket? = null
     private var thread: Thread? = null
     @Volatile private var listener: Listener = object : Listener {}
 
     fun listen(listener: Listener): Int {
-        this.listener = listener
+        check(!closed.get()) { "Screen stream already closed" }
         val bound = ServerSocket()
-        bound.reuseAddress = true
-        bound.bind(InetSocketAddress(InetAddress.getByName("::"), 0))
-        server = bound
-        thread = Thread({ accept(bound) }, "airplay-screen").apply { isDaemon = true; start() }
-        return bound.localPort
+        try {
+            bound.reuseAddress = true
+            bound.bind(InetSocketAddress(InetAddress.getByName("::"), 0))
+            synchronized(resourceLock) {
+                check(!closed.get() && server == null) { "Screen stream unavailable" }
+                this.listener = listener
+                server = bound
+                thread = Thread({ accept(bound) }, "airplay-screen").apply { isDaemon = true; start() }
+            }
+            return bound.localPort
+        } catch (error: Exception) {
+            safeClose(bound)
+            throw error
+        }
     }
 
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        safeClose(socket)
-        safeClose(server)
-        thread?.interrupt()
+        val resources = synchronized(resourceLock) {
+            if (!closed.compareAndSet(false, true)) return
+            Triple(socket, server, thread).also { socket = null; server = null }
+        }
+        safeClose(resources.first)
+        safeClose(resources.second)
+        resources.third?.interrupt()
     }
 
     private fun accept(bound: ServerSocket) {
         try {
-            val accepted = bound.accept()
-            socket = accepted
+            val accepted = acceptConnection(bound)
+            // accept 返回与 close 同时发生时，迟到 socket 不得脱离拥有者继续读取。
+            synchronized(resourceLock) {
+                if (closed.get()) { safeClose(accepted); return }
+                socket = accepted
+            }
             run(accepted)
         } catch (error: Exception) {
             if (!closed.get()) listener.onClosed(error)
@@ -81,7 +99,7 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
             failure = error
         } finally {
             stats.flush(ended = true)
-            if (socket === sock) socket = null
+            synchronized(resourceLock) { if (socket === sock) socket = null }
             safeClose(sock)
             if (!closed.get()) listener.onClosed(failure)
         }

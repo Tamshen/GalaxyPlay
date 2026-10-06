@@ -1,15 +1,21 @@
 package com.shilapi.xcertplay
 
 import android.graphics.Matrix
+import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Switch
 import com.shilapi.xcertplay.airplay.*
+import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.media.VideoViewport
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.orchestration.MfiTarget
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import java.time.Duration
 import java.util.concurrent.ExecutorService
@@ -40,6 +46,10 @@ class CarPlayHostDisplaySizeTest {
     @Before fun setUp() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         // 隔离控制器构造，不启动真实传输和厂商服务线程。
+        AirPlayPersistence.saveAdaptPipResolution(activity, false)
+        // Source-only tests have no provisioned local authentication identity.
+        AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
+        // Exercise host startup without launching vendor-service workers or real transports.
         controllerConstruction = mockConstruction(CarPlayController::class.java)
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
@@ -50,8 +60,11 @@ class CarPlayHostDisplaySizeTest {
 
     @After fun tearDown() {
         (getField("shuttingDown") as AtomicBoolean).set(true)
+        (getField("mainHandler") as Handler).removeCallbacksAndMessages(null)
+        AirPlayPersistence.overlaySettingsListener = null
+        com.shilapi.xcertplay.hud.BydNavigationOutputs.setTurnOverlayListener(null)
         (getField("controller") as? CarPlayController)?.let {
-            CarPlayMediaKeys.detach(it)
+            GalaxyMediaKeys.detach(it)
             it.close()
             it.awaitClosed(1000)
         }
@@ -79,6 +92,14 @@ class CarPlayHostDisplaySizeTest {
         assertSame(display, getField("sessionDisplay"))
         assertEquals(0, getField("restartGeneration"))
         assertEquals(1, keepLogs())
+    }
+
+    @Test fun aNarrowWindowWithAdaptPipResolutionTriggersReconnect() {
+        AirPlayPersistence.saveAdaptPipResolution(activity, true)
+        val display = startSession()
+        applySize(700, 990)
+        assertEquals(1, getField("restartGeneration"))
+        assertNull(getField("sessionDisplay"))
     }
 
     @Test fun connectingInANarrowWindowRebuildsWhenTheCameraCloses() {
@@ -132,6 +153,97 @@ class CarPlayHostDisplaySizeTest {
         setField("hideTopBar", false)
         applySize(1920, 942)
         assertEquals(1, getField("restartGeneration"))
+    }
+
+    @Test fun resumingReadsSavedBarsAndRebuildsEvenWhenTheWindowSizeIsUnchanged() {
+        startSession()
+        // 测试窗口未挂载，使用主线程队列执行布局后的刷新。
+        val video = object : TextureView(activity) {
+            override fun post(action: Runnable): Boolean = Handler(Looper.getMainLooper()).post(action)
+        }.apply { layout(0, 0, 1920, 990) }
+        setField("videoView", video)
+        AirPlayPersistence.saveHideTopBar(activity, true)
+        AirPlayPersistence.saveHideBottomBar(activity, false)
+
+        invoke("onResume")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        assertEquals(true, getField("hideTopBar"))
+        assertEquals(false, getField("hideBottomBar"))
+        assertWindowBars(true, false)
+        assertEquals(1, getField("restartGeneration"))
+        assertTrue(getField("handshakeResetInProgress") as Boolean)
+    }
+
+    @Test fun resumingWithUnchangedBarsKeepsTheSession() {
+        val display = startSession()
+
+        invoke("onResume")
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+    }
+
+    @Test fun resumingWhileEditingDoesNotOverwriteTheBarPreview() {
+        startSession()
+        setField("menuOpen", true)
+        setField("hideTopBar", false)
+        setField("hideBottomBar", true)
+
+        invoke("onResume")
+
+        assertEquals(false, getField("hideTopBar"))
+        assertEquals(true, getField("hideBottomBar"))
+        assertWindowBars(false, true)
+        assertTrue(AirPlayPersistence.loadHideTopBar(activity))
+        assertEquals(0, getField("restartGeneration"))
+    }
+
+    @Test fun fullscreenApplicationSupportsAllFourBarCombinations() {
+        for (hideTop in listOf(false, true)) {
+            for (hideBottom in listOf(false, true)) {
+                setField("hideTopBar", hideTop)
+                setField("hideBottomBar", hideBottom)
+
+                invoke("applyFullscreenMode")
+
+                assertWindowBars(hideTop, hideBottom)
+            }
+        }
+    }
+
+    @Test fun menuBarChangesPreviewWithoutSavingAndCancelRestoresTheSavedValues() {
+        invoke("loadPersistedSettings")
+        setField("settingsBaseline", invoke("captureSettingsBaseline"))
+        setField("menuOpen", true)
+        val controls = invoke("buildFullscreenSection") as ViewGroup
+
+        menuBarSwitch(controls, R.string.hide_the_navigation_bar).performClick()
+
+        assertEquals(false, getField("hideBottomBar"))
+        assertWindowBars(true, false)
+        assertTrue(AirPlayPersistence.loadHideBottomBar(activity))
+
+        invoke("cancelSettingsEdits")
+
+        assertEquals(true, getField("hideBottomBar"))
+        assertWindowBars(true, true)
+        assertTrue(AirPlayPersistence.loadHideBottomBar(activity))
+    }
+
+    @Test fun savingMenuBarsPreservesAnIndependentCombination() {
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        invoke("loadPersistedSettings")
+        setField("menuOpen", true)
+        val controls = invoke("buildFullscreenSection") as ViewGroup
+        menuBarSwitch(controls, R.string.hide_the_status_bar).performClick()
+
+        invoke("saveSettingsAndReconnect")
+
+        assertFalse(AirPlayPersistence.loadHideTopBar(activity))
+        assertTrue(AirPlayPersistence.loadHideBottomBar(activity))
+        assertEquals(false, getField("menuOpen"))
     }
 
     @Test fun quickOpenAndCloseCancelsThePendingShrink() {
@@ -288,6 +400,8 @@ class CarPlayHostDisplaySizeTest {
         }
     }
 
+
+
     private fun startSession(
         rotation: Int = Surface.ROTATION_0,
         windowWidth: Int = 1920,
@@ -342,6 +456,20 @@ class CarPlayHostDisplaySizeTest {
 
     private fun getField(name: String): Any? = activity.javaClass.getDeclaredField(name)
         .apply { isAccessible = true }.get(activity)
+
+    private fun invoke(name: String): Any? = activity.javaClass.getDeclaredMethod(name)
+        .apply { isAccessible = true }.invoke(activity)
+
+    @Suppress("DEPRECATION")
+    private fun assertWindowBars(hideTop: Boolean, hideBottom: Boolean) {
+        assertEquals(hideTop, activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_FULLSCREEN != 0)
+        assertEquals(hideBottom, activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_HIDE_NAVIGATION != 0)
+    }
+
+    private fun menuBarSwitch(controls: ViewGroup, label: Int): Switch = (0 until controls.childCount)
+        .mapNotNull { controls.getChildAt(it) as? ViewGroup }
+        .flatMap { row -> (0 until row.childCount).map { row.getChildAt(it) } }
+        .filterIsInstance<Switch>().single { it.contentDescription == activity.getString(label) }
 
     private fun setField(name: String, value: Any?) {
         activity.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(activity, value)

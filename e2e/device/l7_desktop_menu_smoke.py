@@ -47,7 +47,7 @@ def screenshot(name):
 
 
 def launch(page='home'):
-    adb('shell', 'am', 'start', '-W', '-f', '0x00020000', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '-f', '0x00020000', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
     time.sleep(.6)
 
 

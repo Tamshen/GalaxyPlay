@@ -2,12 +2,12 @@ package com.shilapi.xcertplay.media
 
 import android.media.AudioManager
 
-internal enum class AudioChannelMappingMode {
+enum class AudioChannelMappingMode {
     MOBILE_COMPATIBLE,
     AUTOMOTIVE_BUS,
 }
 
-internal enum class AudioChannel {
+enum class AudioChannel {
     MEDIA,
     PHONE,
     ASSISTANT,

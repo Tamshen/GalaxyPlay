@@ -19,11 +19,11 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30])
 class L7ReportingTestPageTest {
-    private lateinit var activity: DiPlayActivity
+    private lateinit var activity: GalaxySettingsActivity
     private lateinit var page: L7ReportingTestPage
     @Before fun setup() {
         CarPlayBackgroundSession.clear()
-        activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        activity = Robolectric.buildActivity(GalaxySettingsActivity::class.java).get()
         activity.setTheme(R.style.Theme_Xcertplay)
         L7Agreement.accept(activity)
         page = L7ReportingTestPage(activity, LinearLayout(activity), L7ReportingKind.MEDIA) {}

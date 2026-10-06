@@ -59,7 +59,7 @@ class L7DesktopNavigationService : Service() {
         }
     }
 
-    private fun homeIntent(page: String) = Intent(this, DiPlayActivity::class.java).putExtra("page", page)
+    private fun homeIntent(page: String) = Intent(this, GalaxySettingsActivity::class.java).putExtra("page", page)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
 
     private fun navigate(target: String) {

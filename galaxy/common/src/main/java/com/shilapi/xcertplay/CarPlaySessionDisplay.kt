@@ -10,4 +10,5 @@ internal data class CarPlaySessionDisplay(
     // 窗口比较使用未缩放的尺寸，独立于投屏分辨率设置。
     val windowWidth: Int,
     val windowHeight: Int,
+    val viewAreas: CarPlayViewAreas? = null,
 )

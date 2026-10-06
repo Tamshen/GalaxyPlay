@@ -10,6 +10,38 @@ object AirPlayPortSelector {
     /** 首选端口被占用后依次尝试，最后由系统分配临时端口。 */
     val FALLBACK_PORTS: IntRange = 7001..7010
 
+    /** Specific per-family listeners avoid relying on a platform's IPV6_V6ONLY default. */
+    fun bindAll(
+        addresses: List<InetAddress>,
+        preferredPort: Int,
+        fallbackPorts: Iterable<Int> = FALLBACK_PORTS,
+        onFallback: (Int, Int) -> Unit = { _, _ -> },
+    ): List<ServerSocket> {
+        require(addresses.isNotEmpty()) { "At least one listener address is required" }
+        val candidates = listOf(preferredPort) + fallbackPorts.filter { it != preferredPort } + List(4) { 0 }
+        for (candidate in candidates) {
+            val servers = mutableListOf<ServerSocket>()
+            try {
+                for (address in addresses.distinct()) {
+                    servers.add(bindPort(address, servers.firstOrNull()?.localPort ?: candidate))
+                }
+            } catch (error: Throwable) {
+                servers.forEach { closeAfterFailure(it, error) }
+                if (error is BindException) continue
+                throw error
+            }
+            try {
+                val port = servers.first().localPort
+                if (preferredPort != 0 && port != preferredPort) onFallback(preferredPort, port)
+                return servers
+            } catch (error: Throwable) {
+                servers.forEach { closeAfterFailure(it, error) }
+                throw error
+            }
+        }
+        throw BindException("No common AirPlay port available for the selected interface addresses")
+    }
+
     fun bind(
         address: InetAddress,
         preferredPort: Int,

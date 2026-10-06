@@ -8,10 +8,10 @@ class ClusterTurnCardOverlayTest {
     @Test
     fun manualOffsetsReachThePanelEdges() {
         val left = ClusterTurnCardOverlay.card(
-            1920, 720, 10, 28, CarPlayClusterDisplay.OverlaySize.SMALL,
+            1920, 720, 10, 28, 40,
         )
         val right = ClusterTurnCardOverlay.card(
-            1920, 720, 90, 28, CarPlayClusterDisplay.OverlaySize.SMALL,
+            1920, 720, 90, 28, 40,
         )
         assertTrue(left.left < 1920 * 0.12)
         assertTrue(right.left + right.width > 1920 * 0.88)
@@ -24,7 +24,7 @@ class ClusterTurnCardOverlayTest {
             1920, 720,
             ClusterTurnCardOverlay.DEFAULT_X_PERCENT,
             ClusterTurnCardOverlay.DEFAULT_Y_PERCENT,
-            CarPlayClusterDisplay.OverlaySize.MEDIUM,
+            55,
         )
         assertTrue(card.left > 1920 / 2)
         assertTrue(card.top < 720 / 2)
@@ -35,7 +35,7 @@ class ClusterTurnCardOverlayTest {
     @Test
     fun largeCardDoesNotCoverTheWholePanel() {
         val large = ClusterTurnCardOverlay.card(
-            1920, 720, 75, 28, CarPlayClusterDisplay.OverlaySize.LARGE,
+            1920, 720, 75, 28, 75,
         )
         assertTrue(large.width < 1920 / 2)
         assertTrue(large.height < 720 / 2)
@@ -46,7 +46,7 @@ class ClusterTurnCardOverlayTest {
         for (x in ClusterTurnCardOverlay.xPercents) {
             for (y in ClusterTurnCardOverlay.yPercents) {
                 val card = ClusterTurnCardOverlay.card(
-                    1920, 720, x, y, CarPlayClusterDisplay.OverlaySize.MEDIUM,
+                    1920, 720, x, y, 55,
                 )
                 assertTrue(card.left >= 0)
                 assertTrue(card.top >= 0)

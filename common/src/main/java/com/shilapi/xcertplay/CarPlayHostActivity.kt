@@ -183,6 +183,7 @@ class CarPlayHostActivity : ComponentActivity() {
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
         // USB 有线连接不依赖未填写的无线热点参数。
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
+        wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
         manualHotspotSsid = manualHotspotSsid,
         manualHotspotPassphrase = manualHotspotPassphrase,
         manualHotspotBand = manualHotspotBand,
@@ -451,7 +452,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val bootstrap = runCatching { DiPlayBootstrap.ensure(this) }
         if (bootstrap.isFailure) {
             L7WiredDiagnostics.event(this, wiredAttempt, "AUTH_BOOTSTRAP", "FAILED", bootstrap.exceptionOrNull(), "FAILED")
-            startActivity(Intent(this, DiPlayActivity::class.java))
+            startActivity(Intent(this, GalaxySettingsActivity::class.java))
             finish(); return
         }
         L7WiredDiagnostics.event(this, wiredAttempt, "HOST_UI", "BEGIN")
@@ -673,12 +674,8 @@ class CarPlayHostActivity : ComponentActivity() {
         L7DesktopNavigation.ensure(this)
         projectionNavigation?.refreshAppearance()
         projectionNavigation?.setConnected(controller?.hasActiveSession() == true)
-        // 从 L7 设置返回时读取新认证配置，避免复用宿主仍持有旧来源。
-        if (!menuOpen) {
-            mfiTarget = AirPlayPersistence.loadMfiTarget(this)
-            remoteMfiServer = AirPlayPersistence.loadRemoteMfiServer(this)
-            remoteMfiToken = AirPlayPersistence.loadRemoteMfiToken(this)
-        }
+        // 设置页复用原宿主，握手前须读取新连接方式、凭据及显式认证来源。
+        if (!menuOpen) loadPersistedSettings()
         val languagePreference = AppLocale.preference(this)
         if (Build.VERSION.SDK_INT < 33 && languagePreference != languagePreferenceAtCreate) {
             languagePreferenceAtCreate = languagePreference
@@ -702,6 +699,7 @@ class CarPlayHostActivity : ComponentActivity() {
         ensureClusterPresentation()
         maybeStartCarPlay()
         applyFullscreenMode()
+        refreshDisplaySizeAfterLayout()
     }
 
     // Experimental: the CarPlay instrument-cluster stream on the BYD cluster projection display.
@@ -837,12 +835,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     // L7 标准媒体键与系统媒体控制共用转发路径；语音广播另由会话所属接收器处理。
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (l7DebugLogs && CarPlayMediaKeys.onHardwareKey(controller, event)) return true
+        if (l7DebugLogs && GalaxyMediaKeys.onHardwareKey(controller, event)) return true
         val voiceKey = if (l7DebugLogs) event.keyCode == KeyEvent.KEYCODE_VOICE_ASSIST
             else CarPlayMediaButton.opensSiri(event.keyCode)
         if (!voiceKey) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_UP) {
-            val sent = if (l7DebugLogs) CarPlayMediaKeys.onVoiceKey(controller) else controller?.requestSiri() == true
+            val sent = if (l7DebugLogs) GalaxyMediaKeys.onVoiceKey(controller) else controller?.requestSiri() == true
             appendLog("Siri: voice key ${event.keyCode} sent=$sent")
         }
         return true
@@ -999,7 +997,9 @@ class CarPlayHostActivity : ComponentActivity() {
         return root
     }
 
-    private fun createVideoRecoveryPanel() = L7VideoRecoveryPanel(L7UiDensity.wrap(this),
+    private val galaxyChrome by lazy { GalaxyHostChrome(this) }
+
+    private fun createVideoRecoveryPanel() = galaxyChrome.videoRecovery(
         retry = ::retryCurrentVideo, settings = { showDiPlayHome("settings-connection") })
 
     private fun retryCurrentVideo(): Boolean {
@@ -1010,22 +1010,20 @@ class CarPlayHostActivity : ComponentActivity() {
         return queued
     }
 
-    private fun createL7Waiting() = L7ConnectionPanel(L7UiDensity.wrap(this), wirelessEnabled,
-        onReturn = { showDiPlayHome() },
-        onCancel = {
-            CarPlayBackgroundSession.stop { runOnUiThread { showDiPlayHome(); finish() } }
-        },
-        onRecovery = { showDiPlayHome("wireless-recovery") },
-    )
-
-    private fun createL7Navigation() = L7ProjectionNavigation(L7UiDensity.wrap(this), ::releaseVideoTouches) { destination ->
-        when (destination) {
-            "home" -> Unit
-            "exit" -> L7AppExit.confirm(this)
-            "car-home" -> startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
-            else -> showDiPlayHome(destination)
+    private fun createL7Waiting() = galaxyChrome.waiting(wirelessEnabled,
+        home = { showDiPlayHome() },
+        cancel = { CarPlayBackgroundSession.stop { runOnUiThread { showDiPlayHome(); finish() } } },
+        recovery = { showDiPlayHome("wireless-recovery") }).also { panel ->
+        panel.retryButton.visibility = if (startupRecovery.stopped) View.VISIBLE else View.GONE
+        panel.retryButton.setOnClickListener {
+            if (shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return@setOnClickListener
+            startupRecovery.manualRetry()
+            panel.retryButton.visibility = View.GONE
+            restartCarPlay("Manual wireless retry")
         }
     }
+
+    private fun createL7Navigation() = galaxyChrome.navigation(::releaseVideoTouches, ::showDiPlayHome)
 
     private fun refreshL7ChromeDensity() {
         if (!l7DebugLogs || l7ChromeDensity == L7UiDensity.value(this)) return
@@ -2723,6 +2721,7 @@ class CarPlayHostActivity : ComponentActivity() {
         WirelessHotspotMode.WIFI_P2P -> getString(R.string.wi_fi_p2p_5_ghz)
         WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.localonlyhotspot)
         WirelessHotspotMode.MANUAL -> getString(R.string.manual_hotspot)
+        WirelessHotspotMode.EXISTING_WIFI -> getString(R.string.existing_wifi_title)
     }
 
     private fun menuText(
@@ -2908,35 +2907,13 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun largerCanvasSupport(display: AirPlayDisplayConfig): CanvasSupport = try {
         val mime = if (hevcEnabled) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
-        // Match MediaCodec.createDecoderByType's first suitable decoder; do not silently force
-        // an enlarged stream through a software decoder on a slower head unit.
-        val decoder = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
-            !it.isEncoder && it.supportedTypes.any { type -> type.equals(mime, ignoreCase = true) }
-        }
-        if (decoder == null) {
-            CanvasSupport(false, "no_decoder", "Decoder capability mime=$mime result=no_decoder")
-        } else {
-            val hardware = if (Build.VERSION.SDK_INT >= 29) decoder.isHardwareAccelerated
-                else !decoder.name.startsWith("OMX.google.") && !decoder.name.startsWith("c2.android.")
-            val video = decoder.getCapabilitiesForType(mime).videoCapabilities
-            val sizeSupported = video?.isSizeSupported(display.widthPixels, display.heightPixels) == true
-            val rateSupported = sizeSupported && video?.areSizeAndRateSupported(
-                display.widthPixels, display.heightPixels, display.fps.toDouble()) == true
-            val reason = when {
-                !hardware -> "software_decoder"
-                hevcEnabled && hevcSoftwareDecoderEnabled -> "software_hevc_selected"
-                video == null -> "no_video_capabilities"
-                !sizeSupported -> "canvas_dimensions_unsupported"
-                !rateSupported -> "frame_rate_unsupported"
-                else -> "supported"
-            }
-            CanvasSupport(reason == "supported", reason,
-                "Decoder capability codec=${decoder.name} mime=$mime hardware=$hardware " +
-                    "sizeSupported=$sizeSupported rateSupported=$rateSupported " +
-                    "widths=${video?.supportedWidths} heights=${video?.supportedHeights} " +
-                    "alignment=${video?.widthAlignment}x${video?.heightAlignment} " +
-                    "fpsRange=${video?.supportedFrameRates} result=$reason")
-        }
+        val messages = mutableListOf<String>()
+        val candidates = com.shilapi.xcertplay.media.VideoDecoderCapabilities.query(mime,
+            display.widthPixels, display.heightPixels, display.fps.toDouble(), messages::add)
+        val hardware = candidates.any { it.hardware }
+        val supported = hardware && !(hevcEnabled && hevcSoftwareDecoderEnabled)
+        CanvasSupport(supported, if (supported) "supported" else "no_hardware_canvas_support",
+            messages.joinToString("\n").ifEmpty { "Decoder capability result=no_decoder" })
     } catch (error: Exception) {
         CanvasSupport(false, "capability_query_${error.javaClass.simpleName}",
             "Decoder capability query failed error=${error.javaClass.simpleName}")
@@ -3167,8 +3144,6 @@ class CarPlayHostActivity : ComponentActivity() {
     ): AndroidMediaSink {
         // 固定当前会话文件，解码器的迟到回调不能写入新会话。
         val diagnosticLog = sessionLog
-        L7VoiceDiagnostics.initialize(applicationContext)
-        val voiceOwner = L7VoiceDiagnostics.store.session()
         // 当前会话固定一份模板，设置修改从下次连接起生效。
         val audioTemplate = if (l7DebugLogs) L7AudioTemplates.load(this) else null
         return AndroidMediaSink(
@@ -3185,9 +3160,8 @@ class CarPlayHostActivity : ComponentActivity() {
             assistantChannel = audioTemplate?.choice(com.shilapi.xcertplay.media.AudioOutputRole.ASSISTANT)
                 ?: AirPlayPersistence.loadAssistantAudioChannel(this),
             context = this,
-            enableL7AudioRouting = audioTemplate?.preferBus ?: AirPlayPersistence.loadL7AudioBusEnabled(this),
-            audioRoutingTemplate = audioTemplate,
-            enableL7AudioProfile = l7DebugLogs,
+            platformAdaptation = com.shilapi.xcertplay.media.GalaxyMediaPolicy(
+                l7DebugLogs, audioTemplate?.preferBus ?: AirPlayPersistence.loadL7AudioBusEnabled(this), audioTemplate),
             wirelessAudio = wirelessEnabled,
             callProcessingEnabled = AirPlayPersistence.loadCallProcessingEnabled(this),
             onVideoFailure = { codec, reason -> onVideoFailure(controllerGeneration, codec, reason) },
@@ -3197,12 +3171,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 onScreenStreamStateChanged(controllerGeneration, type, active)
             },
             mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
-            onAudioDiagnostic = { message ->
-                L7VoiceDiagnostics.store.observe(voiceOwner, message)
-                val line = formattedLogLine("g=$controllerGeneration $message", System.currentTimeMillis())
-                if (l7DebugLogs) L7DebugLog.buffer.append(line)
-                AsyncDiagnosticLog.append(diagnosticLog, "g=$controllerGeneration $message")
-            },
+            onAudioDiagnostic = GalaxySessionDiagnostics.audio(applicationContext, diagnosticLog, controllerGeneration, l7DebugLogs),
             onVideoSizeChanged = { width, height -> updateVideoCanvas(controllerGeneration, width, height) },
         )
     }
@@ -3284,9 +3253,25 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             }
 
+            override fun onVideoFrameRendered(session: AirPlaySession) {
+                runOnUiThread {
+                    if (controllerGeneration != restartGeneration || activeAirPlaySession !== session || shuttingDown.get()) return@runOnUiThread
+                    if (!startupRecovery.firstFrame(session, android.os.SystemClock.elapsedRealtime())) return@runOnUiThread
+                    mainHandler.postDelayed({
+                        if (controllerGeneration == restartGeneration && activeAirPlaySession === session &&
+                            !shuttingDown.get() && CarPlayBackgroundSession.isOwner(this@CarPlayHostActivity) &&
+                            startupRecovery.stable(session, android.os.SystemClock.elapsedRealtime())) {
+                            appendLog("Wireless startup budget reset after stable video")
+                        }
+                    }, com.shilapi.xcertplay.network.WirelessStartupPolicy.STABLE_SESSION_MILLIS)
+                }
+            }
+
             override fun onSessionEnded(session: AirPlaySession) {
                 runOnUiThread {
-                    if (controllerGeneration != restartGeneration) return@runOnUiThread
+                    if (controllerGeneration != restartGeneration || startupRecovery.stopped) return@runOnUiThread
+                    if (activeAirPlaySession != null && activeAirPlaySession !== session) return@runOnUiThread
+                    startupRecovery.disconnected()
                     appendLog("AirPlay session ended")
                     if (activeAirPlaySession === session) {
                         activeAirPlaySession = null
@@ -3308,6 +3293,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     if (menuOpen || controllerGeneration != restartGeneration) {
                         return@runOnUiThread
                     }
+                    startupRecovery.disconnected()
                     activeScreenStreamTypes.clear()
                     setConnectionStage(getString(R.string.transport_error_reconnecting))
                     reconnectAfterLoss("CarPlay transport error: $message")
@@ -3315,6 +3301,8 @@ class CarPlayHostActivity : ComponentActivity() {
             }
 
             override fun onDebugLog(message: String) {
+                if (controllerGeneration != restartGeneration &&
+                    !message.startsWith(CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX)) return
                 val safe = DiagnosticRedactor.redact(message) ?: return
                 // 文件目标随监听器固定，旧控制器的关闭诊断仍落在所属会话；写盘不占用主线程。
                 AsyncDiagnosticLog.append(diagnosticLog, safe)
@@ -3349,7 +3337,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     wifiRecoveryButton?.visibility = View.VISIBLE
                 } else {
                     wifiRecoveryButton?.visibility = View.GONE
-                    reconnectAfterLoss(description)
+                    reconnectAfterLoss(description, status.startupFailure)
                 }
                 else -> Unit
             }
@@ -3482,8 +3470,8 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         )
         controller = next
-        CarPlayMediaKeys.attach(this, next, renderer::resumeMediaAudioFocus, renderer::isAssistantAudioActive)
-        renderer.setMediaAudioChangedListener { active -> CarPlayMediaKeys.onMediaAudioChanged(next, active) }
+        GalaxyMediaKeys.attach(this, next, renderer::resumeMediaAudioFocus, renderer::isAssistantAudioActive)
+        renderer.setMediaAudioChangedListener { active -> GalaxyMediaKeys.onMediaAudioChanged(next, active) }
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, size.width, size.height)
@@ -3549,7 +3537,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun applyDisplaySize(size: DisplaySize) {
         val display = sessionDisplay
-        val layoutChanged = displayLayoutChanged()
+        val layoutChanged = displayLayoutChanged(size)
         if (shuttingDown.get()) return
         if (size == activeDisplaySize && !layoutChanged) {
             // 等待期间旧会话可能已经拆除，即使尺寸未变也要重新检查启动条件。
@@ -3593,11 +3581,15 @@ class CarPlayHostActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun displayRotation(): Int = videoView?.display?.rotation ?: windowManager.defaultDisplay.rotation
 
-    private fun displayLayoutChanged(): Boolean {
+    private fun displayLayoutChanged(newSize: DisplaySize? = activeDisplaySize): Boolean {
         val display = sessionDisplay ?: return false
         // 环视可能把窗口变窄，不能用窗口宽高比例判断屏幕发生了旋转。
-        return display.rotation != displayRotation() ||
-            display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar
+        if (display.rotation != displayRotation() || display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
+        if (newSize != null && newSize.width > 0 && newSize.height > 0 && AirPlayPersistence.loadAdaptPipResolution(this)) {
+            val aspectDiff = kotlin.math.abs((newSize.width.toDouble() / newSize.height) / (display.width.toDouble() / display.height) - 1.0)
+            if (aspectDiff > 0.08) return true
+        }
+        return false
     }
 
     private fun recordDetectedMaximum(size: DisplaySize) {
@@ -3650,13 +3642,27 @@ class CarPlayHostActivity : ComponentActivity() {
         L7WiredDiagnostics.event(this, wiredAttempt, "STARTUP_WAIT", reason)
     }
 
-    private fun reconnectAfterLoss(reason: String) {
+    private val startupRecovery = GalaxyWirelessRecovery()
+
+    private fun reconnectAfterLoss(reason: String, startupFailure: com.shilapi.xcertplay.network.WirelessStartupFailure? = null) {
         if (!CarPlayBackgroundSession.isOwner(this)) return
-        if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
+        if (shuttingDown.get() || menuOpen || handshakeResetInProgress || startupRecovery.stopped) return
         if (reconnectScheduled) return
+        val startupDelay = startupFailure?.let { failure ->
+            when (val decision = startupRecovery.failed(restartGeneration, failure)) {
+                is GalaxyWirelessRecovery.Decision.Retry -> decision.delayMillis
+                GalaxyWirelessRecovery.Decision.Ignore -> return
+                GalaxyWirelessRecovery.Decision.Stop -> {
+                    (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
+                    setConnectionStage("$reason\n${getString(R.string.wireless_startup_retries_exhausted)}")
+                    appendLog("Wireless recovery stopped retries=${startupRecovery.retries}")
+                    return
+                }
+            }
+        }
         reconnectScheduled = true
         val generation = restartGeneration
-        val delayMillis = if (reason.contains("AirPlay iAP tunnel", ignoreCase = true)) {
+        val delayMillis = if (startupDelay != null) startupDelay else if (reason.contains("AirPlay iAP tunnel", ignoreCase = true)) {
             IAP_TUNNEL_RECONNECT_DELAY_MILLIS
         } else {
             (RECONNECT_DELAY_MILLIS * (1L shl reconnectAttempts.coerceAtMost(4))).coerceAtMost(30_000L)
@@ -3670,7 +3676,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     shuttingDown.get() ||
                     menuOpen ||
                     handshakeResetInProgress ||
-                    generation != restartGeneration
+                    generation != restartGeneration || startupRecovery.stopped
                 ) {
                     return@postDelayed
                 }
@@ -3685,6 +3691,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
         val size = activeDisplaySize ?: return
+        startupRecovery.disconnected()
         appendLog(reason)
         activeScreenStreamTypes.clear()
         pendingVideoFailure = null
@@ -3698,7 +3705,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val oldSink = sink
         releaseVideoTouches()
         oldSink?.let(::detachVideoOwner)
-        CarPlayMediaKeys.detach(oldController)
+        GalaxyMediaKeys.detach(oldController)
         CarPlayBackgroundSession.clear(oldController, keepOwner = true)
         controller = null
         sink = null
@@ -3720,7 +3727,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun showDiPlayHome(page: String = "home") {
         releaseVideoTouches()
-        startActivity(Intent(this, DiPlayActivity::class.java)
+        startActivity(Intent(this, GalaxySettingsActivity::class.java)
             .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
 
@@ -3782,7 +3789,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val oldSink = sink
         releaseVideoTouches()
         oldSink?.let(::detachVideoOwner)
-        CarPlayMediaKeys.detach(oldController)
+        GalaxyMediaKeys.detach(oldController)
         CarPlayBackgroundSession.clear(oldController)
         controller = null
         sink = null
@@ -4082,6 +4089,7 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.ConnectingBluetooth -> getString(R.string.connecting_bluetooth)
         CarPlayStatus.RunningWireless -> getString(R.string.wireless_carplay_control_running)
         CarPlayStatus.WirelessActive -> getString(R.string.wireless_carplay_active)
+        CarPlayStatus.WirelessActiveFallback -> getString(R.string.wireless_carplay_active)
         CarPlayStatus.DiscoveringIphone -> getString(R.string.discovering_iphone)
         CarPlayStatus.WaitingForIphone -> getString(R.string.waiting_for_iphone_over_usb)
         CarPlayStatus.RequestingIphonePermission -> getString(R.string.requesting_iphone_usb_permission)
@@ -4135,119 +4143,3 @@ class CarPlayHostActivity : ComponentActivity() {
 }
 
 /** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */
-internal object CarPlayBackgroundSession {
-    @Volatile var active = false
-    private var stopAction: (((() -> Unit)) -> Unit)? = null
-    private var stopping = false
-    private var owner: Any? = null
-    @Synchronized fun isOwner(candidate: Any): Boolean = owner === candidate
-    @Synchronized fun hasSession(): Boolean = stopAction != null || stopping
-    @Synchronized fun isStopping(): Boolean = stopping
-    private val stopWaiters = mutableListOf<() -> Unit>()
-
-    fun stop(completion: () -> Unit = {}) {
-        L7StartupGuard.stopped()
-        val action: (((() -> Unit)) -> Unit)?
-        synchronized(this) {
-            if (stopping) { stopWaiters.add(completion); return }
-            action = stopAction
-            if (action != null) { stopping = true; stopWaiters.add(completion) }
-        }
-        if (action == null) { completion(); return }
-        action.invoke {
-            val callbacks = synchronized(this) {
-                stopping = false
-                stopWaiters.toList().also { stopWaiters.clear() }
-            }
-            callbacks.forEach { it() }
-        }
-    }
-
-    data class Snapshot(
-        val controller: CarPlayController,
-        val sink: AndroidMediaSink,
-        val width: Int,
-        val height: Int,
-        val display: CarPlaySessionDisplay?,
-    )
-
-    private var controller: CarPlayController? = null
-    private var sink: AndroidMediaSink? = null
-    private var bluetoothMediaGuard: L7BluetoothMediaGuard? = null
-    private var width = 0
-    private var height = 0
-    private var display: CarPlaySessionDisplay? = null
-
-    @Synchronized
-    fun snapshot(): Snapshot? {
-        val currentController = controller ?: return null
-        val currentSink = sink ?: return null
-        return Snapshot(currentController, currentSink, width, height, display)
-    }
-
-    @Synchronized
-    fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int, owner: Any,
-              display: CarPlaySessionDisplay? = null, stop: (() -> Unit) -> Unit) {
-        L7ReportingTests.stop("CARPLAY_SESSION")
-        if (this.controller !== controller) {
-            bluetoothMediaGuard?.close()
-            bluetoothMediaGuard = null
-            L7BluetoothAudioSettings.status = BluetoothMediaStatus.IDLE
-        }
-        this.stopAction = stop
-        this.owner = owner
-        this.controller = controller
-        this.sink = sink
-        this.width = width
-        this.height = height
-        this.display = display
-    }
-
-    @Synchronized
-    fun clear(expected: CarPlayController? = null, keepOwner: Boolean = false) {
-        if (expected != null && controller !== expected) return
-        bluetoothMediaGuard?.close()
-        bluetoothMediaGuard = null
-        controller = null
-        sink = null
-        if (!keepOwner) { stopAction = null; owner = null }
-        active = false
-        width = 0
-        height = 0
-        display = null
-    }
-
-    /** 与后台控制器共存，切换设置或重建窗口不重复断开；结束会话才释放监听。 */
-    @Synchronized fun setBluetoothMediaActive(expected: CarPlayController, context: Context, active: Boolean) {
-        if (controller !== expected) return
-        if (active && expected.isClosed()) return
-        if (!active) {
-            bluetoothMediaGuard?.close()
-            bluetoothMediaGuard = null
-            return
-        }
-        if (bluetoothMediaGuard != null) return
-        bluetoothMediaGuard = L7BluetoothMediaGuard(expected.activeBluetoothDeviceAddress,
-            AirPlayPersistence.loadBluetoothMediaExclusive(context), AndroidBluetoothMediaPort(context.applicationContext)) {
-            L7BluetoothAudioSettings.status = it
-        }.also { it.start() }
-    }
-
-    /** 设置页更新当前会话的既有保护器；不创建会话或重置尝试预算。 */
-    @Synchronized fun updateBluetoothMediaAutomatic(enabled: Boolean) {
-        bluetoothMediaGuard?.setAutomatic(enabled)
-    }
-
-    /** 手机播放命令与 A2DP 断开确认协调；暂停取消等待，旧控制器不能恢复播放。 */
-    fun beforeMediaCommand(expected: CarPlayController, index: Int, action: () -> Unit, dropped: (String) -> Unit = {}) {
-        val guard = synchronized(this) {
-            if (controller !== expected || expected.isClosed()) { dropped("STALE_CONTROLLER"); return }
-            bluetoothMediaGuard
-        }
-        if (index == CarPlayMediaButton.PLAY && guard != null) guard.beforePlay(action, dropped)
-        else {
-            if (index == CarPlayMediaButton.PAUSE || index == CarPlayMediaButton.PLAY_PAUSE) guard?.cancelPendingPlay()
-            action()
-        }
-    }
-}

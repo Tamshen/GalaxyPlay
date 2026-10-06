@@ -11,7 +11,7 @@ class L7FactoryAudioProfile internal constructor(
     private val framework: (Class<*>, String) -> Int? = { type, name ->
         runCatching { type.getField(name).getInt(null) }.getOrNull()?.takeIf { it > 0 }
     },
-) {
+) : PlatformAudioProfile {
     internal fun usage(channel: AudioChannel): Int {
         val kind = when (channel) {
             AudioChannel.MEDIA -> "MEDIA"
@@ -31,7 +31,7 @@ class L7FactoryAudioProfile internal constructor(
     fun attributes(role: AudioOutputRole, choice: Int): AudioAttributes =
         attributes(role.channel, role.contentType, choice)
 
-    internal fun attributes(channel: AudioChannel, contentType: Int, choice: Int): AudioAttributes {
+    override fun attributes(channel: AudioChannel, contentType: Int, choice: Int): AudioAttributes {
         val fallback = AudioOutputPolicy.usage(channel, choice)
         // 电话固定使用标准通信用途；不将厂商编号误当设备或扬声器编号。
         val usage = if (channel != AudioChannel.PHONE &&
@@ -44,7 +44,7 @@ class L7FactoryAudioProfile internal constructor(
             .setUsage(fallback).setContentType(contentType).build()
     }
 
-    internal fun microphoneSource(audioType: String, sampleRate: Int, wireless: Boolean): Int? {
+    override fun microphoneSource(audioType: String, sampleRate: Int, wireless: Boolean): Int? {
         val kind = when (audioType.lowercase()) {
             "speechrecognition" -> "SIRI"
             "telephony" -> when {

@@ -21,7 +21,7 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class L7VoiceInputDebugPageTest {
-    private lateinit var activity: DiPlayActivity
+    private lateinit var activity: GalaxySettingsActivity
     private lateinit var page: L7VoiceInputDebugPage
     private val controller = mock(CarPlayController::class.java)
     private val sink = mock(AndroidMediaSink::class.java)
@@ -36,7 +36,7 @@ class L7VoiceInputDebugPageTest {
 
     @Before fun setup() {
         CarPlayBackgroundSession.clear()
-        activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        activity = Robolectric.buildActivity(GalaxySettingsActivity::class.java).get()
         activity.setTheme(R.style.Theme_Xcertplay)
         L7Agreement.accept(activity)
         shadowOf(activity.application).grantPermissions(Manifest.permission.RECORD_AUDIO)

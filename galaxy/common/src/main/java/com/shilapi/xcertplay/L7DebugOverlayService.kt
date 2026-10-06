@@ -94,7 +94,7 @@ class L7DebugOverlayService : Service() {
         notifications.createNotificationChannel(NotificationChannel(CHANNEL,
             getString(R.string.l7_debug_title), NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 30,
-            Intent(this, DiPlayActivity::class.java).putExtra("page", "diagnostics"),
+            Intent(this, GalaxySettingsActivity::class.java).putExtra("page", "diagnostics"),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 31,
             Intent(this, L7DebugOverlayService::class.java).setAction(ACTION_STOP),

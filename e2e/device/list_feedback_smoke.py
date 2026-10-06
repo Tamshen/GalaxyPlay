@@ -70,7 +70,7 @@ adb('push', str(args.pointer_jar), remote)
 try:
     for theme, mode in [('day', 'no'), ('night', 'yes')]:
         adb('shell', 'cmd', 'uimode', 'night', mode)
-        adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', 'settings-display')
+        adb('shell', 'am', 'start', '-n', 'com.ecarx.carplay/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-display')
         row = find('帧率')
         x, y = point(row)
         bounds = box(row)

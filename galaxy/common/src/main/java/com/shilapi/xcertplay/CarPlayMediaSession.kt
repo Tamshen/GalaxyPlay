@@ -46,7 +46,7 @@ internal class CarPlayMediaSession(
     internal var session: MediaSession? = null
         private set
 
-    private val callback = CarPlayMediaCallback(explicitHardwareActions = true,
+    private val callback = GalaxyMediaCallback(explicitHardwareActions = true,
         observeKey = { event, source -> if ("window-key" !in source) VehicleSteeringInputLog.key(event, source) },
         tracedSend = traceSend?.let { { index, source, trace -> command(index, source, trace) } }) { index, source ->
         command(index, source, null)

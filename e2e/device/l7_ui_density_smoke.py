@@ -45,7 +45,7 @@ def tap(label):
 
 
 def launch(page):
-    adb('shell', 'am', 'start', '-W', '-f', '0x00020000', '-n', package + '/com.shilapi.xcertplay.DiPlayActivity', '--es', 'page', page)
+    adb('shell', 'am', 'start', '-W', '-f', '0x00020000', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', page)
     time.sleep(.5)
     # 已有 singleTask 投屏任务时，Android 可能恢复任务顶层；沿实际菜单进入目标页。
     if page == 'settings-display' and find('界面大小') is None:

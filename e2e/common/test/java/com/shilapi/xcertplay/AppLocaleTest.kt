@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.LocaleList
 import android.view.View
+import com.shilapi.xcertplay.host.R
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith

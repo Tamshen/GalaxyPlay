@@ -56,7 +56,8 @@ class RemoteLogDeviceTest {
     }
 
     @Test fun emptyReportsDoNotRepeatDeviceIdentity() {
-        val record = JSONArray(RemoteLogReport.create(emptyList(), "test", "test").batches.first().body.toString(Charsets.UTF_8)).getJSONObject(0)
+        assertTrue(RemoteLogReport.create(emptyList(), "test", "test").batches.isEmpty())
+        val record = JSONArray(RemoteLogReport.create(listOf("event=observed"), "test", "test").batches.first().body.toString(Charsets.UTF_8)).getJSONObject(0)
         assertFalse(record.has("device_id"))
     }
 

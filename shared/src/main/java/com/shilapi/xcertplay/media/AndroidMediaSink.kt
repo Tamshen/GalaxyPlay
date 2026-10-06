@@ -6,7 +6,6 @@ import android.media.AudioFormat as AndroidAudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaCodec
-import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Build
 import android.os.Handler
@@ -53,13 +52,11 @@ class AndroidMediaSink(
     private val onAudioDiagnostic: (String) -> Unit = {},
     onMediaAudioChanged: (Boolean) -> Unit = {},
     onVideoSizeChanged: ((Int, Int) -> Unit)? = null,
-    enableL7AudioRouting: Boolean = false,
     onVideoFailure: ((VideoCodec, String) -> Unit)? = null,
     private val assistantChannel: Int = 0,
     private val callProcessingEnabled: Boolean = true,
-    enableL7AudioProfile: Boolean = false,
     private val wirelessAudio: Boolean = false,
-    private val audioRoutingTemplate: AudioRoutingTemplate? = null,
+    platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
     onVideoRecovered: (() -> Unit)? = null,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
@@ -74,7 +71,8 @@ class AndroidMediaSink(
     @Volatile private var videoSizeChanged = onVideoSizeChanged
     @Volatile private var mainVideoSize = videoWidth to videoHeight
     private val appContext = context?.applicationContext
-    private val factoryAudio = if (enableL7AudioProfile) L7FactoryAudioProfile.load() else null
+    private val factoryAudio = platformAdaptation.profile
+    private val audioRoutingTemplate = platformAdaptation.template
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
         audioFocusEnabled,
@@ -89,8 +87,7 @@ class AndroidMediaSink(
         val mode = runCatching { appContext?.getSystemService(AudioManager::class.java)?.mode }.getOrNull()
         return "audioMode=${mode ?: "unknown"} ${audioFocusCoordinator.diagnosticState()}"
     }
-    private val audioRouting = if (appContext != null)
-        L7AudioRouting(appContext, audioRoutingTemplate?.preferBus ?: enableL7AudioRouting, audioRoutingTemplate, onAudioDiagnostic) else null
+    private val audioRouting = platformAdaptation.audioRoutes(appContext, onAudioDiagnostic)
     private val screenStateLock = Any()
     private val videoLifecycleLock = Any()
     @Volatile private var closed = false
@@ -696,25 +693,7 @@ private class VideoDecoder(
     }
 
     private fun decoderCandidates(mime: String): List<VideoDecoderCandidate> = decoderCandidateCache.getOrPut(mime) {
-        val candidates = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.mapNotNull { info ->
-            if (info.isEncoder || mime !in info.supportedTypes) return@mapNotNull null
-            runCatching {
-                val capabilities = info.getCapabilitiesForType(mime)
-                val video = capabilities.videoCapabilities
-                val supported = video?.isSizeSupported(width, height) == true
-                report("decoder capability codec=${info.name} mime=$mime requested=${width}x$height " +
-                    "sizeSupported=$supported widths=${video?.supportedWidths} heights=${video?.supportedHeights} " +
-                    "alignment=${video?.widthAlignment}x${video?.heightAlignment} fpsRange=${video?.supportedFrameRates} " +
-                    "profiles=${capabilities.profileLevels.joinToString(",") { "${it.profile}:${it.level}" }}")
-                if (!supported) return@runCatching null
-                VideoDecoderCandidate(
-                    info.name,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isHardwareAccelerated,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && capabilities.isFeatureSupported("low-latency"),
-                )
-            }.onFailure { report("decoder capability query failed codec=${info.name} mime=$mime error=${it.javaClass.simpleName}") }.getOrNull()
-        }
+        val candidates = VideoDecoderCapabilities.query(mime, width, height, report = report)
         if (candidates.isEmpty()) report("no usable decoder mime=$mime size=${width}x$height reason=capability_filter")
         VideoDecoderSelection.ordered(candidates,
             preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC)
@@ -982,8 +961,8 @@ private class AudioRenderer(
     private val navigationChannel: Int,
     private val assistantChannel: Int,
     private val audioFocusCoordinator: AudioFocusCoordinator,
-    private val audioRouting: L7AudioRouting?,
-    private val factoryAudio: L7FactoryAudioProfile?,
+    private val audioRouting: AudioRouteProvider?,
+    private val factoryAudio: PlatformAudioProfile?,
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
@@ -998,7 +977,7 @@ private class AudioRenderer(
     private var pendingPacket: AudioPacket? = null
     private var pendingDueNs = 0L
 
-    private var routeBinding: L7AudioRouting.Binding? = null
+    private var routeBinding: AudioRouteBinding? = null
     private var trackAttributes: AudioAttributes? = null
     private var mappedChannel: AudioChannel? = null
     private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)

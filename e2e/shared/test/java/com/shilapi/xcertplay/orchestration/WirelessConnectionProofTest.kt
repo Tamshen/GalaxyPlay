@@ -31,6 +31,17 @@ class WirelessConnectionProofTest {
         assertFalse(proof.hasRenderedFrame(2))
     }
 
+
+    @Test fun activeSessionEvidenceIsScopedToGenerationAndClearedOnEnd() {
+        val session = Any()
+        val proof = WirelessConnectionProof<Any>()
+        proof.begin(1) {}
+        proof.activate(1, session)
+        assertTrue(proof.hasActiveSession(1))
+        assertFalse(proof.hasActiveSession(2))
+        proof.end(1, session)
+        assertFalse(proof.hasActiveSession(1))
+    }
     @Test fun authenticationWithoutVideoDoesNotConfirm() {
         var saves = 0
         val proof = WirelessConnectionProof<Any>()
