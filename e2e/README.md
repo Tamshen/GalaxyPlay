@@ -172,7 +172,7 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 [L7SteeringWheelTest](common/test/java/com/shilapi/xcertplay/L7SteeringWheelTest.kt) 用模拟广播检查长按、活动助手短按、未连接/关闭拒绝，以及广播与标准语音键去重；不证明实车广播权限或 Siri 已响应。蓝牙互斥用例同时覆盖明确播放等待断开确认、重复点击合并、暂停/关闭丢弃、超时只降级一次；媒体会话用例核对手机状态转换为明确播放/暂停及当前窗口标准媒体键，焦点用例在 API 29/30 观察实际 AudioTrack 音量，核对博越助手和导航临时焦点及实际音量。
 
-设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`CarPlayMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖用途路由默认值、一次迁移后保留手动选择与恢复范围；`L7AudioSettingsTest` 检查内置方案收起技术参数、自定义展开、确认刷新及取消不保存；`L7AudioTemplatesTest` 与 shared 的 `AudioRoutingTemplateTest` 检查文件校验、旧配置迁移、模板隔离和损坏回退。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
+设备脚本追加 `--bluetooth-only` 检查设置入口、最近状态、手动降级说明及昼夜弹窗，不打开系统设置或操作蓝牙。`GalaxyMediaCallbackTest` 保留上游切换键回归并补充 L7 明确播放/暂停，`L7AudioPreferencesTest` 覆盖用途路由默认值、一次迁移后保留手动选择与恢复范围；`L7AudioSettingsTest` 检查内置方案收起技术参数、自定义展开、确认刷新及取消不保存；`L7AudioTemplatesTest` 与 shared 的 `AudioRoutingTemplateTest` 检查文件校验、旧配置迁移、模板隔离和损坏回退。实车需同时记录 CarPlay 播放、原车蓝牙音乐、焦点和电话，按使用说明导出同一复现时段日志。
 
 全部 Android 编译和测试在 `mobiledevops/android-sdk-image:latest` 的 Docker 工具链内执行；完整测试默认采用 `linux/amd64`。Apple Silicon 调试的 ARM64 混合构建入口见 [构建说明](../docs/开发与验证.md)，不将调试打包成功写成完整测试通过。在仓库根目录运行：
 
