@@ -414,6 +414,9 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     private fun selectL7Destination(destination: String) {
         when {
+            destination == "connection" -> GalaxyConnectionMenu.select(this) {
+                page = "settings-connection"; render()
+            }
             destination == "exit" -> L7AppExit.confirm(this)
             destination == "car-home" -> startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
             destination == "home" && CarPlayBackgroundSession.hasSession() -> openProjection()

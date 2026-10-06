@@ -70,11 +70,11 @@ def tap_overlay(label):
         assert x2 - x1 == y2 - y1, '当前不是收起入口'
         y = (y1 + y2) // 2
     else:
-        assert y2 - y1 > 3 * (x2 - x1), '当前不是四项菜单'
-        # 四项等高按钮；视觉状态另由留存截图复核，页面内的选中态仍读取无障碍节点。
-        index = ['画面', '设置', '车机', '退出'].index(label)
+        assert y2 - y1 > 3 * (x2 - x1), '当前不是五项菜单'
+        # 五项等高按钮；视觉状态另由留存截图复核，页面内的选中态仍读取无障碍节点。
+        index = ['画面', '连接', '设置', '车机', '退出'].index(label)
         padding = (x2 - x1) * 10 / 132
-        y = round(y1 + padding + (y2 - y1 - 2 * padding) * (index + .5) / 4)
+        y = round(y1 + padding + (y2 - y1 - 2 * padding) * (index + .5) / 5)
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str(y))
     time.sleep(.7)
 
@@ -107,7 +107,7 @@ assert overlay_bounds()[0] < 100 and overlay_bounds()[1] < 150, '展开菜单没
 screenshot('expanded')
 tap_overlay('画面')
 assert find('有线连接') is not None and overlay_bounds() is None
-print('后台悬浮入口、拖动、固定四项菜单、返回首页与应用内隐藏通过', flush=True)
+print('后台悬浮入口、拖动、固定五项菜单、返回首页与应用内隐藏通过', flush=True)
 tap('有线连接')
 assert find('返回 GalaxyPlay') is not None
 before = host_id()

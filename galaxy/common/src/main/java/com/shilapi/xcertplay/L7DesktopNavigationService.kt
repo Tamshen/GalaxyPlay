@@ -21,6 +21,7 @@ class L7DesktopNavigationService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var floating: L7DesktopWindow
     private var exitDialog: AlertDialog? = null
+    private var connectionDialog: AlertDialog? = null
     private val update = object : Runnable {
         override fun run() { sync(); handler.postDelayed(this, 500) }
     }
@@ -52,7 +53,7 @@ class L7DesktopNavigationService : Service() {
 
     private fun sync() {
         if (!allowed()) { floating.hide(); stopSelf(); return }
-        if (L7DesktopNavigation.appVisible || exitDialog?.isShowing == true) floating.hide()
+        if (L7DesktopNavigation.appVisible || exitDialog?.isShowing == true || connectionDialog?.isShowing == true) floating.hide()
         else runCatching { floating.show() }.onFailure {
             L7DebugLog.record("桌面悬浮菜单不可用 ${it.javaClass.simpleName}")
             stopSelf()
@@ -69,6 +70,9 @@ class L7DesktopNavigationService : Service() {
                 Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                 else homeIntent("home"))
             "settings" -> startActivity(homeIntent("settings"))
+            "connection" -> connectionDialog = GalaxyConnectionMenu.select(this) {
+                startActivity(homeIntent("settings-connection"))
+            }
             "car-home" -> startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             "exit" -> exitDialog = L7AppExit.confirm(this)
         }
@@ -85,6 +89,7 @@ class L7DesktopNavigationService : Service() {
         handler.removeCallbacksAndMessages(null)
         L7DesktopNavigation.onVisibilityChanged = null
         exitDialog?.dismiss()
+        connectionDialog?.dismiss()
         floating.hide()
         super.onDestroy()
     }

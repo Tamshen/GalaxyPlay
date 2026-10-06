@@ -14,6 +14,7 @@ internal class GalaxyHostChrome(private val activity: ComponentActivity) {
         L7ProjectionNavigation(context, releaseTouches) { destination ->
             when (destination) {
                 "home" -> Unit
+                "connection" -> GalaxyConnectionMenu.select(activity) { settings("settings-connection") }
                 "exit" -> L7AppExit.confirm(activity)
                 "car-home" -> activity.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
                 else -> settings(destination)
