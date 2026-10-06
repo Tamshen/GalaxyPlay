@@ -47,6 +47,10 @@ case "${1:-}" in
 esac
 if [[ $# -ne 0 ]]; then usage >&2; exit 2; fi
 
+if [[ "$build_mode" != "image" ]]; then
+    python3 "$project_dir/e2e/checks/check_galaxy_layout.py"
+fi
+
 # 本机 SDK 路径在 Linux 中不可用，避免混用两套工具链。
 if [[ "$build_mode" != "image" && -f "$project_dir/local.properties" ]] &&
    grep -Eq '^[[:space:]]*(sdk|ndk)\.dir[[:space:]]*=' "$project_dir/local.properties"; then

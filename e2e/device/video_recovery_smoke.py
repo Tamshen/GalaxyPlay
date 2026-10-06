@@ -110,7 +110,7 @@ paths = ('shared_prefs/diplay.xml', 'shared_prefs/l7_agreement.xml')
 adb('shell', 'am', 'force-stop', package)
 original = {path: read(path) for path in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
-digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+digest = hashlib.sha256(Path('galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
 if args.frida_address:
     assert re.fullmatch(r'127\.0\.0\.1:\d+', args.frida_address), '只允许本地测试转发'
     port = args.frida_address.split(':')[1]
@@ -122,7 +122,7 @@ else:
 session = script = None
 labels = {}
 for language, folder in (('zh', 'values'), ('en', 'values-en')):
-    resources = ET.parse(f'common/src/main/res/{folder}/l7_media_diagnostics.xml').getroot()
+    resources = ET.parse(f'galaxy/common/src/main/res/{folder}/l7_media_diagnostics.xml').getroot()
     strings = {s.get('name'): s.text for s in resources.findall('string')}
     labels[language] = tuple(strings['l7_video_' + key] for key in
                              ('failed_title', 'retry', 'settings', 'retrying', 'retry_unavailable'))

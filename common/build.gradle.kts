@@ -40,6 +40,11 @@ android {
     testOptions { unitTests.isIncludeAndroidResources = true }
     // 测试集中存放，源集映射保留模块依赖与 internal 可见性。
     sourceSets {
+        getByName("main").kotlin.directories.add(rootProject.file("galaxy/common/src/main/java").path)
+        getByName("main").java.directories.add(rootProject.file("galaxy/common/src/main/java").path)
+        getByName("main").res.directories.apply { clear(); add(rootProject.file("galaxy/common/src/main/res").path) }
+        getByName("main").assets.directories.apply { clear(); add(rootProject.file("galaxy/common/src/main/assets").path) }
+        getByName("main").manifest.srcFile(rootProject.file("galaxy/common/src/main/AndroidManifest.xml"))
         getByName("main").assets.directories.add(layout.buildDirectory.dir("generated/galaxyplay-license-assets").get().asFile.path)
         getByName("test").setRoot(rootProject.file("e2e/common/test").path)
         getByName("androidTest").setRoot(rootProject.file("e2e/common/androidTest").path)

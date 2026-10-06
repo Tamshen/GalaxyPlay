@@ -20,7 +20,9 @@ GalaxyPlay 由本项目维护者独立维护。包名和界面风格不代表官
 | [开发与验证](docs/开发与验证.md) | 范围、运行约束、Docker、签名、AVD、验收与上游同步 |
 | [第三方许可](docs/第三方许可.md) | 源码和资源出处、许可证 |
 
-UI 规范与离线示例位于工作区 `衍生项目/FlymeAutoUI/galaxyplay/组件示例.html`，由 FlymeAutoUI 统一维护。Android 原生组件继续位于本仓库 `common`，不依赖外部 HTML 构建。
+UI 规范与离线示例位于工作区 `衍生项目/FlymeAutoUI/galaxyplay/组件示例.html`，由 FlymeAutoUI 统一维护。Android 原生组件集中于本仓库 `galaxy/common`，由 `:common` 编译，不依赖外部 HTML 构建。
+
+适配与优化集中在 [galaxy](galaxy/AGENTS.md)，核心通过接入点调用；当前为分批拆分阶段，完整覆盖同步流程见 [开发说明](docs/开发与验证.md#galaxy-源码隔离与日志接入)。
 
 项目开发遵循 [开发规范](AGENTS.md)，测试统一放在 [e2e](e2e/README.md)，凭据与报告处理见 [安全与隐私](SECURITY.md)，当前产品变化见 [更新记录](更新记录.md)。
 
@@ -54,7 +56,7 @@ bash scripts/build-galaxyplay-host.sh --check
 
 感谢 carlito12345 开源分享车机适配实现；参考项目版本不代表 L7 核心升级或全部功能已合入。应用「关于」提供项目地址与参考说明；其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，也可在「关于 → 第三方许可」离线查看。
 
-<!-- 首次使用协议开始：正文同步自 common/src/main/assets/galaxyplay-first-use-agreement.md，仅调整 Markdown 排版。 -->
+<!-- 首次使用协议开始：正文同步自 galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md，仅调整 Markdown 排版。 -->
 
 ## 首次使用须知与风险确认协议
 

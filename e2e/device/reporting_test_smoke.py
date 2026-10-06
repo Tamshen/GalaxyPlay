@@ -124,7 +124,7 @@ try:
         ET.SubElement(prefs, 'boolean', {'name': 'auto_connect', 'value': 'false'})
         write(paths[0], ET.tostring(prefs))
         # 仅模拟器夹具；主动阅读／勾选由协议回归覆盖，原同意记录最终恢复。
-        digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+        digest = hashlib.sha256(Path('galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
         write(paths[1], f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
         for theme, night_value in [('day', 'no'), ('night', 'yes')]:
             if language + '-' + theme not in args.cases:

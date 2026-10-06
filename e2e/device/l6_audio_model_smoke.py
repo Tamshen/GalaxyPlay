@@ -95,7 +95,7 @@ labels = {
 
 try:
     # 仅用于 AVD 页面回归；原协议记录结束恢复，主动阅读／勾选另由协议组件回归覆盖。
-    digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+    digest = hashlib.sha256(Path('galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
     write('shared_prefs/l7_agreement.xml', f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
     for language, names in labels.items():
         model, l6, l7, profile, l6_profile, l7_profile, custom, save, cancel, edit, detect, category, auth, back = names

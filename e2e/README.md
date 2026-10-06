@@ -49,6 +49,10 @@ e2e/
 
 ## 上游核心回归
 
+`python3 e2e/checks/check_galaxy_layout.py` 核对核心与 `galaxy/` 的源码冲突及产品源集；构建脚本默认执行。`python3 e2e/checks/test_galaxy_layout.py` 检查上游文件替换不触及独立适配目录，以及 Java／Kotlin 同名冲突被明确拒绝。
+
+`CoreDiagnosticsTest` 覆盖通道隔离、数值快照不可变、序号／耗时、消费异常、终止与迟到事件拒绝、字段数量和名称约束；`GalaxyDiagnosticSinkTest` 核对拥有者过滤、默认进入现有可上传日志文件队列、清除后继续记录，不把日志采集当作实车响应。
+
 视频恢复专项：`VideoDecoderRecoveryTest` 运行真实视频 worker，以 codec 替身控制创建和输入耗时，检查创建超过 250 ms 后丢积压／等待新关键帧、迟到输入槽位保留、重复配置、旧／过期呈现和关闭期间重试。`VideoRecoveryGateTest`、`VideoInputStateTest`、`VideoPlaybackWatchdogTest` 覆盖有限冷却探测、稳定输出恢复额度与输入／呈现进展，`AndroidVideoRetryIsolationTest` 确认视频重试保留音频和麦克风；宿主与面板用例检查 H.264 提示、HEVC 回退待处理、显式动作与旧会话隔离。
 
 `../tools/scripts/python-frida16.sh e2e/device/video_recovery_smoke.py --serial emulator-5556 --frida-address 127.0.0.1:28066` 检查中英文昼夜的失败、重试拒绝／已请求、设置回调与恢复隐藏。需预先在 AVD 启动 Frida 16 测试服务并建立该模拟器的本地端口转发；脚本核对转发归属，结束恢复偏好、协议与昼夜。只注入合成面板／操作回调，不建立连接、不模拟成功解码；截图位于忽略目录 `build/previews/video-recovery/`。

@@ -111,7 +111,7 @@ def language(english):
     ET.SubElement(prefs, 'string', {'name': 'app_language'}).text = 'en' if english else 'zh'
     ET.SubElement(prefs, 'boolean', {'name': 'auto_connect', 'value': 'false'})
     write(paths[0], ET.tostring(prefs))
-    digest = hashlib.sha256(Path('common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
+    digest = hashlib.sha256(Path('galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md').read_bytes()).hexdigest()
     write(paths[1], f'<map><string name="accepted_digest">{digest}</string></map>'.encode())
 
 

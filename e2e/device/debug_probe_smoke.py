@@ -125,7 +125,7 @@ try:
     tap(collect_label())
     report = wait_report(before)
     permissions = {item['name']: item for item in report['items'] if item['domain'] == 'PERMISSION'}
-    catalog = json.loads(Path('common/src/main/assets/galaxyplay-permission-catalog.json').read_text())
+    catalog = json.loads(Path('galaxy/common/src/main/assets/galaxyplay-permission-catalog.json').read_text())
     assert len(catalog['permissions']) == 163
     assert {item['name'] for item in catalog['permissions']} <= permissions.keys()
     assert report['probeVersion'] == 5

@@ -80,8 +80,6 @@ android {
     }
 
 
-    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.directories.add(it.path) }
-
     signingConfigs {
         create("release") {
             storeFile = file(
@@ -115,9 +113,12 @@ android {
     }
     // 新增 L7 入口测试时统一放入 e2e，不在模块 src 下重新分散存放。
     sourceSets {
+        getByName("main").setRoot(rootProject.file("galaxy/mobile/src/main").path)
         getByName("test").setRoot(rootProject.file("e2e/mobile/test").path)
         getByName("androidTest").setRoot(rootProject.file("e2e/mobile/androidTest").path)
     }
+    // 产品源集设置完成后再添加只读外部认证，避免 setRoot 覆盖输入目录。
+    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.directories.add(it.path) }
 }
 
 dependencies {

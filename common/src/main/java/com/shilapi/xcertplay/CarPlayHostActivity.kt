@@ -3470,6 +3470,7 @@ class CarPlayHostActivity : ComponentActivity() {
             listener = createSessionListener(controllerGeneration),
             media = media,
             reportStatus = createStatusReporter(controllerGeneration),
+            diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
             loadPairRecord = { AirPlayPersistence.loadLockdownRecord(this) },
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
