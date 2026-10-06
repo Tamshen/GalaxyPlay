@@ -215,7 +215,7 @@ def check_settings():
     launch('settings')
     assert find('车型设置') is not None and find('返回设置') is None, '设置首页入口或 Header 不符合约定'
     fixed_menu = menu_bounds()
-    assert len(fixed_menu) == 4
+    assert [label for label, _ in fixed_menu] == ["画面", "连接", "设置", "车机", "退出"]
     screenshot('settings-day')
     tap('显示与性能')
     for _ in range(2):
