@@ -4,7 +4,7 @@ package com.shilapi.xcertplay
 internal object L7Routes {
     val settings = setOf("settings", "settings-vehicle", "settings-auth", "settings-connection", "settings-display",
         "settings-audio", "settings-general", "settings-permissions",
-        "settings-about", "settings-debug", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-steering", "settings-debug-voice", "settings-debug-media", "settings-debug-navigation",
+        "settings-about", "settings-debug", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-steering", "settings-debug-voice", "settings-debug-codec", "settings-debug-media", "settings-debug-navigation",
         "settings-connection-wireless", "settings-connection-usb")
     private val aliases = mapOf("connection" to "settings-connection", "diagnostics" to "settings-debug",
         "settings-diagnostics" to "settings-debug", "settings-debug-logs" to "settings-logs", "about" to "settings-about")

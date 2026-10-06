@@ -317,3 +317,11 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 手动上报测试：`L7ReportingTestControllerTest` 验证限时、互斥、构造期间取消、清理等待、代次隔离、固定样例解析与 run／step／phase 判断绑定；`L7ManualReportingTest` 在 API 29／30 使用替身端口核对实际媒体注册／字段／毫秒进度／封面与注销，以及导航 Binder 等待、启停、路名重发和异常清理。`L7ReportingTestPageTest` 验证进入／取消不调用、真实会话禁用、后台关闭待确认窗口、开始前隐藏无效按钮及技术明细默认折叠。AVD 脚本 `device/reporting_test_smoke.py` 检查两项入口、实际 Android 媒体会话、服务缺失日志、样例变化清除旧判断、明细展开／收起、更新和结束及中英文昼夜，结束恢复原偏好与协议；不建立手机连接，不上传。长明细使用重叠视口慢滚定位，展开阅读安排在显式结束上报后，避免消耗两分钟上报动作窗口；失败时先保存截图和节点树，再恢复配置。
 
 语音交互回归 `L7VoiceInputDebugPageTest` 覆盖显式启动、录音权限、后台恢复、Siri 请求去重、用户结果与请求绑定、重连丢弃旧判断并允许新请求、技术明细默认折叠；AVD `device/voice_input_smoke.py` 检查中英文昼夜、权限与 10 秒手动录音、停止／后台不续录、明细展开，逐字节恢复偏好与协议，恢复录音权限和昼夜。模拟器无真实手机，不把本地录音通过写成 Siri 识别通过。
+
+## 硬件解码调试验证
+
+`GalaxyCodecProbeControllerTest`／`GalaxyCodecProbeClientTest`／`GalaxyCodecProbePageTest` 检查默认硬件过滤与手动开始、单项互斥、停止等待、逐项运行、迟到回调、人工判断绑定、清理不明时阻止新运行、八秒无进展／十五秒总预算，以及 UID／主进程 PID 保护。配合 `L7RoutesTest`、`L7StartupRecoveryTest` 验证宿主接入；native 库随 APK 编译三种 ABI。
+
+`python3 e2e/device/codec_probe_smoke.py --serial emulator-5556` 在已安装内置认证 APK 的 AVD 真实调用 Java MediaCodec／JNI AMediaCodec，覆盖中英文昼夜 H.264 五路径、所选语言 HEVC 五路径、人工标注、后台停止与子进程退出。AVD 仅软件对照，硬件通过必须为 false；不连接手机、不上传，结束恢复偏好、协议及昼夜。`--cases zh-day zh-night en-day en-night` 可选择补跑范围，日志按运行编号核对当前与轮转文件，输出默认留在忽略目录 `build/e2e/avd-0.1.76/codec-probe/`。画面判断动作在脚本中为交互夹具，不能替代实车用户观察；采样截图需另行检阅。
+
+两段固定样例可在已安装 FFmpeg 的辅助容器内运行 `bash e2e/runtime/generate_codec_samples.sh` 重建；不得用真实手机视频替换公共测试资产。正式投屏解码器不调用本页 native 接口，libopus 软件音频不列为硬件视频测试。

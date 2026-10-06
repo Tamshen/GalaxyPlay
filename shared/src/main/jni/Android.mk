@@ -10,3 +10,6 @@ LOCAL_MODULE := local_hotspot_radio
 LOCAL_SRC_FILES := local_hotspot_radio.c
 LOCAL_CFLAGS := -Wall -Wextra -Werror
 include $(BUILD_SHARED_LIBRARY)
+
+# 独立 Galaxy 调试库；正式媒体 worker 不调用该入口。
+include $(LOCAL_PATH)/../../../../galaxy/shared/src/main/jni/Android.mk

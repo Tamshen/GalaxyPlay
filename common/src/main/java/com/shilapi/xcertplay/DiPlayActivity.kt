@@ -92,6 +92,9 @@ class DiPlayActivity : ComponentActivity() {
     private var debugPage: L7DebugPage? = null
     private var steeringDebugPage: L7SteeringDebugPage? = null
     private var reportingTestPage: L7ReportingTestPage? = null
+    private var codecProbePage: GalaxyCodecProbePage? = null
+    private fun codecProbeOccupied() = CarPlayBackgroundSession.hasSession() || CarPlayBackgroundSession.isStopping()
+    private val codecProbeController by lazy { GalaxyCodecProbeController(applicationContext, ::codecProbeOccupied) }
     private var voiceDebugPage: L7VoiceInputDebugPage? = null
     private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         voiceDebugPage?.permissionResult(granted)
@@ -236,6 +239,7 @@ class DiPlayActivity : ComponentActivity() {
         steeringDebugPage?.resume()
         if (!L7Agreement.require(this)) return
         voiceDebugPage?.resume()
+        codecProbePage?.resume()
         if (l7Ui && resources.configuration.densityDpi != L7UiDensity.value(this)) {
             recreate()
             return
@@ -281,6 +285,7 @@ class DiPlayActivity : ComponentActivity() {
         steeringDebugPage?.background()
         reportingTestPage?.background()
         voiceDebugPage?.background()
+        codecProbePage?.background()
         channelDialog?.dismiss()
         channelDialog = null
         handler.removeCallbacks(tick)
@@ -300,11 +305,13 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        codecProbeController.close()
         steeringDebugPage?.close(); steeringDebugPage = null
         audioModelConfirmation.close()
         audioTemplateFiles.close()
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
+        codecProbePage?.close(); codecProbePage = null
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
         hotspotSettings?.dispose()
@@ -318,6 +325,7 @@ class DiPlayActivity : ComponentActivity() {
         steeringDebugPage?.close(); steeringDebugPage = null
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
+        codecProbePage?.close(); codecProbePage = null
         hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null
         wiredSettings?.dispose(); wiredSettings = null
         if (page != "settings-connection-wireless") { hotspotActions.close(); hotspotTask.cancel() }
@@ -387,6 +395,7 @@ class DiPlayActivity : ComponentActivity() {
                 { if (CarPlayBackgroundSession.hasSession()) openProjection() else connect(false) }, ::stopFromHome)
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
             "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-logs"; render() }
+            "settings-debug-codec" -> codecProbePage = GalaxyCodecProbePage(this, content, codecProbeController, ::codecProbeOccupied) { page = "settings-logs"; render() }
             "settings-debug-voice" -> voiceDebugPage = L7VoiceInputDebugPage(this, content,
                 grant = { voicePermission.launch(Manifest.permission.RECORD_AUDIO) },
                 onLogs = { page = "settings-logs"; render() })
@@ -475,6 +484,7 @@ class DiPlayActivity : ComponentActivity() {
         "settings-debug-results" -> R.string.l7_probe_environment
         "settings-debug-history" -> R.string.l7_probe_history
         "settings-debug-steering" -> R.string.l7_steering_title
+        "settings-debug-codec" -> R.string.codec_probe_title
         "settings-debug-voice" -> R.string.l7_voice_title
         "settings-debug-media" -> R.string.l7_report_media_title
         "settings-debug-navigation" -> R.string.l7_report_navigation_title
@@ -1417,6 +1427,7 @@ class DiPlayActivity : ComponentActivity() {
     private fun connect(wireless: Boolean, nativeHotspotPrepared: Boolean = false) {
         if (!L7Agreement.require(this)) return
         L7ReportingTests.stop("CONNECT_REQUEST")
+        codecProbeController.stop("CONNECT_REQUEST")
         if (l7Ui && audioModelConfirmation.ensure { connect(wireless, nativeHotspotPrepared) }) return
         if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
             !L7WirelessPrerequisites.ensure(this, ::choosePhone)) return
@@ -1563,6 +1574,7 @@ class DiPlayActivity : ComponentActivity() {
         steeringDebugPage?.update()
         reportingTestPage?.update()
         voiceDebugPage?.update()
+        codecProbePage?.update()
         wiredSettings?.update(connectionRequestPending)
         val running = CarPlayBackgroundSession.hasSession()
         val reconnectable = CarPlayBackgroundSession.snapshot()?.controller?.let { !it.isClosed() } == true

@@ -35,6 +35,7 @@ internal class L7DebugPage(
         L7SettingsSection.add(parent, labels.text(R.string.l7_debug_choose), description = labels.text(R.string.l7_debug_choose_hint)) { card ->
             listOf(
                 Triple(R.string.l7_steering_title, R.string.l7_debug_goal_steering, "settings-debug-steering"),
+                Triple(R.string.codec_probe_title, R.string.codec_probe_hint, "settings-debug-codec"),
                 Triple(R.string.l7_voice_title, R.string.l7_debug_goal_voice, "settings-debug-voice"),
                 Triple(R.string.l7_report_media_title, R.string.l7_debug_goal_media, "settings-debug-media"),
                 Triple(R.string.l7_report_navigation_title, R.string.l7_debug_goal_hud, "settings-debug-navigation"),
