@@ -34,7 +34,7 @@
     <string name="debug_guide_codec">Run a fixed video sample</string>
     <string name="debug_guide_codec_body">Disconnect the phone, choose a sample and decoder path, then run the current case. Watch for motion, black frames, corruption or stalls. A software result does not prove vehicle hardware support.</string>
     <string name="debug_guide_codec_result">Record the visual result</string>
-    <string name="debug_guide_codec_result_body">Wait for the case to finish, compare the current run and choose Normal picture or Abnormal picture. Repeat with other paths; each judgment belongs to that run.</string>
+    <string name="debug_guide_codec_result_body">Wait for the case to finish and check its result. Surface output requires your picture judgment. Buffer output has no picture; failures and skipped cases can continue to logs. Repeat each path separately to record each judgment.</string>
     <string name="debug_guide_collect">Collect environment checks</string>
     <string name="debug_guide_collect_body">Tap Collect checks and wait for the task dialog. Read specific failure reasons; stop from the dialog if needed. The report describes environment facts, not a successful phone connection or vehicle display.</string>
     <string name="debug_guide_scenario">Guided reproduction</string>

@@ -34,7 +34,7 @@
     <string name="debug_guide_codec">运行固定视频样例</string>
     <string name="debug_guide_codec_body">保持手机断开，选择视频样例与解码路径，点击运行当前项。观察预览是否连续变化，有没有黑屏、花屏或卡住；软件对照不代表车机硬件通过。</string>
     <string name="debug_guide_codec_result">记录画面观察</string>
-    <string name="debug_guide_codec_result_body">等待当前项结束，对照本次运行记录，选择“画面正常”或“画面异常”。再换路径重测；每次判断只绑定本次结果。</string>
+    <string name="debug_guide_codec_result_body">等待当前项结束，核对本次结果。Surface 出帧后记录画面；缓冲区输出没有画面，失败或跳过可继续查看日志。逐项单独运行，才能分别记录每次判断。</string>
     <string name="debug_guide_collect">收集环境检查</string>
     <string name="debug_guide_collect_body">点击收集检查，等待任务弹窗完成。检查失败时阅读具体原因；可在弹窗停止。报告描述环境事实，不代表真实手机连接或车辆显示通过。</string>
     <string name="debug_guide_scenario">故障复现引导</string>

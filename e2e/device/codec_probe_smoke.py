@@ -13,11 +13,13 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
 parser.add_argument('--cases', nargs='+', choices=['zh-day','zh-night','en-day','en-night'], default=['zh-day','zh-night','en-day','en-night'])
-parser.add_argument('--output-dir', type=Path, default=Path('build/e2e/avd-0.1.76/codec-probe'))
+parser.add_argument('--buffer-only', action='store_true', help='只检查先呈现旧帧再切换缓冲区的覆盖提示与 Surface 生命周期')
+parser.add_argument('--output-dir', type=Path, default=Path('build/e2e/avd-0.1.87/codec-probe'))
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许 AVD'
 package = 'com.ecarx.carplay'
 args.output_dir.mkdir(parents=True, exist_ok=True)
+methods = ('JAVA_TYPE', 'JAVA_NAME', 'JAVA_ASYNC', 'NDK', 'JAVA_TUNED', 'OEM_UCAR', 'OEM_UCAR_QTI', 'OEM_HISIGHT', 'OEM_DMSDP_HDMI', 'OEM_DMSDP_CALL', 'OEM_DMSDP_BUFFER', 'OEM_LIBPAG')
 base = [args.adb, '-s', args.serial]
 
 def adb(*parts, data=None):
@@ -88,7 +90,7 @@ def fresh(text, before):
 def results(text):
     return [line for line in text.splitlines() if 'processExited=' in line and 'hardwarePassed=' in line]
 
-def wait_results(count, before, timeout=35):
+def wait_results(count, before, timeout=60):
     deadline = time.monotonic()+timeout
     while time.monotonic()<deadline:
         current = results(fresh(logs(), before))
@@ -130,15 +132,25 @@ try:
             capture(language+'-'+theme+'-hardware-default')
             assert not fresh(logs(),baseline), '打开页面自动启动了解码'
             tap(software)
-            # 四种语言／主题均真实执行五种 API，显式的软件对照不作为硬件验收。
-            before=logs(); tap(all_paths)
+            # 各场景执行全部可适用调用；QTI 不适用时必须明确跳过。
+            before=logs(); tap(start if args.buffer_only else all_paths)
             if language == "zh" and theme == "day":
                 time.sleep(1); capture("zh-day-frame-a")
                 time.sleep(.6); capture("zh-day-frame-b")
-            lines=wait_results(5,before)
-            for method in ('JAVA_TYPE','JAVA_NAME','JAVA_ASYNC','NDK','JAVA_TUNED'):
+            expected = ('JAVA_NAME',) if args.buffer_only else methods
+            lines=wait_results(len(expected),before)
+            for method in expected:
                 line=next(line for line in lines if 'method='+method+' ' in line)
+                if method == 'OEM_UCAR_QTI':
+                    assert 'reason=QtiDecoderRequired ' in line and 'outputs=0 ' in line and 'released=true ' in line, line
+                    assert 'hardwarePassed=false' in line, line
+                    continue
                 assert 'outputs=60 ' in line and 'eos=true ' in line and 'released=true ' in line, line
+                if method in ('OEM_UCAR', 'OEM_HISIGHT', 'OEM_DMSDP_HDMI', 'OEM_DMSDP_CALL'):
+                    assert 'configInputs=1 ' in line, line
+                if method == 'OEM_DMSDP_BUFFER':
+                    assert 'surfaceOutput=false' in line and 'rendered=-1 ' in line, line
+                    assert int(re.search(r'outputBytes=(\d+)', line)[1]) > 0, line
                 assert 'hardwarePassed=false' in line, line
                 assert 'software=true ' in line, line
             report.extend(lines)
@@ -146,15 +158,35 @@ try:
             tap(observe); time.sleep(.4)
             assert 'observation=VISIBLE_MOTION origin=USER' in fresh(logs(), before)
             capture(language+'-'+theme+'-results')
+            # 缓冲区项目完成后不能展示或接受画面判断。
+            tap('调用方式' if language == 'zh' else 'API path')
+            tap('原厂对照 · DMSDP 缓冲区输出' if language == 'zh' else 'OEM comparison · DMSDP buffer output')
+            tap(apply)
+            before=logs(); tap(start); line=wait_results(1,before)[0]
+            assert 'method=OEM_DMSDP_BUFFER ' in line and 'outputs=60 ' in line, line
+            assert row(observe) is None, '缓冲区输出仍要求人工判断画面'
+            message = '本项仅检查缓冲区出帧，不显示画面' if language == 'zh' else 'Buffer output only; this path has no preview'
+            assert any(n.get('text') == message for n in nodes().iter('node')), '旧 Surface 画面未被提示覆盖'
+            report.append(line)
+            capture(language+'-'+theme+'-buffer-results')
             tap(back)
             assert row(title) is not None, '未返回调试入口'
+        if args.buffer_only:
+            continue
         # HEVC 也必须真实经过 Java 与 NDK，而非只读取能力列表。
         adb('shell','am','force-stop',package)
         launch(); tap(software); tap(sample); tap('HEVC'); tap(apply)
-        before=logs(); tap(all_paths); lines=wait_results(5,before)
+        before=logs(); tap(all_paths); lines=wait_results(len(methods),before)
         for line in lines:
             assert 'video=HEVC ' in line and 'hardwarePassed=false' in line, line
             assert 'released=true ' in line or 'processExited=true' in line or 'workerStarted=false ' in line, line
+            if 'reason=UnsupportedVideo ' in line:
+                assert any('method='+m+' ' in line for m in ('OEM_DMSDP_HDMI','OEM_DMSDP_CALL','OEM_DMSDP_BUFFER')), line
+                assert 'outputs=0 ' in line, line
+                continue
+            if 'reason=QtiDecoderRequired ' in line:
+                assert 'method=OEM_UCAR_QTI ' in line and 'outputs=0 ' in line, line
+                continue
             assert 'software=true ' in line or 'workerStarted=false ' in line, line
             assert 'outputs=60 ' in line or re.search(r'reason=(ProbeTimeout|NDK_STATUS|TIMEOUT) ',line), line
         report.extend(lines)
@@ -171,7 +203,7 @@ try:
         assert package+':codec_probe' not in adb('shell','ps','-A','-o','NAME').decode()
         report.append(line); launch()
     (args.output_dir/'summary.json').write_text(json.dumps({'scope':'AVD software comparison; no vehicle hardware pass','results':report},ensure_ascii=False,indent=2))
-    print('通过：'+', '.join(args.cases)+' 的 H.264 五路径、所选语言 HEVC 五路径、手动标注与后台取消；没有硬件通过结论。')
+    print('通过：'+', '.join(args.cases)+ (' 的旧帧覆盖、缓冲区输出与 Surface 生命周期' if args.buffer_only else ' 的 H.264／HEVC 十二项调用与适用性跳过、手动标注与后台取消')+'；没有硬件通过结论。')
 except Exception:
     capture('failure')
     (args.output_dir/'failure.xml').write_text(ET.tostring(nodes(), encoding='unicode'))

@@ -68,7 +68,7 @@ class GalaxyCodecProbeControllerTest {
             attempts.last().finish()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(201))
         }
-        assertFalse(engine.busy); assertEquals(5, engine.results.size)
+        assertFalse(engine.busy); assertEquals(CodecProbeMethod.entries.size, engine.results.size)
         val last = engine.results.last()
         attempts.first().stage(CodecProbeStage.CREATE); attempts.first().finish()
         assertEquals(last, engine.results.last()); assertEquals(CodecProbeStage.DONE, engine.stage)
@@ -118,5 +118,18 @@ class GalaxyCodecProbeControllerTest {
         engine.start(surface, true); attempts.single().finish(); occupied = true
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
         assertEquals(1, attempts.size); assertFalse(engine.busy)
+    }
+    @Test fun bufferOutputCannotAcceptAPictureJudgmentAndKeepsCountsAcrossIpc() {
+        engine.method = CodecProbeMethod.OEM_DMSDP_BUFFER
+        engine.start(surface, false)
+        val first = attempts.single()
+        val result = CodecProbeResult(first.run, first.method, CodecProbeStage.DONE,
+            outputs = 60, eos = true, released = true, configInputs = 1, outputBytes = 123456)
+        first.result(CodecProbeResult.read(result.bundle()))
+        engine.observe(true)
+        assertNull(engine.observed)
+        assertEquals(123456L, engine.results.single().outputBytes)
+        assertEquals(1, engine.results.single().configInputs)
+        assertTrue(engine.lines.last().contains("surfaceOutput=false"))
     }
 }
