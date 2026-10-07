@@ -19,7 +19,7 @@ gradle_tasks=()
 usage() {
     cat <<'EOF'
 用法：bash scripts/build-android-docker.sh [选项]
-  无参数          使用本地认证材料构建内置 MFi 的实车测试 APK
+  无参数          使用本地认证材料构建内置 MFi 的实车测试 APK，自动压缩并检查 DEX
   --check         运行单元测试、mobile lint 和内置 MFi APK 构建
   --standalone    同默认打包；DIPLAY_AUTH_ASSETS_DIR 可覆盖本地材料路径
   --release       使用外部 Android keystore 构建带内置 MFi 的发布包
@@ -170,5 +170,19 @@ build_status=$?
 set -e
 if [[ "$build_status" -eq 75 ]]; then
     printf '当前项目已有构建正在运行；未并行修改同一输出目录，请等待后重试。\n' >&2
+fi
+if [[ "$build_status" -eq 0 ]]; then
+    # 只检查本次明确请求的 APK 任务，测试／镜像任务不检查旧产物。
+    apk_variants=()
+    for task in "${gradle_tasks[@]}"; do
+        case "$task" in
+            :mobile:assembleDebug|:mobile:assembleStandaloneDebug) apk_variants+=(debug) ;;
+            :mobile:assembleRelease|:mobile:assembleStandaloneRelease) apk_variants+=(release) ;;
+        esac
+    done
+    for variant in "${apk_variants[@]}"; do
+        python3 "$project_dir/e2e/checks/check_apk_dex_compression.py" \
+            "$project_dir/mobile/build/outputs/apk/$variant/mobile-$variant.apk"
+    done
 fi
 exit "$build_status"
