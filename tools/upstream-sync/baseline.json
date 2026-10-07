@@ -1048,7 +1048,7 @@
     "e2e/upstream-reference/common/test/java/com/shilapi/xcertplay/WheelZoomKeysTest.kt": "478acda193a2d7360ee2783c17cc441fa67c1c1cf1f96e8ef672e93bb97ec3a2",
     "e2e/upstream-reference/common/test/java/com/shilapi/xcertplay/settings/SettingsWidgetsTest.kt": "6facd794d1a2d0a01d6b5e98f783c62bc7f4034a54420d63c1006e04bc6703d7",
     "gradle/libs.versions.toml": "5b657918ae77fe3ede7573be032b96997c07cd868cc03295867ee61064a9894b",
-    "mobile/build.gradle.kts": "f13bcb949e4bb4ec01c98c5d91f88a346ea466b2222a28845ffca617fb9627a1",
+    "mobile/build.gradle.kts": "dc15827f5c173a4775782bc935c09e439d353580e4e96ae895fa2a550d79fae5",
     "mobile/src/main/AndroidManifest.xml": "58e2c73dac15811e1c6c9406a103517810b0930a7ff711fa5be38b663ba81e2c",
     "mobile/src/main/keepRules/rules.keep": "cd9f36ade2d8604e1b7cf24eff5b171f9c0816c0aa013ba7eb55be4fe2e1dac7",
     "mobile/src/main/res/values/config.xml": "7bd7cf82017df67b0f218c6df21bd6419120150d053a9c0e9ad0bcfafd181398",

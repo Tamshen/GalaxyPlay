@@ -53,6 +53,12 @@ val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSET
 
 android {
     namespace = "com.shilapi.xcertplay"
+    packaging {
+        dex {
+            // 交付 APK 压缩 DEX，由 AGP 在签名与对齐前完成打包。
+            useLegacyPackaging = true
+        }
+    }
     androidResources {
         // 同时过滤依赖自带的其他语言，APK 仅保留中英文资源。
         localeFilters += listOf("en", "zh-rCN")

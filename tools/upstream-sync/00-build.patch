@@ -118,7 +118,7 @@
  androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 --- a/mobile/build.gradle.kts
 +++ b/mobile/build.gradle.kts
-@@ -1,29 +1,84 @@
+@@ -1,29 +1,90 @@
 +import java.util.Properties
 +import java.net.URI
 +import java.util.Base64
@@ -175,6 +175,12 @@
  
  android {
      namespace = "com.shilapi.xcertplay"
++    packaging {
++        dex {
++            // 交付 APK 压缩 DEX，由 AGP 在签名与对齐前完成打包。
++            useLegacyPackaging = true
++        }
++    }
 +    androidResources {
 +        // 同时过滤依赖自带的其他语言，APK 仅保留中英文资源。
 +        localeFilters += listOf("en", "zh-rCN")
@@ -210,7 +216,7 @@
  
      signingConfigs {
          create("release") {
-@@ -39,8 +94,7 @@
+@@ -39,8 +100,7 @@
  
      buildTypes {
          debug {
@@ -220,7 +226,7 @@
          }
          release {
              optimization {
-@@ -55,11 +109,21 @@
+@@ -55,11 +115,21 @@
      }
      buildFeatures {
          compose = true
@@ -242,7 +248,7 @@
      implementation(project(":common"))
      implementation(project(":shared"))
      implementation(libs.androidx.activity.compose)
-@@ -73,7 +137,7 @@
+@@ -73,7 +143,7 @@
      debugImplementation(libs.androidx.compose.ui.tooling)
  }
  
@@ -251,7 +257,7 @@
  val credentialAssets = files(android.sourceSets.flatMap { source ->
      source.assets.directories.map { directory ->
          fileTree(directory) {
-@@ -98,7 +162,7 @@
+@@ -98,7 +168,7 @@
  }
  tasks.named("preBuild") { dependsOn(rejectBundledCredentials) }
  
@@ -260,7 +266,7 @@
  val verifyStandaloneAuthentication by tasks.registering {
      group = "verification"
      description = "Require the explicit runtime authentication input for a standalone car-test APK."
-@@ -118,3 +182,9 @@
+@@ -118,3 +188,9 @@
      description = "Build a standalone car-test APK with explicitly provisioned authentication."
      dependsOn(verifyStandaloneAuthentication, "assembleDebug")
  }
