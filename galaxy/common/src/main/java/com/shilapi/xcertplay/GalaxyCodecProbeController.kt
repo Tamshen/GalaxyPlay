@@ -55,7 +55,7 @@ internal class GalaxyCodecProbeController(private val context: Context, private 
         channel = DiagnosticChannel(-run, GalaxyDiagnosticSink.create(context))
         channel?.emit(DiagnosticEvent.Component.VIDEO, DiagnosticEvent.Kind.START, DiagnosticEvent.State.REQUESTED,
             mapOf("methodOrdinal" to selectedMethod.ordinal.toLong(), "videoOrdinal" to video.ordinal.toLong()))
-        record("run=$run method=$selectedMethod stage=BIND video=$video codec=${safe(decoder.name)} declaredHardware=${decoder.hardware} software=${decoder.software}")
+        record("run=$run method=$selectedMethod stage=BIND video=$video codec=${safe(decoder.name)} declaredHardware=${decoder.hardware} software=${decoder.software} ${GalaxyCodecProbeRecipe(selectedMethod).logSummary}")
         val next = create(run, selectedMethod, video, decoder.name, allowSoftware, surface, { phase ->
             if (client?.run == run) {
                 stage = phase
@@ -71,10 +71,10 @@ internal class GalaxyCodecProbeController(private val context: Context, private 
         if (client?.run != result.run) return
         client = null
         results += result
-        while (results.size > 10) results.removeAt(0)
+        while (results.size > CodecProbeMethod.entries.size) results.removeAt(0)
         observed = null
         stage = result.stage
-        record("run=${result.run} method=${result.method} video=${result.video} stage=${result.stage} codec=${safe(result.name)} hardware=${result.hardware} software=${result.software} inputs=${result.inputs} outputs=${result.outputs} rendered=${result.rendered} eos=${result.eos} released=${result.released} code=${result.code} reason=${safe(result.reason)} elapsedMs=${result.elapsedMs} hardwarePassed=${result.hardwarePassed} workerStarted=${result.workerStarted} processExited=${result.processExited}")
+        record("run=${result.run} method=${result.method} video=${result.video} stage=${result.stage} codec=${safe(result.name)} hardware=${result.hardware} software=${result.software} inputs=${result.inputs} outputs=${result.outputs} rendered=${result.rendered} eos=${result.eos} released=${result.released} code=${result.code} reason=${safe(result.reason)} elapsedMs=${result.elapsedMs} hardwarePassed=${result.hardwarePassed} workerStarted=${result.workerStarted} processExited=${result.processExited} configInputs=${result.configInputs} outputBytes=${result.outputBytes} surfaceOutput=${result.method.surfaceOutput}")
         channel?.emit(DiagnosticEvent.Component.VIDEO, if (result.decoded) DiagnosticEvent.Kind.RELEASE else DiagnosticEvent.Kind.FAILURE,
             if (result.decoded) DiagnosticEvent.State.ENDED else DiagnosticEvent.State.FAILED,
             mapOf("inputs" to result.inputs.toLong(), "outputs" to result.outputs.toLong(), "rendered" to result.rendered.toLong(),
@@ -89,7 +89,7 @@ internal class GalaxyCodecProbeController(private val context: Context, private 
     }
     fun observe(visible: Boolean) {
         val result = results.lastOrNull() ?: return
-        if (busy || closed || result.outputs <= 0) return
+        if (busy || closed || result.outputs <= 0 || !result.method.surfaceOutput) return
         observed = visible
         record("run=${result.run} method=${result.method} observation=${if (visible) "VISIBLE_MOTION" else "MISSING_OR_ABNORMAL"} origin=USER")
         changed?.invoke()

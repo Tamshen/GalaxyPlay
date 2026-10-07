@@ -32,6 +32,15 @@ class GalaxyCodecProbePageTest {
         assertEquals(View.GONE, row("visible").visibility)
         assertEquals(View.GONE, row("abnormal").visibility)
         assertFalse(controller.busy)
+        controller.method = CodecProbeMethod.OEM_DMSDP_BUFFER
+        page.update()
+        val cover = ReflectionHelpers.getField<View>(page, "bufferPreview")
+        val preview = ReflectionHelpers.getField<View>(page, "preview")
+        assertEquals(View.VISIBLE, cover.visibility)
+        assertEquals(View.VISIBLE, preview.visibility)
+        controller.method = CodecProbeMethod.JAVA_NAME
+        page.update()
+        assertEquals(View.GONE, cover.visibility)
         page.background(); page.resume(); page.update()
         assertEquals(0, creates)
         assertEquals("settings-debug", L7Routes.back("settings-debug-codec"))

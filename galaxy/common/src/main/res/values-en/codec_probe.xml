@@ -10,7 +10,7 @@
     <string name="codec_probe_software">Allow software comparison</string>
     <string name="codec_probe_software_hint">For API comparison only; software success does not count as hardware success</string>
     <string name="codec_probe_run">2. Start and watch</string>
-    <string name="codec_probe_preview_hint">Bring the preview into view before starting. Each path plays a moving pattern for two seconds. Leaving, backgrounding, or requesting a connection ends the test.</string>
+    <string name="codec_probe_preview_hint">Bring the preview into view before starting. Surface paths play a moving pattern for two seconds; buffer output only counts decoded frames. Leaving, backgrounding, or requesting a connection ends the test.</string>
     <string name="codec_probe_status">Test status</string>
     <string name="codec_probe_preview">Decoder test preview</string>
     <string name="codec_probe_start">Start selected path</string>
@@ -49,7 +49,7 @@
     <string name="codec_stage_bind">Preparing test process</string>
     <string name="codec_stage_sample">Reading sample</string>
     <string name="codec_stage_create">Creating decoder</string>
-    <string name="codec_stage_configure">Configuring Surface</string>
+    <string name="codec_stage_configure">Configuring decoder output</string>
     <string name="codec_stage_start">Starting decoder</string>
     <string name="codec_stage_feed">Feeding frames</string>
     <string name="codec_stage_drain">Draining output</string>
@@ -57,4 +57,24 @@
     <string name="codec_stage_done">API completed</string>
     <string name="codec_probe_cleanup_unconfirmed">Test process exit could not be confirmed. Further tests are blocked to prevent overlapping driver calls. Exit and reopen the app.</string>
     <string name="codec_probe_result_list">API results</string>
+    <string name="codec_probe_oem_ucar">OEM comparison · UCar async Surface</string>
+    <string name="codec_probe_oem_ucar_qti">OEM comparison · UCar QTI low latency</string>
+    <string name="codec_probe_oem_hisight">OEM comparison · HiSight sync Surface</string>
+    <string name="codec_probe_oem_hdmi">OEM comparison · DMSDP HDMI Surface</string>
+    <string name="codec_probe_oem_call">OEM comparison · DMSDP video-call Surface</string>
+    <string name="codec_probe_oem_buffer">OEM comparison · DMSDP buffer output</string>
+    <string name="codec_probe_oem_libpag">OEM comparison · libpag sync Surface</string>
+    <string name="codec_probe_standard_body">Generic API comparison. Named paths use the selected candidate; MIME paths use the system choice.</string>
+    <string name="codec_probe_ucar_body">MIME creation, callbacks, input CSD, operating-rate 45 and immediate rendering. Feed at the sample arrival pace.</string>
+    <string name="codec_probe_ucar_qti_body">UCar with two QTI parameter requests. Requires an actual QTI/QCOM hardware decoder; others are skipped. Accepted keys do not prove activation.</string>
+    <string name="codec_probe_hisight_body">MIME creation, priority 0, input CSD, synchronous Surface output and boolean rendering. Base calls only; business parameter maps and HiSilicon extensions are not assumed.</string>
+    <string name="codec_probe_hdmi_body">H.264 only. Surface color format, configured rate 33, input CSD and boolean rendering. The sample remains 30 fps; waits are bounded.</string>
+    <string name="codec_probe_call_body">H.264 only. Surface, rate 30, low-latency 2 request and input CSD. An OEM parameter experiment; acceptance does not prove low latency.</string>
+    <string name="codec_probe_buffer_body">H.264 only. No Surface: YUV buffer output, rate 30, max input 1536000 and low-latency 2 request. Counts frames/bytes without displaying or saving pixels.</string>
+    <string name="codec_probe_libpag_body">MIME creation, synchronous 1000 μs waits and boolean rendering. Animation decoder API comparison without libpag/EGL; success does not validate projection.</string>
+    <string name="codec_probe_system_choice">The system selects by MIME. The candidate above does not constrain this path; the result records the actual decoder.</string>
+    <string name="codec_probe_not_applicable">Not applicable; skipped. Check the path description.</string>
+    <string name="codec_probe_buffer_ok">Buffer decoding completed; this path has no picture</string>
+    <string name="codec_probe_buffer_observation">Buffer output needs no picture judgment. Check the output counts and logs.</string>
+    <string name="codec_probe_buffer_preview">Buffer output only; this path has no preview</string>
 </resources>

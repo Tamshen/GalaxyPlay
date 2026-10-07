@@ -10,7 +10,7 @@
     <string name="codec_probe_software">允许软件对照</string>
     <string name="codec_probe_software_hint">仅用于比较调用路径，软件成功不计为硬件通过</string>
     <string name="codec_probe_run">2. 开始并观察画面</string>
-    <string name="codec_probe_preview_hint">请先把预览区域滚动到屏幕内，再开始。每种方式播放两秒动态色块；离开页面、进入后台或请求连接会结束测试。</string>
+    <string name="codec_probe_preview_hint">请先把预览区域滚动到屏幕内，再开始。Surface 方式播放两秒动态色块，缓冲区方式只统计出帧；离开页面、进入后台或请求连接会结束测试。</string>
     <string name="codec_probe_status">测试状态</string>
     <string name="codec_probe_preview">解码测试画面</string>
     <string name="codec_probe_start">开始所选方式</string>
@@ -49,7 +49,7 @@
     <string name="codec_stage_bind">准备测试进程</string>
     <string name="codec_stage_sample">读取固定样例</string>
     <string name="codec_stage_create">创建解码器</string>
-    <string name="codec_stage_configure">配置 Surface</string>
+    <string name="codec_stage_configure">配置解码输出</string>
     <string name="codec_stage_start">启动解码器</string>
     <string name="codec_stage_feed">送入视频帧</string>
     <string name="codec_stage_drain">等待输出</string>
@@ -57,4 +57,24 @@
     <string name="codec_stage_done">调用完成</string>
     <string name="codec_probe_cleanup_unconfirmed">未能确认测试进程已退出。为避免同时调用驱动，本次不再启动；请退出并重新打开应用。</string>
     <string name="codec_probe_result_list">调用结果</string>
+    <string name="codec_probe_oem_ucar">原厂对照 · UCar 异步 Surface</string>
+    <string name="codec_probe_oem_ucar_qti">原厂对照 · UCar QTI 低延迟</string>
+    <string name="codec_probe_oem_hisight">原厂对照 · HiSight 同步 Surface</string>
+    <string name="codec_probe_oem_hdmi">原厂对照 · DMSDP HDMI Surface</string>
+    <string name="codec_probe_oem_call">原厂对照 · DMSDP 视频通话 Surface</string>
+    <string name="codec_probe_oem_buffer">原厂对照 · DMSDP 缓冲区输出</string>
+    <string name="codec_probe_oem_libpag">原厂对照 · libpag 同步 Surface</string>
+    <string name="codec_probe_standard_body">通用 API 对照；指定名称使用上方候选，按格式创建由系统选择。</string>
+    <string name="codec_probe_ucar_body">按 MIME 创建、异步回调、输入 CSD、operating-rate 45、立即呈现；按样例到达节奏送帧。</string>
+    <string name="codec_probe_ucar_qti_body">UCar 组合加两项 QTI 参数请求；仅实际 QTI／QCOM 硬件候选适用，其余明确跳过。参数接受不证明生效。</string>
+    <string name="codec_probe_hisight_body">按 MIME 创建、priority 0、输入 CSD、同步 Surface 与布尔呈现。只复现基础调用；不猜测业务参数表或强加 HiSilicon 扩展。</string>
+    <string name="codec_probe_hdmi_body">仅 H.264；Surface 色彩格式、配置帧率 33、输入 CSD、布尔呈现。固定样例仍为 30 fps；等待有界。</string>
+    <string name="codec_probe_call_body">仅 H.264；Surface、帧率 30、low-latency 2 请求、输入 CSD；仅用于原厂参数实验，不代表低延迟已启用。</string>
+    <string name="codec_probe_buffer_body">仅 H.264；无 Surface，YUV 缓冲区输出，帧率 30、最大输入 1536000、low-latency 2 请求。只统计出帧／字节，不显示或保存像素。</string>
+    <string name="codec_probe_libpag_body">按 MIME 创建、同步等待 1000 μs、布尔呈现。复现动画解码 API，不加载 libpag／EGL；成功不证明适用于投屏。</string>
+    <string name="codec_probe_system_choice">此方式由系统按 MIME 选择；上方候选不限定实际解码器，结果记录真实名称。</string>
+    <string name="codec_probe_not_applicable">条件不适用，已跳过；查看方式说明</string>
+    <string name="codec_probe_buffer_ok">缓冲区出帧完成；此方式不显示画面</string>
+    <string name="codec_probe_buffer_observation">缓冲区输出无需画面判断；请查看输出计数和日志</string>
+    <string name="codec_probe_buffer_preview">本项仅检查缓冲区出帧，不显示画面</string>
 </resources>

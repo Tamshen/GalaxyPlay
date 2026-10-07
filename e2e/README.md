@@ -326,9 +326,9 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 ## 硬件解码调试验证
 
-`GalaxyCodecProbeControllerTest`／`GalaxyCodecProbeClientTest`／`GalaxyCodecProbePageTest` 检查默认硬件过滤与手动开始、单项互斥、停止等待、逐项运行、迟到回调、人工判断绑定、清理不明时阻止新运行、八秒无进展／十五秒总预算，以及 UID／主进程 PID 保护。配合 `L7RoutesTest`、`L7StartupRecoveryTest` 验证宿主接入；native 库随 APK 编译三种 ABI。
+`GalaxyCodecProbeRecipeTest`／`GalaxyCodecProbeControllerTest`／`GalaxyCodecProbeClientTest`／`GalaxyCodecProbePageTest` 检查默认硬件过滤与手动开始、单项互斥、停止等待、逐项运行、迟到回调、人工判断绑定、清理不明时阻止新运行、八秒无进展／十五秒总预算，以及 UID／主进程 PID 保护。配合 `L7RoutesTest`、`L7StartupRecoveryTest` 验证宿主接入；native 库随 APK 编译三种 ABI。
 
-`python3 e2e/device/codec_probe_smoke.py --serial emulator-5556` 在已安装内置认证 APK 的 AVD 真实调用 Java MediaCodec／JNI AMediaCodec，覆盖中英文昼夜 H.264 五路径、所选语言 HEVC 五路径、人工标注、后台停止与子进程退出。AVD 仅软件对照，硬件通过必须为 false；不连接手机、不上传，结束恢复偏好、协议及昼夜。`--cases zh-day zh-night en-day en-night` 可选择补跑范围，日志按运行编号核对当前与轮转文件，输出默认留在忽略目录 `build/e2e/avd-0.1.76/codec-probe/`。画面判断动作在脚本中为交互夹具，不能替代实车用户观察；采样截图需另行检阅。
+`python3 e2e/device/codec_probe_smoke.py --serial emulator-5556` 在已安装内置认证 APK 的 AVD 真实调用 Java MediaCodec／JNI AMediaCodec，覆盖中英文昼夜 H.264／HEVC 十二项、QTI／H.264 专用组合明确跳过、缓冲区输出与禁止画面判断、人工标注、后台停止与子进程退出。AVD 仅软件对照，硬件通过必须为 false；不连接手机、不上传，结束恢复偏好、协议及昼夜。`--cases zh-day zh-night en-day en-night` 可选择补跑范围，日志按运行编号核对当前与轮转文件，输出默认留在忽略目录 `build/e2e/avd-0.1.87/codec-probe/`。`--buffer-only` 只复验先播放 Surface 样例再切缓冲区的旧帧覆盖、输出与 Surface 保持。画面判断动作在脚本中为交互夹具，不能替代实车用户观察；采样截图需另行检阅。
 
 两段固定样例可在已安装 FFmpeg 的辅助容器内运行 `bash e2e/runtime/generate_codec_samples.sh` 重建；不得用真实手机视频替换公共测试资产。正式投屏解码器不调用本页 native 接口，libopus 软件音频不列为硬件视频测试。
 
