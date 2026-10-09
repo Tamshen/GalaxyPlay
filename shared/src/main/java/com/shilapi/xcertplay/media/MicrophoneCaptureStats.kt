@@ -13,7 +13,18 @@ internal class MicrophoneCaptureStats(
     private val report: (String) -> Unit,
     private val nowNs: () -> Long = System::nanoTime,
 ) {
-    private val metadata = metadata(config)
+    private var metadata = metadata(config)
+
+    /** Set before each source attempt and before the capture thread starts. */
+    fun useSource(source: Int) {
+        val name = when (source) {
+            1 -> "MIC"
+            6 -> "VOICE_RECOGNITION"
+            7 -> "VOICE_COMMUNICATION"
+            else -> "FACTORY($source)"
+        }
+        metadata = metadata.replace(Regex("source=[^ ]+"), "source=$name")
+    }
     private var windowStart = nowNs()
     private var readStart = windowStart
     private var capturedBytes = 0L

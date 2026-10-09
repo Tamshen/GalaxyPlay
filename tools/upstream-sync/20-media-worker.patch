@@ -1902,7 +1902,7 @@
                  it.className.startsWith("com.shilapi.xcertplay.media.")
 --- a/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneCaptureStats.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneCaptureStats.kt
-@@ -7,7 +7,7 @@
+@@ -7,13 +7,24 @@
      RECORDING, READ, CAPTURE, START,
  }
  
@@ -1911,6 +1911,24 @@
  internal class MicrophoneCaptureStats(
      config: MicrophoneConfig,
      private val report: (String) -> Unit,
+     private val nowNs: () -> Long = System::nanoTime,
+ ) {
+-    private val metadata = metadata(config)
++    private var metadata = metadata(config)
++
++    /** Set before each source attempt and before the capture thread starts. */
++    fun useSource(source: Int) {
++        val name = when (source) {
++            1 -> "MIC"
++            6 -> "VOICE_RECOGNITION"
++            7 -> "VOICE_COMMUNICATION"
++            else -> "FACTORY($source)"
++        }
++        metadata = metadata.replace(Regex("source=[^ ]+"), "source=$name")
++    }
+     private var windowStart = nowNs()
+     private var readStart = windowStart
+     private var capturedBytes = 0L
 --- a/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneUplink.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneUplink.kt
 @@ -3,9 +3,6 @@
@@ -1923,7 +1941,7 @@
  import android.util.Log
  import com.shilapi.xcertplay.airplay.AudioCodecKind
  import com.shilapi.xcertplay.airplay.MicrophoneConfig
-@@ -26,21 +23,28 @@
+@@ -26,21 +23,31 @@
   */
  internal class MicrophoneUplink(
      private val config: MicrophoneConfig,
@@ -1942,23 +1960,27 @@
 -        Log.i(TAG, message)
 -        onDiagnostic(message)
 -    })
++    private val closed = AtomicBoolean(false)
 +    private val firstPacketLogged = AtomicBoolean(false)
      @Volatile private var recorder: AudioRecord? = null
      @Volatile private var socket: DatagramSocket? = null
      @Volatile private var opusEncoder: OpusEncoder? = null
 -    @Volatile private var effects: List<AudioEffect> = emptyList()
      private var thread: Thread? = null
+-
 +    private var effects: TelephonyAudioEffects? = null
 +    private val ended = AtomicBoolean(false)
 +    private val stats = MicrophoneCaptureStats(config, report)
- 
++
++    @Synchronized
      fun start(): Boolean {
++        if (closed.get()) return false
          if (!running.compareAndSet(false, true)) return true
 +        ended.set(false)
  
          val channelMask = if (config.channels >= 2) {
              AndroidAudioFormat.CHANNEL_IN_STEREO
-@@ -55,11 +59,11 @@
+@@ -55,11 +62,11 @@
          if (minBuffer <= 0) {
              Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
              stats.failure(MicrophoneFailureStage.MIN_BUFFER, code = minBuffer)
@@ -1972,7 +1994,7 @@
              "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
              "speechrecognition" -> MediaRecorder.AudioSource.VOICE_RECOGNITION
              else -> MediaRecorder.AudioSource.MIC
-@@ -72,35 +76,40 @@
+@@ -72,35 +79,45 @@
          if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
              Log.w(TAG, "microphone Opus encoder is unavailable")
              stats.failure(MicrophoneFailureStage.ENCODER)
@@ -1996,8 +2018,12 @@
 -        } catch (error: Exception) {
 -            Log.e(TAG, "microphone recorder creation failed", error)
 -            stats.failure(MicrophoneFailureStage.RECORDER_CREATION, error)
-+        // 博越配置优先厂商输入源；权限拒绝、初始化或启动失败后释放，再尝试标准源。
-+        val nextRecorder = listOfNotNull(factorySource, source).distinct().firstNotNullOfOrNull { candidate ->
++        // 厂商源优先；Siri 的识别源拒绝后有限回退至通信源。每次失败先释放。
++        val nextRecorder = listOfNotNull(factorySource, source,
++            MediaRecorder.AudioSource.VOICE_COMMUNICATION.takeIf { config.audioType.equals("speechrecognition", true) },
++        ).distinct().firstNotNullOfOrNull { candidate ->
++            if (!running.get() || closed.get()) return@firstNotNullOfOrNull null
++            stats.useSource(candidate)
 +            var built: AudioRecord? = null
 +            var stage = MicrophoneFailureStage.RECORDER_CREATION
 +            try {
@@ -2014,6 +2040,7 @@
 +                }
 +                record.startRecording()
 +                check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
++                check(running.get() && !closed.get())
 +                runCatching { report("Audio: microphone source=$candidate factory=${candidate == factorySource}") }
 +                record
 +            } catch (error: Exception) {
@@ -2038,7 +2065,7 @@
              return false
          }
  
-@@ -112,9 +121,10 @@
+@@ -112,9 +129,10 @@
          } catch (error: Exception) {
              Log.e(TAG, "microphone socket creation failed", error)
              stats.failure(MicrophoneFailureStage.SOCKET_CREATION, error)
@@ -2050,13 +2077,14 @@
              return false
          }
  
-@@ -122,13 +132,24 @@
+@@ -122,13 +140,25 @@
          socket = nextSocket
          opusEncoder = nextEncoder
          return try {
 -            if (config.audioType == "telephony") effects = voiceEffects(nextRecorder.audioSessionId)
 -            nextRecorder.startRecording()
 -            stats.started(routeType(nextRecorder))
++            check(running.get() && !closed.get())
 +            val channel = when (config.audioType.lowercase()) {
 +                "telephony" -> AudioChannel.PHONE
 +                "speechrecognition" -> AudioChannel.ASSISTANT
@@ -2078,7 +2106,7 @@
              true
          } catch (error: Exception) {
              Log.e(TAG, "microphone recording failed", error)
-@@ -138,56 +159,32 @@
+@@ -138,56 +168,32 @@
          }
      }
  
@@ -2151,7 +2179,7 @@
                  if (count < 0) {
                      if (running.get()) {
                          Log.e(TAG, "microphone read failed code=$count")
-@@ -196,9 +193,12 @@
+@@ -196,9 +202,12 @@
                      return
                  }
                  if (count == 0) {
@@ -2165,7 +2193,7 @@
                  var offset = 0
                  while (offset < count && running.get()) {
                      val copied = minOf(frame.size - filled, count - offset)
-@@ -210,7 +210,6 @@
+@@ -210,7 +219,6 @@
                          filled = 0
                      }
                  }
@@ -2173,7 +2201,7 @@
              }
          } catch (error: Exception) {
              if (running.get()) {
-@@ -218,7 +217,8 @@
+@@ -218,7 +226,8 @@
                  stats.failure(MicrophoneFailureStage.CAPTURE, error)
              }
          } finally {
@@ -2183,7 +2211,7 @@
              running.set(false)
              release()
          }
-@@ -256,16 +256,22 @@
+@@ -256,16 +265,23 @@
          )
          try {
              socket.send(DatagramPacket(packet, packet.size, config.host, config.port))
@@ -2208,11 +2236,12 @@
 +    }
  
      override fun close() {
++        if (!closed.compareAndSet(false, true)) return
 +        runCatching { onStopRequested() }
          if (!running.compareAndSet(true, false)) {
              release()
              return
-@@ -294,9 +300,10 @@
+@@ -294,9 +310,10 @@
      @Synchronized
      private fun release() {
          running.set(false)
@@ -2226,7 +2255,7 @@
          val currentRecorder = recorder
          recorder = null
          try {
-@@ -313,12 +320,14 @@
+@@ -313,12 +330,14 @@
          }
          val currentEncoder = opusEncoder
          opusEncoder = null
