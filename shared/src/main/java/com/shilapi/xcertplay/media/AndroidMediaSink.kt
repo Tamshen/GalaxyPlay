@@ -1187,12 +1187,19 @@ private class AudioRenderer(
             )
         }
         codec = try {
-            MediaCodecStartup.create(
-                create = { diagnosticStage = "decoder-create"; MediaCodec.createDecoderByType(mime) },
+            fun start(create: () -> MediaCodec) = MediaCodecStartup.create(
+                create = { diagnosticStage = "decoder-create"; create() },
                 configure = { diagnosticStage = "decoder-configure"; it.configure(mediaFormat, null, null, 0) },
                 start = { diagnosticStage = "decoder-start"; it.start() },
                 release = { it.release() },
-            ).also {
+            )
+            val started = if (mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
+                MediaCodecStartup.firstAvailable(AudioCodecCapabilities.opusCandidates(false),
+                    create = { name -> start { MediaCodec.createByCodecName(name) } },
+                    failed = { name, error -> report("Audio: decoder candidate audioType=${format.audioType} " +
+                        "codec=OPUS name=$name stage=$diagnosticStage error=${error.javaClass.simpleName}") })
+            } else start { MediaCodec.createDecoderByType(mime) }
+            started.also {
                 // 驱动名称查询或诊断回调失败不能丢弃已启动的解码器。
                 runCatching {
                     val name = it.name
@@ -1201,6 +1208,11 @@ private class AudioRenderer(
                 }
             }
         } catch (error: Exception) {
+            if (mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
+                AudioCodecCapabilities.rejectOpusDecoder()
+                runCatching { report("Audio: codec offer codec=OPUS direction=OUTPUT outcome=REJECTED " +
+                    "nextConnection=LPCM reason=ALL_CANDIDATES_FAILED stage=$diagnosticStage") }
+            }
             Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
             reportFailure(error)
             null

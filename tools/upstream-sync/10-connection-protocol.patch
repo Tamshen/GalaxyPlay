@@ -1,10 +1,11 @@
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayConfig.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayConfig.kt
-@@ -76,6 +76,7 @@
+@@ -76,6 +76,8 @@
       * ahead of time over TCP, so short Wi-Fi gaps do not interrupt it.
       */
      val mainBufferedAudio: Boolean = false,
 +    val supportsOpusOutput: Boolean = true,
++    val supportsOpusInput: Boolean = true,
  )
  
  /** The offer, SETUP and controls must all honor the user's audio-output setting. */
@@ -22,27 +23,31 @@
              writeU16Le(report, offset + 4, Math.round(contact.y.coerceAtLeast(0.0)).toInt())
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlist.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlist.kt
-@@ -50,7 +50,7 @@
+@@ -50,7 +50,8 @@
          )
          if (!config.disableAudioOutput) {
              info["audioLatencies"] = audioLatencies()
 -            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.mainBufferedAudio)
-+            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.mainBufferedAudio, config.supportsOpusOutput)
++            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone,
++                config.mainBufferedAudio, config.supportsOpusOutput, config.supportsOpusInput)
          }
          info["extendedFeatures"] = listOf("vocoderInfo", "enhancedRequestCarUI")
          info["displays"] = displays
-@@ -122,6 +122,7 @@
+@@ -122,6 +123,8 @@
          entertainmentRate: Int,
          microphone: Boolean,
          mainBuffered: Boolean = false,
 +        supportsOpusOutput: Boolean = true,
++        supportsOpusInput: Boolean = true,
      ): List<Map<String, Any?>> {
          fun format(type: Int, audioType: String, outputFormats: Int, inputFormats: Int? = null): Map<String, Any?> {
              val entry = linkedMapOf<String, Any?>(
-@@ -141,16 +142,17 @@
+@@ -140,17 +143,18 @@
+         val opus = 0x70000000
          val aacLc = if (is48) 0x800000 else 0x400000
          val pcmInput = if (microphone) pcmMono else null
-         val wirelessInput = if (microphone) pcmMono or opus else null
+-        val wirelessInput = if (microphone) pcmMono or opus else null
++        val wirelessInput = if (microphone) pcmMono or (if (supportsOpusInput) opus else 0) else null
 +        val outputOpus = if (supportsOpusOutput) opus else 0
  
          return listOf(

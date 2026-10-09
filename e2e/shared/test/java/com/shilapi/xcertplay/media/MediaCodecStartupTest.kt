@@ -6,6 +6,28 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class MediaCodecStartupTest {
+    @Test fun rejectedCodecIsReleasedBeforeTryingTheNextCandidateOnce() {
+        val events = mutableListOf<String>()
+        val result = MediaCodecStartup.firstAvailable(listOf("broken", "broken", "working"),
+            create = { name -> MediaCodecStartup.create(
+                create = { events += "create:$name"; name },
+                configure = { if (it == "broken") throw IllegalArgumentException() },
+                start = { events += "start:$it" }, release = { events += "release:$it" }) },
+            failed = { name, _ -> events += "failed:$name" })
+        assertEquals("working", result)
+        assertEquals(listOf("create:broken", "release:broken", "failed:broken", "create:working", "start:working"), events)
+    }
+
+    @Test fun candidateLogFailureDoesNotBlockFallbackAndOriginalLastFailureIsKept() {
+        val last = IllegalStateException()
+        try {
+            MediaCodecStartup.firstAvailable<Any>(listOf("first", "last"),
+                create = { if (it == "last") throw last else throw IllegalArgumentException() },
+                failed = { _, _ -> throw RuntimeException() })
+            fail("必须保留最后一次失败")
+        } catch (actual: IllegalStateException) { assertSame(last, actual) }
+    }
+
     @Test fun configureFailureReleasesExactlyOnceAndNeverStarts() {
         val candidate = Any()
         val failure = IllegalArgumentException("configure rejected")

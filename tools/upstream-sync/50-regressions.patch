@@ -501,10 +501,24 @@
          report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
-@@ -7,6 +7,20 @@
+@@ -7,6 +7,34 @@
  import org.junit.Test
  
  class AirPlayInfoPlistTest {
++    @Test fun unsupportedEncoderUsesPcmInputWithoutChangingDownlinkOrDisablingMicrophone() {
++        val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
++            AirPlayDisplayConfig(1280, 720), microphone = true)
++        fun formats(c: AirPlayConfig) = AirPlayInfoPlist.build(c)["audioFormats"] as List<Map<String, Any?>>
++        for ((before, after) in formats(config).zip(formats(config.copy(supportsOpusInput = false)))) {
++            assertEquals(before["audioOutputFormats"], after["audioOutputFormats"])
++            val input = before["audioInputFormats"] as Int?
++            assertEquals(input?.and(0x70000000.inv()), after["audioInputFormats"])
++            if (input != null) assertTrue((after["audioInputFormats"] as Int) != 0)
++        }
++        val noMicrophone = formats(config.copy(microphone = false, supportsOpusInput = false))
++        assertTrue(noMicrophone.none { it.containsKey("audioInputFormats") })
++    }
++
 +    @Test fun wiredPcmOfferKeepsVoiceAndMicrophoneButRemovesOutputOpusOnly() {
 +        val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
 +            AirPlayDisplayConfig(1280, 720), microphone = true)
@@ -741,6 +755,37 @@
              ),
              status.acceptUpdate(update {
                  group(1) {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecStartupTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecStartupTest.kt
+@@ -6,6 +6,28 @@
+ import org.junit.Test
+ 
+ class MediaCodecStartupTest {
++    @Test fun rejectedCodecIsReleasedBeforeTryingTheNextCandidateOnce() {
++        val events = mutableListOf<String>()
++        val result = MediaCodecStartup.firstAvailable(listOf("broken", "broken", "working"),
++            create = { name -> MediaCodecStartup.create(
++                create = { events += "create:$name"; name },
++                configure = { if (it == "broken") throw IllegalArgumentException() },
++                start = { events += "start:$it" }, release = { events += "release:$it" }) },
++            failed = { name, _ -> events += "failed:$name" })
++        assertEquals("working", result)
++        assertEquals(listOf("create:broken", "release:broken", "failed:broken", "create:working", "start:working"), events)
++    }
++
++    @Test fun candidateLogFailureDoesNotBlockFallbackAndOriginalLastFailureIsKept() {
++        val last = IllegalStateException()
++        try {
++            MediaCodecStartup.firstAvailable<Any>(listOf("first", "last"),
++                create = { if (it == "last") throw last else throw IllegalArgumentException() },
++                failed = { _, _ -> throw RuntimeException() })
++            fail("必须保留最后一次失败")
++        } catch (actual: IllegalStateException) { assertSame(last, actual) }
++    }
++
+     @Test fun configureFailureReleasesExactlyOnceAndNeverStarts() {
+         val candidate = Any()
+         val failure = IllegalArgumentException("configure rejected")
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt
 @@ -8,6 +8,25 @@
