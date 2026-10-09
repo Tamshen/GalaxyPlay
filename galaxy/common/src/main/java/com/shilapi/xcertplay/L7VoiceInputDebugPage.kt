@@ -149,11 +149,13 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
         toggle.setFeedback(when {
             capturing && !state.busy -> text(R.string.l7_voice_occupied)
             state.phase == L7VoiceInputTest.Phase.INTERRUPTED -> text(R.string.l7_voice_interrupted)
+            state.reason == "NO_DATA" -> text(R.string.l7_voice_no_data)
             state.phase == L7VoiceInputTest.Phase.FAILED -> text(R.string.l7_voice_retry)
             else -> ""
         }, state.phase == L7VoiceInputTest.Phase.FAILED)
         level.setValue(when {
             state.silenced -> text(R.string.l7_voice_system_muted)
+            state.reason == "NO_DATA" -> text(R.string.l7_voice_no_data)
             state.phase == L7VoiceInputTest.Phase.CAPTURING -> activity.getString(R.string.l7_voice_input_level, (state.peak * 100 / 32768).coerceIn(0, 100))
             state.bytes > 0 -> text(R.string.l7_voice_data_received)
             else -> text(R.string.l7_voice_speak_hint)
@@ -176,7 +178,8 @@ internal class L7VoiceInputDebugPage(private val activity: Activity, parent: Lin
         if (revision == trace.revision) return
         revision = trace.revision
         details.update(activity.getString(R.string.l7_voice_stats, state.elapsedMs, state.bytes, state.rms, state.peak, state.zeroPercent) + "\n" +
-            "source=${SOURCES[sourceIndex].second} route=${state.routeType} reason=${state.reason} code=${state.code}\n" + trace.lines.joinToString("\n"))
+            "source=${SOURCES[sourceIndex].second} route=${state.routeType} reason=${state.reason} code=${state.code} " +
+            "reads=${state.reads} zeroReads=${state.zeroReads} maxReadMs=${state.maxReadMs} recordingState=${state.recordingState}\n" + trace.lines.joinToString("\n"))
     }
 
     private fun observePhone(responded: Boolean) {

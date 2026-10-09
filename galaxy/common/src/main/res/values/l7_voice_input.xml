@@ -25,6 +25,7 @@
     <string name="l7_voice_complete">已完成 10 秒测试</string>
     <string name="l7_voice_interrupted">通话／Siri 已接管，停止本地测试</string>
     <string name="l7_voice_failed">测试失败</string>
+    <string name="l7_voice_no_data">未收到录音数据。请在单项语音测试中换一种录音方式，逐项说话并重试；确认系统没有静音后，再上传本轮日志。</string>
     <string name="l7_voice_failure">失败原因：%1$s · code=%2$s</string>
     <string name="l7_voice_occupied">通话／Siri 正在使用麦克风，请结束后再测试。</string>
     <string name="l7_voice_carplay">3. 测试手机 Siri</string>

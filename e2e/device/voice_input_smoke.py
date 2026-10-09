@@ -166,6 +166,7 @@ try:
     tap('开始测试（10 秒）')
     completed = wait_log('COMPLETE', baseline)
     assert any(int(n) > 0 for n in re.findall(r'bytes=(\d+)', completed)), 'AVD 未读取到 PCM 样本'
+    assert 'reads=' in completed and 'zeroReads=' in completed and 'readMode=NON_BLOCKING' in completed
     assert has('已完成 10 秒测试')
     (output / 'zh-complete.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     tap('查看技术明细')
@@ -173,6 +174,8 @@ try:
     tap('收起技术明细')
     top()
     adb('shell', 'input', 'keyevent', '4')
+    assert has('开始完整调试'), '返回须进入调试首页'
+    tap('单项与高级调试')
     assert has('方控调试') and has('语音输入测试'), '返回须进入调试首页'
     print('AVD 语音页权限、手动采集、停止／后台／限时、中英文昼夜及返回通过；未连接手机或上传。')
 finally:

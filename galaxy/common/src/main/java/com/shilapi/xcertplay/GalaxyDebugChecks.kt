@@ -37,7 +37,8 @@ internal object GalaxyDebugChecks {
                     return GalaxyDebugFlow.Evidence(question = !started || !value.busy,
                         canConfirm = value.phase == L7VoiceInputTest.Phase.COMPLETE && value.bytes > 0 && !value.silenced,
                         unavailable = !started, token = "${value.phase}:${value.bytes}",
-                        detail = if (value.busy) activity.getString(R.string.full_debug_voice_level,
+                        detail = if (value.reason == "NO_DATA") activity.getString(R.string.l7_voice_no_data)
+                            else if (value.busy) activity.getString(R.string.full_debug_voice_level,
                             (value.elapsedMs / 1000).toInt(), value.rms) else "")
                 }
                 override fun stop() = test.close()

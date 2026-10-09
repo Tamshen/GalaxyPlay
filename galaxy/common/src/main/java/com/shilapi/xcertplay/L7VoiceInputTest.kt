@@ -21,6 +21,7 @@ internal class L7VoiceInputTest(
         fun read(buffer: ByteArray): Int
         val routeType: Int?
         val silenced: Boolean
+        val recordingState: Int? get() = null
     }
     interface Access {
         fun permitted(): Boolean
@@ -30,7 +31,9 @@ internal class L7VoiceInputTest(
     enum class Phase { IDLE, STARTING, CAPTURING, STOPPING, STOPPED, COMPLETE, INTERRUPTED, FAILED }
     data class Snapshot(val phase: Phase = Phase.IDLE, val elapsedMs: Long = 0, val bytes: Long = 0,
         val rms: Int = 0, val peak: Int = 0, val zeroPercent: Int = 0, val routeType: Int? = null,
-        val silenced: Boolean = false, val reason: String = "", val code: Int? = null) {
+        val silenced: Boolean = false, val reason: String = "", val code: Int? = null,
+        val reads: Long = 0, val zeroReads: Long = 0, val maxReadMs: Long = 0,
+        val recordingState: Int? = null) {
         val busy get() = phase in setOf(Phase.STARTING, Phase.CAPTURING, Phase.STOPPING)
     }
     @Volatile var snapshot = Snapshot()
@@ -63,6 +66,9 @@ internal class L7VoiceInputTest(
         var reason = "USER_OR_BACKGROUND"
         var code: Int? = null
         var total = 0L
+        var reads = 0L
+        var zeroReads = 0L
+        var maxReadMs = 0L
         var lastUpdate = started
         var lastLog = started
         val signal = MicrophoneSignalStats()
@@ -70,7 +76,10 @@ internal class L7VoiceInputTest(
         fun emit(phase: String) = runCatching { log("VOICE_TEST run=$run phase=$phase source=$source rate=16000 channels=1 " +
             "elapsedMs=${now() - started} bytes=$total rms=${signal.rms} peak=${signal.peak} " +
             "zeroPercent=${signal.zeroPercent} routeType=${runCatching { recorder?.routeType }.getOrNull() ?: snapshot.routeType ?: "unknown"} " +
-            "silenced=${runCatching { recorder?.silenced }.getOrNull() ?: snapshot.silenced} reason=$reason code=${code ?: "none"}") }
+            "silenced=${runCatching { recorder?.silenced }.getOrNull() ?: snapshot.silenced} " +
+            "reads=$reads zeroReads=$zeroReads maxReadMs=$maxReadMs readMode=NON_BLOCKING bufferBytes=${buffer.size} " +
+            "recordingState=${runCatching { recorder?.recordingState }.getOrNull() ?: snapshot.recordingState ?: "unknown"} " +
+            "reason=$reason code=${code ?: "none"}") }
         try {
             emit("START")
             if (stopRequested || closed) return
@@ -82,13 +91,23 @@ internal class L7VoiceInputTest(
             while (!stopRequested && !closed) {
                 if (!access.permitted()) { finalPhase = Phase.FAILED; reason = "PERMISSION_REVOKED"; break }
                 if (access.occupied()) { finalPhase = Phase.INTERRUPTED; reason = "UPLINK_ACTIVE"; break }
-                if (now() - started >= MAX_MILLIS) { finalPhase = Phase.COMPLETE; reason = "TIME_LIMIT"; break }
+                if (now() - started >= MAX_MILLIS) {
+                    finalPhase = if (total == 0L) Phase.FAILED else Phase.COMPLETE
+                    reason = if (total == 0L) "NO_DATA" else "TIME_LIMIT"
+                    break
+                }
+                val readStarted = now()
                 val count = recorder.read(buffer)
+                reads++
+                maxReadMs = maxOf(maxReadMs, (now() - readStarted).coerceAtLeast(0))
+                if (count == 0) zeroReads++
                 if (count < 0) { finalPhase = Phase.FAILED; reason = "READ"; code = count; break }
                 if (count > 0) { signal.add(buffer, count); total += count }
                 if (now() - lastUpdate >= 250) {
                     snapshot = Snapshot(Phase.CAPTURING, now() - started, total, signal.rms, signal.peak,
-                        signal.zeroPercent, recorder.routeType, recorder.silenced)
+                        signal.zeroPercent, recorder.routeType, recorder.silenced,
+                        reads = reads, zeroReads = zeroReads, maxReadMs = maxReadMs,
+                        recordingState = recorder.recordingState)
                     lastUpdate = now()
                     if (now() - lastLog >= 1000) { emit("LEVEL"); lastLog = now() }
                     signal.resetWindow()
@@ -100,11 +119,13 @@ internal class L7VoiceInputTest(
         } finally {
             val route = runCatching { recorder?.routeType }.getOrNull()
             val silenced = runCatching { recorder?.silenced }.getOrNull() ?: false
+            val recordingState = runCatching { recorder?.recordingState }.getOrNull()
             runCatching { recorder?.close() }
             recorder = null
             // 先释放录音器再允许下一轮，快速点击不能让两个采集实例重叠。
             snapshot = snapshot.copy(phase = finalPhase, elapsedMs = now() - started, bytes = total,
-                routeType = route, silenced = silenced, reason = reason, code = code)
+                routeType = route, silenced = silenced, reason = reason, code = code,
+                reads = reads, zeroReads = zeroReads, maxReadMs = maxReadMs, recordingState = recordingState)
             emit(finalPhase.name)
             buffer.fill(0)
         }
@@ -129,6 +150,7 @@ internal class L7VoiceInputTest(
                 override fun read(buffer: ByteArray) = record.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
                 override val routeType get() = record.routedDevice?.type
                 override val silenced get() = record.activeRecordingConfiguration?.isClientSilenced ?: false
+                override val recordingState get() = record.recordingState
                 override fun close() { runCatching { record.stop() }; record.release() }
             }
         }
