@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="galaxy_music_owner">音乐输出</string>
-    <string name="galaxy_music_bluetooth">原车蓝牙（推荐）</string>
     <string name="galaxy_music_local">CarPlay 本地音乐</string>
     <string name="galaxy_music_guide">USB 与无线音乐连接</string>
-    <string name="galaxy_music_guide_body">将 iPhone 与原车蓝牙配对，在手机选择原车蓝牙作为音乐输出，并在车机选择蓝牙音乐。音乐控制由原车处理；导航、Siri 和通话仍保留。没有可用蓝牙输出时可选择本地音乐，保存后重连生效。自动媒体断开仅适用于本地音乐。</string>
+    <string name="galaxy_music_guide_body">USB 与无线连接均由 CarPlay 在车机本地播放音乐。原车媒体来源选择 GalaxyPlay，iPhone 音乐输出选择 CarPlay。蓝牙媒体互斥用于避免重复播放，保留蓝牙通话、配对和无线连接所需的蓝牙链路。升级后请重新连接。</string>
 </resources>

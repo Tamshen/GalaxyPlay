@@ -115,7 +115,7 @@ class GalaxyMediaKeysTest {
         `when`(controller.hasActiveSession()).thenAnswer { active }
         `when`(controller.navigationSnapshot()).thenReturn(com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot())
         `when`(controller.activeMediaSessionOwner()).thenReturn(Any())
-        // 本用例验证显式本地音乐模式；默认原车蓝牙不创建本应用媒体会话。
+        // 本用例验证本地音乐模式的媒体会话；产品 USB 与无线均固定使用此模式。
         `when`(controller.localMediaAudioEnabled).thenReturn(true)
         var resumed = 0
         val construction = mockConstruction(MediaSession::class.java)

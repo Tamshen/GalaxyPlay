@@ -11,15 +11,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30], manifest = Config.NONE)
 class GalaxyMusicPlaybackTest {
-    @Test fun oldExclusivePreferenceCannotEnableLocalMusicAndSnapshotIsFrozen() {
+    @Test fun oldBluetoothMusicPreferencesCannotDisableLocalMusic() {
         val app = RuntimeEnvironment.getApplication()
-        app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().putBoolean("bluetooth_media_exclusive", true).commit()
-        val sessionLocal = GalaxyMusicPlayback.localEnabled(app)
-        assertFalse(sessionLocal)
-        GalaxyMusicPlayback.saveLocalEnabled(app, true)
-        assertFalse(sessionLocal)
+        val prefs = app.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
         assertTrue(GalaxyMusicPlayback.localEnabled(app))
-        GalaxyMusicPlayback.saveLocalEnabled(app, false)
-        assertFalse(GalaxyMusicPlayback.localEnabled(app))
+        prefs.edit().putBoolean("galaxy_local_music_enabled", false)
+            .putBoolean("bluetooth_media_exclusive", false).commit()
+        assertTrue(GalaxyMusicPlayback.localEnabled(app))
+        assertFalse(prefs.getBoolean("bluetooth_media_exclusive", true))
     }
 }
