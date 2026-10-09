@@ -68,6 +68,26 @@ class UpstreamSyncTest(unittest.TestCase):
         self.assertFalse((output / '.git').exists())
         sync.prepare(self.product, self.recipe, self.upstream, None, None, True)
 
+    def test_shared_reference_tests_remain_outside_active_source_sets(self):
+        path = 'shared/src/test/java/DeferredTest.kt'
+        original = sync.REFERENCE_TESTS
+        try:
+            sync.REFERENCE_TESTS = {path: 'Deferred feature'}
+            self.assertEqual('e2e/upstream-reference/shared/test/java/DeferredTest.kt', sync.destination(path))
+            sync.safe_target(sync.destination(path))
+        finally:
+            sync.REFERENCE_TESTS = original
+
+    def test_official_missing_final_newline_is_preserved_in_patch_context(self):
+        source = self.upstream / 'shared/src/main/java/Core.kt'
+        source.write_text('class Core {\n    fun hook() = 2\n}')
+        self.commit_upstream('v2')
+        commit, files = sync.snapshot(self.upstream, 'v2')
+        recipe = self.base / 'recipe-v2'
+        sync.refresh(self.product, recipe, commit, 'v2', files)
+        sync.prepare(self.product, recipe, self.upstream, 'v2', None, True)
+        self.assertIn('No newline at end of file', (recipe / '40-policy-diagnostics.patch').read_text())
+
     def test_new_upstream_file_is_included(self):
         (self.upstream / 'shared/src/main/java/New.kt').write_text('class New\n')
         self.commit_upstream('v2')

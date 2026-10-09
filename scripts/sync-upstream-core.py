@@ -32,7 +32,8 @@ def destination(path):
     if path == 'shared/src/main/assets/navigation_test.pcm':
         return 'e2e/shared/runtime/assets/navigation_test.pcm'
     if path in REFERENCE_TESTS:
-        return path.replace('common/src/test/', 'e2e/upstream-reference/common/test/', 1)
+        module = path.split('/')[0]
+        return path.replace(module + '/src/test/', 'e2e/upstream-reference/' + module + '/test/', 1)
     if path.endswith('/LocalMfiProbe.kt'):
         return path.replace('shared/src/main/', 'e2e/shared/debug/')
     for module in ('common', 'shared'):
@@ -71,7 +72,7 @@ def safe_target(path):
     parsed = Path(path)
     if parsed.is_absolute() or '..' in parsed.parts or path.startswith('galaxy/'):
         raise ValueError('补丁目标越过核心目录')
-    if not (path.startswith(MAIN + ('e2e/common/test/', 'e2e/shared/test/', 'e2e/shared/debug/', 'e2e/upstream-reference/common/test/')) or path in CONFIG or path == 'e2e/shared/runtime/assets/navigation_test.pcm'):
+    if not (path.startswith(MAIN + ('e2e/common/test/', 'e2e/shared/test/', 'e2e/shared/debug/', 'e2e/upstream-reference/common/test/', 'e2e/upstream-reference/shared/test/')) or path in CONFIG or path == 'e2e/shared/runtime/assets/navigation_test.pcm'):
         raise ValueError('补丁目标不属于核心源集')
 
 
@@ -150,12 +151,15 @@ def refresh(root, recipe, commit, ref, files):
             new = after.decode() if after is not None else ''
         except UnicodeDecodeError:
             raise ValueError('二进制核心差异需先单独审查：' + path)
-        if old and not old.endswith('\n') or new and not new.endswith('\n'):
+        if new and not new.endswith('\n'):
             raise ValueError('核心文本需保留末尾换行：' + path)
         category = patch_category(path)
-        chunks.setdefault(category, []).extend(difflib.unified_diff(old.splitlines(True), new.splitlines(True),
+        diff = difflib.unified_diff(old.splitlines(True), new.splitlines(True),
             'a/' + path if before is not None else '/dev/null',
-            'b/' + path if after is not None else '/dev/null', n=3))
+            'b/' + path if after is not None else '/dev/null', n=3)
+        # 上游文本可能没有末尾换行，补丁必须保留其原始字节。
+        chunks.setdefault(category, []).extend(
+            line if line.endswith('\n') else line + '\n\\ No newline at end of file\n' for line in diff)
     recipe.mkdir(parents=True, exist_ok=True)
     if any(recipe.glob('*.patch')):
         raise ValueError('已有补丁，请在独立空目录生成并审查后替换')

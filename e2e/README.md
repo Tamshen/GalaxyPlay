@@ -6,7 +6,7 @@
 
 设备脚本按 `--serial` 固定 AVD，多个交互脚本依次执行，并与其他会话约定独占该模拟器；并发 ADB 启动其他应用会改变前台与节点树，不能据此判断产品失败。UI 定位只点击启用的动作行，不点击同名 Header；分类页先滚动查找离屏入口。自动化失败保留原断言及本地日志，补充截图／节点树失败不覆盖原异常。当前验收结论维护于开发说明，运行输出放在忽略的 `build/e2e/` 或 `build/previews/`。
 
-官方源码快照的测试映射与未开放入口范围固定在 [test-scope.json](../tools/upstream-sync/test-scope.json)。`upstream-reference/common/test/` 完整保留原版界面、BYD／仪表／多显示／同网等测试，不在本产品 sourceSets 中执行，也不计入通过数；对应有效协议、热点、USB、窗口、有限重试和导出回退回归仍在 `shared/test/`、`common/test/`。少量用例按产品中英文、MANUAL、唯一权限动作和三个 USB 接收器调整接口断言。原测试没有删除，不能以参考目录文件数宣称产品回归通过。
+官方源码快照的测试映射与未开放入口范围固定在 [test-scope.json](../tools/upstream-sync/test-scope.json)。`upstream-reference/common/test/` 与 `upstream-reference/shared/test/` 完整保留原版界面、BYD／仪表／多显示／同网等测试，不在本产品 sourceSets 中执行，也不计入通过数；对应有效协议、热点、USB、窗口、有限重试和导出回退回归仍在 `shared/test/`、`common/test/`。少量用例按产品中英文、MANUAL、唯一权限动作和三个 USB 接收器调整接口断言。原测试没有删除，不能以参考目录文件数宣称产品回归通过。
 
 [sync-upstream-core.py](../scripts/sync-upstream-core.py) 的覆盖、冲突、漂移和目录隔离由 `checks/test_upstream_sync.py` 使用临时 Git 仓库验证；不读取或复制认证、签名、日志和构建产物。
 
@@ -339,3 +339,5 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 两段固定样例可在已安装 FFmpeg 的辅助容器内运行 `bash e2e/runtime/generate_codec_samples.sh` 重建；不得用真实手机视频替换公共测试资产。正式投屏解码器不调用本页 native 接口，libopus 软件音频不列为硬件视频测试。
 
 分步调试回归：`L7DebugGuideTest` 在 API 29／30 核对显式启动、未完成步骤阻止通过、缺失记录、后台迟到窗口拒绝、重绘／Bundle 进度恢复与人工现象前置操作；`DiagnosticOperationTest` 核对阻塞前锚点、耗时、原结果／异常保持、私有返回值不入日志及诊断失败隔离。`CommunicationResourcesTest` 覆盖上下行真实释放后才恢复及失败／成功前后锚点。AVD 使用 `python3 e2e/device/debug_guide_smoke.py` 验证六类入口的中英文昼夜、模态步骤、控件定位、缺失与返回进度，恢复原偏好／协议／昼夜；不连接手机或上传，模拟操作不算实车通过。
+
+上游 0.2.15 的有效回归按当前 API 29／30、硬件候选和异步 Surface 实现适配；原版 Smooth video／parking、Speex、BYD 与 Android 7 专用用例在 test-scope 中逐项说明参考边界。`python3 e2e/checks/check_upstream_tests.py --upstream ../开源项目/DiPlay --require-results` 核对固定官方标签的全部测试文件去向、参考原文、活动类唯一性与实际执行 XML；参考用例不进入通过数。

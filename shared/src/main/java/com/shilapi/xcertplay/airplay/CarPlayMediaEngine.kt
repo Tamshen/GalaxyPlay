@@ -20,6 +20,8 @@ interface MediaSink {
     fun onVideoCodec(type: Int, codec: VideoCodec) {}
     fun onVideoConfig(type: Int, codecData: ByteArray) {}
     fun onVideoFrame(type: Int, naluBytes: ByteArray) {}
+    fun onVideoFrame(type: Int, naluBytes: ByteArray, senderNanos: Long, arrivalNanos: Long) =
+        onVideoFrame(type, naluBytes)
     fun setVideoRecoveryHandler(type: Int, handler: () -> Unit) {}
     fun setVideoDiagnosticHandler(type: Int, handler: (String) -> Unit) {}
     fun onScreenStreamActive(type: Int, active: Boolean) {}
@@ -30,6 +32,16 @@ interface MediaSink {
     fun onMicrophoneStopped(id: AudioStreamId) {}
     fun onIapMessage(bytes: ByteArray) {}
 }
+
+internal fun currentScreenListener(type: Int, sink: MediaSink, isCurrent: () -> Boolean) = object : ScreenStream.Listener {
+    override fun onCodec(codec: VideoCodec) { if (isCurrent()) sink.onVideoCodec(type, codec) }
+    override fun onConfig(codecData: ByteArray) { if (isCurrent()) sink.onVideoConfig(type, codecData) }
+    override fun onFrame(naluBytes: ByteArray) { if (isCurrent()) sink.onVideoFrame(type, naluBytes) }
+    override fun onFrame(naluBytes: ByteArray, senderNanos: Long, arrivalNanos: Long) {
+        if (isCurrent()) sink.onVideoFrame(type, naluBytes, senderNanos, arrivalNanos)
+    }
+}
+
 
 /**
  * Concrete [AirPlayMediaHandler] that binds the screen, audio and iAP2 DataStream ports,
@@ -118,10 +130,7 @@ class CarPlayMediaEngine(
             }
         }
         val port = screen.listen(
-            object : ScreenStream.Listener {
-                override fun onCodec(codec: VideoCodec) = sink.onVideoCodec(type, codec)
-                override fun onConfig(codecData: ByteArray) = sink.onVideoConfig(type, codecData)
-                override fun onFrame(naluBytes: ByteArray) = sink.onVideoFrame(type, naluBytes)
+            object : ScreenStream.Listener by currentScreenListener(type, sink, isCurrent = { streams[streamKey] === screen }) {
                 override fun onClosed(cause: Throwable?) {
                     Log.w(
                         TAG,
@@ -129,8 +138,8 @@ class CarPlayMediaEngine(
                     )
                     if (streams.remove(streamKey, screen)) {
                         sink.onScreenStreamActive(type, false)
+                        session.close()
                     }
-                    session.close()
                 }
             },
         )

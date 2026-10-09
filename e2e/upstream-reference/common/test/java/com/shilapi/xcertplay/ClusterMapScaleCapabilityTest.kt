@@ -8,6 +8,7 @@ import android.os.Handler
 import android.view.Display
 import com.shilapi.xcertplay.airplay.AirPlayDisplayConfig
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
+import com.shilapi.xcertplay.airplay.SafeAreaRect
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -78,6 +79,30 @@ class ClusterMapScaleCapabilityTest {
         assertSize(100, 1920, 720, cluster(100))
     }
 
+    @Test fun smallerDilink3ProjectionAdvertisesItsPanelAndIgnoresThe1920Calibration() {
+        projectionDisplay(1280, 480)
+        AirPlayPersistence.saveClusterContent(activity, CarPlayClusterDisplay.Content.INSTRUMENTS)
+        AirPlayPersistence.saveClusterMarkerHorizontalStep(activity, 1)
+        AirPlayPersistence.saveClusterMarkerVerticalStep(activity, -1)
+        AirPlayPersistence.saveClusterSafeAreaRect(activity, SafeAreaRect(300, 100, 1500, 620))
+
+        val actual = cluster(100)
+        val expected = CarPlayClusterDisplay.config(1280, 480, 100, 1, -1,
+            CarPlayClusterDisplay.Content.INSTRUMENTS)
+        assertEquals(expected, actual)
+        assertEquals(1280.0 / 480.0, MapMirrors.streamAspect, 0.0001)
+        assertTrue(activity.javaClass.getDeclaredField("clusterStreamOnDisplay")
+            .apply { isAccessible = true }.getBoolean(activity))
+    }
+
+    @Test fun measuredDilink4ProjectionRetainsItsSaved1920Calibration() {
+        projectionDisplay(1920, 720)
+        val rect = SafeAreaRect(300, 100, 1500, 620)
+        AirPlayPersistence.saveClusterSafeAreaRect(activity, rect)
+        assertEquals(DiLink4ClusterDisplay.streamConfig(CarPlayClusterDisplay.Content.MAP,
+            safeAreaRect = rect), cluster(100))
+    }
+
     @Test fun theNewPresetRoundTripsThroughTheSettingsPreferences() {
         AirPlayPersistence.saveClusterMapScalePercent(activity, 125)
         assertEquals(125, AirPlayPersistence.loadClusterMapScalePercent(activity))
@@ -89,6 +114,13 @@ class ClusterMapScaleCapabilityTest {
         AirPlayPersistence.saveClusterMapScalePercent(activity, scale)
         return activity.javaClass.getDeclaredMethod("clusterDisplayConfig")
             .apply { isAccessible = true }.invoke(activity) as AirPlayDisplayConfig
+    }
+
+    private fun projectionDisplay(width: Int, height: Int) {
+        ShadowDisplayManager.removeDisplay(displayId)
+        displayId = ShadowDisplayManager.addDisplay("w${width}dp-h${height}dp-mdpi", 5)
+        val display = activity.getSystemService(DisplayManager::class.java).getDisplay(displayId)
+        shadowOf(display).apply { setName(DiLink4ClusterDisplay.NAME); setFlags(Display.FLAG_PRESENTATION) }
     }
 
     private fun assertSize(scale: Int, width: Int, height: Int, config: AirPlayDisplayConfig) {

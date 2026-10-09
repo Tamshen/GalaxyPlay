@@ -74,12 +74,9 @@ class VideoOperatingRateTest {
             val codecFailure = MediaCodec.CodecException::class.java
                 .getDeclaredConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
                 .apply { isAccessible = true }.newInstance(1100, 0, "test codec failure")
-            val failed = CountDownLatch(1); val once = java.util.concurrent.atomic.AtomicBoolean()
-            doAnswer {
-                if (once.compareAndSet(false, true)) { failed.countDown(); throw codecFailure }
-                MediaCodec.INFO_TRY_AGAIN_LATER
-            }.`when`(f.codec).dequeueOutputBuffer(any(MediaCodec.BufferInfo::class.java), eq(0L))
-            assertTrue(failed.await(2, TimeUnit.SECONDS)); f.barrier()
+            // worker 已启动后只发布故障，不并发重新设置正在调用的 Mockito 桩。
+            f.outputFailure.set(codecFailure)
+            assertTrue(f.outputFailed.await(2, TimeUnit.SECONDS)); f.barrier()
             assertEquals(f.reports.toString(), if (presented) 30 else 0, f.field("operatingRate").getInt(f.worker))
             assertTrue(f.retry()); f.barrier()
             assertEquals(if (presented) 2 else 1, f.formats.count { it.containsKey(MediaFormat.KEY_OPERATING_RATE) })
@@ -93,6 +90,8 @@ class VideoOperatingRateTest {
         val creations = AtomicInteger()
         val formats = java.util.concurrent.CopyOnWriteArrayList<MediaFormat>()
         val presentation = AtomicReference<MediaCodec.OnFrameRenderedListener>()
+        val outputFailure = AtomicReference<RuntimeException?>()
+        val outputFailed = CountDownLatch(1)
         private val closed = CountDownLatch(1)
         val reports = ConcurrentLinkedQueue<String>()
         private val type = Class.forName("com.shilapi.xcertplay.media.VideoDecoder")
@@ -107,8 +106,13 @@ class VideoOperatingRateTest {
             `when`(info.isHardwareAccelerated).thenReturn(true)
             `when`(codec.codecInfo).thenReturn(info)
             `when`(codec.name).thenReturn("test.avc")
-            `when`(codec.dequeueOutputBuffer(any(MediaCodec.BufferInfo::class.java), eq(0L)))
-                .thenReturn(MediaCodec.INFO_TRY_AGAIN_LATER)
+            doAnswer {
+                outputFailure.getAndSet(null)?.let { failure ->
+                    outputFailed.countDown()
+                    throw failure
+                }
+                MediaCodec.INFO_TRY_AGAIN_LATER
+            }.`when`(codec).dequeueOutputBuffer(any(MediaCodec.BufferInfo::class.java), eq(0L))
             `when`(codec.dequeueInputBuffer(anyLong())).thenReturn(0)
             `when`(codec.getInputBuffer(0)).thenReturn(ByteBuffer.allocate(64))
             doAnswer { presentation.set(it.getArgument(0)); null }.`when`(codec)

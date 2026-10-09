@@ -36,12 +36,13 @@
      @Test fun availableWirelessCh341StillWaitsForMfiAndClosesItsPermissionReceiver() {
 --- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayMediaCallbackTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayMediaCallbackTest.kt
-@@ -1,11 +1,9 @@
+@@ -1,12 +1,9 @@
  package com.shilapi.xcertplay
  
 +import android.graphics.Bitmap
  import android.content.Intent
 -import android.graphics.Bitmap
+-import android.graphics.Color
 -import android.media.MediaMetadata
  import android.view.KeyEvent
  import com.shilapi.xcertplay.airplay.CarPlayMediaButton
@@ -49,7 +50,11 @@
  import org.junit.Assert.assertEquals
  import org.junit.Assert.assertNull
  import org.junit.Assert.assertSame
-@@ -17,9 +15,9 @@
+@@ -15,13 +12,12 @@
+ import org.robolectric.RobolectricTestRunner
+ import org.robolectric.RuntimeEnvironment
+ import org.robolectric.annotation.Config
+-import org.robolectric.annotation.GraphicsMode
  
  @RunWith(RobolectricTestRunner::class)
  @Config(sdk = [29], manifest = Config.NONE)
@@ -61,7 +66,7 @@
  
      @Test
      fun controllerPlayAndPauseAreExplicit() {
-@@ -65,29 +63,27 @@
+@@ -67,29 +63,27 @@
          assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
      }
  
@@ -111,7 +116,46 @@
      }
  
      @Test
-@@ -116,14 +112,4 @@
+@@ -101,38 +95,6 @@
+         assertSame(cached, CarPlayMediaKeys.nextArtwork(7, mapOf(7 to cached), previous))
+         assertNull(CarPlayMediaKeys.nextArtwork(7, mapOf(7 to null), previous))
+         assertNull(CarPlayMediaKeys.nextArtwork(null, mapOf(7 to cached), previous))
+-    }
+-
+-    @Test
+-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+-    fun wideArtworkIsPaddedToASquareNotStretched() {
+-        val wide = Bitmap.createBitmap(1280, 720, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+-        val square = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+-
+-        val padded = CarPlayMediaKeys.squareArtwork(wide)
+-
+-        assertEquals(384, padded.width)
+-        assertEquals(384, padded.height)
+-        assertEquals(Color.TRANSPARENT, padded.getPixel(192, 0))
+-        assertEquals(Color.RED, padded.getPixel(192, 192))
+-        assertEquals(Color.TRANSPARENT, padded.getPixel(192, 383))
+-        assertSame(square, CarPlayMediaKeys.squareArtwork(square))
+-    }
+-
+-    @Test
+-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+-    fun smallOrTallArtworkIsPaddedWithoutUpscaling() {
+-        val small = CarPlayMediaKeys.squareArtwork(Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888))
+-        val tall = CarPlayMediaKeys.squareArtwork(
+-            Bitmap.createBitmap(100, 1000, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) },
+-        )
+-
+-        assertEquals(200, small.width)
+-        assertEquals(200, small.height)
+-        assertEquals(384, tall.width)
+-        assertEquals(384, tall.height)
+-        assertEquals(Color.TRANSPARENT, tall.getPixel(0, 192))
+-        assertEquals(Color.RED, tall.getPixel(192, 192))
+     }
+ 
+     @Test
+@@ -150,14 +112,4 @@
      }
  
      private fun button(event: KeyEvent) = Intent(Intent.ACTION_MEDIA_BUTTON).putExtra(Intent.EXTRA_KEY_EVENT, event)
@@ -126,6 +170,78 @@
 -        assertEquals(true, CarPlayMediaKeys.metadataChanged(CarPlayNowPlaying(), song))
 -    }
  }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/ClusterActivityStateTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/ClusterActivityStateTest.kt
+@@ -39,38 +39,7 @@
+         event(ClusterActivityState.SIMPLE, 1, time = 200)
+         assertEquals(ClusterActivityState.Snapshot(Theme.SIMPLE, false), state.snapshot())
+         event(ClusterActivityState.MINI_MAP, 1, time = 210)
+-        assertEquals(ClusterActivityState.Snapshot(Theme.SIMPLE, true, true), state.snapshot())
+-    }
+-
+-    @Test fun smallWindowFollowsTheNewestVisibleMapActivity() {
+-        event(ClusterActivityState.MINI_MAP, 1)
+-        assertTrue(state.snapshot().smallWindow)
+-        event(ClusterActivityState.FULL_MAP, 1, time = 200)
+-        assertFalse(state.snapshot().smallWindow)
+-        event(ClusterActivityState.MINI_MAP, 1, time = 300)
+-        assertTrue(state.snapshot().smallWindow)
+-        event(ClusterActivityState.MINI_MAP, 23, time = 301)
+-        assertFalse(state.snapshot().smallWindow)
+-    }
+-
+-    @Test fun smallWindowAloneRemainsVisibleAndSwitchesBothDirections() {
+-        event(ClusterActivityState.MINI_MAP, 1, time = 100)
+-        assertEquals(ClusterActivityState.Snapshot(null, true, true), state.snapshot())
+-        event(ClusterActivityState.FULL_MAP, 1, time = 200)
+-        assertEquals(ClusterActivityState.Snapshot(Theme.MAP, true, false), state.snapshot())
+-        event(ClusterActivityState.MINI_MAP, 1, time = 300)
+-        assertEquals(ClusterActivityState.Snapshot(Theme.MAP, true, true), state.snapshot())
+-    }
+-
+-    @Test fun coveredMapOnlyReconnectsWhenItReturnsInADifferentWindowMode() {
+-        val small = ClusterActivityState.Snapshot(Theme.SCENARIO, true, true)
+-        val covered = ClusterActivityState.Snapshot(Theme.SCENARIO, false, false)
+-        val full = ClusterActivityState.Snapshot(Theme.MAP, true, false)
+-        assertFalse(ClusterActivityState.shouldReconnectSmallWindowStream(small, covered, true))
+-        assertTrue(ClusterActivityState.shouldReconnectSmallWindowStream(covered, full, true))
+-        assertFalse(ClusterActivityState.shouldReconnectSmallWindowStream(covered, small, true))
+-        assertFalse(ClusterActivityState.shouldReconnectSmallWindowStream(full, full, true))
+-        assertTrue(ClusterActivityState.shouldReconnectSmallWindowStream(full, small, false))
++        assertEquals(ClusterActivityState.Snapshot(Theme.SIMPLE, true), state.snapshot())
+     }
+ 
+     @Test fun pausedButVisibleClusterSurvivesFocusMovingToTheHeadUnit() {
+@@ -104,11 +73,4 @@
+         state.event("unrelated.app", ClusterActivityState.FULL_MAP, 1, 1, 100)
+         assertNull(state.snapshot().theme)
+     }
+-
+-    @Test fun automapPackageReportsTheSameSmallAndFullWindows() {
+-        state.event("com.byd.automap", ClusterActivityState.MINI_MAP, 1, 1, 100)
+-        assertEquals(ClusterActivityState.Snapshot(null, true, true), state.snapshot())
+-        state.event("com.byd.automap", ClusterActivityState.FULL_MAP, 1, 1, 200)
+-        assertEquals(ClusterActivityState.Snapshot(Theme.MAP, true, false), state.snapshot())
+-    }
+ }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/ClusterMapPresentationTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/ClusterMapPresentationTest.kt
+@@ -151,15 +151,6 @@
+         }
+     }
+ 
+-    @Test fun dilink3SmallerProjectionDisplayIsSelected() {
+-        val id = display(DiLink4ClusterDisplay.NAME, "w1280dp-h480dp-mdpi")
+-        try {
+-            assertEquals(id, ClusterMapPresentation.findDisplay(context)?.displayId)
+-        } finally {
+-            ShadowDisplayManager.removeDisplay(id)
+-        }
+-    }
+-
+     @Test fun dilink4WrongGeometryIsRejected() {
+         val id = display(DiLink4ClusterDisplay.NAME, "w1280dp-h720dp-mdpi")
+         try {
 --- a/e2e/common/test/java/com/shilapi/xcertplay/DarkModeTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/DarkModeTest.kt
 @@ -1,24 +1,19 @@
@@ -397,6 +513,37 @@
          val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).setup()
          assertEquals(WirelessHotspotMode.MANUAL, runtimeConfig(host.get()).wirelessHotspotMode)
  
+--- a/e2e/common/test/java/com/shilapi/xcertplay/WifiDirectChannelSettingsTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiDirectChannelSettingsTest.kt
+@@ -72,19 +72,6 @@
+         assertEquals(WifiP2pChannels.AUTO, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+     }
+ 
+-    @Test fun autoBandChoicesAreListedAfterAutoAndPersist() {
+-        val control = channelControl(controls())!!
+-        control.performClick()
+-        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+-        assertEquals("Auto · 5 GHz", dialog.listView.adapter.getItem(1).toString())
+-        assertEquals("Auto · 2.4 GHz", dialog.listView.adapter.getItem(2).toString())
+-        select(dialog, WifiP2pChannels.AUTO_5_GHZ)
+-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+-        shadowOf(Looper.getMainLooper()).idle()
+-        assertEquals(WifiP2pChannels.AUTO_5_GHZ, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+-        assertTrue(control.text.toString().endsWith("Auto · 5 GHz"))
+-    }
+-
+     @Test fun invalidOrCorruptSavedChannelsUseAuto() {
+         for (channel in listOf(-1, 12, 14, 52, 100, 196)) {
+             prefs.edit().putInt("wifi_p2p_preferred_channel", channel).commit()
+@@ -104,7 +91,7 @@
+         assertEquals(149, config.wifiP2pPreferredChannel)
+     }
+ 
+-    private val choices get() = listOf(WifiP2pChannels.AUTO) + WifiP2pChannels.bandChoices + WifiP2pChannels.channels
++    private val choices get() = listOf(WifiP2pChannels.AUTO) + WifiP2pChannels.channels
+ 
+     private fun select(dialog: AlertDialog, channel: Int) {
+         val index = choices.indexOf(channel)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
 @@ -72,48 +72,6 @@
@@ -467,109 +614,6 @@
      }
  
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
---- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessHandoffWatchdogTest.kt
-+++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessHandoffWatchdogTest.kt
-@@ -86,7 +86,7 @@
-         assertEquals(0, confirmations)
-     }
- 
--    @Test fun renderedVideoWithoutTunnelReleasesOnlyBootstrapAndReportsFallbackOnce() {
-+    @Test fun renderedVideoWithoutTunnelPreservesBootstrapAndReportsFallbackOnce() {
-         proofCall("rendered", 0, session)
-         timeout()
-         timeout()
-@@ -94,7 +94,7 @@
-         assertEquals(0, hotspotCloses)
-         assertSame(session, ReflectionHelpers.getField(controller, "activeSession"))
-         assertEquals(listOf(CarPlayStatus.WirelessActiveFallback), statuses)
--        verify(bootstrap, times(1)).close()
-+        verify(bootstrap, never()).close()
-         assertTrue(diagnostics.any { it.startsWith("STEP handoff/fallback:") && it.contains("tunnel iAP2 unavailable") })
-         assertFalse(diagnostics.any { it.startsWith("STEP handoff/complete:") })
-         assertEquals(0, confirmations)
-@@ -117,6 +117,61 @@
-         verify(bootstrap, times(1)).close()
-     }
- 
-+    @Test fun aLateTunnelPromotesFallbackAndClosesBluetoothOnlyOnce() {
-+        proofCall("rendered", 0, session)
-+        timeout()
-+        assertEquals(listOf(CarPlayStatus.WirelessActiveFallback), statuses)
-+        val closing = CountDownLatch(1)
-+        doAnswer { closing.countDown(); null }.`when`(bootstrap).close()
-+        tunnelReady(0)
-+        tunnelReady(0)
-+        assertTrue(closing.await(2, TimeUnit.SECONDS))
-+        awaitHandoff()
-+        assertEquals(listOf(CarPlayStatus.WirelessActiveFallback, CarPlayStatus.WirelessActive), statuses)
-+        verify(bootstrap, times(1)).close()
-+        assertFalse(flag("wirelessHandoffFellBack").get())
-+        assertEquals(0, hotspotCloses)
-+    }
-+
-+    @Test fun aQueuedTunnelCompletionCannotCloseTheNextGenerationsBootstrap() {
-+        val replacement = mock(BluetoothSocket::class.java)
-+        val lock = ReflectionHelpers.getField<Any>(controller, "wirelessResourceLock")
-+        synchronized(lock) {
-+            tunnelReady(0)
-+            // Force replacement to win before the queued completion can claim its resources.
-+            ReflectionHelpers.getField<AtomicInteger>(controller, "wirelessGeneration").set(1)
-+            ReflectionHelpers.setField(controller, "bluetoothSocket", replacement)
-+            flag("wirelessActiveReported").set(false)
-+            flag("wirelessTunnelReady").set(false)
-+        }
-+        awaitHandoff()
-+        verify(bootstrap, never()).close()
-+        verify(replacement, never()).close()
-+        assertTrue(statuses.isEmpty())
-+    }
-+
-+    @Test fun tunnelReadinessWithoutAHandoffRequestDoesNotReleaseBluetooth() {
-+        flag("wirelessHandoffRequested").set(false)
-+        tunnelReady(0)
-+        awaitHandoff()
-+        verify(bootstrap, never()).close()
-+        assertTrue(statuses.isEmpty())
-+        assertTrue(flag("wirelessTunnelReady").get())
-+    }
-+
-+    @Test fun onlyTheCurrentRenderedSessionMayKeepTheBluetoothControlLoopAlive() {
-+        assertFalse(keepControlAlive(0))
-+        proofCall("rendered", 0, session)
-+        assertTrue(keepControlAlive(0))
-+        assertFalse(keepControlAlive(1))
-+        proofCall("end", 0, session)
-+        assertFalse(keepControlAlive(0))
-+        proofCall("activate", 0, session)
-+        proofCall("rendered", 0, session)
-+        flag("wirelessFailureReported").set(true)
-+        assertFalse(keepControlAlive(0))
-+    }
-+
-     @Test fun endedSessionCannotUseItsOldRenderedFrame() {
-         proofCall("rendered", 0, session)
-         proofCall("end", 0, session)
-@@ -163,6 +218,20 @@
-         shadowOf(Looper.getMainLooper()).idle()
-     }
-     private fun flag(name: String): AtomicBoolean = ReflectionHelpers.getField(controller, name)
-+    private fun tunnelReady(generation: Int) {
-+        controller.javaClass.getDeclaredMethod("onWirelessTunnelReady", Int::class.javaPrimitiveType)
-+            .apply { isAccessible = true }.invoke(controller, generation)
-+    }
-+    private fun keepControlAlive(generation: Int): Boolean =
-+        controller.javaClass.getDeclaredMethod("keepBluetoothControlAlive", Int::class.javaPrimitiveType)
-+            .apply { isAccessible = true }.invoke(controller, generation) as Boolean
-+    private fun awaitHandoff() {
-+        for (thread in Thread.getAllStackTraces().keys.filter { it.name == "xcertplay-wireless-handoff" }) {
-+            thread.join(2_000)
-+            assertFalse("Handoff worker did not finish", thread.isAlive)
-+        }
-+        shadowOf(Looper.getMainLooper()).idle()
-+    }
-     private fun proofCall(name: String, vararg args: Any) {
-         proof.javaClass.declaredMethods.single { it.name == name }.apply { isAccessible = true }.invoke(proof, *args)
-     }
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 @@ -32,8 +32,9 @@
@@ -602,6 +646,17 @@
          assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
          assertEquals(View.VISIBLE, retry.visibility)
          report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayCryptoAndroidCompatibilityTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayCryptoAndroidCompatibilityTest.kt
+@@ -10,7 +10,7 @@
+ import org.robolectric.annotation.Config
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [28, 30], manifest = Config.NONE)
++@Config(sdk = [29, 30], manifest = Config.NONE)
+ class AirPlayCryptoAndroidCompatibilityTest {
+     @Test fun olderSupportedAndroidDoesNotStageIntoDirectBuffers() {
+         roundTrip()
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlistTest.kt
 @@ -7,6 +7,34 @@
@@ -639,12 +694,67 @@
      @Test
      fun defaultDisplayIncludesFullViewAndSafeAreas() {
          val info = AirPlayInfoPlist.build(
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlayTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlayTest.kt
+@@ -55,6 +55,6 @@
+             }
+         }
+         assertEquals(76, ClusterTurnCardOverlay.snap(76, ClusterTurnCardOverlay.xPercents))
+-        assertEquals(1, ClusterTurnCardOverlay.STEP_PERCENT)
++        assertEquals(2, ClusterTurnCardOverlay.STEP_PERCENT)
+     }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/CurrentScreenListenerTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/CurrentScreenListenerTest.kt
+@@ -4,6 +4,7 @@
+ import java.net.Socket
+ import java.util.Collections
+ import java.util.concurrent.atomic.AtomicBoolean
++import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertNotNull
+ import org.junit.Assert.assertNotSame
+@@ -18,7 +19,7 @@
+  * frames must not reach the sink, which by then belongs to the successor's decoder.
+  */
+ @RunWith(RobolectricTestRunner::class) // CarPlayMediaEngine.onScreen logs through android.util.Log.
+-@Config(sdk = [29], manifest = Config.NONE)
++@Config(sdk = [29, 30], manifest = Config.NONE)
+ class CurrentScreenListenerTest {
+     private sealed class Event {
+         data class Codec(val type: Int, val codec: VideoCodec) : Event()
+@@ -127,6 +128,11 @@
+             assertNotSame(first, second)
+             val secondListener = listenerOf(second)
+ 
++            // 旧连接迟到的关闭事件不得关闭替换后的会话。
++            firstListener.onClosed(IllegalStateException("old stream ended"))
++            assertFalse(session.isClosed)
++            assertTrue(streams[mainKey] === second)
++
+             // The replaced stream's thread was already past its read when it was closed and still delivers.
+             firstListener.deliverAll()
+             assertEquals(emptyList<Event>(), sink.take())
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/ScreenCodecTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/ScreenCodecTest.kt
+@@ -1,8 +1,8 @@
+ package com.shilapi.xcertplay.airplay
+ 
+ import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertSame
+ import org.junit.Assert.assertEquals
+-import org.junit.Assert.assertSame
+ import org.junit.Test
+ 
+ class ScreenCodecTest {
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/StreamReceiveStatsTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/StreamReceiveStatsTest.kt
-@@ -65,4 +65,20 @@
+@@ -65,20 +65,32 @@
          assertTrue(output.last().contains("packets=1 bytes=20 readMaxMs=0"))
          assertTrue(output.last().contains("seqForwardGaps=1"))
      }
+-
+-    @Test fun decryptTimingIsReportedOnlyWhenRecordedAndThenReset() {
 +    @Test fun separatesStageTimingEvenOnFailureAndResetsAfterBrokenReporter() {
 +        var clock = 0L
 +        val output = mutableListOf<String>()
@@ -661,6 +771,28 @@
 +        stats.flush(true)
 +        assertTrue(output.last().contains("headerMaxUs=0 headerCalls=0"))
 +    }
++    @Test fun decryptTimingIsRecordedAndResetUsingTheProductStageCounters() {
+         var clock = 0L
+         val output = mutableListOf<String>()
+         val stats = StreamReceiveStats("video", output::add) { clock }
+-        stats.received(1_000)
+-        stats.decrypted(2_000_000, 500_000)
+-        stats.decrypted(500_000, 250_000)
+-        stats.processed()
+-        clock = 5_000_000_000L
+-        stats.flush()
+-        assertTrue(output.last().endsWith(" decryptAvgUs=1250 decryptMaxUs=2000 decryptMBps=300"))
+-        clock = 10_000_000_000L
+-        stats.flush()
+-        assertTrue(!output.last().contains("decrypt"))
++        stats.measure(StreamReceiveStats.Stage.DECRYPT) { clock += 2_000_000 }
++        stats.measure(StreamReceiveStats.Stage.DECRYPT) { clock += 500_000 }
++        clock = 5_000_000_000L; stats.flush()
++        assertTrue(output.last().contains("decryptMaxUs=2000 decryptCalls=2"))
++        clock = 10_000_000_000L; stats.flush()
++        assertTrue(output.last().contains("decryptMaxUs=0 decryptCalls=0"))
+     }
++
  }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/Byd13CatalogProbeTest.kt
@@ -763,6 +895,105 @@
  class BydCarPlayCallLifecycleTest {
      private val app get() = RuntimeEnvironment.getApplication()
      private val writer get() = ReflectionHelpers.getField<ExecutorService>(BydCarPlayCall, "writer")
+@@ -29,7 +29,6 @@
+     }
+ 
+     @Before fun setup() {
+-        BydCarPlayCall.watcherReadyMillis = 500L
+         drain()
+         ReflectionHelpers.getField<CarPlayCallState>(BydCarPlayCall, "state").clear()
+         ReflectionHelpers.setField(BydCarPlayCall, "shown", null)
+@@ -37,7 +36,6 @@
+         ReflectionHelpers.setField(BydCarPlayCall, "watcherRunning", false)
+         ReflectionHelpers.setField(BydCarPlayCall, "cleanupPending", false)
+         ReflectionHelpers.setField(BydCarPlayCall, "prepared", false)
+-        ReflectionHelpers.setField(BydCarPlayCall, "sessionActive", false)
+         BydCarPlayCall.attach(app)
+         BydOutputSettings.setCarPlayCalls(app, false)
+         Shell.commands.clear()
+@@ -192,7 +190,7 @@
+         BydOutputSettings.setCarPlayCalls(app, true)
+         BydCarPlayCall.onFrame(ringing("ordered")); drain()
+         val prepare = Shell.commands.indexOfFirst { it.contains(" prepare - ") }
+-        val launch = Shell.commands.indexOfFirst { it.startsWith("setsid nohup ") }
++        val launch = Shell.commands.indexOfFirst { it.startsWith("nohup") }
+         val probe = Shell.commands.indexOfFirst { it.contains(" probe - ") }
+         val show = Shell.commands.indexOfFirst { it.contains(" ringing ") }
+         assertTrue(prepare >= 0 && prepare < launch && launch < probe && probe < show)
+@@ -255,62 +253,6 @@
+         assertNull(ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken"))
+     }
+ 
+-    @Test fun sessionStartArmsTheWatcherSoTheFirstCallSkipsItsLaunch() {
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.sessionStarted(); drain()
+-        val armed = ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken")!!
+-        assertTrue(Shell.commands.any { it.contains(" watch $armed ${app.packageName} ") })
+-        assertTrue(Shell.commands.none { it.contains(" ringing ") || it.contains(" end - ") || it.contains(" cancel - ") })
+-        BydCarPlayCall.onFrame(ringing("armed")); drain()
+-        assertEquals(armed, tokenFrom(Shell.commands.single { it.contains(" ringing ") }))
+-        assertEquals(1, Shell.commands.count { it.startsWith("setsid nohup ") })
+-    }
+-
+-    @Test fun endingASessionWithAnArmedWatcherOnlyCancelsIt() {
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.sessionStarted(); drain()
+-        val armed = ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken")!!
+-        BydCarPlayCall.end(); drain()
+-        assertTrue(Shell.commands.any { it.endsWith(" cancel - $armed") })
+-        assertTrue(Shell.commands.none { it.contains(" end - ") })
+-        assertNull(ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken"))
+-    }
+-
+-    @Test fun turningTheOptionOffCancelsAnArmedWatcherAndOnArmsAgain() {
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.sessionStarted(); drain()
+-        val armed = ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken")!!
+-        BydOutputSettings.setCarPlayCalls(app, false)
+-        BydCarPlayCall.settingChanged(false); drain()
+-        assertTrue(Shell.commands.any { it.endsWith(" cancel - $armed") })
+-        assertNull(ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken"))
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.settingChanged(true); drain()
+-        assertNotEquals(armed, ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken"))
+-        assertTrue(Shell.commands.none { it.contains(" end - ") })
+-    }
+-
+-    @Test fun anEndedCallRearmsWithAFreshToken() {
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.sessionStarted(); drain()
+-        BydCarPlayCall.onFrame(ringing("first")); drain()
+-        val first = tokenFrom(Shell.commands.single { it.contains(" ringing ") })
+-        BydCarPlayCall.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
+-            u8(2, 0); string(4, "first")
+-        }); drain()
+-        assertTrue(Shell.commands.any { it.endsWith(" end - $first") })
+-        val next = ReflectionHelpers.getField<String?>(BydCarPlayCall, "watcherToken")!!
+-        assertNotEquals(first, next)
+-        assertTrue(ReflectionHelpers.getField<Boolean>(BydCarPlayCall, "prepared"))
+-        assertTrue(Shell.commands.any { it.contains(" watch $next ${app.packageName} ") })
+-    }
+-
+-    @Test fun noSessionMeansNoArmedWatcher() {
+-        BydOutputSettings.setCarPlayCalls(app, true)
+-        BydCarPlayCall.settingChanged(true); drain()
+-        assertTrue(Shell.commands.isEmpty())
+-    }
+-
+     private fun awaitRetry() {
+         val future = ReflectionHelpers.getField<java.util.concurrent.ScheduledFuture<*>?>(BydCarPlayCall, "retry")
+             ?: error("Expected a bounded retry")
+@@ -326,8 +268,8 @@
+     class Shell {
+         @Implementation fun run(context: Context, command: String): String? {
+             commands.add(command)
+-            if (command.startsWith("setsid nohup ") && rejectWatcher) return "nohup: watcher launch refused"
+-            if (command.startsWith("setsid nohup ") && emptyWatcherReply) return ""
++            if (command.startsWith("nohup") && rejectWatcher) return "nohup: watcher launch refused"
++            if (command.startsWith("nohup") && emptyWatcherReply) return ""
+             if (command.contains(" cancel - ") && omitCancelCompletion) return ""
+             if (command.contains(" probe ")) return if (rejectWatcher || omitReadiness) "watch=ERR" else "watch=0"
+             if (rejectPhase?.let { command.contains(" $it ") } == true) return "write=ERR call write refused"
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterMapPauseTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterMapPauseTest.kt
 @@ -2,6 +2,7 @@
@@ -773,10 +1004,32 @@
  import org.junit.Test
  import org.junit.runner.RunWith
  import org.robolectric.RobolectricTestRunner
-@@ -25,9 +26,9 @@
+@@ -22,31 +23,12 @@
+         release.countDown()
+         BydClusterMapPause.streamControl = null
+         BydClusterMapPause.clusterMapShown = false
+-        BydClusterMapPause.onNaviMode = null
      }
  
      @Test
+-    fun disablingPauseResumesMapWhileLayoutFollowingRemainsEnabled() {
+-        BydClusterMapPause.readMode = { BydClusterNaviMode.OFF }
+-        BydClusterMapPause.onNaviMode = {}
+-        BydClusterMapPause.clusterMapShown = true
+-        var streaming = true
+-        BydClusterMapPause.streamControl = { streaming = it }
+-        BydClusterMapPause::class.java.getDeclaredField("context")
+-            .apply { isAccessible = true }.set(null, context)
+-        val tick = BydClusterMapPause::class.java.getDeclaredMethod("tick").apply { isAccessible = true }
+-        BydOutputSettings.setClusterStreamPause(context, true)
+-        tick.invoke(BydClusterMapPause)
+-        org.junit.Assert.assertFalse(streaming)
+-        BydOutputSettings.setClusterStreamPause(context, false)
+-        tick.invoke(BydClusterMapPause)
+-        assertTrue(streaming)
+-    }
+-
+-    @Test
 -    fun initializationDoesNotWaitForAPendingAdbRead() {
 +    fun legacySettingDoesNotStartBydAdbReadsOrBlockInitializationOnL7() {
          val reading = CountDownLatch(1)
@@ -785,7 +1038,7 @@
          BydClusterMapPause.readMode = {
              reading.countDown()
              release.await()
-@@ -37,11 +38,11 @@
+@@ -56,11 +38,11 @@
          BydClusterMapPause.clusterMapShown = true
          BydClusterMapPause.streamControl = {}
          BydClusterMapPause.initialize(context)
@@ -812,7 +1065,13 @@
      private fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongTimerTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/BydClusterSongTimerTest.kt
-@@ -13,7 +13,7 @@
+@@ -8,13 +8,12 @@
+ import org.robolectric.RobolectricTestRunner
+ import org.robolectric.RuntimeEnvironment
+ import org.robolectric.annotation.Config
+-import org.robolectric.shadows.ShadowLog
+ import java.util.concurrent.CountDownLatch
+ import java.util.concurrent.ScheduledExecutorService
  import java.util.concurrent.TimeUnit
  
  @RunWith(RobolectricTestRunner::class)
@@ -821,6 +1080,22 @@
  class BydClusterSongTimerTest {
      private val type = BydClusterSong::class.java
      private fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
+@@ -89,15 +88,6 @@
+         assertEquals(current, wanted())
+     }
+ 
+-    @Test fun nowPlayingDoesNotLogPrivateTrackTextWhenOutputIsEnabledOrDisabled() = withWriterBlocked { app ->
+-        ShadowLog.clear()
+-        song("Private enabled title")
+-        BydOutputSettings.setClusterSong(app, false)
+-        song("Private disabled lyric")
+-        val messages = ShadowLog.getLogs().map { it.msg }
+-        assertFalse(messages.any { "Private enabled title" in it || "Private disabled lyric" in it })
+-    }
+-
+     @Test fun disablingSongOutputInvalidatesPendingSongAndNoteTimers() = withWriterBlocked { app ->
+         song()
+         val songToken = get("onChange")!!
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/hud/DiLink3ClusterRecoveryTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/hud/DiLink3ClusterRecoveryTest.kt
 @@ -17,7 +17,7 @@
@@ -832,63 +1107,754 @@
  class DiLink3ClusterRecoveryTest {
      private val app get() = RuntimeEnvironment.getApplication()
      private val output get() = BydDiLink3ClusterOutput
---- a/e2e/shared/test/java/com/shilapi/xcertplay/media/AudioBufferProgressTest.kt
-+++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/AudioBufferProgressTest.kt
-@@ -7,19 +7,47 @@
-     @Test fun musicRebuffersOnlyAfterHardwareAndIncomingQueuesDrain() {
-         val buffer = AudioBufferProgress(4)
-         buffer.written(4000)
--        assertFalse(buffer.shouldRebuffer(true, true, true, true, 999))
--        assertFalse(buffer.shouldRebuffer(true, true, true, false, 1000))
--        assertFalse(buffer.shouldRebuffer(true, true, false, true, 1000))
--        assertTrue(buffer.shouldRebuffer(true, true, true, true, 1000))
--        assertFalse(buffer.shouldRebuffer(true, false, true, true, 1000))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 999, 0))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, false, 1000, 0))
-+        assertFalse(buffer.shouldRebuffer(true, true, false, true, 1000, 0))
-+        assertTrue(buffer.shouldRebuffer(true, true, true, true, 1000, 0))
-+        assertFalse(buffer.shouldRebuffer(true, false, true, true, 1000, 0))
-         buffer.written(400)
-         assertEquals(400, buffer.queuedBytes(1000))
--        assertFalse(buffer.shouldRebuffer(true, true, true, true, 1000))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 1000, 0))
-+    }
-+
-+    @Test fun musicRebuffersOnceResidualAudioFallsBackWithinTheFloor() {
-+        val buffer = AudioBufferProgress(4)
-+        buffer.written(8000)
-+        assertEquals(0, buffer.queuedBytes(2000))
-+        buffer.written(1200)
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 2090, 600))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 2140, 600))
-+        assertTrue(buffer.shouldRebuffer(true, true, true, true, 2160, 600))
-+    }
-+
-+    @Test fun musicKeepsPlayingWhileResidualAudioStaysAboveTheFloor() {
-+        val buffer = AudioBufferProgress(4)
-+        buffer.written(8000)
-+        assertEquals(0, buffer.queuedBytes(2000))
-+        buffer.written(1200)
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 2000, 600))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, true, 2100, 600))
-+    }
-+
-+    @Test fun theFloorAloneDoesNotRebufferWithoutUnderrunMediaPlaybackOrAnEmptyQueue() {
-+        val buffer = AudioBufferProgress(4)
-+        buffer.written(800)
-+        assertFalse(buffer.shouldRebuffer(false, true, true, true, 1900, 600))
-+        assertFalse(buffer.shouldRebuffer(true, false, true, true, 1900, 600))
-+        assertFalse(buffer.shouldRebuffer(true, true, false, true, 1900, 600))
-+        assertFalse(buffer.shouldRebuffer(true, true, true, false, 1900, 600))
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/AndroidMediaSinkCodecDetachTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/AndroidMediaSinkCodecDetachTest.kt
+@@ -1,550 +1,131 @@
+ package com.shilapi.xcertplay.media
+ 
+-import android.graphics.SurfaceTexture
+ import android.media.MediaCodec
+-import android.media.MediaCrypto
++import android.media.MediaCodecInfo
+ import android.media.MediaFormat
+-import android.os.Handler
+-import android.os.Looper
+ import android.view.Surface
+-import org.junit.After
++import com.shilapi.xcertplay.airplay.VideoCodec
++import java.io.Closeable
++import java.nio.ByteBuffer
++import java.util.concurrent.ConcurrentLinkedQueue
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++import java.util.concurrent.atomic.AtomicReference
+ import org.junit.Assert.*
+-import org.junit.Before
+ import org.junit.Test
+ import org.junit.runner.RunWith
++import org.mockito.ArgumentMatchers.*
++import org.mockito.Mockito.*
+ import org.robolectric.RobolectricTestRunner
+ import org.robolectric.annotation.Config
+-import org.robolectric.shadows.ShadowMediaCodec
+-import java.nio.ByteBuffer
+-import java.util.concurrent.ConcurrentLinkedQueue
+-import java.util.concurrent.ConcurrentHashMap
+-import java.util.concurrent.CopyOnWriteArrayList
+-import java.util.concurrent.CountDownLatch
+-import java.util.concurrent.TimeUnit
+-import java.util.concurrent.atomic.AtomicReference
+-import java.util.concurrent.atomic.AtomicInteger
+-import kotlin.concurrent.thread
+ 
+-/**
+- * Surface detach against a decoder that really configures, queues and drains a MediaCodec: Robolectric's
+- * ShadowMediaCodec runs the registered fake codec's process() on the decoder worker inside
+- * queueInputBuffer, so a codec that blocks there stands in for a native call that hangs.
+- *
+- * Robolectric does not render: setOutputSurface is a no-op, no image ever reaches the parking
+- * ImageReader, and releaseOutputBuffer only recycles the buffer. What a codec renders to is therefore
+- * read from the worker's own record (outputSurface) and the configure-time surface the shadow reports.
+- */
++/** Tests existing asynchronous detach; never adds parking or another video output. */
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [29], manifest = Config.NONE)
++@Config(sdk = [30], manifest = Config.NONE)
+ class AndroidMediaSinkCodecDetachTest {
+-    private val sps = byteArrayOf(0x67, 0x42, 0xC0.toByte(), 0x1E)
+-    private val pps = byteArrayOf(0x68, 0xCE.toByte())
+-    // AVCDecoderConfigurationRecord with one SPS and one PPS.
+-    private val avcC = byteArrayOf(1, 0x42, 0xC0.toByte(), 0x1E, 0xFF.toByte(), 0xE1.toByte(), 0, sps.size.toByte()) +
+-        sps + byteArrayOf(1, 0, pps.size.toByte()) + pps
+-    private val idr = byteArrayOf(0, 0, 0, 1, 0x65, 0x88.toByte(), 0x84.toByte(), 0x21)
+-
+-    private lateinit var codec: GateCodec
+-    private val sinks = ArrayList<AndroidMediaSink>()
+-    private val uncaught = ConcurrentLinkedQueue<Throwable>()
+-    private var previousHandler: Thread.UncaughtExceptionHandler? = null
+-
+-    /** The fake codec: records configure surfaces and can hold the worker inside process(). */
+-    private class GateCodec : ShadowMediaCodec.CodecConfig.Codec {
+-        val configuredSurfaces = CopyOnWriteArrayList<Surface?>()
+-        @Volatile private var gate: CountDownLatch? = null
+-        @Volatile var entered = CountDownLatch(1)
+-            private set
+-
+-        /** The next process() call blocks, ignoring interrupts like a hung native call, until [release]. */
+-        fun blockNext() {
+-            entered = CountDownLatch(1)
+-            gate = CountDownLatch(1)
+-        }
+-
+-        fun release() {
+-            gate?.countDown()
+-        }
+-
+-        override fun process(input: ByteBuffer, output: ByteBuffer) {
+-            val held = gate ?: return
+-            entered.countDown()
+-            var interrupted = false
+-            while (true) {
+-                try {
+-                    held.await()
+-                    break
+-                } catch (_: InterruptedException) {
+-                    interrupted = true
+-                }
+-            }
+-            gate = null
+-            if (interrupted) Thread.currentThread().interrupt()
+-        }
+-
+-        override fun onConfigured(format: MediaFormat?, surface: Surface?, crypto: MediaCrypto?, flags: Int) {
+-            configuredSurfaces += surface
++    @Test fun closedRetiredDecoderMustReleaseBeforeDetachAcknowledgement() {
++        val entered = CountDownLatch(1); val resume = CountDownLatch(1); val detached = CountDownLatch(1)
++        Fixture().use { f ->
++            val sink = AndroidMediaSink(); val workerMap = field(sink, "videoDecoders") as MutableMap<Int, Any>
++            workerMap[110] = f.worker
++            doAnswer {
++                entered.countDown()
++                while (resume.count != 0L) try { resume.await() } catch (_: InterruptedException) { }
++                null
++            }.`when`(f.codec).start()
++            try {
++                f.configure(); assertTrue(entered.await(2, TimeUnit.SECONDS))
++                sink.close()
++                sink.detachSurface(f.surface) { assertEquals(0L, f.released.count); detached.countDown() }
++                assertEquals(1L, detached.count) // callback was not UI-blocking and did not release early
++                resume.countDown()
++                assertTrue(detached.await(2, TimeUnit.SECONDS))
++                verify(f.codec, times(1)).release()
++            } finally { resume.countDown(); sink.close() }
+         }
      }
  
-     @Test fun doesNotAddRebufferDelayToCallsOrSpeech() {
-         val buffer = AudioBufferProgress(2)
--        assertFalse(buffer.shouldRebuffer(false, true, true, true, 0))
-+        assertFalse(buffer.shouldRebuffer(false, true, true, true, 0, 600))
+-    @Before fun setUp() {
+-        codec = GateCodec()
+-        ShadowMediaCodec.addDecoder(MediaFormat.MIMETYPE_VIDEO_AVC, ShadowMediaCodec.CodecConfig(64 * 1024, 64 * 1024, codec))
+-        previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+-        Thread.setDefaultUncaughtExceptionHandler { _, error -> uncaught += error }
++    @Test fun oldAndNewSinksAcknowledgeIndependentlyAndLateCallbacksDoNotReviveCodecs() {
++        val surface = mock(Surface::class.java)
++        Fixture(surface).use { old -> Fixture(surface).use { next ->
++            val a = AndroidMediaSink(); val b = AndroidMediaSink()
++            @Suppress("UNCHECKED_CAST")
++            (field(a, "videoDecoders") as MutableMap<Int, Any>)[110] = old.worker
++            @Suppress("UNCHECKED_CAST")
++            (field(b, "videoDecoders") as MutableMap<Int, Any>)[110] = next.worker
++            old.configure(); next.configure()
++            assertTrue(old.ready.await(2, TimeUnit.SECONDS)); assertTrue(next.ready.await(2, TimeUnit.SECONDS))
++            val callbacks = old.presentation.get() to next.presentation.get()
++            val detached = CountDownLatch(2)
++            a.close(); a.detachSurface(surface) { detached.countDown() }
++            b.detachSurface(surface) { detached.countDown() }
++            assertTrue(detached.await(2, TimeUnit.SECONDS))
++            callbacks.first.onFrameRendered(old.codec, System.nanoTime() / 1000, System.nanoTime())
++            callbacks.second.onFrameRendered(next.codec, System.nanoTime() / 1000, System.nanoTime())
++            assertEquals(0, old.recovered.get()); assertEquals(0, next.recovered.get())
++            a.close(); b.close()
++        } }
      }
  
-     @Test fun unsignedPlaybackHeadWrapKeepsQueuedAudio() {
+-    @After fun tearDown() {
+-        codec.release()
+-        sinks.forEach { sink ->
+-            sink.close()
+-            sink.awaitVideoReleased(5_000)
++    private fun field(sink: AndroidMediaSink, name: String) = sink.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(sink)
++    private class Fixture(val surface: Surface = mock(Surface::class.java)) : Closeable {
++        val codec = mock(MediaCodec::class.java)
++        val ready = CountDownLatch(1)
++        val inputQueued = CountDownLatch(1)
++        val recovered = AtomicInteger()
++        val creations = AtomicInteger()
++        val released = CountDownLatch(1)
++        val presentation = AtomicReference<MediaCodec.OnFrameRenderedListener>()
++        private val closed = CountDownLatch(1)
++        private val reports = ConcurrentLinkedQueue<String>()
++        private val type = Class.forName("com.shilapi.xcertplay.media.VideoDecoder")
++        val worker: Any
++        val gate: VideoRecoveryGate get() = field("recoveryGate").get(worker) as VideoRecoveryGate
++        val queue: VideoDecodeQueue get() = field("queue").get(worker) as VideoDecodeQueue
++        init {
++            `when`(surface.isValid).thenReturn(true)
++            doAnswer { released.countDown(); null }.`when`(codec).release()
++            val info = mock(MediaCodecInfo::class.java)
++            `when`(info.isHardwareAccelerated).thenReturn(true)
++            `when`(codec.codecInfo).thenReturn(info)
++            `when`(codec.name).thenReturn("test.avc")
++            `when`(codec.dequeueOutputBuffer(any(MediaCodec.BufferInfo::class.java), eq(0L)))
++                .thenReturn(MediaCodec.INFO_TRY_AGAIN_LATER)
++            `when`(codec.dequeueInputBuffer(anyLong())).thenReturn(0)
++            `when`(codec.getInputBuffer(0)).thenReturn(ByteBuffer.allocate(64))
++            doAnswer { presentation.set(it.getArgument(0)); null }.`when`(codec)
++                .setOnFrameRenderedListener(any(MediaCodec.OnFrameRenderedListener::class.java), any())
++            doAnswer { inputQueued.countDown(); null }.`when`(codec)
++                .queueInputBuffer(anyInt(), anyInt(), anyInt(), anyLong(), anyInt())
++            val report: (String) -> Unit = { reports.add(it); if (it.startsWith("decoder=test.avc")) ready.countDown() }
++            val failure: (Any, VideoCodec, String) -> Unit = { _, _, _ -> }
++            val recoveredCallback: (Any) -> Unit = { recovered.incrementAndGet() }
++            val closedCallback: (Any) -> Unit = { closed.countDown() }
++            val size: (Int, Int) -> Unit = { _, _ -> }
++            val create: (String) -> MediaCodec = { creations.incrementAndGet(); codec }
++            worker = type.declaredConstructors.single { it.parameterCount == 14 }.apply { isAccessible = true }
++                .newInstance(110, surface, 1280, 720, false, 30, {}, report, failure,
++                    recoveredCallback, closedCallback, size, create, null)
++            @Suppress("UNCHECKED_CAST")
++            val candidates = field("decoderCandidateCache").get(worker) as MutableMap<String, List<VideoDecoderCandidate>>
++            candidates[MediaFormat.MIMETYPE_VIDEO_AVC] = listOf(VideoDecoderCandidate("test.avc", true, false, false))
+         }
+-        ShadowMediaCodec.clearCodecs()
+-        Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+-    }
+-
+-    @Test fun smoothVideoParksTheMainDecoderOnAConsumerDrainedOffTheMainThread() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        val codecBefore = mediaCodecOf(mainDecoder(sink))
+-
+-        val detach = sink.beginSurfaceDetach(a, parkMain = true)
+-        assertTrue(detach.await())
+-
+-        assertEquals(DetachOutcome.PARKED, detach.requests.single().outcome)
+-        val decoder = mainDecoder(sink)
+-        val parking = parkingOf(decoder)
+-        assertNotNull("the parked decoder owns an offscreen consumer", parking)
+-        parking!!
+-        assertNotSame(Looper.getMainLooper(), parking.listenerLooper)
+-        assertSame(parking.listenerLooper, readerListenerLooper(parking))
+-        assertSame("the codec now renders to the consumer", parking.surface, decoder.field<Surface?>("outputSurface"))
+-        assertSame("parking keeps the codec and its state", codecBefore, mediaCodecOf(decoder))
+-        assertEquals(listOf<Surface?>(a), codec.configuredSurfaces.toList())
+-    }
+-
+-    @Test fun theParkingConsumerDrainsWhileTheMainThreadIsBlocked() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        assertTrue(sink.beginSurfaceDetach(a, parkMain = true).await())
+-        val parking = checkNotNull(parkingOf(mainDecoder(sink)))
+-
+-        // The test thread is Robolectric's main thread: while it blocks here, as a SurfaceHolder destroy
+-        // callback does during a handoff, work for the consumer must still run.
+-        val consumerRan = CountDownLatch(1)
+-        val readerRan = CountDownLatch(1)
+-        Handler(parking.listenerLooper).post { consumerRan.countDown() }
+-        Handler(readerListenerLooper(parking)).post { readerRan.countDown() }
+-        assertTrue(consumerRan.await(5, TimeUnit.SECONDS))
+-        assertTrue(readerRan.await(5, TimeUnit.SECONDS))
+-    }
+-
+-    @Test fun aNewHostsSurfaceQueuedBeforeTheDetachLeavesNothingToDetach() {
+-        val a = newSurface()
+-        val b = newSurface()
+-        val sink = configuredSink(a)
+-        holdWorkerInCodec(sink)
+-
+-        // The new host's surface arrives before the old one's destroy callback, while the worker is busy.
+-        sink.setSurface(110, b)
+-        val detach = sink.beginSurfaceDetach(a, parkMain = true)
+-        val waiter = AwaitOnThread(detach)
+-        assertFalse("the codec still renders to A until the worker applies B", waiter.returned.await(300, TimeUnit.MILLISECONDS))
+-
+-        codec.release()
+-        assertTrue(waiter.returned.await(5, TimeUnit.SECONDS))
+-        assertEquals(true, waiter.result.get())
+-        assertEquals(DetachOutcome.NOT_RENDERING, detach.requests.single().outcome)
+-        val decoder = mainDecoder(sink)
+-        assertSame(b, decoder.field<Surface?>("outputSurface"))
+-        assertNull("nothing was parked", parkingOf(decoder))
+-    }
+-
+-    @Test fun aDecoderParkedFirstMovesToTheNewHostsSurfaceWithItsCodec() {
+-        val a = newSurface()
+-        val b = newSurface()
+-        val sink = configuredSink(a)
+-        val decoder = mainDecoder(sink)
+-        val codecBefore = mediaCodecOf(decoder)
+-
+-        val first = sink.beginSurfaceDetach(a, parkMain = true)
+-        assertTrue(first.await())
+-        assertEquals(DetachOutcome.PARKED, first.requests.single().outcome)
+-        val parking = checkNotNull(parkingOf(decoder))
+-
+-        sink.setSurface(110, b)
+-        assertTrue(barrier(sink))
+-        assertSame(b, decoder.field<Surface?>("outputSurface"))
+-        assertSame("moving back keeps the codec", codecBefore, mediaCodecOf(decoder))
+-        assertEquals(listOf<Surface?>(a), codec.configuredSurfaces.toList())
+-
+-        // A detaches again (late) but the codec renders to B now.
+-        val stale = sink.beginSurfaceDetach(a, parkMain = true)
+-        assertTrue(stale.await())
+-        assertEquals(DetachOutcome.NOT_RENDERING, stale.requests.single().outcome)
+-
+-        val second = sink.beginSurfaceDetach(b, parkMain = true)
+-        assertTrue(second.await())
+-        assertEquals(DetachOutcome.PARKED, second.requests.single().outcome)
+-        assertSame("the decoder reuses its consumer", parking, parkingOf(decoder))
+-        assertSame(codecBefore, mediaCodecOf(decoder))
+-    }
+-
+-    @Test fun aDetachWaitsForAWorkerBusyInsideTheCodecEvenWhenInterrupted() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        sink.detachTimeoutNanos = 30_000_000_000L // only the codec's progress decides here
+-        holdWorkerInCodec(sink)
+-
+-        val detach = sink.beginSurfaceDetach(a, parkMain = true)
+-        val waiter = AwaitOnThread(detach)
+-        assertFalse(waiter.returned.await(300, TimeUnit.MILLISECONDS))
+-        waiter.thread.interrupt()
+-        assertFalse("an interrupt does not end the wait", waiter.returned.await(600, TimeUnit.MILLISECONDS))
+-        assertNull(detach.requests.single().outcome)
+-
+-        val released = System.nanoTime()
+-        codec.release()
+-        assertTrue(waiter.returned.await(5, TimeUnit.SECONDS))
+-        assertTrue(System.nanoTime() - released < 2_000_000_000L)
+-        assertEquals(true, waiter.result.get())
+-        assertEquals("the interrupt is restored", true, waiter.interruptedAfter.get())
+-        assertEquals(DetachOutcome.PARKED, detach.requests.single().outcome)
+-    }
+-
+-    @Test fun anUnconfirmedDetachRetiresTheDecoderAndTheNextFrameStartsAFreshOneOnNoSurface() {
+-        val a = newSurface()
+-        val c = newSurface()
+-        val sink = configuredSink(a)
+-        val diagnostics = ConcurrentLinkedQueue<String>()
+-        sink.setVideoDiagnosticHandler(110) { diagnostics += it }
+-        sink.detachTimeoutNanos = 200_000_000L
+-        sink.detachGraceNanos = 200_000_000L
+-        holdWorkerInCodec(sink)
+-        val stuck = mainDecoder(sink)
+-
+-        val started = System.nanoTime()
+-        val detach = sink.beginSurfaceDetach(a, parkMain = true)
+-        assertFalse("the worker neither confirmed nor exited", detach.await())
+-        assertTrue(System.nanoTime() - started < 5_000_000_000L)
+-        assertNull(detach.requests.single().outcome)
+-        assertFalse("the unconfirmed decoder was retired", decoders(sink).containsValue(stuck))
+-        assertTrue(diagnostics.any { "detach not confirmed" in it })
+-
+-        // The next frame starts a fresh decoder with the stream's configuration, not on the leaving surface.
+-        sink.onVideoFrame(110, idr)
+-        val fresh = mainDecoder(sink)
+-        assertNotSame(stuck, fresh)
+-        codec.release()
+-        assertTrue("the retired worker exits once the codec returns", sink.awaitVideoReleased(5_000))
+-        assertFalse(stuck.field<Thread>("thread").isAlive)
+-        assertTrue(barrier(sink))
+-        assertNull(fresh.field<Surface?>("outputSurface"))
+-        assertNotNull("it picked up the stream's configuration", fresh.field<Any?>("lastConfig"))
+-        assertEquals("no codec was started on A again", listOf<Surface?>(a), codec.configuredSurfaces.toList())
+-
+-        sink.setSurface(110, c)
+-        sink.onVideoFrame(110, idr)
+-        assertTrue(barrier(sink))
+-        assertEquals(listOf<Surface?>(a, c), codec.configuredSurfaces.toList())
+-        assertTrue(uncaught.toString(), uncaught.isEmpty())
+-    }
+-
+-    @Test fun aDetachWaitsForADecoderClosedAtStreamEndUntilItsWorkerExits() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        sink.detachTimeoutNanos = 30_000_000_000L
+-        holdWorkerInCodec(sink)
+-        val closing = mainDecoder(sink)
+-
+-        sink.onScreenStreamActive(110, false) // closes the busy decoder
+-        assertTrue(decoders(sink).isEmpty())
+-        val detach = sink.beginSurfaceDetach(a, parkMain = true)
+-        assertTrue(detach.requests.isEmpty())
+-        val waiter = AwaitOnThread(detach)
+-        assertFalse("its codec may still render to A", waiter.returned.await(300, TimeUnit.MILLISECONDS))
+-
+-        codec.release()
+-        assertTrue(waiter.returned.await(5, TimeUnit.SECONDS))
+-        assertEquals(true, waiter.result.get())
+-        assertFalse(closing.field<Thread>("thread").isAlive)
+-    }
+-
+-    @Test fun afterCloseTheSinkReportsReleaseOnlyOnceItsWorkersExit() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        holdWorkerInCodec(sink)
+-        val decoder = mainDecoder(sink)
+-
+-        sink.close()
+-        assertFalse("the worker is still inside the codec", sink.awaitVideoReleased(200))
+-        codec.release()
+-        assertTrue(sink.awaitVideoReleased(5_000))
+-        assertFalse(decoder.field<Thread>("thread").isAlive)
+-        assertTrue("nothing left to wait for", sink.beginSurfaceDetach(a, parkMain = true).await())
+-    }
+-
+-    @Test fun detachCannotMissAWorkerWhoseSurfaceWasCapturedBeforePublication() {
+-        val a = newSurface()
+-        val sink = AndroidMediaSink(videoPacingDelayMillis = 90).also { sinks += it }
+-        sink.setSurface(110, a)
+-        val registry = GatedRegistry().also { it.putGate = RegistryGate() }
+-        sink.replaceField("videoDecoders", registry)
+-        val creator = thread { sink.onVideoConfig(110, avcC) }
+-        val gate = checkNotNull(registry.putGate)
+-        var detach: BeginOnThread? = null
+-        try {
+-            assertTrue(gate.entered.await(5, TimeUnit.SECONDS))
+-            assertTrue("an unpublished worker must not configure the old surface", codec.configuredSurfaces.isEmpty())
+-            detach = BeginOnThread(sink, a)
+-            awaitBlockedOnOwnership(detach.thread)
+-            assertEquals(1L, detach.returned.count)
+-            gate.release.countDown()
+-            creator.join(5_000)
+-            assertFalse(creator.isAlive)
+-            assertTrue(detach.returned.await(5, TimeUnit.SECONDS))
+-            assertEquals(true, detach.result.get())
+-            assertNotNull("the registered worker participated in detach", detach.detach.get()?.requests?.singleOrNull())
+-            assertNotSame(a, mainDecoder(sink).field<Surface?>("outputSurface"))
+-        } finally {
+-            gate.release.countDown()
+-            creator.join(5_000)
+-            detach?.thread?.join(5_000)
++        fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
++        fun configure() = type.getDeclaredMethod("configure", VideoCodec::class.java, ByteArray::class.java)
++            .apply { isAccessible = true }.invoke(worker, VideoCodec.H264, byteArrayOf(1))
++        fun submit(bytes: ByteArray) = type.getDeclaredMethod("submit", ByteArray::class.java)
++            .apply { isAccessible = true }.invoke(worker, bytes)
++        fun retry() = type.getDeclaredMethod("retry").apply { isAccessible = true }.invoke(worker) as Boolean
++        fun barrier() {
++            val applied = CountDownLatch(1)
++            val surface = field("desiredSurface").get(worker) as Surface
++            queue.offer(VideoJob.SurfaceChanged(surface) { applied.countDown() })
++            assertTrue(applied.await(2, TimeUnit.SECONDS))
++        }
++        override fun close() {
++            (worker as Closeable).close()
++            assertTrue(closed.await(2, TimeUnit.SECONDS))
+         }
+     }
+-
+-    @Test fun detachCannotMissADecoderTransferringToTheClosingRegistry() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        holdWorkerInCodec(sink)
+-        val registry = GatedRegistry(decoders(sink)).also { it.removeGate = RegistryGate() }
+-        sink.replaceField("videoDecoders", registry)
+-        val retire = thread { sink.onScreenStreamActive(110, false) }
+-        val gate = checkNotNull(registry.removeGate)
+-        var detach: BeginOnThread? = null
+-        try {
+-            assertTrue(gate.entered.await(5, TimeUnit.SECONDS))
+-            assertTrue("active entry has already been removed", registry.isEmpty())
+-            detach = BeginOnThread(sink, a)
+-            awaitBlockedOnOwnership(detach.thread)
+-            assertEquals(1L, detach.returned.count)
+-            gate.release.countDown()
+-            retire.join(5_000)
+-            assertFalse(retire.isAlive)
+-            assertTrue(detach.begun.await(5, TimeUnit.SECONDS))
+-            assertEquals("the codec is still held after the transfer completes", 1L, detach.returned.count)
+-            codec.release()
+-            assertTrue(detach.returned.await(5, TimeUnit.SECONDS))
+-            assertEquals(true, detach.result.get())
+-        } finally {
+-            gate.release.countDown()
+-            codec.release()
+-            retire.join(5_000)
+-            detach?.thread?.join(5_000)
+-        }
+-    }
+-
+-    @Test fun releaseObserversSurviveRegistrationRacingWorkerExitAndRunOutsideOwnershipLock() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        holdWorkerInCodec(sink)
+-        sink.close()
+-        // A late accepted receive callback must not revive a closed sink after release was observed.
+-        sink.onVideoCodec(110, com.shilapi.xcertplay.airplay.VideoCodec.H264)
+-        sink.onVideoConfig(110, avcC)
+-        sink.onVideoFrame(110, idr)
+-        sink.onVideoFrame(110, idr, 1L, System.nanoTime())
+-        assertTrue(decoders(sink).isEmpty())
+-
+-        val calls = AtomicInteger()
+-        val released = CountDownLatch(1)
+-        val delivered = CountDownLatch(9)
+-        val peerFinished = AtomicReference<Boolean>()
+-        sink.whenVideoReleased { throw IllegalStateException("observer failure must be isolated") }
+-        sink.whenVideoReleased {
+-            // The fake native call restores close's interrupt. Ignore it only for this deliberate
+-            // blocking lock probe; release observers do not promise an un-interrupted calling thread.
+-            val interrupted = Thread.interrupted()
+-            try {
+-                val peer = CountDownLatch(1)
+-                thread { sink.clearSurface(110, a); peer.countDown() }
+-                peerFinished.set(peer.await(5, TimeUnit.SECONDS))
+-                calls.incrementAndGet()
+-                delivered.countDown()
+-                released.countDown()
+-            } finally {
+-                if (interrupted) Thread.currentThread().interrupt()
+-            }
+-        }
+-        assertEquals(1L, released.count)
+-        val start = CountDownLatch(1)
+-        val registrations = (0 until 8).map {
+-            thread { start.await(); sink.whenVideoReleased { calls.incrementAndGet(); delivered.countDown() } }
+-        }
+-        start.countDown()
+-        codec.release()
+-        registrations.forEach { it.join(5_000); assertFalse(it.isAlive) }
+-        assertTrue(released.await(5, TimeUnit.SECONDS))
+-        assertTrue(delivered.await(5, TimeUnit.SECONDS))
+-        assertTrue(sink.awaitVideoReleased(5_000))
+-        assertEquals(true, peerFinished.get())
+-        sink.whenVideoReleased { calls.incrementAndGet() } // registration after release is immediate
+-        assertEquals("each successful observer runs exactly once", 10, calls.get())
+-        assertTrue(decoders(sink).isEmpty())
+-        assertEquals(listOf<Surface?>(a), codec.configuredSurfaces.toList())
+-    }
+-
+-    @Test fun aStaleRetirementCannotRepublishAWorkerThatAlreadyReleasedItsCodec() {
+-        val a = newSurface()
+-        val sink = configuredSink(a)
+-        holdWorkerInCodec(sink)
+-        val decoder = mainDecoder(sink)
+-        sink.close()
+-        val notifying = CountDownLatch(1)
+-        val finishNotification = CountDownLatch(1)
+-        sink.whenVideoReleased {
+-            val interrupted = Thread.interrupted()
+-            try {
+-                notifying.countDown()
+-                finishNotification.await(5, TimeUnit.SECONDS)
+-            } finally {
+-                if (interrupted) Thread.currentThread().interrupt()
+-            }
+-        }
+-        try {
+-            codec.release()
+-            assertTrue(notifying.await(5, TimeUnit.SECONDS))
+-            assertTrue("cleanup finished but onExit is still notifying", decoder.field<Thread>("thread").isAlive)
+-            assertTrue(sink.field<Set<Any>>("closingVideoDecoders").isEmpty())
+-            // settleDetach can time out, pause, and only reach retire after onExit completed cleanup.
+-            sink.javaClass.getDeclaredMethod("retire", Int::class.javaPrimitiveType, decoder.javaClass)
+-                .apply { isAccessible = true }.invoke(sink, 110, decoder)
+-            val alreadyReleased = CountDownLatch(1)
+-            sink.whenVideoReleased { alreadyReleased.countDown() }
+-            assertEquals("already-released registration must complete immediately", 0L, alreadyReleased.count)
+-            assertTrue("the stale worker was not republished", sink.field<Set<Any>>("closingVideoDecoders").isEmpty())
+-        } finally {
+-            finishNotification.countDown()
+-            decoder.field<Thread>("thread").join(5_000)
+-        }
+-    }
+-
+-    // --- helpers ---
+-
+-    private fun newSurface() = Surface(SurfaceTexture(0))
+-
+-    /** A smooth-video sink, as the host makes it: no default surface, the main stream configured on [surface]. */
+-    private fun configuredSink(surface: Surface): AndroidMediaSink {
+-        val sink = AndroidMediaSink(surface = null, videoPacingDelayMillis = 90)
+-        sinks += sink
+-        sink.setSurface(110, surface)
+-        sink.onVideoConfig(110, avcC)
+-        sink.onVideoFrame(110, idr, 1L, System.nanoTime())
+-        assertTrue(barrier(sink))
+-        assertEquals(listOf<Surface?>(surface), codec.configuredSurfaces.toList())
+-        assertNotNull(mediaCodecOf(mainDecoder(sink)))
+-        return sink
+-    }
+-
+-    /** Holds the main decoder's worker inside MediaCodec.queueInputBuffer until [GateCodec.release]. */
+-    private fun holdWorkerInCodec(sink: AndroidMediaSink) {
+-        codec.blockNext()
+-        sink.onVideoFrame(110, idr, 16_666_668L, System.nanoTime())
+-        assertTrue("worker entered the codec", codec.entered.await(5, TimeUnit.SECONDS))
+-    }
+-
+-    /**
+-     * Returns once every decoder has handled the jobs queued before it: a detach of a surface nobody uses
+-     * is completed by each worker in queue order.
+-     */
+-    private fun barrier(sink: AndroidMediaSink): Boolean = sink.beginSurfaceDetach(newSurface(), parkMain = false).await()
+-
+-    private class AwaitOnThread(detach: AndroidMediaSink.SurfaceDetach) {
+-        val returned = CountDownLatch(1)
+-        val result = AtomicReference<Boolean?>()
+-        val interruptedAfter = AtomicReference<Boolean?>()
+-        val thread = thread(name = "surface-destroyed") {
+-            result.set(detach.await())
+-            interruptedAfter.set(Thread.currentThread().isInterrupted)
+-            returned.countDown()
+-        }
+-    }
+-
+-    private class BeginOnThread(sink: AndroidMediaSink, surface: Surface) {
+-        val begun = CountDownLatch(1)
+-        val returned = CountDownLatch(1)
+-        val detach = AtomicReference<AndroidMediaSink.SurfaceDetach>()
+-        val result = AtomicReference<Boolean>()
+-        val thread = thread(name = "surface-destroyed-during-registration") {
+-            val pending = sink.beginSurfaceDetach(surface, parkMain = true)
+-            detach.set(pending)
+-            begun.countDown()
+-            result.set(pending.await())
+-            returned.countDown()
+-        }
+-    }
+-
+-    /** Registry hooks pause the actual mutation, not a duplicate implementation of the ownership lock. */
+-    private class RegistryGate {
+-        val entered = CountDownLatch(1)
+-        val release = CountDownLatch(1)
+-        fun pause() {
+-            entered.countDown()
+-            check(release.await(10, TimeUnit.SECONDS)) { "registry gate timed out" }
+-        }
+-    }
+-
+-    private class GatedRegistry(entries: Map<Int, Any> = emptyMap()) : ConcurrentHashMap<Int, Any>(entries) {
+-        var putGate: RegistryGate? = null
+-        var removeGate: RegistryGate? = null
+-        override fun put(key: Int, value: Any): Any? {
+-            putGate?.pause()
+-            return super.put(key, value)
+-        }
+-        override fun remove(key: Int, value: Any): Boolean {
+-            val removed = super.remove(key, value)
+-            if (removed) removeGate?.pause()
+-            return removed
+-        }
+-    }
+-
+-    private fun awaitBlockedOnOwnership(worker: Thread) {
+-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+-        while (worker.isAlive && worker.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+-            java.util.concurrent.locks.LockSupport.parkNanos(1_000_000)
+-        }
+-        assertEquals("detach waits for the in-progress registry mutation", Thread.State.BLOCKED, worker.state)
+-    }
+-
+-    private fun Any.replaceField(name: String, value: Any) {
+-        javaClass.getDeclaredField(name).apply { isAccessible = true }.set(this, value)
+-    }
+-
+-    private fun decoders(sink: AndroidMediaSink): Map<Int, Any> = sink.field("videoDecoders")
+-
+-    private fun mainDecoder(sink: AndroidMediaSink): Any = checkNotNull(decoders(sink)[110]) { "no main decoder" }
+-
+-    private fun mediaCodecOf(decoder: Any): MediaCodec? = decoder.field("decoder")
+-
+-    private fun parkingOf(decoder: Any): ParkingOutput? = decoder.field("parking")
+-
+-    /** The looper the ImageReader dispatches image-available callbacks on. */
+-    private fun readerListenerLooper(parking: ParkingOutput): Looper {
+-        val reader = parking.field<android.media.ImageReader>("reader")
+-        return reader.field<Handler>("mListenerHandler").looper
+-    }
+-
+-    @Suppress("UNCHECKED_CAST")
+-    private fun <T> Any.field(name: String): T {
+-        var type: Class<*>? = javaClass
+-        while (type != null) {
+-            try {
+-                return type.getDeclaredField(name).apply { isAccessible = true }.get(this) as T
+-            } catch (_: NoSuchFieldException) {
+-                type = type.superclass
+-            }
+-        }
+-        error("no field $name on $javaClass")
+-    }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/AudioRebufferCapacityTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/AudioRebufferCapacityTest.kt
+@@ -13,14 +13,16 @@
+ import org.robolectric.annotation.Implements
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [25, 28, 33], manifest = Config.NONE, shadows = [AudioRebufferCapacityTest.CapacityTrack::class])
++@Config(sdk = [29, 30], manifest = Config.NONE, shadows = [AudioRebufferCapacityTest.CapacityTrack::class])
+ class AudioRebufferCapacityTest {
+     @Test fun residualAudioCountsTowardRestartBeforeAPausedTrackFills() {
+-        for (millis in listOf(500, 1000)) {
++        for (millis in listOf(300, 500, 1000)) {
+             val plan = MediaAudioBuffer.plan(true, 48_000, 2, 4096, millis)
+             val threshold = MediaAudioBuffer.startBytesFor(plan.startBytes, plan.trackBufferBytes, 4096)
+-            CapacityTrack.capacity = plan.trackBufferBytes
++            CapacityTrack.capacity = minOf(plan.trackBufferBytes, threshold + 4096)
+             CapacityTrack.queued = threshold / 2
++            CapacityTrack.underruns = 1
++            CapacityTrack.head = 0
+             CapacityTrack.playing = true
+             CapacityTrack.blocked = false
+             val track = AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().build())
+@@ -29,10 +31,11 @@
+                     .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_STEREO).build())
+                 .setBufferSizeInBytes(plan.trackBufferBytes).build()
+             val type = Class.forName("com.shilapi.xcertplay.media.AudioRenderer")
+-            val renderer = type.declaredConstructors.single { it.parameterCount == 11 }
++            val renderer = type.declaredConstructors.single { it.parameterCount == 17 }
+                 .apply { isAccessible = true }.newInstance(
+-                    AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 96, "media"), false, false, 0, 0,
+-                    AudioFocusCoordinator(null, false, false), 0, millis, { _: String -> }, null, false)
++                    AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 96, "media"), false, false, 0, 0, 0,
++                    AudioFocusCoordinator(null, false), null, null, 0, millis, { _: String -> }, false,
++                    CallAudioTimeline(report = { _: String -> }), { "test" }, { _: Any -> }, { _: Any -> })
+             fun set(name: String, value: Any) = type.getDeclaredField(name).apply { isAccessible = true }.set(renderer, value)
+             fun get(name: String) = type.getDeclaredField(name).apply { isAccessible = true }.get(renderer)
+             try {
+@@ -44,22 +47,37 @@
+                 (get("bufferProgress") as AudioBufferProgress).written(CapacityTrack.queued)
+                 type.getDeclaredMethod("maintainPlaybackBuffer").apply { isAccessible = true }.invoke(renderer)
+                 assertFalse(CapacityTrack.playing)
++                assertEquals(CapacityTrack.queued, get("prebufferBytes"))
++                assertTrue((get("lastPcmWriteNs") as Long) > 0)
+                 type.getDeclaredMethod("writePcm", ByteArray::class.java, Int::class.javaPrimitiveType,
+                     Int::class.javaPrimitiveType).apply { isAccessible = true }
+                     .invoke(renderer, ByteArray(threshold), 0, threshold)
+                 assertFalse("${millis}ms buffer blocked before play()", CapacityTrack.blocked)
+                 assertTrue("${millis}ms buffer never resumed", CapacityTrack.playing)
++                val progress = get("bufferProgress") as AudioBufferProgress
++                CapacityTrack.head = ((progress.queuedBytes(0) - threshold / 4) / 4).toInt()
++                CapacityTrack.underruns++
++                set("lastPcmWriteNs", 0L) // old starvation timestamp must not play the tail immediately
++                type.getDeclaredMethod("maintainPlaybackBuffer").apply { isAccessible = true }.invoke(renderer)
++                assertFalse(CapacityTrack.playing)
++                assertEquals(2, get("rebufferCount"))
++                type.getDeclaredMethod("maintainPlaybackBuffer").apply { isAccessible = true }.invoke(renderer)
++                assertFalse(CapacityTrack.playing)
++                set("lastPcmWriteNs", 0L)
++                type.getDeclaredMethod("maintainPlaybackBuffer").apply { isAccessible = true }.invoke(renderer)
++                assertTrue("short retained tail must eventually play", CapacityTrack.playing)
+             } finally { track.release() }
+         }
+     }
+ 
+     @Implements(AudioTrack::class)
+     class CapacityTrack {
+-        @Implementation fun getPlaybackHeadPosition() = 0
+-        @Implementation fun getUnderrunCount() = 1
++        @Implementation fun getPlaybackHeadPosition() = head
++        @Implementation fun getUnderrunCount() = underruns
+         @Implementation fun pause() { playing = false }
+         @Implementation fun play() { playing = true }
+         @Implementation fun write(bytes: ByteArray, offset: Int, size: Int, mode: Int): Int {
++            assertEquals(AudioTrack.WRITE_NON_BLOCKING, mode)
+             if (!playing && queued + size > capacity) {
+                 blocked = true
+                 return 0 // A real blocking AudioTrack.write waits here indefinitely.
+@@ -68,6 +86,8 @@
+             return size
+         }
+         companion object {
++            var underruns = 1
++            var head = 0
+             var capacity = 0
+             var queued = 0
+             var playing = true
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatusTest.kt
 @@ -6,6 +6,15 @@
@@ -974,9 +1940,166 @@
      @Test fun truncatedAccessUnitIsRejectedInsteadOfSubmittingItsValidPrefix() {
          assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0, 0, 0, 9, 0x41)).size)
          assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0)).size)
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/MicrophoneCaptureStatsTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/MicrophoneCaptureStatsTest.kt
+@@ -91,17 +91,6 @@
+         assertTrue(reports.single().contains("routedDeviceType=unknown"))
+     }
+ 
+-    @Test fun fallbackSourceIsReportedAfterTheRefusedSource() {
+-        val reports = mutableListOf<String>()
+-        val stats = MicrophoneCaptureStats(config.copy(audioType = "speechrecognition"), reports::add) { 0 }
+-        stats.failure(MicrophoneFailureStage.RECORDER_CREATION, UnsupportedOperationException())
+-        stats.useVoiceCommunicationSource()
+-        stats.started(15)
+-        stats.flush(ended = true)
+-        assertTrue(reports[0].contains("type=speechrecognition source=VOICE_RECOGNITION"))
+-        assertTrue(reports.drop(1).all { it.contains("type=speechrecognition source=VOICE_COMMUNICATION") })
+-    }
+-
+     @Test fun outputContainsOnlyAllowlistedMetadataAndNeverExceptionMessagesOrEndpoints() {
+         val reports = mutableListOf<String>()
+         val privateConfig = config.copy(audioType = "PRIVATE_PHONE_NAME\nsecret=value")
+@@ -119,4 +108,15 @@
+         assertEquals(4, reports.size)
+         assertTrue(reports.all { it.length < 512 && '\n' !in it })
+     }
++
++    @Test fun fallbackSourceIsReportedAfterTheRefusedSource() {
++        val reports = mutableListOf<String>()
++        val stats = MicrophoneCaptureStats(config.copy(audioType = "speechrecognition"), reports::add) { 0 }
++        stats.failure(MicrophoneFailureStage.RECORDER_CREATION, UnsupportedOperationException())
++        stats.useSource(7)
++        stats.started(15)
++        stats.flush(ended = true)
++        assertTrue(reports[0].contains("type=speechrecognition source=VOICE_RECOGNITION"))
++        assertTrue(reports.drop(1).all { it.contains("type=speechrecognition source=VOICE_COMMUNICATION") })
++    }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/MicrophoneSourceFallbackTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/MicrophoneSourceFallbackTest.kt
+@@ -32,7 +32,7 @@
+ 
+ /** Exercises the real sink/uplink, including creation, teardown and exported diagnostics. */
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [28, 33], manifest = Config.NONE, shadows = [MicrophoneSourceFallbackTest.RecorderBuilder::class])
++@Config(sdk = [29, 30], manifest = Config.NONE, shadows = [MicrophoneSourceFallbackTest.RecorderBuilder::class])
+ class MicrophoneSourceFallbackTest {
+     private val context get() = RuntimeEnvironment.getApplication()
+     private val id = AudioStreamId(100, "speechrecognition")
+@@ -46,6 +46,8 @@
+         RecorderBuilder.built.clear()
+         RecorderBuilder.rejectSources = emptySet()
+         RecorderBuilder.uninitializedSources = emptySet()
++        RecorderBuilder.startRejectedSources = emptySet()
++        RecorderBuilder.beforeBuild = {}
+         shadowOf(context).grantPermissions(Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS)
+         context.getSystemService(AudioManager::class.java).mode = AudioManager.MODE_RINGTONE
+         sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
+@@ -96,6 +98,53 @@
+         assertTrue(diagnostics.any { it.contains("source=VOICE_RECOGNITION") && it.contains("stage=RECORDER_INITIALIZATION") })
+     }
+ 
++    @Test fun siriStartFailureReleasesRecorderBeforeCommunicationFallback() {
++        RecorderBuilder.startRejectedSources = setOf(MediaRecorder.AudioSource.VOICE_RECOGNITION)
++        sink.onMicrophoneStarted(id, config("speechrecognition"))
++        assertTrue(captureStarted.await(5, TimeUnit.SECONDS))
++        assertTrue((RecorderBuilder.built.first() as StartRejectedRecorder).released)
++        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, requireNotNull(captured.get()).audioSource)
++        assertTrue(diagnostics.any { it.contains("source=VOICE_RECOGNITION") && it.contains("stage=RECORDING") })
++    }
++
++    @Test fun cancellationDuringCreationCannotPublishOrRetryARecorder() {
++        val entered = CountDownLatch(1)
++        val resume = CountDownLatch(1)
++        RecorderBuilder.beforeBuild = { entered.countDown(); assertTrue(resume.await(5, TimeUnit.SECONDS)) }
++        val uplink = MicrophoneUplink(config("speechrecognition"))
++        var result = true
++        val starter = Thread { result = uplink.start() }.apply { start() }
++        assertTrue(entered.await(5, TimeUnit.SECONDS))
++        val closer = Thread { uplink.close() }.apply { start() }
++        val closed = ReflectionHelpers.getField<java.util.concurrent.atomic.AtomicBoolean>(uplink, "closed")
++        val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
++        while (!closed.get() && System.nanoTime() < until) Thread.yield()
++        assertTrue(closed.get())
++        resume.countDown()
++        starter.join(5_000); closer.join(5_000)
++        assertFalse(starter.isAlive); assertFalse(closer.isAlive)
++        assertFalse(result)
++        assertEquals(1, RecorderBuilder.attempts.size)
++        assertTrue(RecorderBuilder.built.all { it.state == AudioRecord.STATE_UNINITIALIZED })
++        assertNull(captured.get())
++    }
++
++    @Test fun successfulOriginalSourceDoesNotCreateFallback() {
++        sink.onMicrophoneStarted(id, config("speechrecognition"))
++        assertTrue(captureStarted.await(5, TimeUnit.SECONDS))
++        assertEquals(listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION), RecorderBuilder.attempts)
++    }
++
++    @Test fun factorySourceIsTriedFirstAndCloseIsPermanent() {
++        val uplink = MicrophoneUplink(config("speechrecognition"), factorySource = MediaRecorder.AudioSource.MIC)
++        assertTrue(uplink.start())
++        assertTrue(captureStarted.await(5, TimeUnit.SECONDS))
++        assertEquals(listOf(MediaRecorder.AudioSource.MIC), RecorderBuilder.attempts)
++        uplink.close()
++        assertFalse(uplink.start())
++        assertEquals(AudioRecord.STATE_UNINITIALIZED, requireNotNull(captured.get()).state)
++    }
++
+     @Test fun bothUnsupportedSourcesFailOnceAndALaterStreamCanStart() {
+         RecorderBuilder.rejectSources = setOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+         sink.onMicrophoneStarted(id, config("speechrecognition"))
+@@ -131,8 +180,10 @@
+             val attributes = ReflectionHelpers.getField<AudioAttributes>(builder, "mAttributes")
+             val source = ReflectionHelpers.callInstanceMethod<Int>(attributes, "getCapturePreset")
+             attempts += source
++            beforeBuild()
+             if (source in rejectSources) throw UnsupportedOperationException("Unsupported test capture source")
+             return (if (source in uninitializedSources) RejectedRecorder(source)
++                else if (source in startRejectedSources) StartRejectedRecorder(source)
+                 else Shadow.directlyOn<AudioRecord, AudioRecord.Builder>(builder, AudioRecord.Builder::class.java, "build")).also {
+                 built += it
+             }
+@@ -141,9 +192,18 @@
+         companion object {
+             val attempts = CopyOnWriteArrayList<Int>()
+             val built = CopyOnWriteArrayList<AudioRecord>()
++            var beforeBuild: () -> Unit = {}
+             var rejectSources = emptySet<Int>()
+             var uninitializedSources = emptySet<Int>()
+-        }
++            var startRejectedSources = emptySet<Int>()
++        }
++    }
++
++    class StartRejectedRecorder(source: Int) : AudioRecord(source, 16_000,
++        AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, 4096) {
++        var released = false
++        override fun startRecording() { throw IllegalStateException("source refused start") }
++        override fun release() { released = true; super.release() }
+     }
+ 
+     class RejectedRecorder(source: Int) : AudioRecord(source, 16_000,
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/media/TelephonyMicrophoneTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/TelephonyMicrophoneTest.kt
-@@ -56,7 +56,7 @@
+@@ -7,15 +7,12 @@
+ import android.media.audiofx.AcousticEchoCanceler
+ import android.media.audiofx.AudioEffect
+ import com.shilapi.xcertplay.airplay.AudioStreamId
+-import com.shilapi.xcertplay.airplay.AudioFormat
+-import com.shilapi.xcertplay.airplay.AudioCodecKind
+ import com.shilapi.xcertplay.airplay.MicrophoneConfig
+ import java.net.InetAddress
+ import java.util.concurrent.CountDownLatch
+ import java.util.concurrent.CopyOnWriteArrayList
+ import java.util.concurrent.TimeUnit
+ import java.util.concurrent.atomic.AtomicReference
+-import java.util.concurrent.atomic.AtomicBoolean
+ import org.junit.After
+ import org.junit.Assert.*
+ import org.junit.Before
+@@ -59,7 +56,7 @@
              readStarted.countDown()
              object : ShadowAudioRecord.AudioRecordSource {
                  override fun readInByteArray(buffer: ByteArray, offset: Int, size: Int, blocking: Boolean): Int {
@@ -985,7 +2108,7 @@
                      Thread.sleep(5)
                      return 0
                  }
-@@ -69,8 +69,17 @@
+@@ -72,8 +69,17 @@
          ShadowAudioRecord.clearSource()
      }
  
@@ -1004,7 +2127,7 @@
          sink.onMicrophoneStarted(telephony, config("telephony"))
          val record = awaitCapture()
  
-@@ -85,7 +94,7 @@
+@@ -88,7 +94,7 @@
          }
  
          sink.onMicrophoneStopped(telephony)
@@ -1013,7 +2136,7 @@
          assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
          assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
      }
-@@ -112,6 +121,34 @@
+@@ -115,6 +121,34 @@
          assertFalse(microphone.joinToString("\n").contains("head="))
      }
  
@@ -1048,7 +2171,7 @@
      @Test fun diagnosticCallbackFailureDoesNotStopSpeechRecognitionCapture() {
          sink.close()
          sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })
-@@ -127,7 +164,7 @@
+@@ -130,7 +164,7 @@
      @Test fun diagnosticCallbackFailureDoesNotStopCallCaptureOrChangeModeRestoration() {
          sink.close()
          sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })
@@ -1057,7 +2180,7 @@
          sink.onMicrophoneStarted(telephony, config("telephony"))
          val record = awaitCapture()
          assertEquals(AudioRecord.RECORDSTATE_RECORDING, record.recordingState)
-@@ -135,7 +172,7 @@
+@@ -138,7 +172,7 @@
          assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
          assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
          sink.onMicrophoneStopped(telephony)
@@ -1066,7 +2189,7 @@
          assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
      }
  
-@@ -158,19 +195,19 @@
+@@ -161,19 +195,19 @@
      }
  
      @Test fun duplicateStartDoesNotOverwriteTheOriginalModeOrCreateMoreEffects() {
@@ -1090,14 +2213,106 @@
          assertNull(recorder.get())
          assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
      }
-@@ -207,9 +244,48 @@
+@@ -210,172 +244,48 @@
      @Config(shadows = [RejectingAudioManager::class])
      fun modeFailureDoesNotEscapeTheDownlinkCallback() {
          sink.onMicrophoneStarted(telephony, config("telephony"))
 -        assertNull(recorder.get())
 -        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
 -        assertTrue(ShadowLog.getLogsForTag("xcertplay-usb").any { it.msg.contains("microphone start failed") })
-+        assertEquals(AudioRecord.RECORDSTATE_RECORDING, awaitCapture().recordingState)
+-    }
+-
+-    @Test fun telephonyKeepsRecordingWhenTheEchoCancellerLibraryIsMissing() {
+-        sink.close()
+-        sink = AndroidMediaSink(context = context, callEchoCancellation = true)
+-        registerCallDownlink()
+-        sink.onMicrophoneStarted(telephony, config("telephony"))
+         assertEquals(AudioRecord.RECORDSTATE_RECORDING, awaitCapture().recordingState)
+-        assertTrue(microphoneLog(), microphoneLog().contains("microphone echo canceller enabled=false"))
+-        sink.onMicrophoneStopped(telephony)
+-    }
+-
+-    @Test fun defaultCallCaptureKeepsPlatformEffectsWithoutStartingExperimentalProcessing() {
+-        sink.onMicrophoneStarted(telephony, config("telephony"))
+-        assertEquals(AudioRecord.RECORDSTATE_RECORDING, awaitCapture().recordingState)
+-        assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
+-        assertFalse(microphoneLog().contains("echo canceller"))
+-    }
+-
+-    @Test fun softwareCallCaptureDisablesPlatformAecBeforeProcessingAndReleasesBothOnClose() {
+-        val fake = FakeCallEchoCanceller()
+-        provideCallFrame()
+-        val uplink = MicrophoneUplink(config("telephony"), echoReference = EchoReference(16_000),
+-            echoCancellerFactory = { _, _, _ -> fake })
+-        try {
+-            assertTrue(uplink.start())
+-            awaitCapture()
+-            assertTrue(fake.processed.await(5, TimeUnit.SECONDS))
+-            assertEquals(false, fake.platformAecEnabledAtProcessing)
+-            val effects = ShadowAudioEffect.getAudioEffects()
+-            assertFalse(effects.single { it is AcousticEchoCanceler }.enabled)
+-            assertTrue(effects.single { it.javaClass.simpleName == "NoiseSuppressor" }.enabled)
+-            effects.forEach { assertEquals(recorder.get()!!.audioSessionId, Shadow.extract<ShadowAudioEffect>(it).audioSession) }
+-        } finally { uplink.close() }
+-        assertTrue(fake.closed)
+-        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+-        assertEquals(AudioRecord.STATE_UNINITIALIZED, recorder.get()!!.state)
+-    }
+-
+-    @Test fun softwareProcessingFailureRestoresPlatformAecAndKeepsTheSameRecorderRunning() {
+-        val fake = FakeCallEchoCanceller(succeeds = false)
+-        val nextRead = CountDownLatch(1)
+-        provideCallFrame(nextRead)
+-        val uplink = MicrophoneUplink(config("telephony"), echoReference = EchoReference(16_000),
+-            echoCancellerFactory = { _, _, _ -> fake })
+-        try {
+-            assertTrue(uplink.start())
+-            val record = awaitCapture()
+-            // The next read is reached only after processing/fallback and packet sending finish.
+-            assertTrue(nextRead.await(5, TimeUnit.SECONDS))
+-            assertEquals(false, fake.platformAecEnabledAtProcessing)
+-            assertTrue(fake.closed)
+-            assertEquals(AudioRecord.RECORDSTATE_RECORDING, record.recordingState)
+-            assertTrue(ShadowAudioEffect.getAudioEffects().all { it.enabled })
+-            assertTrue(microphoneLog().contains("platform AEC restored"))
+-        } finally { uplink.close() }
+-    }
+-
+-    @Test fun failedPlatformAecDisableKeepsTheOriginalCallEffectsAndClosesSoftware() {
+-        ConfigurableAudioEffect.disableStatus = AudioEffect.ERROR_INVALID_OPERATION
+-        val fake = FakeCallEchoCanceller()
+-        val uplink = MicrophoneUplink(config("telephony"), echoReference = EchoReference(16_000),
+-            echoCancellerFactory = { _, _, _ -> fake })
+-        try {
+-            assertTrue(uplink.start())
+-            awaitCapture()
+-            assertTrue(fake.closed)
+-            assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
+-            assertTrue(ShadowAudioEffect.getAudioEffects().all { it.enabled })
+-            assertTrue(microphoneLog().contains("platform AEC could not be disabled"))
+-            assertTrue(microphoneLog().contains("microphone echo canceller enabled=false"))
+-        } finally { uplink.close() }
+-    }
+-
+-    @Test fun unmatchedCallRatesAndStereoCaptureKeepPlatformAecWithoutCreatingSoftware() {
+-        var created = 0
+-        for (captureConfig in listOf(config("telephony").copy(sampleRate = 48_000),
+-                config("telephony").copy(channels = 2))) {
+-            val uplink = MicrophoneUplink(captureConfig, echoReference = EchoReference(16_000),
+-                echoCancellerFactory = { _, _, _ -> created++; FakeCallEchoCanceller() })
+-            try {
+-                assertTrue(uplink.start())
+-                assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
+-                assertTrue(ShadowAudioEffect.getAudioEffects().all { it.enabled })
+-            } finally { uplink.close() }
+-        }
+-        assertEquals(0, created)
+-    }
+-
+-    @Test fun eachCallDownlinkOwnsItsReferenceAndReplacementsDoNotReuseOldPcm() {
+-        sink.close()
+-        sink = AndroidMediaSink(context = context, callEchoCancellation = true)
+-        registerCallDownlink()
 +        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
 +    }
 +
@@ -1130,7 +2345,76 @@
 +    }
 +
 +    @Test fun overlappingCallsRetainModeUntilTheLastStreamStops() {
-+        val second = AudioStreamId(101, "telephony")
+         val second = AudioStreamId(101, "telephony")
+-        registerCallDownlink(second)
+-        val references = org.robolectric.util.ReflectionHelpers.getField<Map<AudioStreamId, EchoReference>>(sink, "callEchoReferences")
+-        val firstReference = references.getValue(telephony)
+-        assertNotSame(firstReference, references.getValue(second))
+-        sink.onMicrophoneStarted(telephony, config("telephony"))
+-        awaitCapture()
+-        val uplinks = org.robolectric.util.ReflectionHelpers.getField<Map<AudioStreamId, MicrophoneUplink>>(sink, "microphoneUplinks")
+-        assertSame(firstReference, org.robolectric.util.ReflectionHelpers.getField<EchoReference>(uplinks.getValue(telephony), "echoReference"))
+-
+-        sink.onAudioStopped(second)
+-        assertEquals(setOf(telephony), references.keys)
+-        sink.onMicrophoneStopped(telephony)
+-        sink.onAudioStopped(telephony)
+-        assertTrue(references.isEmpty())
+-        registerCallDownlink()
+-        assertNotSame(firstReference, references.getValue(telephony))
+-        sink.close()
+-        assertTrue(references.isEmpty())
+-    }
+-
+-    @Test fun actualDownlinkRateMismatchKeepsThePlatformCallPath() {
+-        sink.close()
+-        sink = AndroidMediaSink(context = context, callEchoCancellation = true)
+-        registerCallDownlink()
+-        sink.onMicrophoneStarted(telephony, config("telephony").copy(sampleRate = 48_000))
+-        awaitCapture()
+-        assertTrue(microphoneLog(), microphoneLog().contains("echo canceller skipped rate=48000"))
+-        assertTrue(ShadowAudioEffect.getAudioEffects().all { it.enabled })
+-    }
+-
+-    private fun registerCallDownlink(id: AudioStreamId = telephony) {
+-        // Register the real renderer through its production callback without starting a playback
+-        // worker: these tests check capture ownership, not whether Robolectric renders audio.
+-        sink.onAudioRtp(id, AudioFormat(AudioCodecKind.LPCM, 16_000, 1, id.type, "telephony"), byteArrayOf(), 0)
+-    }
+-
+-    private fun provideCallFrame(nextRead: CountDownLatch? = null) {
+-        val produced = AtomicBoolean()
+-        ShadowAudioRecord.setSourceProvider { record ->
+-            recorder.compareAndSet(null, record)
+-            readStarted.countDown()
+-            object : ShadowAudioRecord.AudioRecordSource {
+-                override fun readInByteArray(buffer: ByteArray, offset: Int, size: Int, blocking: Boolean): Int {
+-                    if (produced.compareAndSet(false, true)) return config("telephony").frameBytes
+-                    nextRead?.countDown()
+-                    Thread.sleep(5)
+-                    return 0
+-                }
+-            }
+-        }
+-    }
+-
+-    private class FakeCallEchoCanceller(private val succeeds: Boolean = true) : CallEchoCanceller {
+-        override val frameSamples = 320
+-        val processed = CountDownLatch(1)
+-        @Volatile var closed = false
+-        @Volatile var platformAecEnabledAtProcessing: Boolean? = null
+-        override fun process(frame: ByteArray, reference: ShortArray): Boolean {
+-            platformAecEnabledAtProcessing = ShadowAudioEffect.getAudioEffects().filterIsInstance<AcousticEchoCanceler>().singleOrNull()?.enabled
+-            processed.countDown()
+-            return succeeds
+-        }
+-        override fun close() { closed = true }
+-    }
+-
+-    @Test fun speechRecognitionNeverStartsTheEchoCanceller() {
+-        sink.onMicrophoneStarted(speechRecognition, config("speechrecognition"))
+-        awaitCapture()
+-        assertFalse(microphoneLog().contains("echo canceller"))
 +        sink.onMicrophoneStarted(telephony, config("telephony"))
 +        awaitCapture()
 +        sink.onMicrophoneStarted(second, config("telephony"))
@@ -1142,6 +2426,25 @@
      }
  
      private fun awaitCapture(): AudioRecord {
+@@ -402,17 +312,14 @@
+     class ConfigurableAudioEffect : ShadowAudioEffect() {
+         @Implementation
+         override fun native_setEnabled(enabled: Boolean): Int =
+-            if (!enabled && disableStatus != AudioEffect.SUCCESS) disableStatus
+-            else if (enableStatus == AudioEffect.SUCCESS) super.native_setEnabled(enabled) else enableStatus
++            if (enableStatus == AudioEffect.SUCCESS) super.native_setEnabled(enabled) else enableStatus
+ 
+         companion object {
+             var enableStatus = AudioEffect.SUCCESS
+-            var disableStatus = AudioEffect.SUCCESS
+ 
+             @Resetter @JvmStatic
+             fun resetStatus() {
+                 enableStatus = AudioEffect.SUCCESS
+-                disableStatus = AudioEffect.SUCCESS
+             }
+         }
+     }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoDecodeQueueTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoDecodeQueueTest.kt
 @@ -5,6 +5,22 @@
@@ -1242,6 +2545,191 @@
 +        assertSame(frame, result)
 +        worker.join(100)
 +    }
+ }
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoOperatingRateTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoOperatingRateTest.kt
+@@ -1,44 +1,152 @@
+ package com.shilapi.xcertplay.media
+ 
+-import org.junit.Assert.assertEquals
++import android.media.MediaCodec
++import android.media.MediaCodecInfo
++import android.media.MediaFormat
++import android.view.Surface
++import com.shilapi.xcertplay.airplay.VideoCodec
++import java.io.Closeable
++import java.nio.ByteBuffer
++import java.util.concurrent.ConcurrentLinkedQueue
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++import java.util.concurrent.atomic.AtomicReference
++import org.junit.Assert.*
+ import org.junit.Test
++import org.junit.runner.RunWith
++import org.mockito.ArgumentMatchers.*
++import org.mockito.Mockito.*
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
+ 
++/** Exercises operating-rate rejection and presentation using the production worker. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [30], manifest = Config.NONE)
+ class VideoOperatingRateTest {
+-    @Test fun theMainScreenDecoderAsksForTheFrameRateSetting() {
+-        assertEquals(60, videoOperatingRate(110, statsLabel = null, frameRate = 60))
+-        assertEquals(30, videoOperatingRate(110, statsLabel = null, frameRate = 30))
+-        assertEquals(0, videoOperatingRate(110, statsLabel = null, frameRate = 0)) // none known: leave it unset
++    @Test fun usesNegotiatedFpsOnlyOnTheMainStream() {
++        for (fps in listOf(30, 60)) Fixture(fps).use {
++            it.configure(); assertTrue(it.ready.await(2, TimeUnit.SECONDS)); it.barrier()
++            assertEquals(fps, it.formats.single().getInteger(MediaFormat.KEY_OPERATING_RATE))
++        }
++        Fixture(60, 111).use {
++            it.configure(); assertTrue(it.ready.await(2, TimeUnit.SECONDS)); it.barrier()
++            assertFalse(it.formats.single().containsKey(MediaFormat.KEY_OPERATING_RATE))
++        }
+     }
+ 
+-    @Test fun otherDecodersKeepTheirFormat() {
+-        assertEquals(0, videoOperatingRate(111, statsLabel = null, frameRate = 60)) // the cluster stream
+-        assertEquals(0, videoOperatingRate(110, statsLabel = " stream=110 mirror=centre", frameRate = 60))
++    @Test fun configureRejectionKeepsTunedFallbackAndNeverRepeatsHint() {
++        Fixture().use { f ->
++            doAnswer {
++                val format = it.getArgument<MediaFormat>(0); f.formats.add(format)
++                if (format.containsKey(MediaFormat.KEY_OPERATING_RATE)) throw IllegalArgumentException("rate refused")
++                null
++            }.`when`(f.codec).configure(any(MediaFormat::class.java), any(Surface::class.java), isNull(), eq(0))
++            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
++            assertEquals(2, f.creations.get())
++            assertTrue(f.formats[1].containsKey(MediaFormat.KEY_PRIORITY))
++            assertFalse(f.formats[1].containsKey(MediaFormat.KEY_OPERATING_RATE))
++            assertEquals(0, f.field("operatingRate").getInt(f.worker))
++            assertTrue(f.retry()); f.barrier()
++            assertEquals(1, f.formats.count { it.containsKey(MediaFormat.KEY_OPERATING_RATE) })
++            assertEquals(0, f.gate.failures)
++        }
+     }
+ 
+-    @Test fun theRateIsTriedFirstOnItsOwnBeforeTheExistingFallbacks() {
+-        assertEquals(
+-            listOf(
+-                DecoderAttempt(null, tuned = true, operatingRate = 60),
+-                DecoderAttempt(null, tuned = true),
+-                DecoderAttempt(null, tuned = false),
+-                DecoderAttempt("c2.android.avc.decoder", tuned = false),
+-            ),
+-            videoDecoderAttempts(60, "c2.android.avc.decoder"),
+-        )
++    @Test fun startRejectionAlsoReleasesHintedCodecAndFallsBack() {
++        Fixture().use { f ->
++            val starts = AtomicInteger()
++            doAnswer { if (starts.incrementAndGet() == 1) throw IllegalStateException("start refused"); null }.`when`(f.codec).start()
++            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
++            assertEquals(2, starts.get()); assertEquals(0, f.field("configuredRate").getInt(f.worker))
++            verify(f.codec, times(1)).release()
++        }
+     }
+ 
+-    @Test fun withoutARateTheAttemptsAreTheOnesBefore() {
+-        assertEquals(
+-            listOf(DecoderAttempt(null, tuned = true), DecoderAttempt(null, tuned = false)),
+-            videoDecoderAttempts(0, softwareDecoder = null),
+-        )
++    @Test fun onlyARealFreshPresentationProtectsTheAcceptedHintFromEarlyCodecFailure() {
++        for (presented in listOf(false, true)) Fixture().use { f ->
++            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
++            val callback = f.presentation.get(); val now = System.nanoTime()
++            callback.onFrameRendered(f.codec, (now - 300_000_000L) / 1000, now)
++            assertEquals(0, f.recovered.get())
++            if (presented) callback.onFrameRendered(f.codec, System.nanoTime() / 1000, System.nanoTime())
++            assertEquals(30, f.field("configuredRate").getInt(f.worker))
++            val codecFailure = MediaCodec.CodecException::class.java
++                .getDeclaredConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
++                .apply { isAccessible = true }.newInstance(1100, 0, "test codec failure")
++            // worker 已启动后只发布故障，不并发重新设置正在调用的 Mockito 桩。
++            f.outputFailure.set(codecFailure)
++            assertTrue(f.outputFailed.await(2, TimeUnit.SECONDS)); f.barrier()
++            assertEquals(f.reports.toString(), if (presented) 30 else 0, f.field("operatingRate").getInt(f.worker))
++            assertTrue(f.retry()); f.barrier()
++            assertEquals(if (presented) 2 else 1, f.formats.count { it.containsKey(MediaFormat.KEY_OPERATING_RATE) })
++        }
+     }
+-
+-    @Test fun aRefusedRateIsNotAskedForAgain() {
+-        assertEquals(60, nextOperatingRate(60, DecoderAttempt(null, tuned = true, operatingRate = 60)))
+-        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = true))) // refused, tuned worked
+-        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = false))) // the MediaTek case
+-        assertEquals(60, nextOperatingRate(60, used = null)) // nothing worked: not the rate's fault
+-        assertEquals(0, nextOperatingRate(0, DecoderAttempt(null, tuned = true)))
++    private class Fixture(val fps: Int = 30, val stream: Int = 110) : Closeable {
++        val codec = mock(MediaCodec::class.java)
++        val ready = CountDownLatch(1)
++        val inputQueued = CountDownLatch(1)
++        val recovered = AtomicInteger()
++        val creations = AtomicInteger()
++        val formats = java.util.concurrent.CopyOnWriteArrayList<MediaFormat>()
++        val presentation = AtomicReference<MediaCodec.OnFrameRenderedListener>()
++        val outputFailure = AtomicReference<RuntimeException?>()
++        val outputFailed = CountDownLatch(1)
++        private val closed = CountDownLatch(1)
++        val reports = ConcurrentLinkedQueue<String>()
++        private val type = Class.forName("com.shilapi.xcertplay.media.VideoDecoder")
++        val worker: Any
++        val gate: VideoRecoveryGate get() = field("recoveryGate").get(worker) as VideoRecoveryGate
++        val queue: VideoDecodeQueue get() = field("queue").get(worker) as VideoDecodeQueue
++        init {
++            doAnswer { formats.add(it.getArgument(0)); null }.`when`(codec).configure(any(MediaFormat::class.java), any(Surface::class.java), isNull(), eq(0))
++            val surface = mock(Surface::class.java)
++            `when`(surface.isValid).thenReturn(true)
++            val info = mock(MediaCodecInfo::class.java)
++            `when`(info.isHardwareAccelerated).thenReturn(true)
++            `when`(codec.codecInfo).thenReturn(info)
++            `when`(codec.name).thenReturn("test.avc")
++            doAnswer {
++                outputFailure.getAndSet(null)?.let { failure ->
++                    outputFailed.countDown()
++                    throw failure
++                }
++                MediaCodec.INFO_TRY_AGAIN_LATER
++            }.`when`(codec).dequeueOutputBuffer(any(MediaCodec.BufferInfo::class.java), eq(0L))
++            `when`(codec.dequeueInputBuffer(anyLong())).thenReturn(0)
++            `when`(codec.getInputBuffer(0)).thenReturn(ByteBuffer.allocate(64))
++            doAnswer { presentation.set(it.getArgument(0)); null }.`when`(codec)
++                .setOnFrameRenderedListener(any(MediaCodec.OnFrameRenderedListener::class.java), any())
++            doAnswer { inputQueued.countDown(); null }.`when`(codec)
++                .queueInputBuffer(anyInt(), anyInt(), anyInt(), anyLong(), anyInt())
++            val report: (String) -> Unit = { reports.add(it); if (it.startsWith("decoder=test.avc")) ready.countDown() }
++            val failure: (Any, VideoCodec, String) -> Unit = { _, _, _ -> }
++            val recoveredCallback: (Any) -> Unit = { recovered.incrementAndGet() }
++            val closedCallback: (Any) -> Unit = { closed.countDown() }
++            val size: (Int, Int) -> Unit = { _, _ -> }
++            val create: (String) -> MediaCodec = { creations.incrementAndGet(); codec }
++            worker = type.declaredConstructors.single { it.parameterCount == 14 }.apply { isAccessible = true }
++                .newInstance(stream, surface, 1280, 720, false, fps, {}, report, failure,
++                    recoveredCallback, closedCallback, size, create, null)
++            @Suppress("UNCHECKED_CAST")
++            val candidates = field("decoderCandidateCache").get(worker) as MutableMap<String, List<VideoDecoderCandidate>>
++            candidates[MediaFormat.MIMETYPE_VIDEO_AVC] = listOf(VideoDecoderCandidate("test.avc", true, false, false))
++        }
++        fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
++        fun configure() = type.getDeclaredMethod("configure", VideoCodec::class.java, ByteArray::class.java)
++            .apply { isAccessible = true }.invoke(worker, VideoCodec.H264, byteArrayOf(1))
++        fun submit(bytes: ByteArray) = type.getDeclaredMethod("submit", ByteArray::class.java)
++            .apply { isAccessible = true }.invoke(worker, bytes)
++        fun retry() = type.getDeclaredMethod("retry").apply { isAccessible = true }.invoke(worker) as Boolean
++        fun barrier() {
++            val applied = CountDownLatch(1)
++            val surface = field("desiredSurface").get(worker) as Surface
++            queue.offer(VideoJob.SurfaceChanged(surface) { applied.countDown() })
++            assertTrue(applied.await(2, TimeUnit.SECONDS))
++        }
++        override fun close() {
++            (worker as Closeable).close()
++            assertTrue(closed.await(2, TimeUnit.SECONDS))
++        }
+     }
  }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/network/AirPlayPortSelectorTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/AirPlayPortSelectorTest.kt
@@ -1404,6 +2892,74 @@
      @Test fun addressAndIdentityChangesRestartStability() {
          val selected = await {
              when (now) {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/P2pStartupRecoveryTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/P2pStartupRecoveryTest.kt
+@@ -357,65 +357,6 @@
+         }
+     }
+ 
+-    @Test fun fiveGhzBandStaysInsideTheBandAndIgnoresStationOnTwoGhzAndRememberedAuto() {
+-        val remembered = P2pCreationRequest(P2pCreationMode.FIXED_2_GHZ, 2437)
+-        val plan = P2pStartupRecovery.plan(2437, remembered, preferredChannel = WifiP2pChannels.AUTO_5_GHZ)
+-        assertEquals(listOf(
+-            P2pCreationRequest(P2pCreationMode.BAND_5_GHZ),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5180),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5745),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5220),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5785),
+-        ), plan)
+-        assertTrue(plan.none { it.mode == P2pCreationMode.SYSTEM_DEFAULT })
+-    }
+-
+-    @Test fun bandPlanPutsAnInBandStationChannelFirstWithoutRepeatingIt() {
+-        assertEquals(listOf(
+-            P2pCreationRequest(P2pCreationMode.ALIGNED_5_GHZ, 5745),
+-            P2pCreationRequest(P2pCreationMode.BAND_5_GHZ),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5180),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5220),
+-            P2pCreationRequest(P2pCreationMode.FIXED_5_GHZ, 5785),
+-        ), P2pStartupRecovery.plan(5745, preferredChannel = WifiP2pChannels.AUTO_5_GHZ))
+-        assertEquals(listOf(
+-            P2pCreationRequest(P2pCreationMode.ALIGNED_2_GHZ, 2412),
+-            P2pCreationRequest(P2pCreationMode.BAND_2_GHZ),
+-            P2pCreationRequest(P2pCreationMode.FIXED_2_GHZ, 2437),
+-            P2pCreationRequest(P2pCreationMode.FIXED_2_GHZ, 2462),
+-        ), P2pStartupRecovery.plan(2412, preferredChannel = WifiP2pChannels.AUTO_2_4_GHZ))
+-    }
+-
+-    @Test fun legacyBandPlanUsesOnlyExplicitChannels() {
+-        assertEquals(listOf(5180, 5745, 5220, 5785),
+-            P2pStartupRecovery.plan(null, preferredChannel = WifiP2pChannels.AUTO_5_GHZ, bandRequests = false)
+-                .map { it.frequencyMHz })
+-    }
+-
+-    @Test fun rejectedBandWalksItsChannelsThenStopsWithoutSwitchingBand() {
+-        val attempts = mutableListOf<P2pCreationRequest>()
+-        val failure = assertThrows(P2pChannelUnavailableException::class.java) {
+-            P2pStartupRecovery.create(null, {}, preferredChannel = WifiP2pChannels.AUTO_5_GHZ) {
+-                attempts += it
+-                throw P2pCreateRejected(WifiP2pManager.ERROR, "rejected")
+-            }
+-        }
+-        assertEquals(P2pStartupRecovery.plan(null, preferredChannel = WifiP2pChannels.AUTO_5_GHZ), attempts)
+-        assertTrue(attempts.all { it.mode == P2pCreationMode.BAND_5_GHZ || WifiP2pBand.FIVE_GHZ.contains(it.frequencyMHz) })
+-        assertTrue(failure.message!!.contains("5 GHz band"))
+-    }
+-
+-    @Test fun bandBuilderFailureNeverFallsBackToTheUnpinnedDefault() {
+-        var calls = 0
+-        assertThrows(P2pChannelUnavailableException::class.java) {
+-            P2pStartupRecovery.create(null, { fail("Unexpected fallback") }, preferredChannel = WifiP2pChannels.AUTO_2_4_GHZ) {
+-                calls++
+-                throw P2pConfigBuildCompatibilityFailure(NoSuchMethodError("vendor framework"))
+-            }
+-        }
+-        assertEquals(1, calls)
+-    }
+-
+     private fun reportedBuilderFailure(returnDescriptor: String = "Ljava/lang/String;") = NoSuchMethodError(
+         "No virtual method getNetworkName()$returnDescriptor in class Landroid/net/wifi/p2p/WifiP2pConfig;",
+     ).apply {
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
 @@ -34,7 +34,7 @@
@@ -1498,6 +3054,17 @@
  
      @Test fun activeSessionEvidenceIsScopedToGenerationAndClearedOnEnd() {
          val session = Any()
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/BluetoothRfcommDuplexStreamTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/BluetoothRfcommDuplexStreamTest.kt
+@@ -192,7 +192,7 @@
+             assertEquals("reader exceeded the bounded queue", 1L, input.ninthRead.count)
+ 
+             val received = ByteArrayOutputStream()
+-            // Drain only part of the first chunk: the reader must wake even when its tail remains.
++            // 只消费第一块的一部分，保留尾部时 reader 也必须被唤醒。
+             received.write(stream.recv(64, 2_000)!!)
+             assertTrue("reader remained blocked after recv freed capacity", input.ninthRead.await(2, TimeUnit.SECONDS))
+             while (true) {
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2LocationReporterTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/Iap2LocationReporterTest.kt
 @@ -49,7 +49,7 @@
@@ -1522,158 +3089,28 @@
      @Test
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxFrameBufferTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxFrameBufferTest.kt
-@@ -265,6 +265,125 @@
-         assertArrayEquals(data, buffer.takeFrame()!!.payload.copyOfRange(20, 20 + data.size))
+@@ -266,8 +266,8 @@
      }
  
-+    @Test fun capturedProtocolOneBoundaryWorksAcrossEveryTransferSplit() {
+     @Test fun capturedProtocolOneBoundaryWorksAcrossEveryTransferSplit() {
+-        // Issue #100's complete 187-byte TCP transfer and 73-byte diagnostic transfer.
+-        // The declared frames are 183 and 69 bytes, each followed by four extra bytes.
 +        // Issue #100 中完整的 187 字节 TCP 传输和 73 字节诊断传输。
 +        // 声明帧长分别为 183 和 69，每帧后有四字节尾部。
-+        assertEquals(187, capturedTcpTransfer.size)
-+        assertEquals(73, capturedDiagnosticTransfer.size)
-+        assertEverySplitPreservesFrames(capturedTcpTransfer.copyOfRange(0, 183),
-+            capturedTcpTransfer.copyOfRange(183, 187), capturedDiagnostic)
-+
-+        val buffer = UsbMuxFrameBuffer()
-+        buffer.append(capturedTcpTransfer + capturedDiagnosticTransfer)
-+        assertEquals(6, buffer.takeFrame()!!.protocol)
-+        val diagnostic = buffer.takeFrame()!!
-+        assertEquals(1, diagnostic.protocol)
-+        assertEquals(69, diagnostic.length)
-+        assertEquals(0x0185, diagnostic.sequence)
-+        assertArrayEquals(capturedDiagnostic.copyOfRange(16, 69), diagnostic.payload)
-+        assertNull(buffer.takeFrame())
-+        assertEquals(4, buffer.bufferedBytes)
-+    }
-+
-+    @Test fun diagnosticTrailersKeepRepeatedDiagnosticsAndFollowingTcpAcrossEverySplit() {
-+        val following = tcp(data = data + capturedDiagnosticTransfer + data)
-+        val frames = listOf(capturedTcpTransfer.copyOfRange(0, 183), capturedDiagnostic,
-+            secondCapturedDiagnostic, following)
-+        val wire = capturedTcpTransfer + capturedDiagnosticTransfer + secondCapturedDiagnosticTransfer + following
-+        for (split in 0..wire.size) {
-+            val buffer = UsbMuxFrameBuffer()
-+            val parsed = mutableListOf<UsbMuxFrame>()
-+            fun drain() { while (true) parsed.add(buffer.takeFrame() ?: break) }
-+            buffer.append(wire.copyOfRange(0, split)); drain()
-+            buffer.append(wire.copyOfRange(split, wire.size)); drain()
-+            assertEquals("transfer split at $split", frames.size, parsed.size)
-+            frames.indices.forEach { index ->
-+                assertArrayEquals("reply $index at split $split",
-+                    frames[index].copyOfRange(16, frames[index].size), parsed[index].payload)
-+            }
-+            assertEquals(0, buffer.bufferedBytes)
-+        }
-+    }
-+
-+    @Test fun incompleteDiagnosticDoesNotConsumeTrailerOrAnyPayloadBytes() {
-+        val reports = mutableListOf<String>()
-+        val buffer = UsbMuxFrameBuffer(reports::add)
-+        buffer.append(capturedTcpTransfer)
-+        buffer.takeFrame()
-+        capturedDiagnostic.forEachIndexed { index, byte ->
-+            buffer.append(byteArrayOf(byte))
-+            if (index < capturedDiagnostic.lastIndex) {
-+                repeat(3) { assertNull(buffer.takeFrame()) }
-+                assertEquals(index + 1 + 4, buffer.bufferedBytes)
-+                assertTrue(reports.isEmpty())
-+            }
-+        }
-+        assertArrayEquals(capturedDiagnostic.copyOfRange(16, 69), buffer.takeFrame()!!.payload)
-+        assertEquals(0, buffer.bufferedBytes)
-+        assertEquals(1, reports.size)
-+    }
-+
-+    @Test fun malformedDiagnosticsDoNotQualifyAsRecoveryTargets() {
-+        val wrongMagic = capturedDiagnostic.copyOf().also { putU32(it, 8, 0xfeedface.toInt()) }
-+        val wrongSubtype = capturedDiagnostic.copyOf().also { it[16] = 3 }
-+        val controlByte = capturedDiagnostic.copyOf().also { it[25] = 0 }
-+        val nonAscii = capturedDiagnostic.copyOf().also { it[25] = 0x80.toByte() }
-+        val overlarge = capturedDiagnostic.copyOf().also { putU32(it, 4, 16 + 1_025) }
-+        listOf(wrongMagic, wrongSubtype, controlByte, nonAscii, overlarge,
-+            mux(1, ByteArray(0)), mux(1, byteArrayOf(4))).forEach { invalid ->
-+            rejectAfter(tcp(data = data), reportedPadding + invalid)
-+        }
-+    }
-+
-+    @Test fun malformedPreviousDiagnosticsDoNotEnableTrailerRecovery() {
-+        listOf(
-+            capturedDiagnostic.copyOf().also { putU32(it, 8, 7) },
-+            capturedDiagnostic.copyOf().also { it[16] = 3 },
-+            capturedDiagnostic.copyOf().also { it[25] = 0 },
-+            mux(1, byteArrayOf(4)),
-+            mux(1, byteArrayOf(4) + ByteArray(1_024) { 0x41 }),
-+        ).forEach { invalid -> rejectAfter(invalid, reportedPadding + tcp(data = data)) }
-+    }
-+
-+    @Test fun diagnosticRecoveryStillNeedsAnEligiblePreviousReplyAndExactlyFourBytes() {
-+        rejectAfter(mux(73, data), reportedPadding + capturedDiagnostic)
-+        rejectAfter(tcp(data = data), zeroPadding + capturedPadding + capturedDiagnostic)
-+        rejectAfter(capturedDiagnostic, reportedPadding + mux(7, ByteArray(20)))
-+        val buffer = UsbMuxFrameBuffer()
-+        buffer.append(reportedPadding + capturedDiagnostic)
-+        assertProtocolFailure { buffer.takeFrame() }
-+    }
-+
-+    @Test fun normalProtocolOnePayloadIsPreservedWithoutRecoveryValidation() {
-+        val payload = byteArrayOf(0, 0x80.toByte()) + capturedDiagnosticTransfer + synAck
-+        val normal = mux(1, payload, magic = 9)
-+        val buffer = after(tcp(data = data))
-+        buffer.append(normal + tcp(data = data))
-+        assertArrayEquals(payload, buffer.takeFrame()!!.payload)
-+        assertArrayEquals(tcp(data = data).copyOfRange(16, 16 + 20 + data.size), buffer.takeFrame()!!.payload)
-+        assertEquals(0, buffer.bufferedBytes)
-+    }
-+
-+    @Test fun maximumBoundedDiagnosticPreservesAllTextAndFollowingPayload() {
-+        val text = byteArrayOf(4) + ByteArray(1_023) { 0x41 }
-+        val maximum = mux(1, text)
-+        val buffer = after(tcp(data = data))
-+        buffer.append(reportedPadding + maximum + reportedPadding + tcp(data = data))
-+        assertArrayEquals(text, buffer.takeFrame()!!.payload)
-+        assertArrayEquals(data, buffer.takeFrame()!!.payload.copyOfRange(20, 20 + data.size))
-+        assertEquals(0, buffer.bufferedBytes)
-+    }
-+
-+    @Test fun diagnosticPaddingReportsOnlyFramingMetadata() {
-+        val reports = mutableListOf<String>()
-+        val buffer = UsbMuxFrameBuffer(reports::add)
-+        buffer.append(capturedTcpTransfer + capturedDiagnosticTransfer + tcp(data = data))
-+        repeat(3) { buffer.takeFrame() }
-+        assertEquals(2, reports.size)
-+        assertTrue(reports.first().contains("nextProtocol=1 nextLength=69"))
-+        assertTrue(reports.none { it.contains("detected") || it.contains("Expected") || it.contains("received") })
-+    }
-+
-     private fun assertEverySplitPreservesFrames(first: ByteArray, padding: ByteArray, next: ByteArray) {
-         val wire = first + padding + next
-         for (split in 0..wire.size) {
-@@ -303,6 +422,25 @@
+         assertEquals(187, capturedTcpTransfer.size)
+         assertEquals(73, capturedDiagnosticTransfer.size)
+         assertEverySplitPreservesFrames(capturedTcpTransfer.copyOfRange(0, 183),
+@@ -422,8 +422,8 @@
          val data = "private-sample payload mCon".toByteArray()
          val version = mux(0, byteArrayOf(0x49, 0x28, 0x73, 0), magic = 2)
          val synAck = tcp(flags = 0x12)
+-        // Verbatim first TCP completion from issue-100-proto1.txt, lines 39–44.
+-        // TLS bytes are opaque to framing; the last four bytes (38343134) are outside length 183.
 +        // 逐字节使用 issue-100-proto1.txt 第 39～44 行的首次 TCP completion。
 +        // 组帧不解释 TLS 字节；最后四字节（38343134）在声明长度 183 之外。
-+        val capturedTcpTransfer = hex("""
-+            00000006000000b7faceface01840197e05600020005015d0000051650100200
-+            00000000170303008ee0f6cf38b2e09782cb37c255c64a1cc0941687c920f807
-+            acfbe4741aa5a10776fe70c26d5059c78ba2d486c7b3145a1bd4c258f7096a00
-+            2e00dc19aafc87cbe8b72ff25d962b129b462704d35fcc29a703f6004983fc07
-+            d315c4c7baec956b97b4dabfbdfee1da166e19cc07c922617e8a67bd70917b51
-+            9fa0cf713b0d9ee97036efade9e4b83e40a2904a9f1ba438343134
-+        """)
-+        val capturedDiagnostic = hex("0000000100000045faceface01850197") + byteArrayOf(4) +
-+            "detected duplicate packet. Expected 408 received 410".toByteArray(Charsets.US_ASCII)
-+        val capturedDiagnosticTransfer = capturedDiagnostic + hex("a5a10776")
-+        val secondCapturedDiagnostic = hex("0000000100000045faceface01870197") + byteArrayOf(4) +
-+            "detected duplicate packet. Expected 408 received 411".toByteArray(Charsets.US_ASCII)
-+        val secondCapturedDiagnosticTransfer = secondCapturedDiagnostic + hex("e724c574")
-+
-+        fun hex(value: String): ByteArray = value.filterNot(Char::isWhitespace).chunked(2)
-+            .map { it.toInt(16).toByte() }.toByteArray()
- 
-         fun tcp(flags: Int = 0x10, data: ByteArray = ByteArray(0), headerBytes: Int = 20,
-             magic: Int = 0xfaceface.toInt()): ByteArray {
+         val capturedTcpTransfer = hex("""
+             00000006000000b7faceface01840197e05600020005015d0000051650100200
+             00000000170303008ee0f6cf38b2e09782cb37c255c64a1cc0941687c920f807
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxIssue100RegressionTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbMuxIssue100RegressionTest.kt
 @@ -22,7 +22,7 @@
@@ -1707,3 +3144,76 @@
  object UsbEvidenceReplay {
      val transfers = ArrayDeque<ByteArray>()
      val writes = mutableListOf<ByteArray>()
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbReadQueueCompatibilityTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/transport/UsbReadQueueCompatibilityTest.kt
+@@ -22,7 +22,7 @@
+ import org.robolectric.util.ReflectionHelpers
+ import org.robolectric.util.ReflectionHelpers.ClassParameter
+ 
+-/** Exercises the actual two read paths; queue rejection is a compatibility hypothesis. */
++/** 验证两条真实读取路径；queue 拒绝只作为兼容假设。 */
+ @RunWith(RobolectricTestRunner::class)
+ @Config(sdk = [28], manifest = Config.NONE,
+     shadows = [CompatibilityUsbConnectionShadow::class, CompatibilityUsbRequestShadow::class])
+@@ -67,7 +67,7 @@
+         val frame = ByteArray(32_740) { (it * 31).toByte() }
+         val followingFrame = byteArrayOf(0x33, 0x33, 0, 0, 0, 1, 0x86.toByte(), 0xdd.toByte())
+         val block = Ntb16Codec.build(frame, 7)
+-        assertEquals(32_769, block.size) // Two 16 KiB reads, then the required short-packet pad.
++        assertEquals(32_769, block.size) // 两次 16 KiB 读取后保留必需的短包填充。
+         UsbQueueReplay.transfer = block + Ntb16Codec.build(followingFrame, 8)
+         UsbQueueReplay.outcomes.addAll(listOf(false, true))
+         val diagnostics = mutableListOf<String>()
+@@ -208,11 +208,10 @@
+     var transfer: ByteArray? = null
+     var transferOffset = 0
+     val completedBytes = mutableListOf<Int>()
+-    @Volatile var untimedWaits = 0
+     fun reset() {
+         outcomes.clear(); sizes.clear(); buffers.clear(); request = null; buffer = null
+         queueException = null; timeout = false; onQueue = null
+-        transfer = null; transferOffset = 0; completedBytes.clear(); untimedWaits = 0
++        transfer = null; transferOffset = 0; completedBytes.clear()
+     }
+ }
+ 
+@@ -220,7 +219,7 @@
+ class CompatibilityUsbRequestShadow {
+     @RealObject lateinit var request: UsbRequest
+     @Implementation fun initialize(connection: UsbDeviceConnection, endpoint: UsbEndpoint) = true
+-    @Implementation(minSdk = 26) fun queue(buffer: ByteBuffer): Boolean {
++    @Implementation fun queue(buffer: ByteBuffer): Boolean {
+         UsbQueueReplay.sizes.add(buffer.remaining())
+         UsbQueueReplay.buffers.add(buffer)
+         UsbQueueReplay.queueException?.let { throw it }
+@@ -229,18 +228,13 @@
+         if (queued) { UsbQueueReplay.request = request; UsbQueueReplay.buffer = buffer }
+         return queued
+     }
+-    /** Android 7.x queue; the buffer is filled from position 0 up to [length]. */
+-    @Implementation fun queue(buffer: ByteBuffer, length: Int): Boolean {
+-        check(buffer.position() == 0 && buffer.remaining() == length) { "Unexpected Android 7 queue range" }
+-        return queue(buffer)
+-    }
+     @Implementation fun cancel() = true
+     @Implementation fun close() = Unit
+ }
+ 
+ @Implements(UsbDeviceConnection::class)
+ class CompatibilityUsbConnectionShadow {
+-    @Implementation(minSdk = 26) fun requestWait(timeoutMillis: Long): UsbRequest {
++    @Implementation fun requestWait(timeoutMillis: Long): UsbRequest {
+         if (UsbQueueReplay.timeout) throw TimeoutException()
+         val buffer = UsbQueueReplay.buffer!!
+         val transfer = UsbQueueReplay.transfer
+@@ -255,10 +249,5 @@
+         }
+         return UsbQueueReplay.request!!
+     }
+-    /** Android 7.x blocking wait. */
+-    @Implementation fun requestWait(): UsbRequest {
+-        UsbQueueReplay.untimedWaits += 1
+-        return requestWait(Long.MAX_VALUE)
+-    }
+     @Implementation fun close() = Unit
+ }
