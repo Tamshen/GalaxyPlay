@@ -121,7 +121,8 @@ class ManualHotspotManager(
         onDiagnostic("Manual hotspot configReadable=${apConfiguration != null} " +
             "security=$security channelKnown=${channel > 0} " +
             "hardwareAddressKnown=${localInterface.hardwareAddress != null} iface=${localInterface.name} " +
-            "family=${if (localInterface.hostAddress is Inet6Address) "IPv6" else "IPv4"}")
+            "family=${if (localInterface.hostAddress is Inet6Address) "IPv6" else "IPv4"} " +
+            "mdnsFamilies=${selected.hostAddresses.joinToString("+") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
         if (security != Iap2WirelessSecurity.NONE && passphrase.isEmpty()) {
             throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION, "Manual hotspot is secured but no passphrase was provided")
         }
@@ -135,6 +136,7 @@ class ManualHotspotManager(
             )
         }
         val observedBandLabel = wifiBandLabel(apConfiguration?.band)
+        validateReady()
         return WirelessHotspotInfo(
             ssid = expectedSsid,
             passphrase = passphrase,
@@ -144,6 +146,7 @@ class ManualHotspotManager(
             bssid = localInterface.hardwareAddress,
             interfaceName = localInterface.name,
             hostAddress = localInterface.hostAddress,
+            hostAddresses = selected.hostAddresses,
             bandLabel = when (expectedBand) {
                 ManualHotspotBand.GHZ_2_4 -> "2.4 GHz"
                 ManualHotspotBand.GHZ_5 -> "5 GHz"

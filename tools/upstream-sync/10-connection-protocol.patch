@@ -672,6 +672,64 @@
      }
  
      private fun runNcmToTun() {
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/ManualHotspotManager.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/ManualHotspotManager.kt
+@@ -121,7 +121,8 @@
+         onDiagnostic("Manual hotspot configReadable=${apConfiguration != null} " +
+             "security=$security channelKnown=${channel > 0} " +
+             "hardwareAddressKnown=${localInterface.hardwareAddress != null} iface=${localInterface.name} " +
+-            "family=${if (localInterface.hostAddress is Inet6Address) "IPv6" else "IPv4"}")
++            "family=${if (localInterface.hostAddress is Inet6Address) "IPv6" else "IPv4"} " +
++            "mdnsFamilies=${selected.hostAddresses.joinToString("+") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
+         if (security != Iap2WirelessSecurity.NONE && passphrase.isEmpty()) {
+             throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION, "Manual hotspot is secured but no passphrase was provided")
+         }
+@@ -135,6 +136,7 @@
+             )
+         }
+         val observedBandLabel = wifiBandLabel(apConfiguration?.band)
++        validateReady()
+         return WirelessHotspotInfo(
+             ssid = expectedSsid,
+             passphrase = passphrase,
+@@ -144,6 +146,7 @@
+             bssid = localInterface.hardwareAddress,
+             interfaceName = localInterface.name,
+             hostAddress = localInterface.hostAddress,
++            hostAddresses = selected.hostAddresses,
+             bandLabel = when (expectedBand) {
+                 ManualHotspotBand.GHZ_2_4 -> "2.4 GHz"
+                 ManualHotspotBand.GHZ_5 -> "5 GHz"
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/ManualHotspotReadiness.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/ManualHotspotReadiness.kt
+@@ -22,10 +22,13 @@
+     val apEnabled: Boolean? = true,
+ )
+ 
+-internal data class HotspotSelection(val name: String, val index: Int, val address: InetAddress) {
++internal data class HotspotSelection(val name: String, val index: Int, val address: InetAddress,
++    val hostAddresses: List<InetAddress> = listOf(address),
++) {
+     fun sameAddress(other: HotspotSelection): Boolean = name == other.name && index == other.index &&
+         address.address.contentEquals(other.address.address) &&
+-        (address as? Inet6Address)?.scopeId == (other.address as? Inet6Address)?.scopeId
++        (address as? Inet6Address)?.scopeId == (other.address as? Inet6Address)?.scopeId &&
++        hostAddresses.toSet() == other.hostAddresses.toSet()
+ }
+ 
+ internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (String) -> Unit): HotspotSelection? {
+@@ -56,7 +59,10 @@
+             "ap=${snapshot.apInterfaces?.let { if (owned) "yes" else "no" } ?: "unobservable"} " +
+             "defaultConflict=${owned && (upstream || snapshot.defaultInterface == iface.name)}")
+         if (reason != "platform_ap" && reason != "wireless_non_upstream") null
+-        else (if (owned) 100 else 0) to HotspotSelection(iface.name, iface.index, address!!)
++        else (if (owned) 100 else 0) to HotspotSelection(iface.name, iface.index, address!!,
++            existingWifiHostAddresses(iface.addresses.filter {
++                it is Inet6Address && it.isLinkLocalAddress || it is Inet4Address && it.isSiteLocalAddress
++            }, iface.index))
+     }.sortedWith(compareByDescending<Pair<Int, HotspotSelection>> { it.first }.thenBy { it.second.name })
+         .firstOrNull()?.second
+ }
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/WirelessReceiveDiagnostics.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/WirelessReceiveDiagnostics.kt
 @@ -4,9 +4,9 @@

@@ -22,10 +22,13 @@ internal data class HotspotNetworkSnapshot(
     val apEnabled: Boolean? = true,
 )
 
-internal data class HotspotSelection(val name: String, val index: Int, val address: InetAddress) {
+internal data class HotspotSelection(val name: String, val index: Int, val address: InetAddress,
+    val hostAddresses: List<InetAddress> = listOf(address),
+) {
     fun sameAddress(other: HotspotSelection): Boolean = name == other.name && index == other.index &&
         address.address.contentEquals(other.address.address) &&
-        (address as? Inet6Address)?.scopeId == (other.address as? Inet6Address)?.scopeId
+        (address as? Inet6Address)?.scopeId == (other.address as? Inet6Address)?.scopeId &&
+        hostAddresses.toSet() == other.hostAddresses.toSet()
 }
 
 internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (String) -> Unit): HotspotSelection? {
@@ -56,7 +59,10 @@ internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (Stri
             "ap=${snapshot.apInterfaces?.let { if (owned) "yes" else "no" } ?: "unobservable"} " +
             "defaultConflict=${owned && (upstream || snapshot.defaultInterface == iface.name)}")
         if (reason != "platform_ap" && reason != "wireless_non_upstream") null
-        else (if (owned) 100 else 0) to HotspotSelection(iface.name, iface.index, address!!)
+        else (if (owned) 100 else 0) to HotspotSelection(iface.name, iface.index, address!!,
+            existingWifiHostAddresses(iface.addresses.filter {
+                it is Inet6Address && it.isLinkLocalAddress || it is Inet4Address && it.isSiteLocalAddress
+            }, iface.index))
     }.sortedWith(compareByDescending<Pair<Int, HotspotSelection>> { it.first }.thenBy { it.second.name })
         .firstOrNull()?.second
 }

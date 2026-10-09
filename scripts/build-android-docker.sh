@@ -180,7 +180,7 @@ if [[ "$build_status" -eq 0 ]]; then
             :mobile:assembleRelease|:mobile:assembleStandaloneRelease) apk_variants+=(release) ;;
         esac
     done
-    for variant in "${apk_variants[@]}"; do
+    for variant in ${apk_variants[@]+"${apk_variants[@]}"}; do
         python3 "$project_dir/e2e/checks/check_apk_dex_compression.py" \
             "$project_dir/mobile/build/outputs/apk/$variant/mobile-$variant.apk"
     done

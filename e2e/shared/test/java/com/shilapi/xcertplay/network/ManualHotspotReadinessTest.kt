@@ -75,6 +75,25 @@ class ManualHotspotReadinessTest {
         assertEquals(ipv4, select(snapshot(iface(index = 9, addresses = listOf(ipv4, ipv6))))?.address)
     }
 
+    @Test fun confirmedAddressesStayOnTheSelectedInterfaceAndAreScoped() {
+        val selected = select(snapshot(iface(index = 9, addresses = listOf(ipv4, ipv6)),
+            iface("eth0", 11, addresses = listOf(InetAddress.getByName("192.168.99.1")))))!!
+        assertEquals(ipv4, selected.address)
+        assertEquals(2, selected.hostAddresses.size)
+        assertEquals(9, (selected.hostAddresses[1] as Inet6Address).scopeId)
+        assertEquals(listOf(ipv4), select(snapshot(iface()))!!.hostAddresses)
+        assertEquals(1, select(snapshot(iface(addresses = listOf(ipv6))))!!.hostAddresses.size)
+        assertFalse(selected.sameAddress(select(snapshot(iface(index = 9)))!!))
+    }
+
+    @Test fun secondaryAddressChangeRestartsStability() {
+        val selected = await {
+            snapshot(iface(addresses = if (now < 250) listOf(ipv4, ipv6) else listOf(ipv4)))
+        }
+        assertEquals(750L, now)
+        assertEquals(listOf(ipv4), selected.hostAddresses)
+    }
+
     @Test fun addressAndIdentityChangesRestartStability() {
         val selected = await {
             when (now) {
