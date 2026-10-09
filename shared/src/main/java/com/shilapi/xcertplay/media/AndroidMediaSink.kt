@@ -1637,12 +1637,14 @@ private class AudioRenderer(
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
         if (bufferProgress.shouldRebuffer(!e5Realtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
-            // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
+                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition, startThresholdBytes / 2L)) {
+            // An underrun left the track below the recovery waterline. Retain PCM while paused,
             // then use the configured start threshold again when music resumes.
             track.pause()
             playbackStarted = false
-            prebufferBytes = 0
+            prebufferBytes = bufferProgress.queuedBytes(track.playbackHeadPosition)
+                .coerceAtMost(startThresholdBytes.toLong()).toInt()
+            lastPcmWriteNs = System.nanoTime()
             rebufferCount++
         }
         // A short final burst may never reach the start threshold. Play it after a bounded wait.

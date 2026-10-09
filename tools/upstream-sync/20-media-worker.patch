@@ -1553,16 +1553,27 @@
                  break
              }
              if (count < writeLength) partialWritesThisWindow++
-@@ -1361,7 +1636,7 @@
+@@ -1361,13 +1636,15 @@
  
      private fun maintainPlaybackBuffer() {
          val track = track ?: return
 -        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
+-                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
+-            // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
 +        if (bufferProgress.shouldRebuffer(!e5Realtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                 track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
-             // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
++                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition, startThresholdBytes / 2L)) {
++            // An underrun left the track below the recovery waterline. Retain PCM while paused,
              // then use the configured start threshold again when music resumes.
-@@ -1382,6 +1657,7 @@
+             track.pause()
+             playbackStarted = false
+-            prebufferBytes = 0
++            prebufferBytes = bufferProgress.queuedBytes(track.playbackHeadPosition)
++                .coerceAtMost(startThresholdBytes.toLong()).toInt()
++            lastPcmWriteNs = System.nanoTime()
+             rebufferCount++
+         }
+         // A short final burst may never reach the start threshold. Play it after a bounded wait.
+@@ -1382,6 +1659,7 @@
          val now = System.nanoTime()
          if (statsWindowStartNs == 0L) statsWindowStartNs = now
          if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
@@ -1570,7 +1581,7 @@
          val underruns = track?.underrunCount ?: 0
          val lastRx = lastArrivalNs.get()
          val currentTrack = track
-@@ -1410,8 +1686,13 @@
+@@ -1410,8 +1688,13 @@
              "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
          Log.i(STATS_TAG, line)
          report(line)
@@ -1585,7 +1596,7 @@
              val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                  "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                  "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
-@@ -1458,7 +1739,8 @@
+@@ -1458,7 +1741,8 @@
  
      @Synchronized
      private fun release() {
@@ -1595,7 +1606,7 @@
          val codec = codec
          this.codec = null
          if (codec != null) {
-@@ -1492,6 +1774,7 @@
+@@ -1492,6 +1776,7 @@
                  // Best effort.
              }
          }
@@ -1603,6 +1614,18 @@
      }
  
      private companion object {
+--- a/shared/src/main/java/com/shilapi/xcertplay/media/AudioBufferProgress.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/media/AudioBufferProgress.kt
+@@ -16,6 +16,7 @@
+     }
+ 
+     fun shouldRebuffer(isMedia: Boolean, playing: Boolean, underrunSinceStart: Boolean,
+-        compressedQueueEmpty: Boolean, rawHead: Int): Boolean =
+-        isMedia && playing && underrunSinceStart && compressedQueueEmpty && queuedBytes(rawHead) == 0L
++        compressedQueueEmpty: Boolean, rawHead: Int, floorBytes: Long): Boolean =
++        isMedia && playing && underrunSinceStart && compressedQueueEmpty &&
++            queuedBytes(rawHead) <= floorBytes
+ }
 --- a/shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt
 @@ -2,16 +2,17 @@
