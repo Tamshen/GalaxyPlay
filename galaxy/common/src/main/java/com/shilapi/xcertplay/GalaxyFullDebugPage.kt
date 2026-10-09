@@ -38,8 +38,9 @@ internal class GalaxyFullDebugPage(private val activity: Activity, parent: Linea
             setMeasuredDimension(width, width * 9 / 16)
         }
     }
+    private var runLog: (String) -> Unit = L7DebugLog::record
     private val flow = GalaxyDebugFlow(GalaxyDebugChecks.build(activity, codecController) { preview.holder.surface },
-        GalaxyDebugChecks::now, L7DebugLog::record)
+        GalaxyDebugChecks::now, { runLog(it) })
     private var statusRow: L7SettingRow? = null
     private val tick = object : Runnable {
         override fun run() { if (!closed && foreground) { update(); handler.postDelayed(this, 200) } }
@@ -69,12 +70,14 @@ internal class GalaxyFullDebugPage(private val activity: Activity, parent: Linea
     private fun text(id: Int) = activity.getString(id)
     private fun begin() {
         pendingStart = false
-        if (!closed && foreground && L7Agreement.canUse(activity)) flow.start()
+        if (!closed && foreground && L7Agreement.canUse(activity)) {
+            runLog = L7DebugLog.logger(activity); flow.start()
+        }
         update()
     }
     private fun update() {
         if (closed) return
-        if (pendingStart && L7Agreement.canUse(activity)) { pendingStart = false; flow.start() }
+        if (pendingStart && L7Agreement.canUse(activity)) { pendingStart = false; runLog = L7DebugLog.logger(activity); flow.start() }
         flow.poll()
         val check = flow.checks.getOrNull(flow.index)
         val active = flow.phase in setOf(GalaxyDebugFlow.Phase.RUNNING, GalaxyDebugFlow.Phase.QUESTION, GalaxyDebugFlow.Phase.RELEASING)

@@ -77,7 +77,9 @@ internal object L7Dialogs {
                 else -> platform.setNeutralButton(label, click)
             }
         }
-        fun setPositiveButton(label: Int, click: DialogInterface.OnClickListener?) = setPositiveButton(context.getString(label), click)
+        fun setPositiveButton(label: Int, click: DialogInterface.OnClickListener?) = setPositiveButton(context.getString(
+            if (context is GalaxyConfigurationContext && context.editable && label == R.string.l7_save_next_connection)
+                R.string.profile_update_draft else label), click)
         fun setPositiveButton(label: CharSequence, click: DialogInterface.OnClickListener?) = action(AlertDialog.BUTTON_POSITIVE, label, click)
         fun setNegativeButton(label: Int, click: DialogInterface.OnClickListener?) = setNegativeButton(context.getString(label), click)
         fun setNegativeButton(label: CharSequence, click: DialogInterface.OnClickListener?) = action(AlertDialog.BUTTON_NEGATIVE, label, click)

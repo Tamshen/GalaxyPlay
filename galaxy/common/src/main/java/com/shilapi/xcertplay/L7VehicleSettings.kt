@@ -7,11 +7,12 @@ import com.shilapi.xcertplay.host.R
 
 /** 车型选择独立于音频参数；沿用确认与下次连接应用契约。 */
 internal object L7VehicleSettings {
-    fun page(context: Context, parent: LinearLayout) {
+    fun page(context: Context, parent: LinearLayout, profileChanged: (() -> Unit)? = null) {
         val model = L7AudioTemplates.model(context)
         val modelNames = L7AudioTemplates.Model.entries.map { L7AudioModelConfirmation.name(context, it) }
         fun text(id: Int) = context.getString(id)
-        fun refresh() { parent.removeAllViews(); page(context, parent) }
+        fun refresh() { parent.removeAllViews(); page(context, parent, profileChanged) }
+        GalaxyProfilePage.add(context, parent, profileChanged ?: ::refresh)
         L7SettingsSection.add(parent, description = text(R.string.l7_vehicle_settings_note)) { card ->
             card.addView(L7Components.valueRow(context, text(R.string.l7_template_model), modelNames[model.ordinal]) {
                 L7Components.select(context, text(R.string.l7_template_model), modelNames, model.ordinal,

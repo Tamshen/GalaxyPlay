@@ -48,7 +48,8 @@ internal object L7ProbeRunner {
         busy = true
         storageFailed = false
         logFailed = false
-        current = L7ProbeReport(id, "pending", "pending", System.currentTimeMillis(), L7ProbePhase.RUNNING)
+        current = L7ProbeReport(id, "pending", "pending", System.currentTimeMillis(), L7ProbePhase.RUNNING,
+            configuration = runCatching { GalaxyConfigurationEvidence.capture(app).text }.getOrNull())
         revision++
         val timeout = Runnable { if (current?.id == id) stop(L7ProbePhase.TIMED_OUT) }
         main.postDelayed(timeout, 15_000)

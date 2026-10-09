@@ -25,7 +25,8 @@ internal object L7AudioTemplateEditor {
         val dialog = L7Dialogs.builder(context).setTitle(R.string.l7_template_edit)
             .setMessage(R.string.l7_template_schema_hint).setView(editor)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.l7_save_next_connection, null).create()
+            .setPositiveButton(if (context is GalaxyConfigurationContext && context.editable)
+                R.string.profile_update_draft else R.string.l7_save_next_connection, null).create()
         var committed = false
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {

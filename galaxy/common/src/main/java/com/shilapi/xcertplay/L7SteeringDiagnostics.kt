@@ -9,6 +9,7 @@ internal class L7SteeringTraceStore(
     private val log: (String) -> Unit,
     private val capacity: Int = 256,
     private val model: () -> String = { "unknown" },
+    private val logger: () -> ((String) -> Unit) = { log },
 ) {
     data class Event(val id: Long, val generation: Long, val source: String, val command: Int,
                      val stage: String, val detail: String, val elapsedMs: Long, val atMs: Long)
@@ -23,7 +24,7 @@ internal class L7SteeringTraceStore(
     private val run = clock()
 
     @Synchronized fun begin(source: String, command: Int, detail: String = ""): L7SteeringTrace {
-        val trace = L7SteeringTrace(++serial, generation, safe(source), command, clock(), this, safe(model()))
+        val trace = L7SteeringTrace(++serial, generation, safe(source), command, clock(), this, safe(model()), logger())
         trace.step("INPUT", detail)
         return trace
     }
@@ -49,7 +50,7 @@ internal class L7SteeringTraceStore(
         events.addLast(event)
         while (events.size > capacity) events.removeFirst()
         revision++
-        log("STEERING_TRACE run=$run trace=${event.id} generation=${event.generation} model=${trace.model} source=${event.source} index=${event.command} stage=${event.stage} elapsedMs=${event.elapsedMs} monoMs=$now detail=${event.detail} thread=${safe(Thread.currentThread().name)}")
+        trace.log("STEERING_TRACE run=$run trace=${event.id} generation=${event.generation} model=${trace.model} source=${event.source} index=${event.command} stage=${event.stage} elapsedMs=${event.elapsedMs} monoMs=$now detail=${event.detail} thread=${safe(Thread.currentThread().name)}")
     }
 
     @Synchronized fun snapshot() = Snapshot(revision, connected, generation, events.toList(), states.toMap())
@@ -61,6 +62,7 @@ internal class L7SteeringTrace internal constructor(
     val id: Long, val generation: Long, val source: String, val command: Int,
     internal val started: Long, private val store: L7SteeringTraceStore,
     val model: String,
+    internal val log: (String) -> Unit,
 ) {
     fun step(stage: String, detail: String = "") = store.append(this, stage, detail)
 }
@@ -68,8 +70,21 @@ internal class L7SteeringTrace internal constructor(
 internal object L7SteeringDiagnostics {
     @Volatile private var target: SessionLogFile? = null
     @Volatile private var app: android.content.Context? = null
+    @Volatile private var listeningConfiguration: GalaxyConfigurationEvidence? = null
+    @Volatile private var listeningModel: String? = null
     val store = L7SteeringTraceStore(SystemClock::elapsedRealtime, ::record,
-        model = { app?.let { L7AudioTemplates.model(it).id } ?: "unknown" })
+        model = { listeningModel ?: CarPlayBackgroundSession.configuration?.let {
+            it.model.takeIf { value -> value in setOf("l7", "l6", "custom") } ?: "l7"
+        } ?: app?.let { L7AudioTemplates.model(it).id } ?: "unknown" },
+        logger = {
+            val context = app
+            val effective = CarPlayBackgroundSession.configuration
+            val snapshot = listeningConfiguration ?: if (context != null && effective != null)
+                runCatching { GalaxyConfigurationEvidence.from(context, effective) }.getOrNull()
+            else context?.let { runCatching { GalaxyConfigurationEvidence.capture(it) }.getOrNull() }
+            val write: (String) -> Unit = { line -> L7DebugLog.record(line, target, snapshot) }
+            write
+        })
 
     @Synchronized fun initialize(context: android.content.Context) {
         app = context.applicationContext
@@ -79,8 +94,14 @@ internal object L7SteeringDiagnostics {
     }
 
     internal fun record(line: String) {
-        L7DebugLog.record(line, target)
+        L7DebugLog.record(line, target, listeningConfiguration)
     }
+    fun freezeListening(context: android.content.Context) {
+        initialize(context)
+        listeningConfiguration = runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()
+        listeningModel = L7AudioTemplates.model(context).id
+    }
+    fun endListening() { listeningConfiguration = null; listeningModel = null }
     fun begin(source: String, index: Int, detail: String = ""): L7SteeringTrace =
         store.begin(source, index, detail).also { SteeringListening.input(it, detail) }
 }

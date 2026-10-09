@@ -78,13 +78,16 @@ internal object L7ProbeLog {
 
     /** 调用方已经在采集工作线程；先原子落盘，再发布到当前日志，失败由页面提示。 */
     @Synchronized fun write(context: Context, report: L7ProbeReport) {
-        val entries = lines(report)
+        val evidence = report.configuration?.let { runCatching { GalaxyConfigurationEvidence.read(it) }.getOrNull() }
+        val entries = listOfNotNull(evidence?.header) + lines(report).map { line ->
+            (evidence?.let { "config_ref=${it.id} " } ?: "") + line
+        }
         val folder = File(context.filesDir, "logs").apply { mkdirs() }
         val latest = File(folder, files.last())
         if (latest.isFile) save(File(folder, files.first()), latest.readBytes().take(MAX_BYTES).toByteArray())
         save(latest, entries.joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8))
         L7DebugLog.initialize(context)
-        entries.forEach { L7DebugLog.record(it) }
+        lines(report).forEach { L7DebugLog.recordConfiguration(it, evidence) }
     }
 
     @Synchronized fun read(context: Context): List<String> = files.flatMap { name ->

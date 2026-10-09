@@ -129,7 +129,8 @@ internal object L7Components {
                 (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = pending != current
             }
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(applyLabel, null).create()
+            .setPositiveButton(if (context is GalaxyConfigurationContext && context.editable)
+                context.getString(R.string.profile_update_draft) else applyLabel, null).create()
         dialog.setOnDismissListener { onDismiss() }
         dialog.setOnShowListener {
             val apply = dialog.getButton(AlertDialog.BUTTON_POSITIVE)

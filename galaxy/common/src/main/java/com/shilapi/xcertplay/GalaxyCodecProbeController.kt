@@ -33,11 +33,13 @@ internal class GalaxyCodecProbeController(private val context: Context, private 
     private val handler = Handler(Looper.getMainLooper())
     private var closed = false
     private var cleanupUnconfirmed = false
+    private var runLog: (String) -> Unit = L7DebugLog::record
     val busy get() = client != null || pending.isNotEmpty()
     val available get() = runCatching { catalog(video).filter { allowSoftware || it.hardware && !it.software } }.getOrDefault(emptyList())
     fun decoder(): CodecProbeDecoder? = available.let { it.firstOrNull { row -> row.name == selected } ?: it.firstOrNull() }
     fun start(surface: Surface, all: Boolean): Boolean {
         if (closed || cleanupUnconfirmed || busy || occupied() || !L7Agreement.canUse(context) || !surface.isValid || decoder() == null) return false
+        runLog = L7DebugLog.logger(context)
         notice = ""; observed = null; results.clear(); lines.clear()
         target = surface
         pending.addAll(if (all) CodecProbeMethod.entries else listOf(method))
@@ -105,7 +107,7 @@ internal class GalaxyCodecProbeController(private val context: Context, private 
     private fun record(value: String) {
         val line = "CODEC_PROBE $value"
         lines.addLast(line); while (lines.size > 32) lines.removeFirst()
-        runCatching { L7DebugLog.record(line) }
+        runCatching { runLog(line) }
     }
     override fun close() { closed = true; changed = null; stop(); channel?.close() }
     companion object {

@@ -190,6 +190,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         menuExpanded = savedInstanceState?.getBoolean("home_menu_expanded") ?: false
         render()
         handleWirelessRecovery()
+        GalaxyProfileEditor.restore(this) { if (page == "settings-vehicle") profileChanged() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (page != "home") { page = if (l7Ui) L7Routes.back(page) else "home"; render() }
@@ -328,6 +329,11 @@ class GalaxySettingsActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    private fun profileChanged() {
+        if (resources.configuration.densityDpi != L7UiDensity.value(this) ||
+            AppLocale.preference(this) != languagePreferenceAtCreate) recreate()
+        else render()
+    }
     private fun render() {
         if (!L7Agreement.require(this)) return
         steeringDebugPage?.close(); steeringDebugPage = null
@@ -378,7 +384,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         }
         when (page) {
             "settings" -> settingsL7(content)
-            "settings-vehicle" -> L7VehicleSettings.page(this, content)
+            "settings-vehicle" -> L7VehicleSettings.page(this, content, ::profileChanged)
             "settings-connection" -> connectionChoicesL7(content)
             "settings-connection-wireless" -> connectionSettingsL7(content)
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,

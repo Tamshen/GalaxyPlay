@@ -41,12 +41,14 @@ internal class L7VoiceInputTest(
     @Volatile private var stopRequested = false
     @Volatile private var closed = false
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "l7-voice-test") }
+    private var runLog = log
 
     @Synchronized fun start(source: Int): Boolean {
         if (closed || snapshot.busy) return false
         if (!access.permitted()) { snapshot = Snapshot(Phase.FAILED, reason = "PERMISSION"); return false }
         if (access.occupied()) { snapshot = Snapshot(Phase.FAILED, reason = "UPLINK_ACTIVE"); return false }
         stopRequested = false
+        runLog = if (access is SystemAccess) L7VoiceDiagnostics.logger(access.context) else log
         snapshot = Snapshot(Phase.STARTING)
         worker.execute { capture(source) }
         return true
@@ -73,7 +75,7 @@ internal class L7VoiceInputTest(
         var lastLog = started
         val signal = MicrophoneSignalStats()
         val buffer = ByteArray(640)
-        fun emit(phase: String) = runCatching { log("VOICE_TEST run=$run phase=$phase source=$source rate=16000 channels=1 " +
+        fun emit(phase: String) = runCatching { runLog("VOICE_TEST run=$run phase=$phase source=$source rate=16000 channels=1 " +
             "elapsedMs=${now() - started} bytes=$total rms=${signal.rms} peak=${signal.peak} " +
             "zeroPercent=${signal.zeroPercent} routeType=${runCatching { recorder?.routeType }.getOrNull() ?: snapshot.routeType ?: "unknown"} " +
             "silenced=${runCatching { recorder?.silenced }.getOrNull() ?: snapshot.silenced} " +
@@ -134,6 +136,7 @@ internal class L7VoiceInputTest(
     @Synchronized override fun close() { closed = true; stop(); worker.shutdown() }
 
     class SystemAccess(context: Context) : Access {
+        val context = context.applicationContext
         private val app = context.applicationContext
         override fun permitted() = app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         override fun occupied() = CarPlayBackgroundSession.snapshot()?.sink?.hasMicrophoneUplink() == true

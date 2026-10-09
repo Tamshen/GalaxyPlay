@@ -7,6 +7,8 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 
 internal object CarPlayBackgroundSession {
     @Volatile var active = false
+    @Volatile var configuration: GalaxyProfile? = null
+        private set
     private var stopAction: (((() -> Unit)) -> Unit)? = null
     private var stopping = false
     private var owner: Any? = null
@@ -57,7 +59,8 @@ internal object CarPlayBackgroundSession {
 
     @Synchronized
     fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int, owner: Any,
-              display: CarPlaySessionDisplay? = null, stop: (() -> Unit) -> Unit) {
+              display: CarPlaySessionDisplay? = null, configuration: GalaxyProfile? = this.configuration,
+              stop: (() -> Unit) -> Unit) {
         L7ReportingTests.stop("CARPLAY_SESSION")
         if (this.controller !== controller) {
             bluetoothMediaGuard?.close()
@@ -71,6 +74,7 @@ internal object CarPlayBackgroundSession {
         this.width = width
         this.height = height
         this.display = display
+        this.configuration = configuration
     }
 
     @Synchronized
@@ -85,6 +89,7 @@ internal object CarPlayBackgroundSession {
         width = 0
         height = 0
         display = null
+        configuration = null
     }
 
     /** 与后台控制器共存，切换设置或重建窗口不重复断开；结束会话才释放监听。 */

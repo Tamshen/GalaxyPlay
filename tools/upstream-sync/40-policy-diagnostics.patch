@@ -688,7 +688,7 @@
  }
 --- a/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
-@@ -1,19 +1,37 @@
+@@ -1,19 +1,39 @@
  package com.shilapi.xcertplay
  
 +import java.io.File
@@ -701,21 +701,24 @@
  internal object AsyncDiagnosticLog {
 -    private data class Entry(val target: SessionLogFile, val line: String)
 -    private val writer = BoundedDiagnosticWriter<Entry> { it.target.append(it.line) }
-+    private data class Entry(val target: SessionLogFile, val line: String, val generation: Long)
++    private data class Entry(val target: SessionLogFile, val line: String, val generation: Long,
++        val configuration: GalaxyConfigurationEvidence?)
 +    @Volatile private var generation = 0L
 +    private val writer = BoundedDiagnosticWriter<Entry> {
 +        synchronized(SessionLogFile.storageLock) {
-+            if (it.generation == generation) it.target.append(it.line)
++            if (it.generation == generation) it.target.append(it.line, it.configuration)
 +        }
 +    }
  
-     fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
+-    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
++    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis(),
++        configuration: GalaxyConfigurationEvidence? = target?.configuration) {
          if (target == null) return
 +        val captured = generation
          val safe = DiagnosticRedactor.redact(message) ?: return
          val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
 -        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe")) }
-+        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe", captured)) }
++        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe", captured, configuration)) }
 +    }
 +
 +    /** 由后台维护任务调用，当前会话仍可从新代次继续记录。 */
@@ -5961,7 +5964,7 @@
      fun setRect(value: SafeAreaRect, sourceWidthPixels: Int, sourceHeightPixels: Int) {
 --- a/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
-@@ -3,9 +3,9 @@
+@@ -3,43 +3,58 @@
  import java.io.Closeable
  import java.io.File
  
@@ -5972,21 +5975,37 @@
 +internal class SessionLogFile(val file: File, private val archiveNames: List<String> = ARCHIVE_NAMES) : Closeable {
 +    private val lock = storageLock
      private var closed = false
++    @Volatile var configuration: GalaxyConfigurationEvidence? = null
++    private var writtenConfiguration: String? = null
      fun reset(header: String) = synchronized(lock) {
          if (!closed) {
-@@ -18,28 +18,33 @@
-     fun append(line: String) = synchronized(lock) {
+             file.parentFile?.mkdirs()
+             rotate()
+             file.writeText("")
++            writtenConfiguration = null
+             append(header)
+         }
+     }
+-    fun append(line: String) = synchronized(lock) {
++    fun append(line: String, evidence: GalaxyConfigurationEvidence? = configuration) = synchronized(lock) {
          if (closed) return@synchronized
          val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
-+        val bytes = (safe + "\n").toByteArray(Charsets.UTF_8)
++        val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + safe + "\n").toByteArray(Charsets.UTF_8)
          runCatching {
 -            if (file.length() > MAX_BYTES) {
 +            file.parentFile?.mkdirs()
-+            if (file.length() + bytes.size > MAX_BYTES) {
++            val header = evidence?.takeIf { writtenConfiguration != it.id || file.length() == 0L }
++                ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
++            if (file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES) {
                  rotate()
                  file.writeText("")
++                writtenConfiguration = null
              }
 -            file.appendText(safe + "\n")
++            if (evidence != null && (writtenConfiguration != evidence.id || file.length() == 0L)) {
++                file.appendText(evidence.header + "\n")
++                writtenConfiguration = evidence.id
++            }
 +            file.appendBytes(bytes)
          }
          Unit

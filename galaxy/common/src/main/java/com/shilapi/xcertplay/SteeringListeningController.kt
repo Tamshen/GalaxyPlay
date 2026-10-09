@@ -1,7 +1,8 @@
 package com.shilapi.xcertplay
 
 /** 将一次监听输入与事后标注绑定；状态锁内不写日志，避免输入线程与界面互相等待。 */
-internal class SteeringListeningController(private val clock: () -> Long, private val log: (String) -> Unit) {
+internal class SteeringListeningController(private val clock: () -> Long, private val log: (String) -> Unit,
+    private val ended: () -> Unit = {}) {
     enum class Phase { IDLE, LISTENING, LABEL, STOPPED }
     data class Sample(val id: Long, val traces: List<L7SteeringTrace>, val label: String? = null)
     data class Snapshot(val run: Long, val phase: Phase, val samples: List<Sample>, val pending: Sample?, val revision: Long)
@@ -77,6 +78,7 @@ internal class SteeringListeningController(private val clock: () -> Long, privat
             run
         }
         log("SteeringListen stage=STOP run=$currentRun reason=$reason")
+        ended()
     }
 
     private fun candidate(trace: L7SteeringTrace, detail: String): Boolean {
@@ -96,7 +98,8 @@ internal class SteeringListeningController(private val clock: () -> Long, privat
 }
 
 internal object SteeringListening {
-    val controller = SteeringListeningController(android.os.SystemClock::elapsedRealtime, L7SteeringDiagnostics::record)
+    val controller = SteeringListeningController(android.os.SystemClock::elapsedRealtime,
+        L7SteeringDiagnostics::record, L7SteeringDiagnostics::endListening)
     fun active() = controller.active()
     fun input(trace: L7SteeringTrace, detail: String) = controller.input(trace, detail)
     fun stop(reason: String) = controller.stop(reason)
