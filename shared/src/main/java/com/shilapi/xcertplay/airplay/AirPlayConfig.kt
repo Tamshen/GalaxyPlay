@@ -77,6 +77,7 @@ data class AirPlayConfig(
      */
     val mainBufferedAudio: Boolean = false,
     val supportsOpusOutput: Boolean = true,
+    val supportsOpusInput: Boolean = true,
 )
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */

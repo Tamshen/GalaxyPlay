@@ -7,6 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AirPlayInfoPlistTest {
+    @Test fun unsupportedEncoderUsesPcmInputWithoutChangingDownlinkOrDisablingMicrophone() {
+        val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
+            AirPlayDisplayConfig(1280, 720), microphone = true)
+        fun formats(c: AirPlayConfig) = AirPlayInfoPlist.build(c)["audioFormats"] as List<Map<String, Any?>>
+        for ((before, after) in formats(config).zip(formats(config.copy(supportsOpusInput = false)))) {
+            assertEquals(before["audioOutputFormats"], after["audioOutputFormats"])
+            val input = before["audioInputFormats"] as Int?
+            assertEquals(input?.and(0x70000000.inv()), after["audioInputFormats"])
+            if (input != null) assertTrue((after["audioInputFormats"] as Int) != 0)
+        }
+        val noMicrophone = formats(config.copy(microphone = false, supportsOpusInput = false))
+        assertTrue(noMicrophone.none { it.containsKey("audioInputFormats") })
+    }
+
     @Test fun wiredPcmOfferKeepsVoiceAndMicrophoneButRemovesOutputOpusOnly() {
         val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:02", "366.0",
             AirPlayDisplayConfig(1280, 720), microphone = true)

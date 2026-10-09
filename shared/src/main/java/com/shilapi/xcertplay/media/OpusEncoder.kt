@@ -19,18 +19,16 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
             setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, MAX_INPUT_BYTES)
         }
-        MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_OPUS).also {
-            it.configure(
-                format,
-                null,
-                null,
-                MediaCodec.CONFIGURE_FLAG_ENCODE,
-            )
-            it.start()
-            Log.i(TAG, "Opus microphone encoder started bitrate=$bitrate")
-        }
+        MediaCodecStartup.firstAvailable(AudioCodecCapabilities.opusCandidates(true),
+            create = { name -> MediaCodecStartup.create(
+                create = { MediaCodec.createByCodecName(name) },
+                configure = { it.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE) },
+                start = { it.start() }, release = { it.release() }) },
+            failed = { name, error -> Log.w(TAG, "Opus microphone candidate rejected name=$name " +
+                "error=${error.javaClass.simpleName}") })
     } catch (error: Exception) {
-        Log.w(TAG, "Opus microphone encoder unavailable", error)
+        AudioCodecCapabilities.rejectOpusEncoder()
+        Log.w(TAG, "Opus microphone encoder unavailable error=${error.javaClass.simpleName}; next connection uses PCM")
         null
     }
     private val bufferInfo = MediaCodec.BufferInfo()
@@ -101,8 +99,7 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
                         if (outputPackets <= FIRST_PACKET_LOG_COUNT) {
                             Log.i(
                                 TAG,
-                                "Opus microphone packet=$outputPackets bytes=${bytes.size} " +
-                                    "head=${bytes.copyOf(minOf(bytes.size, 16)).toHexString()}",
+                                    "Opus microphone packet=$outputPackets bytes=${bytes.size}",
                             )
                         }
                     }
