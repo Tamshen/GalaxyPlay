@@ -12,7 +12,6 @@ internal object L7VehicleSettings {
         val modelNames = L7AudioTemplates.Model.entries.map { L7AudioModelConfirmation.name(context, it) }
         fun text(id: Int) = context.getString(id)
         fun refresh() { parent.removeAllViews(); page(context, parent, profileChanged) }
-        GalaxyProfilePage.add(context, parent, profileChanged ?: ::refresh)
         L7SettingsSection.add(parent, description = text(R.string.l7_vehicle_settings_note)) { card ->
             card.addView(L7Components.valueRow(context, text(R.string.l7_template_model), modelNames[model.ordinal]) {
                 L7Components.select(context, text(R.string.l7_template_model), modelNames, model.ordinal,

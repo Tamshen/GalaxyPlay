@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="l7_bt_media_auto">Bluetooth media coordination</string>
-    <string name="l7_bt_media_auto_desc">After CarPlay connects, try to disconnect Bluetooth media from the same phone while keeping calls and pairing. Applies immediately to the current session.</string>
+    <string name="l7_bt_media_auto_desc">After CarPlay connects, try to disconnect Bluetooth media from the same phone while keeping calls and pairing. Applies to the next connection.</string>
     <string name="l7_bt_media_help">Bluetooth music troubleshooting</string>
     <string name="l7_bt_media_help_desc">If playback pauses automatically, check the result and how to turn off Bluetooth media manually.</string>
     <string name="l7_bt_media_help_body">Latest check: %1$s\n\nReceiving music from the same phone over both Bluetooth and CarPlay may cause competing media sources. Automatic handling targets only the phone identified for this wireless connection. Calls and pairing are preserved.\n\nIf the firmware prevents automatic handling, open the phone details in the vehicle Bluetooth settings. Turn off Media audio / Bluetooth music while keeping Call audio enabled, then return to CarPlay and play again. If there is no separate switch, record the logs and firmware version.\n\nIf the target phone cannot be identified over USB, handle this manually. Hearing a test tone does not confirm that phone playback and Bluetooth audio focus are coordinated.</string>

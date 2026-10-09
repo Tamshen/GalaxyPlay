@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仅在 AVD 验证配置模态框、取消、新建及切换；不连接手机、不上传日志。"""
+"""仅在 AVD 验证当前配置快速模板、草稿及固定操作区；不连接手机、不上传日志。"""
 import argparse
 import json
 import re
@@ -49,7 +49,7 @@ def click(text, contains=False):
         root = tree()
         parents = {child: parent for parent in root.iter() for child in parent}
         for node in root.iter('node'):
-            value = node.get('text', '')
+            value = node.get('text', '') or node.get('content-desc', '')
             if (value not in alternatives if not contains else text not in value):
                 continue
             while node.get('clickable') != 'true' and node.get('checkable') != 'true' and node in parents:
@@ -67,21 +67,9 @@ def tap(node):
     time.sleep(.25)
 
 
-def name(value):
-    node = next(node for node in tree().iter('node') if node.get('class') == 'android.widget.EditText')
-    tap(node)
-    adb('shell', 'input', 'keyevent', 'KEYCODE_MOVE_END')
-    adb('shell', 'input', 'keyevent', '--longpress', 'KEYCODE_DEL')
-    # 一次发送删除键序列，避免依赖输入法的全选菜单。
-    adb('shell', 'input', 'keyevent', *(['KEYCODE_DEL'] * 40))
-    adb('shell', 'input', 'text', value)
-    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-    time.sleep(.25)
-
-
 def screenshot(name):
     (output / f'{name}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
-    # 不保存输入节点文本，截图仅包含人工构造的测试名称或隐藏值。
+    # 不保存输入节点文本，截图只覆盖本轮模板与普通参数。
 
 
 def private(path):
@@ -92,21 +80,23 @@ def active():
     return private('files/configurations/active').strip()
 
 
-if 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package):
-    raise AssertionError('模拟器有活动连接服务，请结束后再检查配置 UI')
-adb('shell', 'am', 'force-stop', package)
-launch()
-english = 'Vehicle settings' in texts()
+
+
 labels = {
-    'edit': ('编辑配置', 'Edit configuration'), 'cancel': ('取消', 'Cancel'),
-    'keep': ('继续编辑', 'Keep editing'), 'discard': ('放弃修改', 'Discard changes'),
-    'new': ('新建配置', 'New configuration'), 'l6': ('L6 默认', 'L6 default'),
-    'next': ('下一步', 'Next'), 'save': ('保存', 'Save'), 'files': ('本地配置文件', 'Local configuration files'),
-    'use': ('使用此配置', 'Use this configuration'), 'category': ('参数分类', 'Settings category'),
-    'projection': ('投屏参数', 'Projection'), 'view': ('查看分类', 'View category'),
+    'l7': ('银河 L7', 'Galaxy L7'), 'l6': ('银河 L6', 'Galaxy L6'),
+    'cancel': ('取消', 'Cancel'), 'keep': ('继续编辑', 'Keep editing'),
+    'discard': ('放弃修改', 'Discard changes'), 'undo': ('撤销修改', 'Undo edits'),
+    'save': ('保存', 'Save'), 'video': ('画面', 'Display'), 'connection': ('连接', 'Connection'),
+    'bluetooth': ('蓝牙音乐互斥', 'Bluetooth media coordination'),
+    'right': ('右舵布局', 'Right-hand drive layout'), 'back': ('返回设置', 'Back to settings'),
     'language': ('应用语言', 'App language'), 'apply': ('应用', 'Apply'),
-    'system': ('跟随系统', 'System default'),
+    'system': ('跟随系统', 'System default'), 'title': ('配置', 'Configuration'),
 }
+english = False
+
+
+def detect_language():
+    return 'Configuration' in texts()
 
 
 def label(key):
@@ -117,60 +107,110 @@ def language(value):
     global english
     launch('settings-general')
     click(label('language'))
-    option = {'zh': '简体中文', 'en': 'English', 'system': label('system')}[value]
+    option = {'zh': '简体中文', 'en': 'English'}[value]
     selected = any(node.get('text') == option and node.get('checked') == 'true' for node in tree().iter('node'))
-    if selected:
-        click(label('cancel'))
-    else:
-        click(option)
+    click(label('cancel') if selected else option)
+    if not selected:
         click(label('apply'))
-    time.sleep(1)
     launch()
-    english = 'Vehicle settings' in texts()
+    english = detect_language()
 
 
+def category(key):
+    node = next(node for node in tree().iter('node') if node.get('text') in labels[key] and node.get('class') == 'android.widget.Button')
+    tap(node)
+
+
+def bounds(key):
+    node = next(node for node in tree().iter('node') if node.get('text') in labels[key] and node.get('class') == 'android.widget.Button')
+    return node.get('bounds')
+
+
+def read_optional(path):
+    try:
+        return private(path).encode('utf-8')
+    except subprocess.CalledProcessError:
+        return None
+
+
+def restore_file(path, value):
+    if value is None:
+        adb('shell', 'run-as', package, 'rm', '-f', path)
+    else:
+        # 私有配置仅经 stdin 回写到模拟器，不打印、落入截图目录或拼接进命令。
+        subprocess.run([args.adb, '-s', args.serial, 'shell', '-T', 'run-as ' + package + " sh -c 'cat > " + path + "'"],
+                       input=value, capture_output=True, check=True, timeout=15)
+
+
+if 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package):
+    raise AssertionError('模拟器有活动连接服务')
+adb('shell', 'am', 'force-stop', package)
+launch()
+english = detect_language()
 original_id = active()
-original = json.loads(private(f'files/configurations/{original_id}.json'))
-original_language = original['configuration']['preferences']['diplay']['app_language']['value']
+assert re.fullmatch(r'[a-z0-9_]{1,64}', original_id)
+path = f'files/configurations/{original_id}.json'
+original = private(path).encode('utf-8')
+previous = read_optional(path + '.previous')
+audio = {name: read_optional('files/' + name) for name in ['audio-template.json', 'audio-template-l6.json', 'audio-template-custom.json']}
 original_files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
-test_name = 'CONFIG_UX_L6_' + str(int(time.time()))[-6:]
 try:
     if args.language:
         language(args.language)
-    screenshot('01-files')
-    before = private(f'files/configurations/{original_id}.json')
-    click(label('edit')); name('CONFIG_UX_DRAFT')
-    screenshot('02-editor')
-    click(label('cancel')); click(label('keep'))
-    assert 'CONFIG_UX_DRAFT' in texts()
-    click(label('cancel')); click(label('discard'))
-    assert private(f'files/configurations/{original_id}.json') == before, '取消修改了文件'
-    click(label('new')); click(label('l6')); click(label('next'))
-    name(test_name); click(label('save'))
-    assert active() == original_id, '新建自动切换了配置'
-    files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
-    new_file = next(value for value in files - original_files if value.endswith('.json'))
-    created = json.loads(private(f'files/configurations/{new_file}'))
-    assert created['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
-    click(label('files')); click(test_name, contains=True)
-    screenshot('03-switch-confirm')
-    click(label('use'))
-    time.sleep(1)
-    english = 'Vehicle settings' in texts()
-    assert active() == created['profile_id']
-    screenshot('04-l6-selected')
-    click(label('edit')); click(label('category'))
-    screenshot('05-categories')
-    click(label('cancel')); click(label('cancel'))
-    print('配置 UX 通过：取消保留文件、新建不自动使用、L6 切换确认、编辑分类。语言：' + ('en' if english else 'zh'))
-finally:
-    # 通过同一真实界面恢复原配置，保留测试创建文件供复核，不删除既有资料。
-    adb('shell', 'am', 'force-stop', package)
-    launch()
-    english = 'Vehicle settings' in texts()
-    click(label('files')); click(original['profile_name'], contains=True); click(label('use'))
-    assert active() == original_id, '未恢复原配置'
+    launch('settings')
+    assert label('title') in texts()
+    assert '车型设置' not in texts() and 'Vehicle settings' not in texts()
+    screenshot('01-settings')
+    click(label('title'))
+    screenshot('02-configuration')
+    click(label('l6'))
+    english = detect_language()
+    assert active() == original_id, '模板另建或切换了文件'
+    applied = json.loads(private(path))
+    assert applied['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
+    screenshot('03-l6-applied')
+    # 模板默认语言可能跟随系统；重新设置本轮展示语言后仍只编辑当前文件。
     if args.language:
-        time.sleep(1)
-        english = 'Vehicle settings' in texts()
-        language(original_language)
+        language(args.language)
+    before = private(path)
+    click(label('bluetooth'))
+    assert private(path) == before, '普通参数提前写入文件'
+    category('video')
+    screenshot('04-display-draft')
+    click(label('undo')); click(label('keep'))
+    click(label('undo')); click(label('discard'))
+    assert private(path) == before
+    category('connection')
+    fixed = bounds('l7'), bounds('save')
+    adb('shell', 'input', 'swipe', '1000', '1450', '1000', '750', '300')
+    assert fixed == (bounds('l7'), bounds('save')), '模板或底部操作随参数滚动'
+    screenshot('05-connection-scrolled')
+    category('video'); click(label('right')); click(label('save'))
+    edited = json.loads(private(path))
+    assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
+    assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
+    assert active() == original_id
+    screenshot('06-edited')
+    click(label('right'))
+    saved = private(path)
+    click(label('back')); click(label('keep'))
+    assert '有未保存的修改' in texts() or 'Unsaved changes' in texts()
+    click(label('back')); click(label('discard'))
+    assert private(path) == saved
+    launch()
+    click(label('l7'))
+    assert json.loads(private(path))['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l7'
+    assert set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines()) - original_files <= {original_id + '.json.previous'}
+finally:
+    # 本轮会覆盖当前设置；在内存保留原件，恢复该文件及三份兼容音频文件后重启。
+    adb('shell', 'am', 'force-stop', package)
+    restore_file(path, original)
+    for name, value in audio.items():
+        restore_file('files/' + name, value)
+    launch()
+    assert active() == original_id
+    assert json.loads(private(path))['configuration'] == json.loads(original)['configuration'], '原配置未恢复'
+    restore_file(path + '.previous', previous)
+    for name, value in audio.items():
+        assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
+print('配置 UX 通过：单一配置入口、L7/L6 一键覆盖同一文件、后续编辑保存、分类直接切换、撤销、固定操作、离开草稿确认与测试前配置恢复。', flush=True)
