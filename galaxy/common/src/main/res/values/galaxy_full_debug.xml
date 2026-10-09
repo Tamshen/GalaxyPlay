@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="full_debug_title">完整调试</string>
+    <string name="full_debug_start">开始完整调试</string>
+    <string name="full_debug_intro">停车后开始。程序会依次检查并保存日志，需要你观察或按键时再提示。</string>
+    <string name="full_debug_stop">停止调试</string>
+    <string name="full_debug_logs">查看调试日志</string>
+    <string name="full_debug_advanced">单项与高级调试</string>
+    <string name="full_debug_confirm">确认正常</string>
+    <string name="full_debug_missing">没有或异常</string>
+    <string name="full_debug_retry">再试一次</string>
+    <string name="full_debug_unavailable">当前条件无法完成这一项。可以补齐权限或连接条件后重试，也可以点“没有或异常”记录并继续。</string>
+    <string name="full_debug_progress">%1$d / %2$d · %3$s</string>
+    <string name="full_debug_finished">检查完成，日志已记录</string>
+    <string name="full_debug_stopped">检查已停止</string>
+    <string name="full_debug_summary">已记录正常或自动检查 %1$d 项 · 没有或异常 %2$d 项 · 无法执行 %3$d 项</string>
+    <string name="full_debug_environment">正在检查环境与权限，完成后自动继续。</string>
+    <string name="full_debug_codec">请观察测试区域的动态色块。运行结束后确认有没有正常播放；再试一次只重跑当前方式。</string>
+    <string name="full_debug_no_hardware">这台设备没有报告可用的硬件视频解码器。点“没有或异常”记录后继续；不会把软件解码计为硬件通过。</string>
+    <string name="full_debug_reporting">程序已经发送下方样例。请对照原车媒体卡片、HUD 或仪表，确认内容有没有更新。</string>
+    <string name="full_debug_cleanup">已结束本次上报。请检查测试内容是否已经清除，再确认结果。</string>
+    <string name="full_debug_microphone">录音检查持续十秒，请对车机说一句话。需要麦克风权限时点“再试一次”授权；只记录电平和计数，不保存录音。</string>
+    <string name="full_debug_siri">需要连接真实 CarPlay 手机。程序会请求打开 Siri，请说一句话，确认手机是否有正确响应；没有连接时可记录后继续。</string>
+    <string name="full_debug_key">请操作标题指定的方向盘按键，观察手机或车机是否正确响应。收到按键信号后可以确认正常；没有响应可直接记录，或再试一次。</string>
+    <string name="full_debug_voice_level">录音中 %1$d / 10 秒 · 输入电平 %2$d</string>
+    <string name="full_debug_release_unconfirmed">无法确认测试资源已释放，已停止后续检查。请退出并重新打开应用后再试。</string>
+</resources>

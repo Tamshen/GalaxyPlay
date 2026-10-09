@@ -324,6 +324,12 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 语音交互回归 `L7VoiceInputDebugPageTest` 覆盖显式启动、录音权限、后台恢复、Siri 请求去重、用户结果与请求绑定、重连丢弃旧判断并允许新请求、技术明细默认折叠；AVD `device/voice_input_smoke.py` 检查中英文昼夜、权限与 10 秒手动录音、停止／后台不续录、明细展开，逐字节恢复偏好与协议，恢复录音权限和昼夜。模拟器无真实手机，不把本地录音通过写成 Siri 识别通过。
 
+## 完整调试交互验证
+
+`GalaxyDebugFlowTest` 核对自动推进与人工等待、当前项重试先释放、旧代次及旧样例拒绝、无证据禁止通过、停止不启动后续、释放不明禁止重启，以及不适用项不计正常。配合原硬件、上报、方控与路由控制器回归验证组件边界。
+
+中文、已主动同意协议且未连接手机的 AVD 覆盖安装后，运行 `python3 e2e/device/full_debug_smoke.py`。核对默认单按钮与折叠高级工具、三按钮判断、无硬件时正常按钮禁用、只重试当前项、缺失记录后自动推进所有类别、完成阶段默认落盘、完成后再次开始及停止。脚本仅允许 emulator，人工项统一记录缺失，不注入真实输入或确认通过，不改权限／偏好，不上传或清空日志；会新增环境报告、测试样例及明确的人工缺失记录。截图与本次 `DEBUG_SUITE` 阶段留在忽略目录 `build/previews/full-debug/`，不代表实车硬件、HUD、声音或 Siri 通过。
+
 ## 硬件解码调试验证
 
 `GalaxyCodecProbeRecipeTest`／`GalaxyCodecProbeControllerTest`／`GalaxyCodecProbeClientTest`／`GalaxyCodecProbePageTest` 检查默认硬件过滤与手动开始、单项互斥、停止等待、逐项运行、迟到回调、人工判断绑定、清理不明时阻止新运行、八秒无进展／十五秒总预算，以及 UID／主进程 PID 保护。配合 `L7RoutesTest`、`L7StartupRecoveryTest` 验证宿主接入；native 库随 APK 编译三种 ABI。

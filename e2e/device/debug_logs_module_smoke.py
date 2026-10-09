@@ -107,8 +107,9 @@ try:
             tap(debug)
             root = nodes()
             texts = [n.get('text') for n in root.iter('node')]
-            assert ('Voice input test' if mode else '语音输入测试') in texts
-            assert ('Steering controls' if mode else '方控调试') in texts
+            assert ('Start full test' if mode else '开始完整调试') in texts
+            assert ('Individual and advanced tests' if mode else '单项与高级调试') in texts
+            assert ('Voice input test' if mode else '语音输入测试') not in texts
             assert ('Upload logs' if mode else '上传日志') not in texts
             (output / (('en' if mode else 'zh') + '-' + night + '-debug.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
             tap(back)
@@ -122,15 +123,16 @@ try:
         assert has('Upload logs' if mode else '上传日志'), '旧日志路由不可达'
         launch('settings-debug-voice')
         adb('shell', 'input', 'keyevent', '4')
-        assert has('Voice input test' if mode else '语音输入测试'), '调试子页返回错误'
+        assert has('Start full test' if mode else '开始完整调试'), '调试子页返回错误'
     if english:
         language(False); english = False
     launch('settings-debug')
     before = {r['runId'] for r in reports()}
     time.sleep(.3)
     assert before == {r['runId'] for r in reports()}, '进入调试页面触发自动收集'
-    title = next(n.get('text') for n in nodes().iter('node') if n.get('text') in
-                 ('收集环境与调试信息', '重新收集环境与调试信息'))
+    tap('单项与高级调试')
+    title = '重新收集环境与调试信息' if before else '收集环境与调试信息'
+    reachable(title)
     deadline = time.monotonic() + 5
     while entry(title).get('enabled') != 'true' and time.monotonic() < deadline:
         time.sleep(.2)

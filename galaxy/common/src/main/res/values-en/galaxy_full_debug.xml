@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="full_debug_title">Full diagnostic test</string>
+    <string name="full_debug_start">Start full test</string>
+    <string name="full_debug_intro">Start while parked. Checks run in order and save logs. You will be prompted when observation or a button press is needed.</string>
+    <string name="full_debug_stop">Stop test</string>
+    <string name="full_debug_logs">View test logs</string>
+    <string name="full_debug_advanced">Individual and advanced tests</string>
+    <string name="full_debug_confirm">Looks correct</string>
+    <string name="full_debug_missing">Missing or abnormal</string>
+    <string name="full_debug_retry">Try again</string>
+    <string name="full_debug_unavailable">This check cannot run under the current conditions. Grant permission or connect the required device and retry, or record it as missing and continue.</string>
+    <string name="full_debug_progress">%1$d / %2$d · %3$s</string>
+    <string name="full_debug_finished">Checks finished. Results logged.</string>
+    <string name="full_debug_stopped">Test stopped</string>
+    <string name="full_debug_summary">%1$d normal or automatic checks recorded · %2$d missing or abnormal · %3$d unavailable</string>
+    <string name="full_debug_environment">Checking the environment and permissions. The next check starts automatically.</string>
+    <string name="full_debug_codec">Watch the moving color blocks. After playback, confirm whether the picture was correct. Try again repeats only this method.</string>
+    <string name="full_debug_no_hardware">This device reports no usable hardware video decoder. Record this as missing to continue. Software decoding is not counted as a hardware pass.</string>
+    <string name="full_debug_reporting">The sample below has been sent. Check the vehicle media card, HUD or cluster and confirm whether it updated.</string>
+    <string name="full_debug_cleanup">Reporting has ended. Check whether the test content has cleared and confirm the result.</string>
+    <string name="full_debug_microphone">Speak to the vehicle during the ten-second microphone check. If permission is required, tap Try again to grant it. Only levels and counts are logged; recordings are not saved.</string>
+    <string name="full_debug_siri">A real CarPlay phone connection is required. Siri will be requested; speak and confirm the phone response. If disconnected, record this and continue.</string>
+    <string name="full_debug_key">Press the steering wheel button named in the title and check the phone or vehicle response. Confirm after a real input is received, or record no response and continue. Try again repeats this button check.</string>
+    <string name="full_debug_voice_level">Recording %1$d / 10 seconds · Input level %2$d</string>
+    <string name="full_debug_release_unconfirmed">Resource release could not be confirmed. Further checks have stopped. Exit and reopen the app before retrying.</string>
+</resources>

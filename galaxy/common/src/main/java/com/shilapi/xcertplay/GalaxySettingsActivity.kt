@@ -90,12 +90,15 @@ class GalaxySettingsActivity : ComponentActivity() {
     private var steeringDebugPage: L7SteeringDebugPage? = null
     private var reportingTestPage: L7ReportingTestPage? = null
     private var codecProbePage: GalaxyCodecProbePage? = null
+    private var fullDebugPage: GalaxyFullDebugPage? = null
+    private var pendingFullDebugStart = false
     private var scenarioDebugPage: GalaxyScenarioDebugPage? = null
     private fun codecProbeOccupied() = CarPlayBackgroundSession.hasSession() || CarPlayBackgroundSession.isStopping()
     private val codecProbeController by lazy { GalaxyCodecProbeController(applicationContext, ::codecProbeOccupied) }
     private var voiceDebugPage: L7VoiceInputDebugPage? = null
     private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         voiceDebugPage?.permissionResult(granted)
+        fullDebugPage?.permissionResult(granted)
     }
     private val audioTemplateFiles = L7AudioTemplateFiles(this) {
         if (page == "settings-audio") render()
@@ -240,6 +243,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         if (!L7Agreement.require(this)) return
         voiceDebugPage?.resume()
         codecProbePage?.resume()
+        fullDebugPage?.resume()
         if (l7Ui && resources.configuration.densityDpi != L7UiDensity.value(this)) {
             recreate()
             return
@@ -251,9 +255,9 @@ class GalaxySettingsActivity : ComponentActivity() {
         handler.removeCallbacks(tick); handler.post(tick)
         if (l7Ui && L7Routes.isDebug(page)) L7ProbeRunner.refreshEnvironment(this)
         L7DesktopNavigation.ensure(this)
-        if (l7Ui) { debugTasks.resume(); hotspotActions.resume(); hotspotSettings?.refresh(); wiredSettings?.check(); wirelessPrerequisites?.update() }
+        if (l7Ui) { if (page != "settings-debug-full") debugTasks.resume(); hotspotActions.resume(); hotspotSettings?.refresh(); wiredSettings?.check(); wirelessPrerequisites?.update() }
         // Back from the car settings: refresh the car hotspot reminder on the home page.
-        if (!initialLaunch && (page == "home" || page == "connection" || page in L7Routes.settings)) {
+        if (!initialLaunch && page != "settings-debug-full" && (page == "home" || page == "connection" || page in L7Routes.settings)) {
             setupError = runCatching { DiPlayBootstrap.ensure(this) }.exceptionOrNull()?.let { getString(R.string.setup_error_auth) }
             render()
         }
@@ -287,6 +291,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         reportingTestPage?.background()
         voiceDebugPage?.background()
         codecProbePage?.background()
+        fullDebugPage?.background()
         channelDialog?.dismiss()
         channelDialog = null
         handler.removeCallbacks(tick)
@@ -314,6 +319,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         codecProbePage?.close(); codecProbePage = null
+        fullDebugPage?.close(); fullDebugPage = null
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
         hotspotSettings?.dispose()
@@ -329,6 +335,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         codecProbePage?.close(); codecProbePage = null
+        fullDebugPage?.close(); fullDebugPage = null
         hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null
         wiredSettings?.dispose(); wiredSettings = null
         if (page != "settings-connection-wireless") { hotspotActions.close(); hotspotTask.cancel() }
@@ -380,6 +387,12 @@ class GalaxySettingsActivity : ComponentActivity() {
             "settings-debug-scenario" -> scenarioDebugPage = GalaxyScenarioDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-codec" -> codecProbePage = GalaxyCodecProbePage(this, content, codecProbeController, ::codecProbeOccupied) { page = "settings-logs"; render() }
+            "settings-debug-full" -> {
+                val startNow = pendingFullDebugStart; pendingFullDebugStart = false
+                fullDebugPage = GalaxyFullDebugPage(this, content, startNow, codecProbeController,
+                    grant = { voicePermission.launch(Manifest.permission.RECORD_AUDIO) },
+                    onLogs = { page = "settings-logs"; render() })
+            }
             "settings-debug-voice" -> voiceDebugPage = L7VoiceInputDebugPage(this, content,
                 grant = { voicePermission.launch(Manifest.permission.RECORD_AUDIO) },
                 onLogs = { page = "settings-logs"; render() })
@@ -388,6 +401,7 @@ class GalaxySettingsActivity : ComponentActivity() {
             "settings-logs" -> diagnostics(content)
             "settings-debug", "settings-debug-results", "settings-debug-history" -> {
                 debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks) { destination ->
+                    pendingFullDebugStart = destination == "settings-debug-full"
                     page = destination; render()
                 }
             }
@@ -471,6 +485,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         "settings-debug-results" -> R.string.l7_probe_environment
         "settings-debug-history" -> R.string.l7_probe_history
         "settings-debug-scenario" -> R.string.debug_guide_scenario
+        "settings-debug-full" -> R.string.full_debug_title
         "settings-debug-steering" -> R.string.l7_steering_title
         "settings-debug-codec" -> R.string.codec_probe_title
         "settings-debug-voice" -> R.string.l7_voice_title
