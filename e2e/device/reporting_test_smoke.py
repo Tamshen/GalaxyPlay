@@ -134,6 +134,7 @@ try:
             adb('shell', 'cmd', 'uimode', 'night', night_value)
             for kind, label in [('media', media), ('navigation', nav)]:
                 launch('settings-debug')
+                tap('单项与高级调试' if language == 'zh' else 'Individual and advanced tests')
                 tap(label)
                 assert row(end) is None
                 screenshot(f'{language}-{kind}-{theme}-idle.png')

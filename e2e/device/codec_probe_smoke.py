@@ -126,7 +126,7 @@ try:
             if language+'-'+theme not in args.cases:
                 continue
             adb('shell','am','force-stop',package)
-            adb('shell','cmd','uimode','night',value); launch('settings-debug'); tap(title)
+            adb('shell','cmd','uimode','night',value); launch('settings-debug'); tap('单项与高级调试' if language=='zh' else 'Individual and advanced tests'); tap(title)
             baseline = logs(); assert not row(stop) or row(stop).get('enabled')=='false'
             assert 'c2.android' not in ' '.join(n.get('text','') for n in nodes().iter('node')), '默认暴露了软件候选'
             capture(language+'-'+theme+'-hardware-default')

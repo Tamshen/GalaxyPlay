@@ -64,7 +64,15 @@ def screenshot(name):
 
 def collect_label():
     titles = {'收集环境与调试信息', '重新收集环境与调试信息'}
-    return next(n.get('text') for n in nodes().iter('node') if n.get('text') in titles)
+    root = nodes()
+    if any(n.get('text') == '单项与高级调试' for n in root.iter('node')) and not any(n.get('text') in titles for n in root.iter('node')):
+        tap('单项与高级调试')
+    for _ in range(6):
+        matches = [n.get('text') for n in nodes().iter('node') if n.get('text') in titles]
+        if matches:
+            return matches[0]
+        adb('shell', 'input', 'swipe', '1000', '1700', '1000', '650', '250')
+    raise AssertionError('高级调试收集入口不可达')
 
 def reports():
     command = 'ls files/probe-reports/*.json 2>/dev/null || true'
@@ -86,6 +94,7 @@ def english_table():
     tap('English')
     tap('应用')
     launch('settings-debug')
+    tap('Individual and advanced tests')
     before = {r['runId'] for r in reports()}
     tap('Collect environment and debug info again')
     wait_report(before)

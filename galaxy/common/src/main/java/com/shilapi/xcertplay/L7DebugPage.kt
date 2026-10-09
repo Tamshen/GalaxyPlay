@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import android.app.Activity
 import android.widget.LinearLayout
+import android.view.View
 import com.shilapi.xcertplay.host.R
 
 /** 调试入口只读取本地历史；用户明确开始后才扫描，日志服务继续由原组件管理。 */
@@ -39,14 +40,20 @@ internal class L7DebugPage(
     }
 
     private fun home() {
-        guide = L7DebugGuide(activity, parent, "ENVIRONMENT", listOf(
-            L7DebugGuide.Step(R.string.debug_guide_prepare, R.string.debug_guide_prepare_body),
-            L7DebugGuide.Step(R.string.debug_guide_collect, R.string.debug_guide_collect_body, { start }, {
-                L7ProbeRunner.current?.let { it.id != guideBaseline && it.phase != L7ProbePhase.RUNNING && !L7ProbeRunner.busy } == true
-            }, { guideBaseline = L7ProbeRunner.current?.id }),
-            L7DebugGuide.Step(R.string.debug_guide_logs, R.string.debug_guide_logs_body)
-        ))
-        L7SettingsSection.add(parent, labels.text(R.string.l7_debug_choose), description = labels.text(R.string.l7_debug_choose_hint)) { card ->
+        L7SettingsSection.actions(parent, labels.text(R.string.full_debug_intro)) { actions ->
+            actions.addView(L7Components.actionButton(activity, labels.text(R.string.full_debug_start), true) {
+                onNavigate("settings-debug-full")
+            })
+        }
+        val advanced = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.full_debug_logs)) { onNavigate("settings-logs") })
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.full_debug_advanced)) {
+                advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            })
+        }
+        parent.addView(advanced)
+        L7SettingsSection.add(advanced, labels.text(R.string.l7_debug_choose), description = labels.text(R.string.l7_debug_choose_hint)) { card ->
             listOf(
                 Triple(R.string.debug_guide_scenario, R.string.debug_guide_scenario_hint, "settings-debug-scenario"),
                 Triple(R.string.l7_steering_title, R.string.l7_debug_goal_steering, "settings-debug-steering"),
@@ -58,7 +65,7 @@ internal class L7DebugPage(
                 card.addView(L7Components.actionRow(activity, labels.text(title), labels.text(hint)) { onNavigate(page) })
             }
         }
-        L7SettingsSection.add(parent, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
+        L7SettingsSection.add(advanced, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
                 if (tasks.collect()) {
@@ -71,7 +78,7 @@ internal class L7DebugPage(
                 onNavigate("settings-debug-results")
             }.also(card::addView)
         }
-        L7SettingsSection.add(parent) { card ->
+        L7SettingsSection.add(advanced) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_history)) { onNavigate("settings-debug-history") })
         }
     }
