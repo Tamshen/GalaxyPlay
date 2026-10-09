@@ -115,7 +115,7 @@
      private val mediaChannel: Int = 0,
      private val navigationChannel: Int = 0,
      context: Context? = null,
-@@ -138,37 +52,81 @@
+@@ -138,37 +52,82 @@
      onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
      private val mediaBufferMillis: Int = MediaAudioBuffer.DEFAULT_MILLIS,
      private val onAudioDiagnostic: (String) -> Unit = {},
@@ -129,6 +129,7 @@
 +    private val wirelessAudio: Boolean = false,
 +    platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
 +    onVideoRecovered: (() -> Unit)? = null,
++    private val preferredAvcDecoder: String? = null,
  ) : MediaSink {
 +    @Volatile private var mediaAudioChanged = onMediaAudioChanged
 +
@@ -209,7 +210,7 @@
      private val recoveryExecutor = Executors.newSingleThreadExecutor { task ->
          Thread(task, "carplay-video-recovery").apply { isDaemon = true }
      }
-@@ -185,7 +143,7 @@
+@@ -185,7 +144,7 @@
          if (!recoveryPending.compareAndSet(false, true)) return
          try {
              recoveryExecutor.execute {
@@ -218,7 +219,7 @@
                  catch (error: Exception) { Log.w("xcertplay-usb", "Video keyframe request failed", error) }
                  finally { recoveryPending.set(false) }
              }
-@@ -193,36 +151,36 @@
+@@ -193,36 +152,36 @@
      }
  
      fun setSurface(type: Int, surface: Surface) {
@@ -282,7 +283,7 @@
      }
  
      fun setScreenStreamActiveChangedListener(listener: ((Int, Boolean) -> Unit)?) {
-@@ -232,31 +190,51 @@
+@@ -232,31 +191,51 @@
          }
      }
  
@@ -344,7 +345,7 @@
              pendingVideoCodec.remove(type)
          }
          synchronized(screenStateLock) {
-@@ -265,17 +243,22 @@
+@@ -265,17 +244,22 @@
          }
      }
  
@@ -372,7 +373,7 @@
          updateMediaAudio(id, false)
      }
  
-@@ -285,117 +268,141 @@
+@@ -285,117 +269,142 @@
              if (active) mediaAudioTypes.add(id) else mediaAudioTypes.remove(id)
              before to mediaAudioTypes.isNotEmpty()
          }
@@ -553,6 +554,7 @@
 +                        videoSizeChanged?.invoke(width, height)
 +                    }
 +                },
++                preferredAvcDecoder = preferredAvcDecoder,
 +            )
 +        }
 +    }
@@ -591,7 +593,7 @@
          ).also { audioRenderers[id] = it }
      }
  }
-@@ -407,83 +414,159 @@
+@@ -407,83 +416,160 @@
      private val width: Int,
      private val height: Int,
      private val preferSoftwareHevcDecoder: Boolean,
@@ -605,6 +607,7 @@
 +    private val onOutputSize: (Int, Int) -> Unit,
 +    // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
 +    private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
++    private val preferredAvcDecoder: String? = null,
  ) : Closeable {
 -    private val queue = VideoDecodeQueue()
      @Volatile private var running = true
@@ -779,7 +782,7 @@
          if (
              decoder != null &&
              previous?.codec == config.codec &&
-@@ -496,10 +579,13 @@
+@@ -496,10 +582,13 @@
              return
          }
          lastConfig = config
@@ -794,7 +797,7 @@
          val codec = config.codec
          val codecData = config.codecData
          val mime = if (codec == VideoCodec.H265) MediaFormat.MIMETYPE_VIDEO_HEVC
-@@ -514,25 +600,39 @@
+@@ -514,25 +603,39 @@
                  pps.takeIf { it.isNotEmpty() }?.let { START_CODE + it },
              )
          }
@@ -842,7 +845,7 @@
              Log.i(
                  TAG,
                  "video decoder configured name=${next.name} mime=$mime size=${width}x$height",
-@@ -540,7 +640,7 @@
+@@ -540,7 +643,7 @@
          }
      }
  
@@ -851,7 +854,7 @@
  
      private fun buildFormat(mime: String, csd: List<ByteArray>, tuned: Boolean): MediaFormat =
          MediaFormat.createVideoFormat(mime, width, height).apply {
-@@ -558,23 +658,56 @@
+@@ -558,23 +661,56 @@
          attempt: DecoderAttempt,
      ): MediaCodec? {
          var candidate: MediaCodec? = null
@@ -912,7 +915,7 @@
                      "tuned=${attempt.tuned} mime=$mime size=${width}x$height",
                  error,
              )
-@@ -582,44 +715,39 @@
+@@ -582,44 +718,42 @@
          }
      }
  
@@ -943,8 +946,11 @@
 +    private fun decoderCandidates(mime: String): List<VideoDecoderCandidate> = decoderCandidateCache.getOrPut(mime) {
 +        val candidates = VideoDecoderCapabilities.query(mime, width, height, fps.toDouble(), report = report)
 +        if (candidates.isEmpty()) report("no usable decoder mime=$mime size=${width}x$height reason=capability_filter")
++        val preferred = preferredAvcDecoder.takeIf { mime == MediaFormat.MIMETYPE_VIDEO_AVC }
++        if (preferred != null) report("decoder preference requested=$preferred available=" +
++            candidates.any { it.name == preferred && it.hardware && !it.software })
 +        VideoDecoderSelection.ordered(candidates,
-+            preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC)
++            preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC, preferred)
      }
  
      private fun changeSurface(surface: Surface?) {
@@ -976,7 +982,7 @@
                  Log.i(TAG, "video decoder output surface updated")
                  return
              } catch (error: Exception) {
-@@ -630,75 +758,147 @@
+@@ -630,75 +764,147 @@
          lastConfig?.let(::configureDecoder)
      }
  
@@ -1147,7 +1153,7 @@
                      if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
                  }
                  else -> return
-@@ -707,6 +907,13 @@
+@@ -707,6 +913,13 @@
      }
  
      private fun logOutputFormat(format: MediaFormat) {
@@ -1161,7 +1167,7 @@
          report("output format requested=${width}x${height} " +
              "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
              "crop=${format.intOrNull("crop-left")},${format.intOrNull("crop-top")}," +
-@@ -726,19 +933,16 @@
+@@ -726,19 +939,16 @@
          )
      }
  
@@ -1186,7 +1192,7 @@
              try {
                  codec.stop()
              } catch (_: Exception) {
-@@ -756,7 +960,6 @@
+@@ -756,7 +966,6 @@
          const val TAG = "xcertplay-usb"
          const val MAX_INPUT_SIZE = 8 * 1024 * 1024
          const val INPUT_TIMEOUT_US = 10_000L
@@ -1194,7 +1200,7 @@
          val START_CODE = byteArrayOf(0x00, 0x00, 0x00, 0x01)
      }
  }
-@@ -779,13 +982,27 @@
+@@ -779,13 +988,27 @@
      private val audioFocusEnabled: Boolean,
      private val mediaChannel: Int,
      private val navigationChannel: Int,
@@ -1224,7 +1230,7 @@
      private var trackAttributes: AudioAttributes? = null
      private var mappedChannel: AudioChannel? = null
      private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
-@@ -832,10 +1049,26 @@
+@@ -832,10 +1055,26 @@
      private var lastDecoderOutputMetadata: String? = null
      private var decoderOutputReports = 0
      private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
@@ -1251,7 +1257,7 @@
          thread.start()
      }
  
-@@ -846,7 +1079,7 @@
+@@ -846,7 +1085,7 @@
              val previous = lastArrivalNs.getAndSet(now)
              if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
          }
@@ -1260,7 +1266,7 @@
              if (started) packetsDropped.incrementAndGet()
              if (started && !droppedPacketsLogged) {
                  droppedPacketsLogged = true
-@@ -857,6 +1090,7 @@
+@@ -857,6 +1096,7 @@
      }
  
      override fun close() {
@@ -1268,7 +1274,7 @@
          running = false
          thread.interrupt()
      }
-@@ -866,20 +1100,21 @@
+@@ -866,20 +1106,21 @@
              runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
                  "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
                  "mapping=${if (advancedAudioChannelMapping) "automotive" else "mobile"} " +
@@ -1294,7 +1300,7 @@
                  diagnosticStage = "decoder-output"
                  codec?.let(::drainCodec)
                  diagnosticStage = "buffer-maintenance"
-@@ -888,20 +1123,38 @@
+@@ -888,20 +1129,38 @@
                  logStatsIfDue()
              }
          } catch (_: InterruptedException) {
@@ -1337,7 +1343,7 @@
      }
  
      private fun configureCodec(mime: String) {
-@@ -934,7 +1187,7 @@
+@@ -934,7 +1193,7 @@
                  start = { diagnosticStage = "decoder-start"; it.start() },
                  release = { it.release() },
              ).also {
@@ -1346,7 +1352,7 @@
                  runCatching {
                      val name = it.name
                      Log.i(TAG, "audio decoder configured mime=$mime name=$name")
-@@ -956,9 +1209,8 @@
+@@ -956,9 +1215,8 @@
          val minBuffer = AudioTrack.getMinBufferSize(format.sampleRate, channelMask, encoding)
          if (minBuffer <= 0) {
              Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}")
@@ -1358,7 +1364,7 @@
              return
          }
          val selection = mappedSelection()
-@@ -966,15 +1218,15 @@
+@@ -966,15 +1224,15 @@
          val streamOverride = channelOverride(selection.channel)
          var attributes = audioAttributesFor(selection, streamOverride)
          trackAttributes = attributes
@@ -1379,7 +1385,7 @@
              built = AudioTrack.Builder()
                  .setAudioAttributes(attributes)
                  .setAudioFormat(pcmFormat(encoding, channelMask))
-@@ -1008,19 +1260,18 @@
+@@ -1008,19 +1266,18 @@
          track = built
          diagnosticStage = "track-attributes"
          trackAttributes = audioTrackAttributesForFocus(built, attributes)
@@ -1405,7 +1411,7 @@
          Log.i(
              TAG,
              "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
-@@ -1033,19 +1284,20 @@
+@@ -1033,19 +1290,20 @@
              TAG,
              "audio route type=${format.payloadType} audioType=${format.audioType} " +
                  "mode=${if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE} " +
@@ -1431,7 +1437,7 @@
  
      private fun audioAttributesFor(
          selection: AudioChannelSelection,
-@@ -1061,13 +1313,17 @@
+@@ -1061,13 +1319,17 @@
                  Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
              }
          }
@@ -1450,7 +1456,7 @@
          val mode = if (advancedAudioChannelMapping) {
              AudioChannelMappingMode.AUTOMOTIVE_BUS
          } else {
-@@ -1081,20 +1337,17 @@
+@@ -1081,20 +1343,17 @@
      }
  
      private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
@@ -1475,7 +1481,7 @@
              return
          }
          track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
-@@ -1135,6 +1388,7 @@
+@@ -1135,6 +1394,7 @@
      private fun usageFor(channel: AudioChannel): Int = when (channel) {
          AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
          AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
@@ -1483,7 +1489,7 @@
          AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
          AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
      }
-@@ -1257,7 +1511,7 @@
+@@ -1257,7 +1517,7 @@
              when {
                  index == MediaCodec.INFO_TRY_AGAIN_LATER -> return
                  index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
@@ -1492,7 +1498,7 @@
                      if (decoderOutputReports < 4) runCatching {
                          val outputFormat = codec.outputFormat
                          val metadata = "rate=${outputFormat.intOrNull(MediaFormat.KEY_SAMPLE_RATE)} " +
-@@ -1317,14 +1571,16 @@
+@@ -1317,14 +1577,16 @@
          }
          var written = 0
          while (written < length && running) {
@@ -1511,7 +1517,7 @@
              maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
              if (count < 0) {
                  writeErrorsThisWindow++
-@@ -1333,6 +1589,7 @@
+@@ -1333,6 +1595,7 @@
              }
              if (count == 0) {
                  zeroWritesThisWindow++
@@ -1519,7 +1525,7 @@
                  break
              }
              if (count < writeLength) partialWritesThisWindow++
-@@ -1361,7 +1618,7 @@
+@@ -1361,7 +1624,7 @@
  
      private fun maintainPlaybackBuffer() {
          val track = track ?: return
@@ -1528,7 +1534,7 @@
                  track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
              // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
              // then use the configured start threshold again when music resumes.
-@@ -1382,6 +1639,7 @@
+@@ -1382,6 +1645,7 @@
          val now = System.nanoTime()
          if (statsWindowStartNs == 0L) statsWindowStartNs = now
          if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
@@ -1536,7 +1542,7 @@
          val underruns = track?.underrunCount ?: 0
          val lastRx = lastArrivalNs.get()
          val currentTrack = track
-@@ -1410,8 +1668,13 @@
+@@ -1410,8 +1674,13 @@
              "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
          Log.i(STATS_TAG, line)
          report(line)
@@ -1551,7 +1557,7 @@
              val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                  "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                  "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
-@@ -1458,7 +1721,8 @@
+@@ -1458,7 +1727,8 @@
  
      @Synchronized
      private fun release() {
@@ -1561,7 +1567,7 @@
          val codec = codec
          this.codec = null
          if (codec != null) {
-@@ -1492,6 +1756,7 @@
+@@ -1492,6 +1762,7 @@
                  // Best effort.
              }
          }

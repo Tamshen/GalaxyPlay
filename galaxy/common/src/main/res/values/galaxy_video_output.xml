@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="galaxy_software_video_note">当前窗口使用 SurfaceView 输出，颜色调整不可用；已保存的颜色设置保留。</string>
+    <string name="galaxy_video_decoder_title">硬件加速</string>
+    <string name="galaxy_video_decoder_default">DiPlay 默认</string>
+    <string name="galaxy_video_decoder_c2">C2 · c2.qti.avc.decoder</string>
+    <string name="galaxy_video_decoder_omx">OMX · OMX.qcom.video.decoder.avc</string>
+    <string name="galaxy_video_decoder_hint">H.264 优先使用所选硬件解码器，不可用时自动回退；重新连接后生效。HEVC 使用默认选择。</string>
+    <string name="galaxy_video_decoder_unavailable">当前车型或设备不支持指定解码器，使用 DiPlay 默认选择。</string>
 </resources>

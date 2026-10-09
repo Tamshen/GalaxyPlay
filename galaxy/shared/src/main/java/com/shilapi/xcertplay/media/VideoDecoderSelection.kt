@@ -9,8 +9,9 @@ data class VideoDecoderCandidate(
 )
 
 object VideoDecoderSelection {
-    fun ordered(candidates: List<VideoDecoderCandidate>, preferSoftware: Boolean): List<VideoDecoderCandidate> =
-        candidates.distinctBy { it.name }.sortedBy {
+    fun ordered(candidates: List<VideoDecoderCandidate>, preferSoftware: Boolean,
+                preferredHardwareDecoder: String? = null): List<VideoDecoderCandidate> {
+        val defaults = candidates.distinctBy { it.name }.sortedBy {
             when {
                 preferSoftware && it.software -> 0
                 it.hardware -> 1
@@ -18,4 +19,10 @@ object VideoDecoderSelection {
                 else -> 3
             }
         }
+        // 指定名称只调整可用硬件的尝试顺序，能力不符或创建失败仍保留默认回退。
+        val preferred = defaults.firstOrNull {
+            !preferSoftware && it.name == preferredHardwareDecoder && it.hardware && !it.software
+        } ?: return defaults
+        return listOf(preferred) + defaults.filter { it.name != preferred.name }
+    }
 }
