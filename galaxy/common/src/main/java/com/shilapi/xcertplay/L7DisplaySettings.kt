@@ -39,6 +39,7 @@ internal object L7DisplaySettings {
                 text(R.string.s_60_fps_smoother_motion)), if (AirPlayPersistence.loadFps(activity) == 60) 1 else 0) {
                 AirPlayPersistence.saveFps(activity, if (it == 1) 60 else 30)
             }
+            GalaxyVideoDecoderSettings.add(activity, card)
             card.addView(L7Components.switchRow(activity, text(R.string.efficient_video),
                 text(R.string.use_hevc_leave_off_for_the_widest_head_unit_compatibility),
                 AirPlayPersistence.loadHevcEnabled(activity)) { AirPlayPersistence.saveHevcEnabled(activity, it) })

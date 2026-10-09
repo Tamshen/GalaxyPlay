@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="galaxy_software_video_note">This window uses SurfaceView output. Picture adjustments are unavailable; saved values are preserved.</string>
+    <string name="galaxy_video_decoder_title">Hardware acceleration</string>
+    <string name="galaxy_video_decoder_default">DiPlay default</string>
+    <string name="galaxy_video_decoder_c2">C2 · c2.qti.avc.decoder</string>
+    <string name="galaxy_video_decoder_omx">OMX · OMX.qcom.video.decoder.avc</string>
+    <string name="galaxy_video_decoder_hint">Prefer the selected hardware decoder for H.264, with automatic fallback. Reconnect to apply. HEVC uses the default selection.</string>
+    <string name="galaxy_video_decoder_unavailable">The current vehicle or device does not support these decoder choices. DiPlay selects the decoder automatically.</string>
 </resources>

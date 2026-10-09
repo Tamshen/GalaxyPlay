@@ -60,6 +60,7 @@ class AndroidMediaSink(
     private val wirelessAudio: Boolean = false,
     platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
     onVideoRecovered: (() -> Unit)? = null,
+    private val preferredAvcDecoder: String? = null,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -372,6 +373,7 @@ class AndroidMediaSink(
                         videoSizeChanged?.invoke(width, height)
                     }
                 },
+                preferredAvcDecoder = preferredAvcDecoder,
             )
         }
     }
@@ -423,6 +425,7 @@ private class VideoDecoder(
     private val onOutputSize: (Int, Int) -> Unit,
     // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
     private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
+    private val preferredAvcDecoder: String? = null,
 ) : Closeable {
     @Volatile private var running = true
     @Volatile private var decoder: MediaCodec? = null
@@ -718,8 +721,11 @@ private class VideoDecoder(
     private fun decoderCandidates(mime: String): List<VideoDecoderCandidate> = decoderCandidateCache.getOrPut(mime) {
         val candidates = VideoDecoderCapabilities.query(mime, width, height, fps.toDouble(), report = report)
         if (candidates.isEmpty()) report("no usable decoder mime=$mime size=${width}x$height reason=capability_filter")
+        val preferred = preferredAvcDecoder.takeIf { mime == MediaFormat.MIMETYPE_VIDEO_AVC }
+        if (preferred != null) report("decoder preference requested=$preferred available=" +
+            candidates.any { it.name == preferred && it.hardware && !it.software })
         VideoDecoderSelection.ordered(candidates,
-            preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC)
+            preferSoftwareHevcDecoder && mime == MediaFormat.MIMETYPE_VIDEO_HEVC, preferred)
     }
 
     private fun changeSurface(surface: Surface?) {
