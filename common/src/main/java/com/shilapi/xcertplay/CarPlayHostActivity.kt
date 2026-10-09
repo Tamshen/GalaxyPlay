@@ -277,8 +277,11 @@ class CarPlayHostActivity : ComponentActivity() {
     private var videoCanvasSize: DisplaySize? = null
     private var videoViewport: VideoViewport? = null
     // 同一个 UI Surface 可能先后绑定新旧会话，释放时必须等待全部持有者。
-    private val surfaceOwners = mutableMapOf<Surface, MutableSet<AndroidMediaSink>>()
-    private val retiringTextures = mutableSetOf<SurfaceTexture>()
+    private val surfaceOwners = mutableMapOf<Surface, MutableMap<AndroidMediaSink, Long>>()
+    private var surfaceOwnerEpoch = 0L
+    private val retiringSurfaces = mutableSetOf<Surface>()
+    private val retiringTextures = java.util.Collections.newSetFromMap(
+        java.util.WeakHashMap<SurfaceTexture, Boolean>())
     private var gestureOverlay: View? = null
     private var settingsMenu: View? = null
     private var mfiTargetGroup: RadioGroup? = null
@@ -422,7 +425,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
         override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-            if (retiringTextures.remove(texture)) return false
+            if (texture in retiringTextures) return false
             if (currentSurfaceTexture !== texture) return true
             releaseVideoTouches()
             val surface = currentSurface
@@ -432,7 +435,6 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("Texture surface destroyed")
             if (surface == null) return true
             // SurfaceTexture 由宿主在 worker 解除后释放，框架不能提前释放。
-            retiringTextures.remove(texture)
             return false
         }
 
@@ -3891,15 +3893,17 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun retireVideoSurface(surface: Surface, texture: SurfaceTexture?, releaseSurface: Boolean = true) {
+        if (!retiringSurfaces.add(surface)) return
         if (texture != null) retiringTextures.add(texture)
-        val owners = surfaceOwners.remove(surface).orEmpty().toList()
+        val owners = surfaceOwners.remove(surface).orEmpty().keys.toList()
         val generation = restartGeneration
         val report = GalaxySessionDiagnostics.scoped(sessionLog, generation, l7DebugLogs)
         report("ProjectionSurface: requestGeneration=$generation phase=DETACH_REQUESTED owners=${owners.size} releaseSurface=$releaseSurface monoMs=${android.os.SystemClock.elapsedRealtime()}")
         val release = {
             mainHandler.post {
-                if (releaseSurface) surface.release()
-                texture?.release()
+                if (releaseSurface) runCatching { surface.release() }
+                runCatching { texture?.release() }
+                retiringSurfaces.remove(surface)
                 report("ProjectionSurface: requestGeneration=$generation phase=RELEASED owners=0 releaseSurface=$releaseSurface monoMs=${android.os.SystemClock.elapsedRealtime()}")
             }
             Unit
@@ -3907,17 +3911,21 @@ class CarPlayHostActivity : ComponentActivity() {
         if (owners.isEmpty()) { release(); return }
         val remaining = java.util.concurrent.atomic.AtomicInteger(owners.size)
         owners.forEach { owner ->
-            owner.detachSurface(surface) { if (remaining.decrementAndGet() == 0) release() }
+            val acknowledged = java.util.concurrent.atomic.AtomicBoolean()
+            owner.detachSurface(surface) {
+                if (acknowledged.compareAndSet(false, true) && remaining.decrementAndGet() == 0) release()
+            }
         }
     }
 
     /** 会话退出也先解除目标，完成后清除持有者记录，避免多次重连积累引用。 */
     private fun detachVideoOwner(owner: AndroidMediaSink) {
         surfaceOwners.filterValues { owner in it }.keys.toList().forEach { surface ->
+            val epoch = surfaceOwners[surface]?.get(owner)
             owner.detachSurface(surface) {
                 mainHandler.post {
                     surfaceOwners[surface]?.let { owners ->
-                        owners.remove(owner)
+                        if (owners[owner] == epoch) owners.remove(owner)
                         if (owners.isEmpty()) surfaceOwners.remove(surface)
                     }
                 }
@@ -3980,7 +3988,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun attachSurface(surface: Surface) {
-        sink?.let { owner -> surfaceOwners.getOrPut(surface) { mutableSetOf() }.add(owner) }
+        if (surface in retiringSurfaces) return
+        sink?.let { owner -> surfaceOwners.getOrPut(surface) { mutableMapOf() }[owner] = ++surfaceOwnerEpoch }
         sink?.setSurface(SCREEN_TYPE_MAIN, surface)
         if (AirPlayPersistence.loadClusterMapEnabled(this)) {
             clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }

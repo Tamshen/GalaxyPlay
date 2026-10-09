@@ -43,6 +43,10 @@ class AndroidVideoSurfaceLifecycleTest {
             sink.detachSurface(surface) { count.incrementAndGet(); completed.countDown() }
             assertTrue(completed.await(2, TimeUnit.SECONDS))
             assertEquals(1, count.get())
+            val field = sink.javaClass.getDeclaredField("retiringVideoDecoders").apply { isAccessible = true }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (System.nanoTime() < deadline && (field.get(sink) as Set<*>).isNotEmpty()) Thread.sleep(5)
+            assertTrue("retired decoder reference must be removed after worker exit", (field.get(sink) as Set<*>).isEmpty())
         } finally { sink.close(); surface.release(); texture.release() }
     }
 
