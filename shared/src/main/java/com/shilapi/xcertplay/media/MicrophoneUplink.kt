@@ -33,6 +33,7 @@ internal class MicrophoneUplink(
     @Volatile private var routeBinding: AudioRouteBinding? = null
     private var packetsSent = 0L
     private val running = AtomicBoolean(false)
+    private val closed = AtomicBoolean(false)
     private val firstPacketLogged = AtomicBoolean(false)
     @Volatile private var recorder: AudioRecord? = null
     @Volatile private var socket: DatagramSocket? = null
@@ -42,7 +43,9 @@ internal class MicrophoneUplink(
     private val ended = AtomicBoolean(false)
     private val stats = MicrophoneCaptureStats(config, report)
 
+    @Synchronized
     fun start(): Boolean {
+        if (closed.get()) return false
         if (!running.compareAndSet(false, true)) return true
         ended.set(false)
 
@@ -80,8 +83,12 @@ internal class MicrophoneUplink(
             return false
         }
         val bufferSize = maxOf(minBuffer * 2, config.frameBytes * 4)
-        // 博越配置优先厂商输入源；权限拒绝、初始化或启动失败后释放，再尝试标准源。
-        val nextRecorder = listOfNotNull(factorySource, source).distinct().firstNotNullOfOrNull { candidate ->
+        // 厂商源优先；Siri 的识别源拒绝后有限回退至通信源。每次失败先释放。
+        val nextRecorder = listOfNotNull(factorySource, source,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION.takeIf { config.audioType.equals("speechrecognition", true) },
+        ).distinct().firstNotNullOfOrNull { candidate ->
+            if (!running.get() || closed.get()) return@firstNotNullOfOrNull null
+            stats.useSource(candidate)
             var built: AudioRecord? = null
             var stage = MicrophoneFailureStage.RECORDER_CREATION
             try {
@@ -98,6 +105,7 @@ internal class MicrophoneUplink(
                 }
                 record.startRecording()
                 check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+                check(running.get() && !closed.get())
                 runCatching { report("Audio: microphone source=$candidate factory=${candidate == factorySource}") }
                 record
             } catch (error: Exception) {
@@ -132,6 +140,7 @@ internal class MicrophoneUplink(
         socket = nextSocket
         opusEncoder = nextEncoder
         return try {
+            check(running.get() && !closed.get())
             val channel = when (config.audioType.lowercase()) {
                 "telephony" -> AudioChannel.PHONE
                 "speechrecognition" -> AudioChannel.ASSISTANT
@@ -271,6 +280,7 @@ internal class MicrophoneUplink(
     }
 
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
         runCatching { onStopRequested() }
         if (!running.compareAndSet(true, false)) {
             release()
