@@ -81,4 +81,16 @@ class StreamReceiveStatsTest {
         stats.flush(true)
         assertTrue(output.last().contains("headerMaxUs=0 headerCalls=0"))
     }
+    @Test fun decryptTimingIsRecordedAndResetUsingTheProductStageCounters() {
+        var clock = 0L
+        val output = mutableListOf<String>()
+        val stats = StreamReceiveStats("video", output::add) { clock }
+        stats.measure(StreamReceiveStats.Stage.DECRYPT) { clock += 2_000_000 }
+        stats.measure(StreamReceiveStats.Stage.DECRYPT) { clock += 500_000 }
+        clock = 5_000_000_000L; stats.flush()
+        assertTrue(output.last().contains("decryptMaxUs=2000 decryptCalls=2"))
+        clock = 10_000_000_000L; stats.flush()
+        assertTrue(output.last().contains("decryptMaxUs=0 decryptCalls=0"))
+    }
+
 }

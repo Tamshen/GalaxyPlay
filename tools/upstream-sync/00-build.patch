@@ -21,10 +21,12 @@
  }
  
  android {
-@@ -11,6 +25,7 @@
+@@ -10,7 +24,8 @@
+     }
  
      defaultConfig {
-         minSdk = 28
+-        minSdk = 25
++        minSdk = 28
 +        testInstrumentationRunner = "com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation"
      }
  
@@ -191,13 +193,13 @@
  
      defaultConfig {
 -        applicationId = "com.shihab.diplay"
--        minSdk = 28
+-        minSdk = 25
 +        applicationId = "com.ecarx.carplay"
 +        // L7 专用应用最低支持 Android 10，实车验证以 Flyme OS / Android 11 为准。
 +        minSdk = 29
          targetSdk = 37
--        versionCode = 32
--        versionName = "0.2.13"
+-        versionCode = 34
+-        versionName = "0.2.15"
 +        versionCode = l7Version.getProperty("versionCode").toInt()
 +        versionName = l7Version.getProperty("versionName")
 +        manifestPlaceholders["diplayCoreVersion"] = l7Version.getProperty("diplayCoreVersion")
@@ -294,6 +296,24 @@
 -project(":home").projectDir = file("samples/home")
 --- a/shared/build.gradle
 +++ b/shared/build.gradle
+@@ -6,7 +6,7 @@
+     compileSdk = 37
+ 
+     defaultConfig {
+-        minSdk = 25
++        minSdk = 28
+         targetSdk = 37
+ 
+         ndk {
+@@ -15,7 +15,7 @@
+ 
+         externalNativeBuild {
+             ndkBuild {
+-                arguments 'APP_PLATFORM=android-25'
++                arguments 'APP_PLATFORM=android-28'
+             }
+         }
+ 
 @@ -31,11 +31,22 @@
          sourceCompatibility = JavaVersion.VERSION_11
          targetCompatibility = JavaVersion.VERSION_11

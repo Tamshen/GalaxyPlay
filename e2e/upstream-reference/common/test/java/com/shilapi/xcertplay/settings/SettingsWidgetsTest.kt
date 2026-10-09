@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.RadioButton
 import android.widget.TextView
+import com.shilapi.xcertplay.DiPlayPalette
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
 import com.shilapi.xcertplay.orchestration.MfiTarget
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
@@ -67,10 +68,23 @@ class SettingsWidgetsTest {
         assertFalse(label.includeFontPadding)
         assertEquals(Color.rgb(170, 180, 190), label.currentTextColor)
         assertEquals(Color.rgb(127, 205, 154), row.switch.thumbTintList!!.getColorForState(
-            intArrayOf(android.R.attr.state_checked), 0))
+            intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked), 0))
         val heading = SettingsWidgets.createCategoryHeader(context, "Heading")
         assertEquals(Color.rgb(127, 205, 154), heading.currentTextColor)
         assertFalse(heading.includeFontPadding)
+    }
+
+    @Test fun switchesUseTheLargeTrackAndMarkTheDisabledState() {
+        for (theme in SettingsTheme.entries) {
+            val switch = SettingsWidgets.createSwitchRow(context, "Title", "Details", false, theme, onChanged = {}).switch
+            switch.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            assertTrue(switch.measuredWidth >= theme.dp(context, 60))
+            assertTrue(switch.measuredHeight >= theme.dp(context, 34))
+            val enabledOff = switch.trackTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled), 0)
+            val disabled = switch.trackTintList!!.getColorForState(intArrayOf(), 0)
+            assertEquals(theme.trackOff, enabledOff)
+            assertNotEquals(enabledOff, disabled)
+        }
     }
 
     @Test fun cardDescriptionsKeepMultilineSpacingAndTheirAccessibleTitle() {
@@ -80,6 +94,49 @@ class SettingsWidgetsTest {
         assertEquals(listOf("Title", "First line\nSecond line"), texts.map { it.text.toString() })
         assertTrue(texts.all { it.lineSpacingExtra == SettingsTheme.CARD.dp(context, 3).toFloat() })
         assertEquals("Title", row.switch.contentDescription)
+    }
+
+    @Test fun lightCardUsesTheResolvedSemanticPalette() {
+        val theme = SettingsTheme.card(DiPlayPalette.LIGHT)
+        val row = SettingsWidgets.createSwitchRow(context, "Title", "Details", false,
+            theme, onChanged = {})
+        val texts = views(row.rowView).filterIsInstance<TextView>().filter { it !== row.switch }.toList()
+        assertEquals(DiPlayPalette.LIGHT.primaryText, texts[0].currentTextColor)
+        assertEquals(DiPlayPalette.LIGHT.secondaryText, texts[1].currentTextColor)
+        assertEquals(DiPlayPalette.LIGHT.trackOff, row.switch.trackTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled), 0))
+        assertEquals(
+            DiPlayPalette.LIGHT.accent,
+            row.switch.thumbTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked), 0),
+        )
+        assertEquals(DiPlayPalette.LIGHT.ripple, theme.ripple)
+        assertEquals(DiPlayPalette.LIGHT.focusRing, theme.focusRing)
+    }
+
+    @Test fun lightOverlayUsesSemanticTextAndControlColors() {
+        val theme = SettingsTheme.overlay(DiPlayPalette.LIGHT)
+        val row = SettingsWidgets.createSwitchRow(
+            context,
+            "Title",
+            "Details",
+            true,
+            theme,
+            onChanged = {},
+        )
+        val label = (row.rowView as ViewGroup).getChildAt(0) as TextView
+
+        assertEquals(DiPlayPalette.LIGHT.overlaySecondaryText, label.currentTextColor)
+        assertEquals(
+            DiPlayPalette.LIGHT.overlayAccent,
+            row.switch.thumbTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked), 0),
+        )
+        assertEquals(
+            DiPlayPalette.LIGHT.overlayAccentTrack,
+            row.switch.trackTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_checked), 0),
+        )
+        assertEquals(
+            DiPlayPalette.LIGHT.overlayTrackOff,
+            row.switch.trackTintList!!.getColorForState(intArrayOf(android.R.attr.state_enabled), 0),
+        )
     }
 
     @Test @Config(sdk = [28]) fun android9HotspotChoiceDoesNotExposeUnavailableWifiDirect() {

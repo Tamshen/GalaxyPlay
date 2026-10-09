@@ -200,6 +200,29 @@ class CarPlayHostSettingsTest {
         assertEquals(MfiTarget.USB_CH341, field("mfiTarget"))
     }
 
+    @Test fun lightAppearanceRepaintsAnOpenMenuWithoutLosingDraftState() {
+        invoke("openSettingsMenu")
+        setField("manualHotspotSsid", "Unsaved hotspot")
+        val oldMenu = menu()
+        val scroll = views(oldMenu).filterIsInstance<android.widget.ScrollView>().single()
+        scroll.scrollTo(0, 120)
+
+        AirPlayPersistence.saveAppAppearance(activity, AppAppearance.LIGHT)
+        invoke("refreshAppAppearance")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertNotSame(oldMenu, menu())
+        assertEquals("Unsaved hotspot", field("manualHotspotSsid"))
+        assertEquals(false, field("appNight"))
+        assertEquals(
+            DiPlayPalette.LIGHT.overlayBackground,
+            (menu().background as android.graphics.drawable.ColorDrawable).color,
+        )
+        val heading = views(menu()).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.carplay_settings) }
+        assertEquals(DiPlayPalette.LIGHT.overlayPrimaryText, heading.currentTextColor)
+    }
+
     @Test fun savingPersistsSettingsAndRestartsOnce() {
         attachController()
         invoke("openSettingsMenu")
