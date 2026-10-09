@@ -25,6 +25,7 @@
     <string name="l7_voice_complete">10-second test complete</string>
     <string name="l7_voice_interrupted">Call or Siri took over; local test stopped</string>
     <string name="l7_voice_failed">Test failed</string>
+    <string name="l7_voice_no_data">No recording data received. In the individual voice test, select another input mode, speak, and retry each mode separately. Check system mute, then upload this run\'s logs.</string>
     <string name="l7_voice_failure">Failure: %1$s · code=%2$s</string>
     <string name="l7_voice_occupied">A call or Siri is using the microphone. Finish it before testing.</string>
     <string name="l7_voice_carplay">3. Test phone Siri</string>

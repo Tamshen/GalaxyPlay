@@ -18,6 +18,8 @@ class L7VoiceInputTestTest {
         val clock = AtomicLong()
         var advance = 0L
         var source = -1
+        var readCount = 0
+        var readResult: ((Int) -> Int)? = null
         override fun permitted() = permission
         override fun occupied() = occupied
         override fun create(source: Int): L7VoiceInputTest.Recorder {
@@ -27,7 +29,7 @@ class L7VoiceInputTestTest {
                 override fun read(buffer: ByteArray): Int {
                     clock.addAndGet(advance)
                     for (i in buffer.indices step 2) { buffer[i] = 0; buffer[i + 1] = 4 }
-                    return code
+                    return readResult?.invoke(++readCount) ?: code
                 }
                 override val routeType = 15
                 override val silenced = false
@@ -68,6 +70,36 @@ class L7VoiceInputTestTest {
             assertFalse(logs.any { it.contains("pcm=") || it.contains("transcript=") })
             assertTrue(test.start(1)); await { !test.snapshot.busy }
             assertEquals(2, access.closed)
+        }
+    }
+
+    @Test fun tenSecondsOfZeroReadsFailAndKeepEvidenceWithoutChangingTheInputSource() {
+        val access = Access().apply { advance = 500; code = 0 }
+        val logs = java.util.concurrent.CopyOnWriteArrayList<String>()
+        L7VoiceInputTest(access, logs::add, access.clock::get).use { test ->
+            assertTrue(test.start(6)); await { !test.snapshot.busy }
+            assertEquals(L7VoiceInputTest.Phase.FAILED, test.snapshot.phase)
+            assertEquals("NO_DATA", test.snapshot.reason)
+            assertEquals(0L, test.snapshot.bytes)
+            assertEquals(20L, test.snapshot.reads)
+            assertEquals(20L, test.snapshot.zeroReads)
+            assertEquals(1, access.created); assertEquals(1, access.closed); assertEquals(6, access.source)
+            await { logs.any { "phase=FAILED" in it && "reason=NO_DATA" in it && "zeroReads=20" in it } }
+            access.code = 640
+            assertTrue(test.start(1)); await { !test.snapshot.busy }
+            assertEquals(L7VoiceInputTest.Phase.COMPLETE, test.snapshot.phase)
+            assertEquals(0L, test.snapshot.zeroReads); assertEquals(2, access.closed)
+        }
+    }
+
+    @Test fun initialNonblockingZeroReadsDoNotRejectALaterWorkingCapture() {
+        val access = Access().apply { advance = 500; readResult = { if (it <= 5) 0 else 640 } }
+        L7VoiceInputTest(access, {}, access.clock::get).use { test ->
+            test.start(6); await { !test.snapshot.busy }
+            assertEquals(L7VoiceInputTest.Phase.COMPLETE, test.snapshot.phase)
+            assertEquals(5L, test.snapshot.zeroReads)
+            assertEquals(9600L, test.snapshot.bytes)
+            assertEquals(1, access.closed)
         }
     }
 
