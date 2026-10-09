@@ -57,12 +57,13 @@ internal class GalaxyProfiles(private val context: Context,
         val initial = GalaxyProfile("current", labels.getString(R.string.profile_migrated), 1,
             System.currentTimeMillis(), GalaxyConfigurationFields.capture(context))
         saveFile(initial)
-        listOf("l7", "l6").forEach { model ->
-            if (!file("default_$model").exists()) saveFile(GalaxyProfile("default_$model",
-                labels.getString(if (model == "l7") R.string.profile_default_l7 else R.string.profile_default_l6),
-                1, System.currentTimeMillis(), GalaxyConfigurationFields.factory(context, model)))
-        }
         persist(selection, initial.id)
+    }
+    /** 车型是快速模板，直接覆盖当前完整文件；设备身份仍由兼容镜像保护。 */
+    fun applyTemplate(model: String): GalaxyProfile = synchronized(lock) {
+        require(model in setOf("l7", "l6"))
+        val current = refresh()
+        save(current.copy(configuration = GalaxyConfigurationFields.factory(context, model)))
     }
     fun draft(model: String, name: String): GalaxyProfile = synchronized(lock) {
         val configuration = if (model == "current") refresh().configuration else GalaxyConfigurationFields.factory(context, model)

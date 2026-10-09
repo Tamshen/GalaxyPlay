@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="l7_bt_media_auto">蓝牙音乐互斥</string>
-    <string name="l7_bt_media_auto_desc">CarPlay 接通后尝试断开同一手机的蓝牙媒体音频，保留蓝牙通话与配对；当前会话即时生效。</string>
+    <string name="l7_bt_media_auto_desc">CarPlay 接通后尝试断开同一手机的蓝牙媒体音频，保留蓝牙通话与配对；下次连接生效。</string>
     <string name="l7_bt_media_help">蓝牙音乐冲突排查</string>
     <string name="l7_bt_media_help_desc">播放后自动暂停时，查看处理结果与手动关闭媒体音频的方法。</string>
     <string name="l7_bt_media_help_body">最近检查：%1$s\n\n蓝牙音乐与 CarPlay 同时接收同一手机的音乐，可能引起媒体源竞争。自动处理只针对本次无线连接实际识别的手机，不断开通话、不取消配对。\n\n如固件不允许自动处理，在车机蓝牙设置中打开该手机的详情，关闭“媒体音频 / 蓝牙音乐”，保留“通话音频”；返回 CarPlay 再播放。若系统没有独立开关，请记录日志与固件版本。\n\nUSB 未识别出目标手机时需手动处理。试听能出声不代表手机音乐与蓝牙焦点已经协调。</string>

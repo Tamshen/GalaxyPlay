@@ -190,7 +190,6 @@ class GalaxySettingsActivity : ComponentActivity() {
         menuExpanded = savedInstanceState?.getBoolean("home_menu_expanded") ?: false
         render()
         handleWirelessRecovery()
-        GalaxyProfileEditor.restore(this) { if (page == "settings-vehicle") profileChanged() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (page != "home") { page = if (l7Ui) L7Routes.back(page) else "home"; render() }
@@ -312,6 +311,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        configurationPage?.close(); configurationPage = null
         codecProbeController.close()
         steeringDebugPage?.close(); steeringDebugPage = null
         debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
@@ -334,7 +334,15 @@ class GalaxySettingsActivity : ComponentActivity() {
             AppLocale.preference(this) != languagePreferenceAtCreate) recreate()
         else render()
     }
+    private var configurationPage: GalaxyConfigurationPage? = null
     private fun render() {
+        if (renderedPage == "settings-vehicle" && page != "settings-vehicle" && configurationPage?.dirty == true) {
+            val destination = page
+            page = "settings-vehicle"
+            configurationPage?.requestLeave { page = destination; render() }
+            return
+        }
+        configurationPage?.close(); configurationPage = null
         if (!L7Agreement.require(this)) return
         steeringDebugPage?.close(); steeringDebugPage = null
         debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
@@ -384,7 +392,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         }
         when (page) {
             "settings" -> settingsL7(content)
-            "settings-vehicle" -> L7VehicleSettings.page(this, content, ::profileChanged)
+            "settings-vehicle" -> Unit
             "settings-connection" -> connectionChoicesL7(content)
             "settings-connection-wireless" -> connectionSettingsL7(content)
             "settings-connection-usb" -> wiredSettings = L7WiredSettings(this, content,
@@ -431,7 +439,12 @@ class GalaxySettingsActivity : ComponentActivity() {
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
         contentScroll = scroll
         renderedPage = page
-        body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (page == "settings-vehicle") {
+            configurationPage = GalaxyConfigurationPage(this,
+                credentials = { page = "settings-auth"; render() }, changed = ::profileChanged)
+            body.addView(configurationPage!!.view, LinearLayout.LayoutParams(-1, 0, 1f))
+            contentScroll = configurationPage!!.view.scroll
+        } else body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(body, LinearLayout.LayoutParams(0, -1, 1f).apply {
             if (settingsPage) marginStart = L7ProjectionNavigation.settingsColumnWidth(this@GalaxySettingsActivity)
         })
@@ -442,6 +455,10 @@ class GalaxySettingsActivity : ComponentActivity() {
     }
 
     private fun selectL7Destination(destination: String) {
+        if (configurationPage?.dirty == true) {
+            configurationPage?.requestLeave { selectL7Destination(destination) }
+            return
+        }
         when {
             destination == "connection" -> GalaxyConnectionMenu.select(this) {
                 page = "settings-connection"; render()
@@ -477,7 +494,7 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     private fun pageTitle(): String = getString(when (page) {
         "connection" -> R.string.connection_setup
-        "settings-vehicle" -> R.string.l7_vehicle_settings
+        "settings-vehicle" -> R.string.config_page_title
         "settings-auth" -> R.string.l7_auth_title
         "settings-connection" -> R.string.connection_setup
         "settings-connection-wireless" -> R.string.l7_start_wireless
@@ -504,19 +521,13 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     private fun settingsL7(content: LinearLayout) {
         val entries = listOf(
-            Triple("settings-vehicle", R.string.l7_vehicle_settings, R.drawable.ic_l7_vehicle),
-            Triple("settings-auth", R.string.l7_auth_title, R.drawable.ic_l7_lock),
-            Triple("settings-connection", R.string.connection_setup, R.drawable.ic_l7_hotspot),
-            Triple("settings-display", R.string.display_and_performance, R.drawable.ic_dp_display),
-            Triple("settings-audio", R.string.audio_routing, R.drawable.ic_l7_audio),
-            Triple("settings-general", R.string.l7_general_settings, R.drawable.ic_l7_settings),
+            Triple("settings-vehicle", R.string.config_page_title, R.drawable.ic_l7_vehicle),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
             Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
             Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
-        val hints = listOf(R.string.l7_vehicle_row_hint, R.string.l7_auth_row_hint, R.string.l7_connection_row_hint,
-            R.string.l7_display_row_hint, R.string.l7_audio_row_hint, R.string.l7_general_row_hint,
+        val hints = listOf(R.string.config_page_entry_hint,
             R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_logs_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))

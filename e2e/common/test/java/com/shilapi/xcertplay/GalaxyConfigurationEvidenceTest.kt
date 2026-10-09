@@ -84,7 +84,7 @@ class GalaxyConfigurationEvidenceTest {
         val writer = SessionLogFile(File(app.filesDir, "logs/diplay.log"))
         writer.append("test=historical", old)
         val repository = GalaxyProfiles(app)
-        repository.select("default_l6")
+        repository.applyTemplate("l6")
         val records = records(RemoteLogReport.collect(app))
         val historical = records.first { it.optString("configuration_role") == "at_event" }
         val saved = records.first { it.optString("configuration_role") == "saved_at_upload" }

@@ -22,7 +22,7 @@ class GalaxyProfilesTest {
         GalaxyConfigurationFields.names.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() }
         L7AudioTemplates.Model.entries.forEach { AtomicFile(File(app.filesDir, GalaxyConfigurationFields.audioFile(it.id))).delete() }
     }
-    @Test fun migrationCapturesAllSettingsAndIndependentDefaultsWithoutConfirmingModel() {
+    @Test fun migrationCapturesOneCompleteCurrentConfigurationWithoutConfirmingModel() {
         val prefs = app.getSharedPreferences("xcertplay_airplay", 0)
         prefs.edit().putInt("display_scale_tenths", 8).putInt("media_buffer_ms", 500)
             .putString("remote_mfi_token", "synthetic_token").putString("identity_private", "protected_identity")
@@ -37,8 +37,8 @@ class GalaxyProfilesTest {
         assertFalse(values.containsKey("pairing_ids"))
         assertFalse(current.configuration.preferences.getValue("l7_audio_templates").containsKey("model"))
         assertEquals(3, current.configuration.audio.size)
-        assertEquals(setOf("current", "default_l7", "default_l6"), repository.list().map { it.id }.toSet())
-        repository.select("default_l6")
+        assertEquals(setOf("current"), repository.list().map { it.id }.toSet())
+        repository.applyTemplate("l6")
         assertEquals("protected_identity", prefs.getString("identity_private", null))
         assertEquals(setOf("synthetic_pair"), prefs.getStringSet("pairing_ids", null))
         assertEquals("TEXT", app.getSharedPreferences("l7_authentication", 0).getString("source", null))
@@ -61,10 +61,10 @@ class GalaxyProfilesTest {
         assertEquals(19, L7AudioTemplates.load(app).choice(AudioOutputRole.NAVIGATION))
     }
     @Test fun frozenContextKeepsOriginalSettingsAndSharesPairingStorageAfterSwitch() {
-        val saved = repository.select("default_l7")
+        val saved = repository.applyTemplate("l7")
         val frozen = GalaxyConfigurationContext(app, saved)
         val identity = AirPlayPersistence.loadIdentity(app)
-        repository.select("default_l6")
+        repository.applyTemplate("l6")
         assertEquals(L7AudioTemplates.Model.L7, L7AudioTemplates.model(frozen))
         assertEquals(L7AudioTemplates.Model.L6, L7AudioTemplates.model(app))
         assertEquals(identity.pairingId, AirPlayPersistence.loadIdentity(frozen).pairingId)
@@ -104,6 +104,7 @@ class GalaxyProfilesTest {
             GalaxyProfiles.write(target, text)
         }
         assertTrue(runCatching { failed.save(old.copy(name = "Cannot write")) }.isFailure)
+        assertTrue(runCatching { failed.applyTemplate("l6") }.isFailure)
         assertEquals(before, File(app.filesDir, "configurations/current.json").readText())
         assertEquals(300, AirPlayPersistence.loadMediaBufferMillis(app))
         val invalid = GalaxyConfigurationContext(app, old, true)
@@ -126,7 +127,7 @@ class GalaxyProfilesTest {
         assertEquals(L7AudioTemplates.Model.L6, L7AudioTemplates.model(app))
     }
     @Test fun runtimeWritesSaveFuturePreferencesWithoutChangingCurrentConnectionReadValues() {
-        val old = repository.select("default_l7")
+        val old = repository.applyTemplate("l7")
         val context = GalaxyConfigurationContext(app, old, runtimeOnly = true)
         AirPlayPersistence.saveMediaBufferMillis(context, 1000)
         assertEquals(300, AirPlayPersistence.loadMediaBufferMillis(context))
@@ -140,7 +141,7 @@ class GalaxyProfilesTest {
         File(app.filesDir, "configurations/broken.json").writeText("broken")
         val catalog = repository.catalog()
         assertEquals(1, catalog.unavailable)
-        assertEquals(3, catalog.profiles.size)
+        assertEquals(1, catalog.profiles.size)
         val first = repository.save(repository.draft("l7", "Same name"))
         assertTrue(runCatching { repository.save(repository.draft("l6", "Same name")) }.exceptionOrNull() is GalaxyProfileNameConflict)
         assertEquals(first.id, repository.select(first.id).id)

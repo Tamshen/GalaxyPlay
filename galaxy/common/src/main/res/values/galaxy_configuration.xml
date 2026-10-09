@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="config_page_credentials">本地认证材料</string>
+    <string name="config_page_credentials_hint">由本机统一管理，不随车型模板覆盖</string>
+    <string name="config_page_title">配置</string>
+    <string name="config_page_entry_hint">统一修改当前设置，支持 L7、L6 快速模板</string>
+    <string name="config_page_value_hint">先更新草稿，再在配置页面保存。</string>
+    <string name="config_page_restore">撤销修改</string>
+    <string name="config_page_common">常用</string>
+    <string name="config_page_connection">连接</string>
+    <string name="config_page_audio">音频</string>
+    <string name="config_page_video">画面</string>
+    <string name="config_page_interface">界面</string>
+    <string name="config_page_more">更多</string>
+    <string name="config_page_unsaved">有未保存的修改</string>
+    <string name="config_page_next_connection">参数调整不会中断当前连接。</string>
+    <string name="template_l7">银河 L7</string>
+    <string name="template_l6">银河 L6</string>
+    <string name="template_quick">内置快速设置</string>
+    <string name="template_overwrite">点击车型，直接覆盖当前设置。之后可继续修改。</string>
+    <string name="template_saved">已保存 · 当前车型：%1$s</string>
+    <string name="template_pending_connection">已保存 · 当前连接保持原配置，下次连接生效</string>
+</resources>
