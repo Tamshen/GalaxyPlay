@@ -7,23 +7,33 @@ import java.io.File
 internal class SessionLogFile(val file: File, private val archiveNames: List<String> = ARCHIVE_NAMES) : Closeable {
     private val lock = storageLock
     private var closed = false
+    @Volatile var configuration: GalaxyConfigurationEvidence? = null
+    private var writtenConfiguration: String? = null
     fun reset(header: String) = synchronized(lock) {
         if (!closed) {
             file.parentFile?.mkdirs()
             rotate()
             file.writeText("")
+            writtenConfiguration = null
             append(header)
         }
     }
-    fun append(line: String) = synchronized(lock) {
+    fun append(line: String, evidence: GalaxyConfigurationEvidence? = configuration) = synchronized(lock) {
         if (closed) return@synchronized
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
-        val bytes = (safe + "\n").toByteArray(Charsets.UTF_8)
+        val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + safe + "\n").toByteArray(Charsets.UTF_8)
         runCatching {
             file.parentFile?.mkdirs()
-            if (file.length() + bytes.size > MAX_BYTES) {
+            val header = evidence?.takeIf { writtenConfiguration != it.id || file.length() == 0L }
+                ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
+            if (file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES) {
                 rotate()
                 file.writeText("")
+                writtenConfiguration = null
+            }
+            if (evidence != null && (writtenConfiguration != evidence.id || file.length() == 0L)) {
+                file.appendText(evidence.header + "\n")
+                writtenConfiguration = evidence.id
             }
             file.appendBytes(bytes)
         }

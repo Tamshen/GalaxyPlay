@@ -19,7 +19,6 @@ internal object L7BluetoothAudioSettings {
         parent.addView(L7Components.switchRow(context, context.getString(R.string.l7_bt_media_auto),
             context.getString(R.string.l7_bt_media_auto_desc), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
             AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
-            CarPlayBackgroundSession.updateBluetoothMediaAutomatic(it)
         })
         parent.addView(L7Components.actionRow(context, context.getString(R.string.l7_bt_media_help),
             context.getString(R.string.l7_bt_media_help_desc)) { show(context) })

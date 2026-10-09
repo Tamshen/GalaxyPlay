@@ -102,6 +102,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Apple devices are discovered by vendor ID; CH341 uses the configured VID/PID below.
  */
 class CarPlayHostActivity : ComponentActivity() {
+    private var configurationContext: GalaxyConfigurationContext? = null
+    override fun getSharedPreferences(name: String, mode: Int): android.content.SharedPreferences =
+        configurationContext?.getSharedPreferences(name, mode) ?: super.getSharedPreferences(name, mode)
+    override fun getApplicationContext(): Context = configurationContext ?: super.getApplicationContext()
     private var wiredAttempt: String? = null
     private var wiredStartupFeedback: String? = null
     private var wiredStartupWait: String? = null
@@ -3389,6 +3393,11 @@ class CarPlayHostActivity : ComponentActivity() {
             return false
         }
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.currentAttempt(this)
+        CarPlayBackgroundSession.configuration?.let { profile ->
+            configurationContext = GalaxyConfigurationContext(super.getApplicationContext(), profile, runtimeOnly = true)
+            sessionLog?.configuration = GalaxyConfigurationEvidence.from(this, profile)
+            loadPersistedSettings()
+        }
         controller = snapshot.controller
         sink = snapshot.sink
         sessionDisplay = snapshot.display
@@ -3437,6 +3446,11 @@ class CarPlayHostActivity : ComponentActivity() {
         if (L7AppExit.exiting || !L7Agreement.canUse(this)) return
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
+        val profile = runCatching { GalaxyProfiles(super.getApplicationContext()).refresh() }.getOrNull()
+        if (profile == null) { setConnectionStage(getString(R.string.profile_load_failed)); return }
+        configurationContext = GalaxyConfigurationContext(super.getApplicationContext(), profile, runtimeOnly = true)
+        sessionLog?.configuration = GalaxyConfigurationEvidence.from(this, profile)
+        loadPersistedSettings()
         val controllerGeneration = restartGeneration
         L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "BEGIN")
         val config = createRuntimeConfig()
@@ -3520,7 +3534,7 @@ class CarPlayHostActivity : ComponentActivity() {
         sessionDisplay = display
         videoCanvasSize = null
         videoView?.let { updateVideoViewport(it.width, it.height) }
-        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display) { completion ->
+        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display, profile) { completion ->
             runOnUiThread {
                 shutdown(terminateProcess = false, reason = "DiPlay disconnect", completion = completion)
                 finish()
@@ -3750,6 +3764,7 @@ class CarPlayHostActivity : ComponentActivity() {
         GalaxyMediaKeys.detach(oldController)
         CarPlayBackgroundSession.clear(oldController, keepOwner = true)
         controller = null
+        configurationContext = null
         sink = null
         sessionDisplay = null
         videoCanvasSize = null
@@ -3839,6 +3854,7 @@ class CarPlayHostActivity : ComponentActivity() {
         GalaxyMediaKeys.detach(oldController)
         CarPlayBackgroundSession.clear(oldController)
         controller = null
+        configurationContext = null
         sink = null
         sessionDisplay = null
         videoCanvasSize = null

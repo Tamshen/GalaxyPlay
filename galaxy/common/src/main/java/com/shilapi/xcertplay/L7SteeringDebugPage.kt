@@ -59,6 +59,7 @@ internal class L7SteeringDebugPage(private val activity: Activity, parent: Linea
                 if (controller.active()) { controller.stop("USER"); dialog?.dismiss(); dialog = null }
                 else if (L7Agreement.canUse(activity) && !L7AppExit.exiting) {
                     L7SteeringDiagnostics.initialize(activity)
+                    L7SteeringDiagnostics.freezeListening(activity)
                     controller.start(L7AudioTemplates.model(activity).id)
                 }
                 update()

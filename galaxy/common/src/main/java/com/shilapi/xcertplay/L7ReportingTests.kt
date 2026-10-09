@@ -9,6 +9,7 @@ import android.os.SystemClock
 internal object L7ReportingTests {
     private val handler = Handler(Looper.getMainLooper())
     private var app: Context? = null
+    private var runLog: (String) -> Unit = L7DebugLog::record
     private val controller = L7ReportingTestController(
         factory = { kind, log, released, current ->
             val context = AppLocale.wrap(requireNotNull(app))
@@ -19,7 +20,7 @@ internal object L7ReportingTests {
         },
         blocked = { L7AppExit.exiting || CarPlayBackgroundSession.hasSession() ||
             app?.let { !L7Agreement.canUse(it) } != false },
-        clock = SystemClock::elapsedRealtime, log = L7DebugLog::record,
+        clock = SystemClock::elapsedRealtime, log = { runLog(it) },
     )
     private val timeout = object : Runnable {
         override fun run() {
@@ -28,8 +29,10 @@ internal object L7ReportingTests {
         }
     }
     fun start(context: Context, kind: L7ReportingKind): Boolean {
+        if (snapshot().phase in setOf(L7ReportingTestController.Phase.RUNNING, L7ReportingTestController.Phase.STOPPING)) return false
         app = context.applicationContext
         L7DebugLog.initialize(requireNotNull(app))
+        runLog = L7DebugLog.logger(context)
         return controller.start(kind).also { if (it) {
             handler.removeCallbacks(timeout)
             handler.postDelayed(timeout, 1000)

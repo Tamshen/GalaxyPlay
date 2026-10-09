@@ -20,7 +20,7 @@ internal class GalaxyDiagnosticSink(
     companion object {
         fun create(context: Context): DiagnosticSink {
             L7DebugLog.initialize(context.applicationContext)
-            return GalaxyDiagnosticSink()
+            return GalaxyDiagnosticSink(L7DebugLog.logger(context))
         }
     }
 }

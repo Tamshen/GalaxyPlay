@@ -456,6 +456,9 @@ class CarPlayHostDisplaySizeTest {
 
     private fun allowStartup() {
         L7Agreement.accept(activity)
+        // 新连接会冻结实际偏好；几何回归用有线模式绕过真实热点前置条件。
+        AirPlayPersistence.saveWirelessEnabled(activity, false)
+        AirPlayPersistence.saveMfiTarget(activity, MfiTarget.LOCAL)
         setField("airPlayIdentity", AirPlayIdentity.generate())
         setField("mfiTarget", MfiTarget.LOCAL)
         setField("vpnReady", true)

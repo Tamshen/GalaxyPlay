@@ -32,18 +32,29 @@ internal class DebugLogBuffer(private val capacity: Int = 1000) {
 internal object L7DebugLog {
     val buffer = DebugLogBuffer()
     @Volatile private var persistent: SessionLogFile? = null
+    @Volatile private var currentConfiguration: GalaxyConfigurationEvidence? = null
     @Synchronized fun initialize(context: android.content.Context) {
         if (persistent == null) persistent = SessionLogFile(java.io.File(context.filesDir, "logs/debug.log"),
             listOf("debug-previous.log", "debug-previous-2.log"))
+        if (currentConfiguration == null) refreshConfiguration(context)
+    }
+    fun refreshConfiguration(context: android.content.Context) {
+        currentConfiguration = runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()
+    }
+    fun logger(context: android.content.Context, target: SessionLogFile? = persistent): (String) -> Unit {
+        val snapshot = runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()
+        return { line -> record(line, target, snapshot) }
     }
 
     /** 所有调试入口默认落盘；展示窗口和 JSON 报告不承担日志留存。 */
     fun record(message: String) = record(message, persistent)
+    fun recordConfiguration(message: String, configuration: GalaxyConfigurationEvidence?) = record(message, persistent, configuration)
 
-    fun record(message: String, target: SessionLogFile?) {
+    fun record(message: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence? = target?.configuration ?: currentConfiguration) {
         val safe = DiagnosticRedactor.redact(message) ?: return
-        buffer.append("${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())}  $safe")
-        AsyncDiagnosticLog.append(target, safe)
+        buffer.append((configuration?.let { "config_ref=${it.id} " } ?: "") +
+            "${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())}  $safe")
+        AsyncDiagnosticLog.append(target, safe, configuration = configuration)
     }
 }
 

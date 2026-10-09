@@ -64,4 +64,11 @@ internal object L7VoiceDiagnostics {
         if (target == null) target = SessionLogFile(File(context.filesDir, "logs/voice-input.log"),
             listOf("voice-input-previous.log", "voice-input-previous-2.log"))
     }
+    fun logger(context: Context): (String) -> Unit {
+        initialize(context)
+        return L7DebugLog.logger(context, target)
+    }
+    fun freezeConnection(context: Context) {
+        target?.configuration = runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()
+    }
 }

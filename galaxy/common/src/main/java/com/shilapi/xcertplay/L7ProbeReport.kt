@@ -43,12 +43,13 @@ internal data class L7ProbeReport(
     val finished: Long? = null,
     val truncated: Boolean = false,
     val probeVersion: Int = 5,
+    val configuration: String? = null,
 ) {
     fun json() = JSONObject().put("schemaVersion", 1).put("probeVersion", probeVersion).put("runId", id)
         .put("caseId", "BASIC").put("executorContext", "L7_APP").put("environmentGeneration", environment)
         .put("appVersion", version).put("startedAt", started).put("finishedAt", finished ?: JSONObject.NULL)
         .put("executionState", phase.name).put("expectedItems", expected).put("truncated", truncated)
-        .put("items", JSONArray(items.map { it.json() }))
+        .put("items", JSONArray(items.map { it.json() })).put("configuration", configuration ?: JSONObject.NULL)
 
     fun counts() = L7ProbeOutcome.entries.associateWith { result -> items.count { it.result == result } }
 
@@ -60,7 +61,8 @@ internal data class L7ProbeReport(
                 L7ProbePhase.valueOf(json.getString("executionState")),
                 json.getJSONArray("items").let { array -> (0 until array.length()).map { L7ProbeItem.read(array.getJSONObject(it)) } },
                 json.getInt("expectedItems"), if (json.isNull("finishedAt")) null else json.getLong("finishedAt"),
-                json.optBoolean("truncated"), json.optInt("probeVersion", 1))
+                json.optBoolean("truncated"), json.optInt("probeVersion", 1),
+                if (json.isNull("configuration") || !json.has("configuration")) null else json.getString("configuration"))
         }
     }
 }

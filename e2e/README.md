@@ -6,6 +6,8 @@
 
 设备脚本按 `--serial` 固定 AVD，多个交互脚本依次执行，并与其他会话约定独占该模拟器；并发 ADB 启动其他应用会改变前台与节点树，不能据此判断产品失败。UI 定位只点击启用的动作行，不点击同名 Header；分类页先滚动查找离屏入口。自动化失败保留原断言及本地日志，补充截图／节点树失败不覆盖原异常。当前验收结论维护于开发说明，运行输出放在忽略的 `build/e2e/` 或 `build/previews/`。
 
+配置文件回归由 `GalaxyProfilesTest`、`GalaxyProfileEditorTest`、`GalaxyConfigurationEvidenceTest` 和 `RemoteLogBatchTest` 覆盖迁移、同车型独立文件、草稿取消／保存、身份保留、写入失败、损坏恢复、当前连接读取与未来设置写入、完整脱敏配置头、日志轮转、报告裁剪及切换配置后的冻结重试。`python3 e2e/device/configuration_profiles_smoke.py --adb ../tools/scripts/adb.sh --language zh` 只允许无连接服务的 AVD，检查实际模态框、取消确认、新建 L6 不自动使用及明确切换，结束恢复原文件选择与语言。可改为 `--language en`；截图目录由 `--output-dir` 指定。保留新建测试文件供复核，不清除原有配置、认证或日志，不连接手机、不上传。
+
 官方源码快照的测试映射与未开放入口范围固定在 [test-scope.json](../tools/upstream-sync/test-scope.json)。`upstream-reference/common/test/` 与 `upstream-reference/shared/test/` 完整保留原版界面、BYD／仪表／多显示／同网等测试，不在本产品 sourceSets 中执行，也不计入通过数；对应有效协议、热点、USB、窗口、有限重试和导出回退回归仍在 `shared/test/`、`common/test/`。少量用例按产品中英文、MANUAL、唯一权限动作和三个 USB 接收器调整接口断言。原测试没有删除，不能以参考目录文件数宣称产品回归通过。
 
 [sync-upstream-core.py](../scripts/sync-upstream-core.py) 的覆盖、冲突、漂移和目录隔离由 `checks/test_upstream_sync.py` 使用临时 Git 仓库验证；不读取或复制认证、签名、日志和构建产物。

@@ -86,7 +86,10 @@ class RemoteLogBatchTest {
     }
 
     @Test fun failedBatchStopsAndManualRetrySkipsConfirmedBatchesWithStableEvents() {
-        File(folder, "diplay.log").writeText((0..2400).joinToString("\n") { "event=$it HEVC codec=c2.qti.hevc.decoder " + "frame=1920x1440 ".repeat(5) })
+        val configuration = GalaxyConfigurationEvidence.capture(app)
+        File(folder, "diplay.log").writeText(configuration.header + "\n" + (0..2400).joinToString("\n") {
+            "config_ref=${configuration.id} event=$it HEVC codec=c2.qti.hevc.decoder " + "frame=1920x1440 ".repeat(5)
+        })
         val received = CopyOnWriteArrayList<Pair<Int, String>>()
         configure { text, data ->
             val batch = data.getJSONObject(0).getInt("batch_index")
@@ -98,13 +101,21 @@ class RemoteLogBatchTest {
         assertNull(RemoteLogHistory.last(app))
         assertEquals(listOf(1, 2), received.map { it.first })
         assertEquals(1, RemoteLogUpload.status.completedBatches)
+        val reportId = RemoteLogUpload.status.id
         Thread.sleep(100)
         assertEquals(2, received.size)
+        // 失败后切换车型与参数，重试仍发送原报告，而不是读取新配置冒充旧测试。
+        val repository = GalaxyProfiles(app)
+        val draft = GalaxyConfigurationContext(app, repository.draft("current", "Retry next configuration"), true)
+        L7AudioTemplates.selectModel(draft, L7AudioTemplates.Model.L6)
+        val saved = repository.save(draft.profile.copy(configuration = draft.configuration()))
+        repository.select(saved.id)
         assertTrue(RemoteLogUpload.start(app, retry = true))
         await(RemoteLogUpload.Phase.SUCCESS)
         assertEquals(listOf(1, 2, 2), received.take(3).map { it.first })
         assertEquals(received[1].second, received[2].second)
         val status = RemoteLogUpload.status
+        assertEquals(reportId, status.id)
         assertEquals(status.totalBatches, status.completedBatches)
         assertEquals(status.totalLines, status.uploadedLines)
         assertEquals(RemoteLogHistory.Entry(status.finishedAt, status.totalLines), RemoteLogHistory.last(app))

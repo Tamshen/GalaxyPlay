@@ -92,7 +92,8 @@ internal object L7AudioTemplates {
     }
 
     @Synchronized fun customInvalid(context: Context): Boolean =
-        mode(context) == Mode.CUSTOM && runCatching { readCustom(context) }.isFailure
+        mode(context) == Mode.CUSTOM && ((context is GalaxyConfigurationContext && model(context).id in context.audioRecovery) ||
+            runCatching { readCustom(context) }.isFailure)
 
     fun builtin(context: Context, mode: Mode): AudioRoutingTemplate {
         require(mode != Mode.CUSTOM)
@@ -117,12 +118,15 @@ internal object L7AudioTemplates {
     }
 
     private fun customExists(context: Context, targetModel: Model = model(context)): Boolean {
+        if (context is GalaxyConfigurationContext) return targetModel.id in context.audio
         val base = file(context, targetModel).baseFile
         // Android 10/11 的 AtomicFile 可从备份恢复，切换方案不能抢先覆盖该备份。
         return base.exists() || File(base.path + ".bak").exists()
     }
 
-    private fun readCustom(context: Context): AudioRoutingTemplate = file(context).openRead().use { parse(it) }
+    private fun readCustom(context: Context): AudioRoutingTemplate = if (context is GalaxyConfigurationContext)
+        AudioRoutingTemplate.parse(context.audio.getValue(model(context).id))
+    else file(context).openRead().use { parse(it) }
 
     private fun file(context: Context, targetModel: Model = model(context)): AtomicFile =
         AtomicFile(File(context.filesDir, when (targetModel) {
@@ -132,11 +136,18 @@ internal object L7AudioTemplates {
         }))
 
     private fun writeCustom(context: Context, template: AudioRoutingTemplate, targetModel: Model = model(context)) {
+        if (context is GalaxyConfigurationContext) {
+            context.audio[targetModel.id] = template.toJson()
+            context.audioRecovery.remove(targetModel.id)
+            context.onChanged?.invoke()
+            return
+        }
         val target = file(context, targetModel)
         val stream = target.startWrite()
         try {
             stream.write(template.toJson().toByteArray(Charsets.UTF_8))
             target.finishWrite(stream)
+            GalaxyProfiles.changed(context)
         } catch (error: Exception) {
             target.failWrite(stream)
             throw error

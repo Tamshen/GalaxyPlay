@@ -13,6 +13,7 @@ internal object GalaxyDebugInputChecks {
                 L7SteeringDiagnostics.initialize(activity)
                 VehicleSteeringInputLog.initialize(activity)
                 val controller = SteeringListening.controller
+                L7SteeringDiagnostics.freezeListening(activity)
                 controller.start(L7AudioTemplates.model(activity).id)
                 var shown = controller.snapshot()
                 object : GalaxyDebugFlow.Attempt {
