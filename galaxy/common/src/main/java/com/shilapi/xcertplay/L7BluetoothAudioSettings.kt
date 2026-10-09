@@ -12,21 +12,9 @@ internal object L7BluetoothAudioSettings {
     @Volatile var status = BluetoothMediaStatus.IDLE
 
     fun add(context: Context, parent: LinearLayout) {
-        var local = GalaxyMusicPlayback.localEnabled(context)
-        lateinit var ownerRow: L7SettingRow
-        ownerRow = L7Components.valueRow(context, context.getString(R.string.galaxy_music_owner),
-            context.getString(if (local) R.string.galaxy_music_local else R.string.galaxy_music_bluetooth)) {
-            val names = listOf(context.getString(R.string.galaxy_music_bluetooth), context.getString(R.string.galaxy_music_local))
-            L7Components.select(context, context.getString(R.string.galaxy_music_owner), names,
-                if (local) 1 else 0, context.getString(R.string.l7_save_next_connection)) { selected ->
-                try {
-                    GalaxyMusicPlayback.saveLocalEnabled(context, selected == 1)
-                    local = selected == 1
-                    ownerRow.setValue(names[selected])
-                } catch (_: Exception) { android.widget.Toast.makeText(context, R.string.l7_template_save_failed, android.widget.Toast.LENGTH_LONG).show() }
-            }
-        }
-        parent.addView(ownerRow)
+        parent.addView(L7SettingRow(context, context.getString(R.string.galaxy_music_owner)).apply {
+            setValue(context.getString(R.string.galaxy_music_local))
+        })
         parent.addView(L7SettingRow(context, context.getString(R.string.galaxy_music_guide), context.getString(R.string.galaxy_music_guide_body)))
         parent.addView(L7Components.switchRow(context, context.getString(R.string.l7_bt_media_auto),
             context.getString(R.string.l7_bt_media_auto_desc), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
