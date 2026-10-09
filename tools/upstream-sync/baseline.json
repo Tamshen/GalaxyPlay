@@ -1200,7 +1200,7 @@
     "shared/src/main/java/com/shilapi/xcertplay/iap2/wire/Iap2Wire.kt": "f6fb6707e0ba0a21bed9cd08cfdc1557745cf66a5acff0c03358af9a98690af6",
     "shared/src/main/java/com/shilapi/xcertplay/iap2/wire/Iap2WireCodec.kt": "860865941159f56bd11172682ee504f623f249a1b052ce8542ddf90a269703f5",
     "shared/src/main/java/com/shilapi/xcertplay/location/AndroidCarPlayLocationProvider.kt": "0106cfdae2aeb7eb62ff440f980eac95f092c94198197b0bc12576a3cca99f80",
-    "shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt": "f315952695b41f846eeadf4f41168e443ad0435933c21177d676fa02dbc4084f",
+    "shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt": "eff08d45e6f93384e7e91093e1d2eed97d113e9efa19bd8e7eba16be4a6bd3d8",
     "shared/src/main/java/com/shilapi/xcertplay/media/AudioBufferProgress.kt": "b78fe7970785a18eac805e826473dda0e18682505a13930892c3a8765d585fb9",
     "shared/src/main/java/com/shilapi/xcertplay/media/AudioChannelMapping.kt": "641096d277dc6bc1a686bc91f4bed355001fdb26c0f2c7994d1170ba55129666",
     "shared/src/main/java/com/shilapi/xcertplay/media/CarPlayPlaybackStatus.kt": "f54ca6d8e674f5064ad3a32913d5158d6c09217fcc32ef5e050771f28951767b",

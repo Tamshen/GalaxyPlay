@@ -409,6 +409,10 @@ class AndroidMediaSink(
     }
 }
 
+/** Only the primary stream asks for the actual negotiated fps; auxiliary outputs keep their format. */
+internal fun videoOperatingRate(type: Int, frameRate: Int): Int =
+    if (type == 110 && frameRate > 0) frameRate else 0
+
 /** Serial MediaCodec video decoder: one worker owns configure and frame feeding. */
 private class VideoDecoder(
     streamType: Int,
@@ -448,6 +452,8 @@ private class VideoDecoder(
     @Volatile private var surfaceChangedUs = 0L
     private var lastConfig: VideoJob.Config? = null
     @Volatile private var renderedFrameLogged = false
+    private var operatingRate = videoOperatingRate(streamType, fps)
+    private var configuredRate = 0
     private var submittedFrameLogged = false
     private var duplicateConfigLogged = false
     private val referenceChain = VideoReferenceChain()
@@ -549,6 +555,9 @@ private class VideoDecoder(
                 } catch (error: Exception) {
                     if (running) Log.e(TAG, "video decoder job failed: ${job?.javaClass?.simpleName}", error)
                     if (running) report("decoder error ${error.javaClass.simpleName}; waiting for keyframe")
+                    if (configuredRate > 0 && !renderedFrameLogged && error is MediaCodec.CodecException) {
+                        dropOperatingRate("codec failed before first presentation")
+                    }
                     if (running) recover("decoder exception ${error.javaClass.simpleName}")
                 }
             }
@@ -614,19 +623,23 @@ private class VideoDecoder(
         val candidates = decoderCandidates(mime)
         val attempts = candidates.flatMap { candidate ->
             if (candidate.software) listOf(DecoderAttempt(candidate, false))
-            else listOf(DecoderAttempt(candidate, true), DecoderAttempt(candidate, false))
+            else listOfNotNull(DecoderAttempt(candidate, true, operatingRate).takeIf { operatingRate > 0 },
+                DecoderAttempt(candidate, true), DecoderAttempt(candidate, false))
         }
         var next: MediaCodec? = null
+        var usedRate = 0
         for (attempt in attempts) {
             // 系统 create/configure/start 为同步调用；只约束后续候选，不用第二个线程争抢 codec。
             if (!running || System.nanoTime() - setupStartedNs >= 3_000_000_000L) break
+            if (attempt.operatingRate > 0 && operatingRate == 0) continue
             next = tryConfigure(mime, csd, surface, attempt)
-            if (next != null) break
+            if (next != null) { usedRate = attempt.operatingRate; break }
         }
         if (next == null) {
             recover("decoder configuration failed mime=$mime size=${width}x$height")
         }
         decoder = next
+        configuredRate = usedRate
         renderedFrameLogged = false
         submittedFrameLogged = false
         if (next != null) {
@@ -643,13 +656,19 @@ private class VideoDecoder(
         }
     }
 
-    private data class DecoderAttempt(val candidate: VideoDecoderCandidate, val tuned: Boolean)
+    private data class DecoderAttempt(val candidate: VideoDecoderCandidate, val tuned: Boolean, val operatingRate: Int = 0)
 
-    private fun buildFormat(mime: String, csd: List<ByteArray>, tuned: Boolean): MediaFormat =
+    private fun dropOperatingRate(reason: String) {
+        report("operatingRate dropped requested=$operatingRate reason=$reason")
+        operatingRate = 0
+    }
+
+    private fun buildFormat(mime: String, csd: List<ByteArray>, attempt: DecoderAttempt): MediaFormat =
         MediaFormat.createVideoFormat(mime, width, height).apply {
-            if (tuned) {
+            if (attempt.tuned) {
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, MAX_INPUT_SIZE)
                 setInteger(MediaFormat.KEY_PRIORITY, 0)
+                if (attempt.operatingRate > 0) setInteger(MediaFormat.KEY_OPERATING_RATE, attempt.operatingRate)
             }
             csd.forEachIndexed { index, bytes -> setByteBuffer("csd-$index", ByteBuffer.wrap(bytes)) }
         }
@@ -663,7 +682,7 @@ private class VideoDecoder(
         var candidate: MediaCodec? = null
         var phase = "create"
         return try {
-            val format = buildFormat(mime, csd, attempt.tuned)
+            val format = buildFormat(mime, csd, attempt)
             val codec = createCodec(attempt.candidate.name)
             candidate = codec
             if (attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
@@ -697,11 +716,12 @@ private class VideoDecoder(
             }, renderHandler)
             phase = "start"
             codec.start()
-            report("decoder attempt=${codec.name} tuned=${attempt.tuned} " +
+            report("decoder attempt=${codec.name} tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} " +
                 "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency}")
             codec
         } catch (error: Exception) {
             runCatching { candidate?.release() }
+            if (attempt.operatingRate > 0) dropOperatingRate("rejected at $phase")
             val detail = (error as? MediaCodec.CodecException)?.diagnosticInfo ?: error.javaClass.simpleName
             val codecError = error as? MediaCodec.CodecException
             report("configure rejected decoder=${attempt.candidate.name} phase=$phase tuned=${attempt.tuned} " +
@@ -943,6 +963,7 @@ private class VideoDecoder(
     private fun releaseDecoder() {
         val codec = decoder
         decoder = null
+        configuredRate = 0
         inputTiming.clear()
         inputSlot.clear(); inputProgress.reset()
         startupWatchdog.reset()
