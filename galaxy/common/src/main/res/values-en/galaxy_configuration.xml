@@ -3,8 +3,8 @@
     <string name="config_page_credentials">Local authentication material</string>
     <string name="config_page_credentials_hint">Managed by this device; model templates keep it unchanged</string>
     <string name="config_page_title">Vehicle configuration</string>
-    <string name="config_page_entry_hint">Edit connection, audio and video settings with L7 and L6 quick templates</string>
-    <string name="config_page_value_hint">Update the draft, then save on the configuration page.</string>
+    <string name="config_page_entry_hint">Choose a vehicle template and adjust connection, audio and video settings</string>
+    <string name="config_page_value_hint">Confirm your choice, then tap Save on the configuration page.</string>
     <string name="config_page_restore">Undo edits</string>
     <string name="config_page_common">Common</string>
     <string name="config_page_connection">Connection</string>
@@ -17,9 +17,41 @@
     <string name="template_l7">Galaxy L7</string>
     <string name="template_l6">Galaxy L6</string>
     <string name="template_quick">Built-in quick settings</string>
-    <string name="template_overwrite">Tap a model to overwrite current vehicle settings. You can edit them afterwards.</string>
+    <string name="template_overwrite">Applying a template replaces vehicle settings and unsaved edits. You can adjust them afterwards. App settings, including language and interface size, are kept.</string>
     <string name="template_saved">Saved · Current model: %1$s</string>
     <string name="template_pending_connection">Saved · The current connection keeps its settings; changes apply next time</string>
     <string name="application_settings_title">App settings</string>
     <string name="application_settings_hint">Language, interface size and appearance are saved separately from vehicle templates and included with uploaded logs.</string>
+    <string name="template_choose">Choose vehicle</string>
+    <string name="template_apply">Apply template</string>
+    <string name="template_current">Vehicle · %1$s</string>
+    <string name="template_hint">Choose a vehicle, enter hotspot details, then connect. Expand advanced settings when needed.</string>
+    <string name="config_hotspot_title">Hotspot name and password</string>
+    <string name="config_hotspot_hint">Enter the car hotspot name and password. Leave the password blank for an open hotspot; other settings are automatic.</string>
+    <string name="config_advanced_open">Advanced settings</string>
+    <string name="config_advanced_close">Hide advanced settings</string>
+    <string name="config_common_details">Fine-tune picture quality. Defaults suit everyday use.</string>
+    <string name="config_connection_details">Startup behaviour and vehicle location reporting.</string>
+    <string name="config_audio_details">Audio presets, output devices, routing, buffer and focus.</string>
+    <string name="config_video_details">Hardware decoding, video format, scale and safe area.</string>
+    <string name="config_auth_details">Change authentication source or configure a remote service.</string>
+    <string name="config_auth_default_hint">Keep the defaults for everyday use. Adjust these only when changing authentication methods.</string>
+    <string name="config_quality">Picture quality</string>
+    <string name="config_quality_clear" formatted="false">Clear · 100% (recommended)</string>
+    <string name="config_quality_balanced" formatted="false">Balanced · 80%</string>
+    <string name="config_quality_light" formatted="false">Save resources · 60%</string>
+    <string name="config_smoothness">Picture smoothness</string>
+    <string name="config_smoothness_standard">Standard · 30 fps (recommended)</string>
+    <string name="config_smoothness_high">Smoother · 60 fps</string>
+    <string name="config_music_stability">Music playback</string>
+    <string name="config_music_fast">Faster response · 300 ms (recommended)</string>
+    <string name="config_music_stable">More stable · 500 ms</string>
+    <string name="config_music_safest">Prioritize stability · 1000 ms</string>
+    <string name="config_bluetooth_music">Pause phone Bluetooth music</string>
+    <string name="config_bluetooth_hint">Avoid Bluetooth music playing alongside CarPlay.</string>
+    <string name="config_icon_size">CarPlay icon size</string>
+    <string name="config_size_default" formatted="false">Default · 100% (recommended)</string>
+    <string name="config_size_large" formatted="false">Large · 125%</string>
+    <string name="config_size_larger" formatted="false">Larger · 150%</string>
+    <string name="config_custom_value">Custom · %1$d</string>
 </resources>

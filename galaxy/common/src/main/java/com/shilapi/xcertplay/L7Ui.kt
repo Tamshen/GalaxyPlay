@@ -33,7 +33,7 @@ internal object L7Ui {
         bind(view) { view.setTextColor(view.context.getColor(color)) }
     }
 
-    fun surface(view: View, color: Int = R.color.product_ui_surface, radius: Int = 12) {
+    fun surface(view: View, color: Int = R.color.product_ui_surface, radius: Int = 4) {
         bind(view) { view.background = rounded(view.context, view.context.getColor(color), radius) }
     }
 
@@ -54,7 +54,8 @@ internal object L7Ui {
         view.background = RippleDrawable(ripple, states, ColorDrawable(Color.WHITE))
     }
 
-    fun button(view: Button, primary: Boolean = false, radius: Int = 8, compact: Boolean = false) {
+    fun button(view: Button, primary: Boolean = false, radius: Int = 4, compact: Boolean = false,
+               surface: Int = R.color.product_ui_control, withIcon: Boolean = true) {
         view.isAllCaps = false
         view.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         view.stateListAnimator = null
@@ -64,7 +65,7 @@ internal object L7Ui {
         view.textSize = if (compact) 13f else 20f
         view.minWidth = 0
         view.minimumWidth = 0
-        view.minHeight = L7Components.dp(view.context, if (compact) 48 else 64)
+        view.minHeight = L7Components.dp(view.context, if (compact) 48 else 72)
         view.minimumHeight = view.minHeight
         bind(view) {
             val context = view.context
@@ -75,7 +76,7 @@ internal object L7Ui {
                 intArrayOf(context.getColor(R.color.product_ui_disabled), foreground)
             ))
             val fill = rounded(context, context.getColor(
-                if (primary && view.isEnabled) R.color.product_ui_accent else R.color.product_ui_control), radius)
+                if (primary && view.isEnabled) R.color.product_ui_accent else surface), radius)
             view.background = RippleDrawable(ColorStateList.valueOf(context.getColor(R.color.product_ui_ripple)),
                 fill, null)
             // 替换背景后再次设置内边距，防止系统 Button 的 inset 覆盖统一的图标/文字留白。
@@ -85,7 +86,30 @@ internal object L7Ui {
             // 按当前可用状态直接重绘背景，避免主题切换复用旧 drawable 的状态与 tint。
             view.backgroundTintList = null
             view.invalidate()
-            L7Icons.decorate(view)
+            if (withIcon) L7Icons.decorate(view)
+            else view.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, null, null)
+        }
+    }
+
+    /** 输入框采用细圆角填充和明确的焦点边框，避免 Material 默认下划线。 */
+    fun input(view: android.widget.EditText) {
+        view.textSize = 20f
+        view.minimumHeight = L7Components.dp(view.context, 64)
+        bind(view) {
+            val context = view.context
+            view.setTextColor(context.getColor(R.color.product_ui_text))
+            view.setHintTextColor(context.getColor(R.color.product_ui_muted))
+            view.backgroundTintList = null
+            fun outline(focused: Boolean) = rounded(context, context.getColor(R.color.product_ui_control), 4).apply {
+                setStroke(L7Components.dp(context, 1).coerceAtLeast(1), context.getColor(
+                    if (focused) R.color.product_ui_accent else R.color.product_ui_border))
+            }
+            view.background = StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), outline(true))
+                addState(intArrayOf(), outline(false))
+            }
+            val padding = L7Components.dp(context, 16)
+            view.setPaddingRelative(padding, padding, padding, padding)
         }
     }
 

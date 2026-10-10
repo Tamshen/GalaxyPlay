@@ -69,13 +69,13 @@ internal object L7Components {
         actionRow(context, title, click = click).apply { setValue(value) }
 
     fun choice(parent: LinearLayout, title: String, options: List<String>, current: Int,
-               reconnects: Boolean = true, save: (Int) -> Unit) {
-        val context = parent.context
+               reconnects: Boolean = true, context: Context = parent.context, save: (Int) -> Unit) {
         var selection = current.coerceIn(options.indices)
         lateinit var row: L7SettingRow
         row = valueRow(context, title, options[selection]) {
             select(context, title, options, selection,
-                context.getString(if (reconnects && CarPlayBackgroundSession.hasSession()) R.string.l7_save_next_connection else R.string.save)) { chosen ->
+                context.getString(if (context is GalaxyConfigurationContext) R.string.profile_update_draft
+                    else if (reconnects && CarPlayBackgroundSession.hasSession()) R.string.l7_save_next_connection else R.string.save)) { chosen ->
                 save(chosen)
                 selection = chosen
                 row.setValue(options[chosen])
@@ -94,17 +94,15 @@ internal object L7Components {
                 contentDescription = title
                 isChecked = checked
                 minHeight = dp(context, 64)
-                L7Ui.bind(this) {
-                    val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
-                    thumbTintList = ColorStateList(states, intArrayOf(context.getColor(R.color.product_ui_accent), context.getColor(R.color.product_ui_muted)))
-                    trackTintList = ColorStateList(states, intArrayOf(context.getColor(R.color.product_ui_selected), context.getColor(R.color.product_ui_border)))
-                }
+                L7SwitchStyle.apply(this)
                 // 行点击调用控件入口，拖动与点击都只经这个监听器提交一次。
                 setOnCheckedChangeListener { _, value -> if (!updatingSwitch) save(value) }
             }
-            setAccessory(control)
-            isFocusable = true
+            setAccessory(control, slotWidth = dp(context, 82), leading = true)
+            // 无障碍与键盘只提供一个带 checked 状态的开关目标，触屏仍可点整行。
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             setOnClickListener { if (isEnabled && control.isEnabled) control.performClick() }
+            isFocusable = false
             L7Ui.rowFeedback(this)
         }
 
@@ -112,7 +110,7 @@ internal object L7Components {
         listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL).forEach { which ->
             dialog.getButton(which)?.apply {
                 minHeight = dp(context, 64)
-                L7Ui.button(this, primary = which == AlertDialog.BUTTON_POSITIVE, radius = 8)
+                L7Ui.button(this, primary = which == AlertDialog.BUTTON_POSITIVE, radius = 4)
             }
         }
     }

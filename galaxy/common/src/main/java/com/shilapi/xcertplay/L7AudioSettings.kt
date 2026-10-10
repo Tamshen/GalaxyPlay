@@ -9,12 +9,14 @@ import com.shilapi.xcertplay.media.AudioOutputRole
 /** 内置方案只显示日常设置；自定义方案才展开配置文件与三用途调试。 */
 internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
-             onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null,
+             onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null, advanced: Boolean = true,
              open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
         fun text(id: Int) = context.getString(id)
+        val applyLabel = if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.l7_save_next_connection
+        val applyHint = if (context is GalaxyConfigurationContext) "" else text(R.string.l7_setting_apply_hint)
         val mode = L7AudioTemplates.mode(context)
         val custom = mode == L7AudioTemplates.Mode.CUSTOM
-        fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, open) }
+        fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, advanced, open) }
         val model = L7AudioTemplates.model(context)
         val modelName = L7AudioModelConfirmation.name(context, model)
         val modes = L7AudioTemplates.modes(context)
@@ -28,14 +30,16 @@ internal object L7AudioSettings {
                 R.string.l7_template_recovery else R.string.l7_template_custom_note
         }
         L7SettingsSection.add(parent, text(R.string.l7_template_title),
-            description = context.getString(summary, modelName), footer = text(R.string.l7_setting_apply_hint)) { card ->
-            card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[modes.indexOf(mode)]) {
+            description = context.getString(summary, modelName), footer = applyHint) { card ->
+            if (!advanced) card.addView(L7SettingRow(context, text(R.string.l7_template_select)).apply {
+                setValue(names[modes.indexOf(mode)])
+            }) else card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[modes.indexOf(mode)]) {
                 L7Components.select(context, text(R.string.l7_template_select), names, modes.indexOf(mode),
-                    text(R.string.l7_save_next_connection)) { selected ->
+                    text(applyLabel)) { selected ->
                     change(context) { L7AudioTemplates.select(context, modes[selected]); refresh() }
                 }
             })
-            if (custom) {
+            if (custom && advanced) {
                 card.addView(L7Components.actionRow(context, text(R.string.l7_template_edit),
                     text(R.string.l7_template_file_note)) { L7AudioTemplateEditor.show(context, ::refresh) })
                 onImport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_import),
@@ -43,12 +47,12 @@ internal object L7AudioSettings {
                 onExport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_export),
                     text(R.string.l7_template_export_note), click = it)) }
             }
-            card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
+            if (advanced) card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
                 context.getString(R.string.l7_template_restore_note, modelName)) {
                 L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
                     .setMessage(context.getString(R.string.l7_template_restore_confirm, modelName))
                     .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
+                    .setPositiveButton(applyLabel) { _, _ ->
                         change(context) {
                             AirPlayPersistence.restoreUsageAudioDefaults(context)
                             L7AudioTemplates.select(context, L7AudioTemplates.defaultMode(context))
@@ -57,8 +61,8 @@ internal object L7AudioSettings {
                     }.show()
             })
         }
-        L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
-        if (custom) L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
+        if (advanced) L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
+        if (custom && advanced) L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
             description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
             add(context, card, custom = true, open = open)
             card.addView(L7SettingRow(context, text(R.string.l7_audio_phone), text(R.string.l7_audio_phone_note)).apply {
@@ -72,14 +76,14 @@ internal object L7AudioSettings {
                 refresh()
             })
         }
-        L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = text(R.string.l7_setting_apply_hint)) { card ->
+        L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = applyHint) { card ->
             val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            L7Components.choice(card, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
+            if (advanced) L7Components.choice(card, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
                 text(R.string.s_500_ms), text(R.string.s_1000_ms_most_stable)),
                 presets.indexOf(AirPlayPersistence.loadMediaBufferMillis(context))) {
                 AirPlayPersistence.saveMediaBufferMillis(context, presets[it])
             }
-            card.addView(L7Components.switchRow(context, text(R.string.contrib_audio_home_toggle_audio_focus),
+            if (advanced) card.addView(L7Components.switchRow(context, text(R.string.contrib_audio_home_toggle_audio_focus),
                 text(R.string.contrib_audio_home_toggle_audio_focus_desc), AirPlayPersistence.loadAudioFocusEnabled(context)) {
                 AirPlayPersistence.saveAudioFocusEnabled(context, it)
             })

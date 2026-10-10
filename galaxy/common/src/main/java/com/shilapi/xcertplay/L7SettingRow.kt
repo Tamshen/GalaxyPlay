@@ -21,7 +21,9 @@ internal class L7SettingRow(context: Context, title: String, description: String
     private val accessory = FrameLayout(context)
     internal var updatingSwitch = false
         private set
-    val textInset = dp(20) + if (icon == null) 0 else dp(48)
+    private val iconInset = if (icon == null) 0 else dp(48)
+    private var leadingAccessoryWidth = 0
+    val textInset get() = dp(20) + iconInset + leadingAccessoryWidth
 
     init {
         orientation = HORIZONTAL
@@ -48,10 +50,14 @@ internal class L7SettingRow(context: Context, title: String, description: String
         feedbackView.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
 
-    fun setAccessory(view: View, width: Int = -2, height: Int = -2) {
+    fun setAccessory(view: View, width: Int = -2, height: Int = -2, slotWidth: Int = dp(64), leading: Boolean = false) {
         accessory.removeAllViews()
-        // 操作槽保留文字间隔，图标与开关统一靠末端，避免窄箭头被居中后显得偏左。
-        accessory.addView(view, FrameLayout.LayoutParams(width, height, Gravity.END or Gravity.CENTER_VERTICAL))
+        leadingAccessoryWidth = if (leading) slotWidth else 0
+        removeView(accessory)
+        addView(accessory, if (leading) 0 else childCount, LayoutParams(slotWidth, -2))
+        // 开关置于文字前，箭头仍在末端；视觉尺寸和整行命中区域分别处理。
+        accessory.addView(view, FrameLayout.LayoutParams(width, height,
+            (if (leading) Gravity.START else Gravity.END) or Gravity.CENTER_VERTICAL))
         accessory.visibility = VISIBLE
         view.isEnabled = isEnabled
     }

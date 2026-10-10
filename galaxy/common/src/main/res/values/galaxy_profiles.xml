@@ -31,7 +31,7 @@
     <string name="profile_name">配置名称</string>
     <string name="profile_category">参数分类</string>
     <string name="profile_view_category">查看分类</string>
-    <string name="profile_update_draft">更新草稿</string>
+    <string name="profile_update_draft">确定</string>
     <string name="profile_draft_hint">本窗口只修改草稿。切换分类不会丢失修改；点击底部“保存”才写入完整配置文件，取消保留原文件。</string>
     <string name="profile_discard_title">放弃本次修改？</string>
     <string name="profile_discard_message">未保存的修改会丢弃，已保存文件保持原值。</string>

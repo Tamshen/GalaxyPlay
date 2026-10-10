@@ -66,9 +66,9 @@ internal class GalaxyProfiles(private val context: Context,
     }
     /** 车型是快速模板，直接覆盖当前完整文件；设备身份仍由兼容镜像保护。 */
     fun applyTemplate(model: String): GalaxyProfile = synchronized(lock) {
-        require(model in setOf("l7", "l6"))
+        val template = requireNotNull(GalaxyVehicleTemplates.find(model))
         val current = refresh()
-        save(current.copy(configuration = GalaxyConfigurationFields.factory(context, model)))
+        save(current.copy(configuration = template.create(context)))
     }
     fun draft(model: String, name: String): GalaxyProfile = synchronized(lock) {
         val configuration = if (model == "current") refresh().configuration else GalaxyConfigurationFields.factory(context, model)

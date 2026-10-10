@@ -32,8 +32,14 @@ def launch(page='settings-vehicle'):
 
 
 def tree():
-    adb('shell', 'uiautomator', 'dump', '/sdcard/configuration-ux.xml')
-    return ET.fromstring(adb('shell', 'cat', '/sdcard/configuration-ux.xml'))
+    for attempt in range(3):
+        try:
+            adb('shell', 'uiautomator', 'dump', '/sdcard/configuration-ux.xml')
+            return ET.fromstring(adb('shell', 'cat', '/sdcard/configuration-ux.xml'))
+        except subprocess.CalledProcessError:
+            if attempt == 2:
+                raise
+            time.sleep(1)
 
 
 def texts():
@@ -64,7 +70,7 @@ def click(text, contains=False):
 def tap(node):
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
-    time.sleep(.25)
+    time.sleep(.4)
 
 
 def screenshot(name):
@@ -84,10 +90,14 @@ def active():
 
 labels = {
     'l7': ('银河 L7', 'Galaxy L7'), 'l6': ('银河 L6', 'Galaxy L6'),
+    'vehicle': ('车型 · ', 'Vehicle · '), 'template_apply': ('应用模板', 'Apply template'),
+    'more': ('更多', 'More'), 'common': ('常用', 'Common'),
+    'advanced': ('高级设置', 'Advanced settings'), 'collapse': ('收起高级设置', 'Hide advanced settings'),
+    'hotspot': ('热点名称与密码', 'Hotspot name and password'), 'audio': ('音频', 'Audio'),
     'cancel': ('取消', 'Cancel'), 'keep': ('继续编辑', 'Keep editing'),
     'discard': ('放弃修改', 'Discard changes'), 'undo': ('撤销修改', 'Undo edits'),
     'save': ('保存', 'Save'), 'video': ('画面', 'Display'), 'connection': ('连接', 'Connection'),
-    'bluetooth': ('蓝牙音乐互斥', 'Bluetooth media coordination'),
+    'bluetooth': ('暂停手机蓝牙音乐', 'Pause phone Bluetooth music'),
     'right': ('右舵布局', 'Right-hand drive layout'), 'back': ('返回设置', 'Back to settings'),
     'language': ('应用语言', 'App language'), 'apply': ('应用', 'Apply'),
     'system': ('跟随系统', 'System default'), 'title': ('车型配置', 'Vehicle configuration'),
@@ -118,12 +128,44 @@ def language(value):
 
 
 def category(key):
-    node = next(node for node in tree().iter('node') if node.get('text') in labels[key] and node.get('class') == 'android.widget.Button')
-    tap(node)
+    for _ in range(5):
+        root = tree()
+        node = next((node for node in root.iter('node') if node.get('text') in labels[key]
+                     and node.get('class') == 'android.widget.Button' and node.get('clickable') == 'true'), None)
+        if node is not None:
+            tap(node)
+            assert any(node.get('text') in labels[key] and node.get('selected') == 'true'
+                       for node in tree().iter('node')), 'TAB 点选未切换：' + key
+            return
+        bar = next(node for node in root.iter('node') if node.get('class') == 'android.widget.HorizontalScrollView')
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', bar.get('bounds')))
+        start, end = (x1 + 30, x2 - 30) if key == 'common' else (x2 - 30, x1 + 30)
+        adb('shell', 'input', 'swipe', str(start), str((y1 + y2) // 2), str(end), str((y1 + y2) // 2), '300')
+    raise AssertionError('横向 TAB 不可达：' + key)
+
+
+def swipe_tabs():
+    root = tree()
+    bar = next(node for node in root.iter('node') if node.get('class') == 'android.widget.HorizontalScrollView')
+    old = [(node.get('text'), node.get('bounds')) for node in bar.iter('node') if node.get('class') == 'android.widget.Button']
+    x1, y1, x2, y2 = map(int, re.findall(r'\d+', bar.get('bounds')))
+    adb('shell', 'input', 'swipe', str(x2 - 30), str((y1 + y2) // 2), str(x1 + 30), str((y1 + y2) // 2), '300')
+    time.sleep(.3)
+    bar = next(node for node in tree().iter('node') if node.get('class') == 'android.widget.HorizontalScrollView')
+    new = [(node.get('text'), node.get('bounds')) for node in bar.iter('node') if node.get('class') == 'android.widget.Button']
+    assert old != new, 'TAB 横向手势没有滚动'
+
+
+def template(key, apply=True):
+    click(label('vehicle'), contains=True)
+    click(label(key))
+    assert any(node.get('text') in labels[key] and node.get('checked') == 'true'
+               for node in tree().iter('node')), '车型候选没有选中：' + key
+    click(label('template_apply') if apply else label('cancel'))
 
 
 def bounds(key):
-    node = next(node for node in tree().iter('node') if node.get('text') in labels[key] and node.get('class') == 'android.widget.Button')
+    node = next(node for node in tree().iter('node') if (node.get('text') in labels[key] or (key == 'vehicle' and node.get('text', '').startswith(label('vehicle')))) and node.get('class') == 'android.widget.Button')
     return node.get('bounds')
 
 
@@ -190,7 +232,13 @@ try:
     launch()
     screenshot('02-configuration')
     independent = current_app_values()
+    click(label('vehicle'), contains=True)
+    screenshot('03-vehicle-picker')
     click(label('l6'))
+    assert any(node.get('text') in labels['l6'] and node.get('checked') == 'true'
+               for node in tree().iter('node')), '车型候选没有选中：l6'
+    screenshot('03-l6-selected')
+    click(label('template_apply'))
     assert english == detect_language(), '车型模板改变了语言'
     assert current_app_values() == independent, '车型模板改变了应用偏好'
     assert active() == original_id, '模板另建或切换了文件'
@@ -201,19 +249,52 @@ try:
     assert not applied['configuration']['preferences']['diplay'].get('app_language')
     assert not applied['configuration']['preferences']['l7_ui'].get('density')
     before = private(path)
+    category('common')
+    root = tree()
+    switch = next(n for n in root.iter('node') if n.get('class') == 'android.widget.Switch' and n.get('content-desc') in labels['bluetooth'])
+    title = next(n for n in root.iter('node') if n.get('class') == 'android.widget.TextView' and n.get('text') in labels['bluetooth'])
+    control_bounds = list(map(int, re.findall(r'\d+', switch.get('bounds'))))
+    title_bounds = list(map(int, re.findall(r'\d+', title.get('bounds'))))
+    assert control_bounds[2] <= title_bounds[0], 'Flyme 开关没有位于文字左侧'
+    assert control_bounds[2] - control_bounds[0] <= 144, '320 DPI 开关视觉比例过大'
     click(label('bluetooth'))
     assert private(path) == before, '普通参数提前写入文件'
+    template('l7', apply=False)
+    assert private(path) == before, '取消车型选择写入了文件'
+    assert '有未保存的修改' in texts() or 'Unsaved changes' in texts(), '取消车型选择丢失草稿'
+    swipe_tabs()
+    assert private(path) == before, 'TAB 滑动写入了草稿'
+    category('more')
+    screenshot('04-tabs-more')
+    category('common')
     category('video')
     screenshot('04-display-draft')
     click(label('undo')); click(label('keep'))
     click(label('undo')); click(label('discard'))
     assert private(path) == before
     category('connection')
-    fixed = bounds('l7'), bounds('save')
+    click(label('hotspot'))
+    assert len([n for n in tree().iter('node') if n.get('class') == 'android.widget.EditText']) == 2, '热点不是两项输入'
+    screenshot('05-hotspot-modal')
+    click(label('cancel'))
+    click(label('advanced'))
+    assert not any(value in texts() for value in ['热点频段', '热点通道', '热点安全方式', 'Hotspot band', 'Hotspot channel', 'Hotspot security'])
+    screenshot('05-connection-details')
+    category('audio')
+    screenshot('05-audio-basic')
+    category('video')
+    assert not any(value in texts() for value in ['HEVC 软件解码', 'Software HEVC decoder'])
+    click(label('advanced'))
+    screenshot('05-display-details')
+    fixed = bounds('vehicle'), bounds('save')
     adb('shell', 'input', 'swipe', '1000', '1450', '1000', '750', '300')
-    assert fixed == (bounds('l7'), bounds('save')), '模板或底部操作随参数滚动'
-    screenshot('05-connection-scrolled')
-    category('video'); click(label('right')); click(label('save'))
+    assert fixed == (bounds('vehicle'), bounds('save')), '模板或底部操作随参数滚动'
+    screenshot('05-display-scrolled')
+    for _ in range(3):
+        adb('shell', 'input', 'swipe', '1000', '750', '1000', '1450', '200')
+    click(label('collapse'))
+    screenshot('05-display-basic')
+    click(label('right')); click(label('save'))
     edited = json.loads(private(path))
     assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
     assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
@@ -227,7 +308,7 @@ try:
     click(label('back')); click(label('discard'))
     assert private(path) == saved
     launch()
-    click(label('l7'))
+    template('l7')
     assert json.loads(private(path))['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l7'
     assert current_app_values() == independent
     # 旧版其他文件首次读取会升级并保留上一份，不能把迁移备份误判成新配置。
@@ -248,4 +329,4 @@ finally:
     assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、L7/L6 一键覆盖同一文件、后续编辑保存、分类直接切换、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
+print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6 确认覆盖同一文件、后续编辑保存、横向 TAB 滚动切换、基础与高级设置切换、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)

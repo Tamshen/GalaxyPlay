@@ -717,55 +717,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     }
 
     private fun askHotspotCredentials(done: (String, String) -> Unit) {
-        val fields = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
-        fields.addView(label(getString(R.string.copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av), 16, MUTED))
-        val ssid = EditText(this).apply { hint = getString(R.string.hotspot_name); setText(storedSsid()); setSingleLine() }
-        val password = EditText(this).apply {
-            hint = getString(R.string.hotspot_password); setText(storedPassword()); setSingleLine()
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        ssid.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_NEXT or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
-        password.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
-        fun hideKeyboard() {
-            val token = password.windowToken ?: ssid.windowToken
-            (this.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
-                .hideSoftInputFromWindow(token, 0)
-            ssid.clearFocus(); password.clearFocus()
-        }
-        ssid.setOnEditorActionListener { _, action, _ ->
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT) { password.requestFocus(); true } else false
-        }
-        password.setOnEditorActionListener { _, action, _ ->
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
-        }
-        fields.addView(ssid); fields.addView(password)
-        fields.addView(CheckBox(this).apply {
-            text = getString(R.string.show_password)
-            setOnCheckedChangeListener { _, checked ->
-                password.transformationMethod = if (checked) null else android.text.method.PasswordTransformationMethod.getInstance()
-                password.setSelection(password.text.length)
-            }
-        })
-        val error = label("", 14, WARNING)
-        error.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        fields.addView(error)
-        val dialog = L7Dialogs.builder(this).setTitle(getString(R.string.car_hotspot_details))
-            .setView(ScrollView(this).apply { addView(fields) })
-            .setPositiveButton(getString(R.string.save_details), null).setNegativeButton(getString(R.string.cancel)) { _, _ -> hideKeyboard() }
-            .setNeutralButton(getString(R.string.hide_keyboard), null).create()
-        dialog.setOnShowListener {
-            if (l7Ui) L7Components.styleDialog(dialog)
-            dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener { hideKeyboard() }
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = ssid.text.toString().trim()
-                val secret = password.text.toString()
-                val problem = hotspotError(name, secret)
-                if (problem != null) error.text = problem
-                else { hideKeyboard(); dialog.dismiss(); done(name, secret) }
-            }
-        }
-        dialog.show()
+        L7HotspotEditor.show(this, storedSsid(), storedPassword(), apply = done)
     }
 
     // "Left 20 %", "Centre · default", "Down 10 %": a signed step reads as a direction and a distance.

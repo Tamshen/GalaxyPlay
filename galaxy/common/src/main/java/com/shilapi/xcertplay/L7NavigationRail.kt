@@ -55,7 +55,7 @@ internal class L7NavigationRail(context: Context, onSelect: (String) -> Unit) : 
                 L7Ui.bind(this) {
                     background = RippleDrawable(ColorStateList.valueOf(context.getColor(R.color.product_ui_ripple)),
                         L7Ui.rounded(context, if (isSelected) context.getColor(R.color.product_ui_selected) else Color.TRANSPARENT,
-                            12), null)
+                            4), null)
                 }
                 isFocusable = true
                 isClickable = true
