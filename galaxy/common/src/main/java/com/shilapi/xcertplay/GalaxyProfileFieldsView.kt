@@ -36,7 +36,8 @@ internal object GalaxyProfileFieldsView {
             fun value(): Any? = prefs.all[field.key] ?: field.default
             val title = context.getString(field.title)
             if (field.default is Boolean) {
-                parent.addView(L7Components.switchRow(context, title, "", value() as Boolean) { selected ->
+                val detail = if (field.key == "adapt_pip_resolution") context.getString(R.string.profile_pip_description) else ""
+                parent.addView(L7Components.switchRow(context, title, detail, value() as Boolean) { selected ->
                     prefs.edit().putBoolean(field.key, selected).commit()
                 })
             } else {

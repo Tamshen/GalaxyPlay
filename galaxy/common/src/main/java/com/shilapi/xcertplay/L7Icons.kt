@@ -130,7 +130,8 @@ internal object L7Icons {
     )
     fun dialog(context: Context, title: String) = dialogs.entries.firstOrNull { context.getString(it.key) == title }?.value ?: action(context, title)
 
-    fun decorate(button: Button, icon: Int? = action(button.context, button.text.toString())) {
+    fun decorate(button: Button, icon: Int? = (button as? L7ActionButton)?.actionIcon
+        ?: action(button.context, button.text.toString())) {
         button.compoundDrawablePadding = L7Components.dp(button.context, 10)
         val leading = icon?.let { resource ->
             button.context.getDrawable(resource)?.apply {

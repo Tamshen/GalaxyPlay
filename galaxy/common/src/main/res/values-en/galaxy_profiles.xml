@@ -72,5 +72,6 @@
     <string name="profile_resolution_percent">Projection resolution (percent)</string>
     <string name="profile_projection_ui">Projection text size (percent)</string>
     <string name="profile_draw_outside">Draw outside safe area</string>
-    <string name="profile_pip">Adjust projection resolution in floating windows</string>
+    <string name="profile_pip">Adapt to split screen / picture-in-picture</string>
+    <string name="profile_pip_description">When enabled, changing the window aspect ratio may reconnect CarPlay to fit the screen. When disabled, the picture usually scales directly. Unrelated to the floating menu. Off by default.</string>
 </resources>

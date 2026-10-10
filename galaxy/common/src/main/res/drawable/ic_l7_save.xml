@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 保存使用磁盘轮廓，与现有图标共用 80 单位网格、4 单位线宽及主题颜色。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp" android:height="32dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@android:color/transparent" android:strokeColor="@color/product_ui_text"
+        android:strokeWidth="4" android:strokeLineJoin="round"
+        android:pathData="M16,16H55L64,25V64H16ZM28,16V32H48V16M26,64V44H54V64" />
+</vector>

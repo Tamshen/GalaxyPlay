@@ -72,5 +72,6 @@
     <string name="profile_resolution_percent">投屏分辨率（百分比）</string>
     <string name="profile_projection_ui">投屏字号（百分比）</string>
     <string name="profile_draw_outside">安全区外显示画面</string>
-    <string name="profile_pip">浮窗调整投屏分辨率</string>
+    <string name="profile_pip">分屏／小窗自动适配</string>
+    <string name="profile_pip_description">开启后，窗口比例变化可能重连 CarPlay 以适配画面；关闭时通常直接缩放。与悬浮菜单无关，默认关闭。</string>
 </resources>

@@ -9,14 +9,14 @@ import com.shilapi.xcertplay.host.R
 /** 快速模板与分类固定在上方，参数独立滚动，主要操作始终可达。 */
 internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> Unit,
     changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit) : LinearLayout(context) {
-    val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), click = chooseTemplate)
-    val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_reset_current), click = resetCurrent)
+    val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), R.drawable.ic_l7_vehicle, click = chooseTemplate)
+    val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_reset_current), R.drawable.ic_l7_refresh, click = resetCurrent)
     val tabs = GalaxyConfigurationTabs(context, changeGroup)
     val status = L7Typography.text(context, "", L7Typography.Role.FEEDBACK)
     val fields = LinearLayout(context).apply { orientation = VERTICAL }
     val scroll = ScrollView(context).apply { isFillViewport = false; addView(fields) }
-    val resetButton = L7Components.actionButton(context, context.getString(R.string.config_page_restore), click = reset)
-    val commitButton = L7Components.actionButton(context, context.getString(R.string.save), true, commit)
+    val resetButton = L7Components.actionButton(context, context.getString(R.string.config_page_restore), R.drawable.ic_l7_revoke, click = reset)
+    val commitButton = L7Components.actionButton(context, context.getString(R.string.save), R.drawable.ic_l7_save, true, commit)
     private fun dp(value: Int) = L7Components.dp(context, value)
     init {
         orientation = VERTICAL

@@ -36,6 +36,15 @@ internal object L7Components {
         setOnClickListener { if (isEnabled) click() }
     }
 
+    /** 显式图标不依赖按钮文案，车型名称更新及昼夜重绘后仍保留。 */
+    fun actionButton(context: Context, title: String, icon: Int, primary: Boolean = false,
+                     click: () -> Unit) = L7ActionButton(context).apply {
+        actionIcon = icon
+        text = title
+        L7Ui.button(this, primary)
+        setOnClickListener { if (isEnabled) click() }
+    }
+
     fun text(context: Context, value: String, secondary: Boolean = false) = TextView(context).apply {
         text = value
         textSize = if (secondary) 16f else 20f
