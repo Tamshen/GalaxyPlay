@@ -231,7 +231,7 @@ class GalaxyConfigurationPageTest {
         assertTrue(tabs.buttons.last().right <= tabs.scrollX + tabs.width)
         page.close()
     }
-    @Test fun connectionUsesOneHotspotEditorAndNeverShowsBandChannelOrSecurityEvenWhenExpanded() {
+    @Test fun connectionShowsStartupAndLocationDirectlyWithOneHotspotEditor() {
         val activity = activity()
         val page = GalaxyConfigurationPage(activity) {}
         page.view.tabs.buttons[1].performClick()
@@ -240,31 +240,73 @@ class GalaxyConfigurationPageTest {
         for (title in listOf(R.string.profile_hotspot_name, R.string.profile_hotspot_password,
             R.string.profile_hotspot_band, R.string.profile_hotspot_channel, R.string.profile_hotspot_security))
             assertFalse(activity.getString(title) in titles())
-        descendants(page.view.fields).filterIsInstance<L7SettingRow>()
-            .first { it.titleView.text.toString() == activity.getString(R.string.config_advanced_open) }.performClick()
+        assertTrue(activity.getString(R.string.open_after_the_car_starts) in titles())
         assertTrue(activity.getString(R.string.report_location_to_iphone) in titles())
         assertFalse(activity.getString(R.string.profile_hotspot_band) in titles())
         page.close()
     }
-    @Test fun advancedSettingsStartCollapsedAndKeepDraftAndExpansionAcrossPageRebuild() {
+    @Test fun professionalSettingsAreDirectlyVisibleAndKeepDraftAcrossPageRebuild() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)
         val original = repository.active()
         val page = GalaxyConfigurationPage(activity) {}
         page.view.tabs.buttons[3].performClick()
         fun rows() = descendants(page.view.fields).filterIsInstance<L7SettingRow>()
-        assertFalse(rows().any { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) })
-        rows().first { it.titleView.text.toString() == activity.getString(R.string.config_advanced_open) }.performClick()
+        assertTrue(rows().any { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) })
         rows().first { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) }.performClick()
         assertTrue(page.dirty)
         assertEquals(original, repository.active())
         page.close()
         val rebuilt = GalaxyConfigurationPage(activity) {}
         assertTrue(rebuilt.dirty)
-        assertTrue(3 in state(activity).advanced)
+        assertEquals(3, state(activity).group)
         assertTrue(descendants(rebuilt.view.fields).filterIsInstance<L7SettingRow>()
             .any { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) })
         rebuilt.close()
+    }
+    @Test fun eachParameterHasOneEntryAndCustomPercentIsValidatedBeforeSaving() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val original = repository.active()
+        val page = GalaxyConfigurationPage(activity) {}
+        fun rows() = descendants(page.view.fields).filterIsInstance<L7SettingRow>()
+        val titles = mutableListOf<String>()
+        for (group in 0..4) {
+            page.view.tabs.buttons[group].performClick()
+            titles += rows().map { it.titleView.text.toString() }
+        }
+        for (title in listOf(R.string.config_quality, R.string.config_smoothness, R.string.config_icon_size,
+            R.string.config_music_stability, R.string.config_bluetooth_music))
+            assertEquals(1, titles.count { it == activity.getString(title) })
+        for (duplicate in listOf(R.string.profile_resolution_percent, R.string.frame_rate,
+            R.string.profile_projection_ui, R.string.music_buffer, R.string.l7_bt_media_auto))
+            assertFalse(activity.getString(duplicate) in titles)
+        page.view.tabs.buttons[0].performClick()
+        val quality = rows().first { it.titleView.text.toString() == activity.getString(R.string.config_quality) }
+        fun custom() {
+            quality.performClick()
+            val picker = dialog()
+            picker.listView.performItemClick(picker.listView.adapter.getView(3, null, picker.listView), 3, 3)
+            picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        }
+        custom()
+        dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertFalse(page.dirty)
+        custom()
+        val editor = dialog()
+        val input = descendants(editor.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
+        input.setText("29")
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertNotNull(input.error)
+        assertFalse(page.dirty)
+        input.setText("73")
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertTrue(page.dirty)
+        assertEquals(original, repository.active())
+        assertEquals(activity.getString(R.string.config_percent_value, 73), quality.valueView.text.toString())
+        page.view.commitButton.performClick()
+        assertEquals(73, repository.active().configuration.preferences.getValue("xcertplay_airplay")["display_scale_percent"])
+        page.close()
     }
     @Test fun hotspotPairOnlyUpdatesDraftAndAutomaticallyDerivesSecurityAndNetworkDefaults() {
         val activity = activity()

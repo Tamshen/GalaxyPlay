@@ -64,12 +64,8 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val context = draft ?: return
         view.fields.removeAllViews()
         view.category(state.group)
-        GalaxyConfigurationSections.add(context, view.fields, state.group, state.group in state.advanced,
-            expand = {
-                if (!state.advanced.add(state.group)) state.advanced.remove(state.group)
-                state.scroll[state.group] = view.scroll.scrollY
-                renderFields()
-            }, credentials = { requestLeave(credentials) })
+        GalaxyConfigurationSections.add(context, view.fields, state.group,
+            credentials = { requestLeave(credentials) })
         if (state.group == 4 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
         view.scroll.post { view.scroll.scrollTo(0, state.scroll[state.group] ?: 0) }

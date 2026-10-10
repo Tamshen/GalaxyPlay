@@ -92,8 +92,9 @@ labels = {
     'l7': ('银河 L7', 'Galaxy L7'), 'l6': ('银河 L6', 'Galaxy L6'),
     'vehicle': ('车型 · ', 'Vehicle · '), 'template_apply': ('应用模板', 'Apply template'),
     'more': ('更多', 'More'), 'common': ('常用', 'Common'),
-    'advanced': ('高级设置', 'Advanced settings'), 'collapse': ('收起高级设置', 'Hide advanced settings'),
     'hotspot': ('热点名称与密码', 'Hotspot name and password'), 'audio': ('音频', 'Audio'),
+    'quality': ('画面清晰度', 'Picture quality'), 'custom': ('自定义百分比…', 'Custom percentage…'),
+    'confirm': ('确定', 'Confirm'),
     'cancel': ('取消', 'Cancel'), 'keep': ('继续编辑', 'Keep editing'),
     'discard': ('放弃修改', 'Discard changes'), 'undo': ('撤销修改', 'Undo edits'),
     'save': ('保存', 'Save'), 'video': ('画面', 'Display'), 'connection': ('连接', 'Connection'),
@@ -134,6 +135,7 @@ def category(key):
                      and node.get('class') == 'android.widget.Button' and node.get('clickable') == 'true'), None)
         if node is not None:
             tap(node)
+            assert not any(value in texts() for value in ['高级设置', 'Advanced settings', '收起高级设置', 'Hide advanced settings']), '配置仍有折叠入口'
             assert any(node.get('text') in labels[key] and node.get('selected') == 'true'
                        for node in tree().iter('node')), 'TAB 点选未切换：' + key
             return
@@ -250,6 +252,14 @@ try:
     assert not applied['configuration']['preferences']['l7_ui'].get('density')
     before = private(path)
     category('common')
+    click(label('quality')); click(label('custom')); click(label('confirm'))
+    editor = tree()
+    inputs = [n for n in editor.iter('node') if n.get('class') == 'android.widget.EditText']
+    assert len(inputs) == 1, '精确百分比不是单项输入'
+    screenshot('04-custom-percent')
+    click(label('cancel'))
+    assert private(path) == before, '取消精确输入修改文件'
+    assert '有未保存的修改' not in texts() and 'Unsaved changes' not in texts(), '取消精确输入修改草稿'
     root = tree()
     switch = next(n for n in root.iter('node') if n.get('class') == 'android.widget.Switch' and n.get('content-desc') in labels['bluetooth'])
     title = next(n for n in root.iter('node') if n.get('class') == 'android.widget.TextView' and n.get('text') in labels['bluetooth'])
@@ -277,14 +287,17 @@ try:
     assert len([n for n in tree().iter('node') if n.get('class') == 'android.widget.EditText']) == 2, '热点不是两项输入'
     screenshot('05-hotspot-modal')
     click(label('cancel'))
-    click(label('advanced'))
     assert not any(value in texts() for value in ['热点频段', '热点通道', '热点安全方式', 'Hotspot band', 'Hotspot channel', 'Hotspot security'])
     screenshot('05-connection-details')
     category('audio')
-    screenshot('05-audio-basic')
+    screenshot('05-audio-direct')
     category('video')
-    assert not any(value in texts() for value in ['HEVC 软件解码', 'Software HEVC decoder'])
-    click(label('advanced'))
+    for _ in range(8):
+        if any(value in texts() for value in ['HEVC 软件解码', 'HEVC software decoding']):
+            break
+        adb('shell', 'input', 'swipe', '1000', '1450', '1000', '750', '300')
+    else:
+        raise AssertionError('专业参数未直接显示')
     screenshot('05-display-details')
     fixed = bounds('vehicle'), bounds('save')
     adb('shell', 'input', 'swipe', '1000', '1450', '1000', '750', '300')
@@ -292,8 +305,8 @@ try:
     screenshot('05-display-scrolled')
     for _ in range(3):
         adb('shell', 'input', 'swipe', '1000', '750', '1000', '1450', '200')
-    click(label('collapse'))
-    screenshot('05-display-basic')
+    assert not any(value in texts() for value in ['高级设置', 'Advanced settings', '收起高级设置', 'Hide advanced settings'])
+    screenshot('05-display-direct')
     click(label('right')); click(label('save'))
     edited = json.loads(private(path))
     assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
@@ -329,4 +342,4 @@ finally:
     assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6 确认覆盖同一文件、后续编辑保存、横向 TAB 滚动切换、基础与高级设置切换、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
+print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6 确认覆盖同一文件、后续编辑保存、横向 TAB 滚动切换、各模块参数直接显示、自定义百分比取消、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
