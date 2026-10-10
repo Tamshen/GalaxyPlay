@@ -522,7 +522,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         val entries = listOf(
             Triple("settings-vehicle", R.string.config_page_title, R.drawable.ic_l7_preferences),
             Triple("settings-connection", R.string.connection_setup, R.drawable.ic_l7_connection),
-            Triple("settings-general", R.string.application_settings_title, R.drawable.ic_l7_app_settings),
+            Triple("settings-general", R.string.application_settings_title, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
             Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
             Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
