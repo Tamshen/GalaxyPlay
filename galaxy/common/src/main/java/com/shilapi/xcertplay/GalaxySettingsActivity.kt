@@ -440,8 +440,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         contentScroll = scroll
         renderedPage = page
         if (page == "settings-vehicle") {
-            configurationPage = GalaxyConfigurationPage(this,
-                credentials = { page = "settings-auth"; render() }, changed = ::profileChanged)
+            configurationPage = GalaxyConfigurationPage(this, changed = ::profileChanged)
             body.addView(configurationPage!!.view, LinearLayout.LayoutParams(-1, 0, 1f))
             contentScroll = configurationPage!!.view.scroll
         } else body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -552,9 +551,16 @@ class GalaxySettingsActivity : ComponentActivity() {
                 getString(R.string.l7_connection_usb_hint), R.drawable.ic_l7_usb) {
                 page = "settings-connection-usb"; render()
             })
+            card.addView(L7Components.categoryRow(this, getString(R.string.l7_auth_title),
+                getString(R.string.config_auth_default_hint), R.drawable.ic_l7_settings) {
+                page = "settings-auth"; render()
+            })
             reconnectRow = L7Components.actionRow(this, getString(R.string.l7_reconnect_current),
                 getString(R.string.l7_reconnect_current_hint), R.drawable.ic_l7_refresh, ::reconnectCurrent)
                 .also { card.addView(it) }
+        }
+        L7SettingsSection.add(content, getString(R.string.automatic_connection)) { card ->
+            GalaxyProfileFieldsView.add(this, card, R.string.automatic_connection)
         }
     }
 

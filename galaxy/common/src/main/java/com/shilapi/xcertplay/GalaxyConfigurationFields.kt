@@ -33,7 +33,10 @@ internal object GalaxyConfigurationFields {
         Field(R.string.automatic_connection, "diplay", "auto_connect", R.string.connect_when_diplay_opens, false),
         Field(R.string.automatic_connection, MAIN, "auto_start_on_boot", R.string.open_after_the_car_starts, false),
         Field(R.string.automatic_connection, MAIN, "wireless_enabled", R.string.profile_wireless_default, true),
-        Field(R.string.automatic_connection, MAIN, "location_reporting_enabled", R.string.report_location_to_iphone, false),
+        Field(R.string.config_page_steering, MAIN, "galaxy_steering_enabled", R.string.config_steering_control, true),
+        Field(R.string.config_page_reporting, MAIN, "galaxy_media_reporting_enabled", R.string.config_media_reporting, true),
+        Field(R.string.config_page_reporting, MAIN, "galaxy_navigation_reporting_enabled", R.string.config_navigation_reporting, true),
+        Field(R.string.config_page_reporting, MAIN, "location_reporting_enabled", R.string.report_location_to_iphone, false),
         Field(R.string.l7_start_wireless, MAIN, "manual_hotspot_ssid", R.string.profile_hotspot_name, "", sensitive = true),
         Field(R.string.l7_start_wireless, MAIN, "manual_hotspot_passphrase", R.string.profile_hotspot_password, "", sensitive = true),
         Field(R.string.l7_start_wireless, MAIN, "manual_hotspot_security", R.string.profile_hotspot_security, "OPEN",
@@ -49,7 +52,7 @@ internal object GalaxyConfigurationFields {
         Field(R.string.l7_logs_title, "l7_remote_log", "authorization", R.string.profile_log_authorization, "", sensitive = true),
         Field(R.string.l7_section_app_ui, MAIN, "ambient_lux_threshold", R.string.profile_ambient_lux, 30, minimum = 1, maximum = 200000),
         Field(R.string.l7_section_projection, MAIN, "display_scale_percent", R.string.profile_resolution_percent, 100, minimum = 30, maximum = 100),
-        Field(R.string.l7_section_projection, MAIN, "ui_scale_percent", R.string.profile_projection_ui, 100, minimum = 50, maximum = 200),
+        Field(R.string.l7_section_app_ui, MAIN, "ui_scale_percent", R.string.profile_projection_ui, 100, minimum = 50, maximum = 200),
         Field(R.string.l7_section_projection, MAIN, "safe_area_draw_outside", R.string.profile_draw_outside, true),
         Field(R.string.l7_section_projection, MAIN, "adapt_pip_resolution", R.string.profile_pip, false),
     )
@@ -68,9 +71,30 @@ internal object GalaxyConfigurationFields {
         }
     }
 
-    fun vehicleAllowed(space: String, key: String) = allowed(space, key) && !GalaxyApplicationPreferences.contains(space, key)
+    // 明确列出车型参数，新增连接或应用偏好不能意外进入模板覆盖范围。
+    private val vehicleKeys = setOf(
+        "display_scale_tenths", "display_scale_percent", "display_fps",
+        "hevc_enabled", "hevc_software_decoder", "hide_top_bar", "hide_bottom_bar", "right_hand_drive",
+        "safe_area_draw_outside", "adapt_pip_resolution", "display_width_physical_mm", "display_physical_size_basis",
+        "galaxy_video_decoder_l7", "galaxy_video_decoder_l6", "galaxy_video_decoder_custom",
+        "media_buffer_ms", "main_buffered_audio", "advanced_audio_channel_mapping", "audio_focus_enabled",
+        "l7_audio_bus_enabled", "l7_call_processing_enabled", "bluetooth_media_exclusive",
+        "media_audio_channel", "navigation_audio_channel", "navigation_stream_type", "assistant_audio_channel",
+        "galaxy_navigation_output_L7", "galaxy_navigation_output_L6", "galaxy_navigation_output_CUSTOM",
+        "galaxy_steering_enabled", "galaxy_media_reporting_enabled", "galaxy_navigation_reporting_enabled",
+        "location_reporting_enabled", "cluster_map_enabled", "adb_cluster_activity_enabled",
+        "center_map_overlay", "center_map_auto_hide", "center_map_follows_dashboard", "cluster_map_scale_percent",
+        "cluster_content", "cluster_marker_horizontal_step", "cluster_marker_vertical_step",
+        "cluster_turn_card_overlay_position", "cluster_turn_card_overlay_size", "cluster_turn_card_overlay_x_percent",
+        "cluster_turn_card_overlay_y_percent", "cluster_turn_card_overlay_size_percent", "cluster_turn_card_opacity_percent",
+        "cluster_safe_area_1920x720")
+    fun vehicleAllowed(space: String, key: String): Boolean = allowed(space, key) && when (space) {
+        "l7_audio_templates" -> true
+        MAIN -> key in vehicleKeys || key.matches(Regex("safe_area_[0-9]{1,5}x[0-9]{1,5}"))
+        else -> false
+    }
 
-    fun defaults(context: Context): Map<String, Map<String, Any?>> {
+    fun defaults(context: Context, vehicleOnly: Boolean = true): Map<String, Map<String, Any?>> {
         val groups = names.associateWith { mutableMapOf<String, Any?>() }
         fields.forEach { groups.getValue(it.space)[it.key] = it.default }
         groups.getValue(MAIN).putAll(mapOf("wireless_hotspot_mode" to "MANUAL", "media_buffer_ms" to 300,
@@ -99,7 +123,7 @@ internal object GalaxyConfigurationFields {
         CarPlayPicture.keys.forEach { groups.getValue("carplay_picture")[it] = CarPlayPicture.defaultValue(it) }
         groups.getValue("l7_remote_log")["endpoint"] = context.getString(R.string.l7_log_default_url)
         groups.getValue("l7_remote_log")["authorization"] = context.getString(R.string.l7_log_default_authorization)
-        return groups.mapValues { (space, values) -> values.filterKeys { vehicleAllowed(space, it) } }
+        return groups.mapValues { (space, values) -> values.filterKeys { !vehicleOnly || vehicleAllowed(space, it) } }
     }
 
     fun capture(context: Context): GalaxyConfiguration {
@@ -120,9 +144,6 @@ internal object GalaxyConfigurationFields {
             audio[model.id] = old ?: context.assets.open("audio-templates/${if (model.id == "custom") "system" else model.id}.json")
                 .use { L7AudioTemplates.parse(it).toJson() }
         }
-        // 旧热点安全模式随是否设置密码变化，迁移时冻结其真实默认值。
-        if (!context.getSharedPreferences(MAIN, 0).contains("manual_hotspot_security"))
-            groups.getValue(MAIN)["manual_hotspot_security"] = AirPlayPersistence.loadManualHotspotSecurity(context).name
         return GalaxyConfiguration(groups, audio, recovery)
     }
 

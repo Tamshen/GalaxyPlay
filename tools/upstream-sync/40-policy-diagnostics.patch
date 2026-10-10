@@ -125,6 +125,23 @@
      private const val KEY_WIDTH_PHYSICAL_MM = "display_width_physical_mm"
      private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
      private const val KEY_MAX_DETECTED_WIDTH = "display_max_detected_width"
+@@ -157,14 +145,14 @@
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+             .getBoolean(KEY_HEVC_ENABLED, false)
+ 
+-    fun loadUiScalePercent(context: Context): Int = CarPlayUiScale.sanitize(
++    fun loadUiScalePercent(context: Context): Int = GalaxyProjectionScale.sanitize(
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+             .getInt(KEY_UI_SCALE_PERCENT, CarPlayUiScale.DEFAULT),
+     )
+ 
+     fun saveUiScalePercent(context: Context, percent: Int) {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putInt(KEY_UI_SCALE_PERCENT, CarPlayUiScale.sanitize(percent)).apply()
++            .putInt(KEY_UI_SCALE_PERCENT, GalaxyProjectionScale.sanitize(percent)).apply()
+     }
+ 
+     fun saveHevcEnabled(context: Context, enabled: Boolean) {
 @@ -183,9 +171,7 @@
              .apply()
      }

@@ -37,14 +37,18 @@ internal object GalaxyMediaKeys {
         covers = null
         mediaCenter = null
         steeringWheel?.close()
+        steeringWheel = null
         L7SteeringDiagnostics.store.connection(false)
         controller = next
         mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
         pendingArtwork = null
         commandGate = L7MediaCommandGate()
         val commands = dispatcher(next, onPlaybackStarted)
-        val dispatch: (Int, String) -> Unit = { index, source -> commands.dispatch(index, source, L7SteeringDiagnostics.begin(source, index)) }
-        val traced: (Int, String, L7SteeringTrace) -> Unit = commands::dispatch
+        val traced: (Int, String, L7SteeringTrace) -> Unit = { index, source, trace ->
+            if (GalaxyVehiclePreferences.steering(context)) commands.dispatch(index, source, trace)
+            else trace.step("DROP", "VEHICLE_CONTROL_DISABLED")
+        }
+        val dispatch: (Int, String) -> Unit = { index, source -> traced(index, source, L7SteeringDiagnostics.begin(source, index)) }
         bridge = if (next.localMediaAudioEnabled) CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch, traced) else null
         next.sessionStateListener = { active -> onConnection(context, next, active, dispatch, traced) }
         next.navigationListener = { value -> synchronized(this) { if (controller === next) navigation?.update(value) } }
@@ -74,7 +78,7 @@ internal object GalaxyMediaKeys {
                     pendingArtwork = id to bytes
             } }
         }
-        if (context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
+        if (GalaxyVehiclePreferences.steering(context) && context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
             steeringWheel = L7SteeringWheel(context.applicationContext, next::hasActiveSession, assistantActive) {
                 synchronized(this) { controller === next && next.requestSiri() }
             }.also { it.start() }
@@ -92,7 +96,7 @@ internal object GalaxyMediaKeys {
             traceBefore = { index, action, dropped -> CarPlayBackgroundSession.beforeMediaCommand(next, index, action, dropped) })
 
     @Synchronized private fun onConnection(context: Context, next: CarPlayController, active: Boolean,
-                                          dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit) {
+                                              dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit) {
         if (controller !== next) return
         L7SteeringDiagnostics.store.connection(active)
         bridge?.onConnected(active)
@@ -105,32 +109,41 @@ internal object GalaxyMediaKeys {
             mediaCenter = null
             mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
             pendingArtwork = null
-        } else if (mediaCenter == null && context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
-            navigation = L7NavigationSession(L7ReflectiveNavigation(context), {
-                synchronized(this) { controller === next && next.hasActiveSession() }
-            })
-            navigationTick = object : Runnable {
-                override fun run() = synchronized(this@GalaxyMediaKeys) {
-                    if (controller === next && next.hasActiveSession() && navigationTick === this) {
-                        navigation?.update(next.navigationSnapshot())
-                        handler.postDelayed(this, 1000)
-                    }
-                }
-            }.also { handler.post(it) }
-            lateinit var coverOwner: L7MediaArtwork
-            coverOwner = L7MediaArtwork(context) { _ -> synchronized(this) {
-                // 解码通知等待宿主锁期间可能已经切歌，重新取当前选择，不能复用通知里的旧 URI。
-                if (controller === next && covers === coverOwner)
-                    mediaCenter?.update(mediaInfo, coverOwner.selectedUri(mediaInfo.artworkTransferId))
-            } }
-            covers = coverOwner
-            pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
-            pendingArtwork = null
-            mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext), context.packageName,
-                { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced, localPlayback = next.localMediaAudioEnabled).also { it.start(); it.update(mediaInfo) }
-            coverOwner.select(mediaInfo.artworkTransferId)
+        } else if (context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
+            if (navigation == null && GalaxyVehiclePreferences.navigationReporting(context)) startNavigation(context, next)
+            if (mediaCenter == null && GalaxyVehiclePreferences.mediaReporting(context)) startMediaReporting(context, next, dispatch, traced)
         }
         if (active) bridge?.onNowPlayingChanged(mediaInfo)
+    }
+
+    private fun startNavigation(context: Context, next: CarPlayController) {
+        navigation = L7NavigationSession(L7ReflectiveNavigation(context), {
+            synchronized(this) { controller === next && next.hasActiveSession() }
+        })
+        navigationTick = object : Runnable {
+            override fun run() = synchronized(this@GalaxyMediaKeys) {
+                if (controller === next && next.hasActiveSession() && navigationTick === this) {
+                    navigation?.update(next.navigationSnapshot())
+                    handler.postDelayed(this, 1000)
+                }
+            }
+        }.also { handler.post(it) }
+    }
+
+    private fun startMediaReporting(context: Context, next: CarPlayController,
+                                   dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit) {
+        lateinit var coverOwner: L7MediaArtwork
+        coverOwner = L7MediaArtwork(context) { _ -> synchronized(this) {
+            // 解码通知等待宿主锁期间可能已经切歌，重新取当前选择，不能复用通知里的旧 URI。
+            if (controller === next && covers === coverOwner)
+                mediaCenter?.update(mediaInfo, coverOwner.selectedUri(mediaInfo.artworkTransferId))
+        } }
+        covers = coverOwner
+        pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
+        pendingArtwork = null
+        mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext), context.packageName,
+            { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced, localPlayback = next.localMediaAudioEnabled).also { it.start(); it.update(mediaInfo, null) }
+        coverOwner.select(mediaInfo.artworkTransferId)
     }
 
     @Synchronized fun detach(expected: CarPlayController?) {

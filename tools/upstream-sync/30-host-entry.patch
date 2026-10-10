@@ -587,7 +587,7 @@
                          if (safeAreaEditorActive) closeSafeAreaEditor() else cancelSettingsEdits()
                      } else {
                          showDiPlayHome()
-@@ -610,35 +498,33 @@
+@@ -610,37 +498,35 @@
              "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                  "transport=${if (wirelessEnabled) "wireless" else "wired"}",
          )
@@ -632,10 +632,14 @@
 -        gestureFingerCount = AirPlayPersistence.loadSettingsGestureFingers(this)
 -        displayScalePercent = AirPlayPersistence.loadDisplayScalePercent(this)
 -        displayScaleTenths = CarPlayDisplayScale.sanitize((displayScalePercent + 5) / 10)
+-        // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
+-        uiScalePercent = CarPlayUiScale.DEFAULT
 +        displayScaleTenths = AirPlayPersistence.loadDisplayScaleTenths(this)
-         // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
-         uiScalePercent = CarPlayUiScale.DEFAULT
++        // Galaxy 使用独立图标比例，其他宿主保留上游默认行为。
++        uiScalePercent = if (GalaxyProjectionScale.enabled(this)) AirPlayPersistence.loadUiScalePercent(this) else CarPlayUiScale.DEFAULT
          hevcEnabled = AirPlayPersistence.loadHevcEnabled(this)
+         hevcSoftwareDecoderEnabled =
+             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
 @@ -665,35 +551,24 @@
          hideTopBar = AirPlayPersistence.loadHideTopBar(this)
          hideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
@@ -2899,10 +2903,10 @@
 -        val requestedResolutionDisplay = CarPlayDisplayScale.applyPercent(baseDisplay, requestedResolutionPercent)
 -        var resolutionDisplay = requestedResolutionDisplay
 +        )
-+        val resolutionDisplay = CarPlayDisplayScale.apply(baseDisplay, displayScaleTenths)
++        val resolutionDisplay = GalaxyProjectionScale.resolution(this, baseDisplay, displayScaleTenths)
          val requestedPercent = uiScalePercent
 -        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, uiScalePercent)
-+        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, requestedPercent)
++        var scaledDisplay = GalaxyProjectionScale.icons(resolutionDisplay, requestedPercent)
 +        var effectivePercent = requestedPercent
          val candidate = scaledDisplay
 -        var support = when {
@@ -2958,7 +2962,7 @@
              }
          }
 -        appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
-+        appendLog("CarPlay size=${CarPlayUiScale.label(effectivePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
++        appendLog("CarPlay size=${GalaxyProjectionScale.label(effectivePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
 +        var effectiveHevc = hevcEnabled && !sessionAvcFallback
 +        val capabilityLog = mutableListOf<String>()
 +        fun support(mime: String, rate: Int, software: Boolean): Boolean? {

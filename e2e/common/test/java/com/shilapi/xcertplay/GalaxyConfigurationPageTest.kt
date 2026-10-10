@@ -283,6 +283,44 @@ class GalaxyConfigurationPageTest {
         assertEquals(280, L7UiDensity.value(activity))
         assertFalse(GalaxyProfiles(activity).active().configuration.preferences.getValue("l7_ui").containsKey("density"))
     }
+    @Test fun iconSizeIsOnlyInApplicationSettingsAndExactPercentNeverEditsVehicle() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val original = repository.applyTemplate("l7")
+        val parent = android.widget.LinearLayout(activity)
+        GalaxyApplicationSettingsPage.add(activity, parent)
+        val row = descendants(parent).filterIsInstance<L7SettingRow>()
+            .single { it.titleView.text.toString() == activity.getString(R.string.config_icon_size) }
+        row.performClick()
+        val picker = dialog()
+        assertEquals(activity.getString(R.string.save), picker.getButton(AlertDialog.BUTTON_POSITIVE).text.toString())
+        picker.listView.performItemClick(picker.listView.adapter.getView(3, null, picker.listView), 3, 3)
+        picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        val editor = dialog()
+        val input = descendants(editor.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
+        input.setText("201")
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertNotNull(input.error)
+        assertEquals(original, repository.refresh())
+        input.setText("137")
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(137, AirPlayPersistence.loadUiScalePercent(activity))
+        assertEquals(original, repository.refresh())
+        for (model in listOf("l7", "l6", "custom")) {
+            val applied = repository.applyTemplate(model)
+            repository.resetCurrent(applied)
+            assertEquals(137, AirPlayPersistence.loadUiScalePercent(activity))
+            assertFalse(repository.active().configuration.preferences.getValue("xcertplay_airplay").containsKey("ui_scale_percent"))
+        }
+        val page = GalaxyConfigurationPage(activity) {}
+        for (group in 0..4) {
+            page.view.tabs.buttons[group].performClick()
+            assertFalse(descendants(page.view.fields).filterIsInstance<L7SettingRow>().any {
+                it.titleView.text.toString() == activity.getString(R.string.config_icon_size)
+            })
+        }
+        page.close()
+    }
     @Test fun choosingOrCancellingVehicleKeepsTheFileAndDirtyDraftUntilExplicitApply() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)
@@ -349,18 +387,30 @@ class GalaxyConfigurationPageTest {
         assertTrue(tabs.buttons.last().right <= tabs.scrollX + tabs.width)
         page.close()
     }
-    @Test fun connectionShowsStartupAndLocationDirectlyWithOneHotspotEditor() {
+    @Test fun vehicleTabsOnlyShowVehicleParametersAndReportingIsEditableAsDraft() {
         val activity = activity()
+        val repository = GalaxyProfiles(activity)
         val page = GalaxyConfigurationPage(activity) {}
-        page.view.tabs.buttons[1].performClick()
-        fun titles() = descendants(page.view.fields).filterIsInstance<L7SettingRow>().map { it.titleView.text.toString() }
-        assertTrue(activity.getString(R.string.config_hotspot_title) in titles())
-        for (title in listOf(R.string.profile_hotspot_name, R.string.profile_hotspot_password,
-            R.string.profile_hotspot_band, R.string.profile_hotspot_channel, R.string.profile_hotspot_security))
-            assertFalse(activity.getString(title) in titles())
-        assertTrue(activity.getString(R.string.open_after_the_car_starts) in titles())
-        assertTrue(activity.getString(R.string.report_location_to_iphone) in titles())
-        assertFalse(activity.getString(R.string.profile_hotspot_band) in titles())
+        template(page, "l7")
+        val original = repository.active()
+        val titles = mutableListOf<String>()
+        for (group in 0..4) {
+            page.view.tabs.buttons[group].performClick()
+            titles += descendants(page.view.fields).filterIsInstance<L7SettingRow>().map { it.titleView.text.toString() }
+        }
+        for (title in listOf(R.string.config_hotspot_title, R.string.open_after_the_car_starts,
+            R.string.connect_when_diplay_opens, R.string.profile_wireless_default, R.string.l7_auth_choose_source))
+            assertFalse(activity.getString(title) in titles)
+        for (title in listOf(R.string.config_steering_control, R.string.config_media_reporting,
+            R.string.config_navigation_reporting, R.string.report_location_to_iphone))
+            assertTrue(activity.getString(title) in titles)
+        descendants(page.view.fields).filterIsInstance<L7SettingRow>()
+            .first { it.titleView.text.toString() == activity.getString(R.string.config_media_reporting) }.performClick()
+        assertTrue(page.dirty)
+        assertEquals(original, repository.active())
+        page.view.commitButton.performClick()
+        assertFalse(GalaxyVehiclePreferences.mediaReporting(activity))
+        assertEquals("custom", repository.active().template)
         page.close()
     }
     @Test fun professionalSettingsAreDirectlyVisibleAndKeepDraftAcrossPageRebuild() {
@@ -393,7 +443,7 @@ class GalaxyConfigurationPageTest {
             page.view.tabs.buttons[group].performClick()
             titles += rows().map { it.titleView.text.toString() }
         }
-        for (title in listOf(R.string.config_quality, R.string.config_smoothness, R.string.config_icon_size,
+        for (title in listOf(R.string.config_quality, R.string.config_smoothness,
             R.string.config_music_stability, R.string.config_bluetooth_music))
             assertEquals(1, titles.count { it == activity.getString(title) })
         for (duplicate in listOf(R.string.profile_resolution_percent, R.string.frame_rate,
@@ -426,32 +476,30 @@ class GalaxyConfigurationPageTest {
         assertEquals(73, repository.active().configuration.preferences.getValue("xcertplay_airplay")["display_scale_percent"])
         page.close()
     }
-    @Test fun hotspotPairOnlyUpdatesDraftAndAutomaticallyDerivesSecurityAndNetworkDefaults() {
+    @Test fun independentHotspotEditorSavesOnlyTwoInputsWithoutEditingVehicleConfiguration() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)
-        val original = repository.active()
-        val page = GalaxyConfigurationPage(activity) {}
-        page.view.tabs.buttons[1].performClick()
-        val hotspot = descendants(page.view.fields).filterIsInstance<L7SettingRow>()
-            .first { it.titleView.text.toString() == activity.getString(R.string.config_hotspot_title) }
+        val original = repository.applyTemplate("l7")
+        val parent = android.widget.LinearLayout(activity)
+        GalaxyHotspotSettings.add(activity, parent)
+        val hotspot = descendants(parent).filterIsInstance<L7SettingRow>().single()
         hotspot.performClick()
         dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
-        assertFalse(page.dirty)
+        assertEquals(original, repository.refresh())
         hotspot.performClick()
         val picker = dialog()
         val inputs = descendants(picker.window!!.decorView).filterIsInstance<android.widget.EditText>()
+        assertEquals(2, inputs.size)
         inputs[0].setText("test-hotspot"); inputs[1].setText("test-secret")
         picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        assertTrue(page.dirty)
-        assertEquals(original, repository.active())
-        page.view.commitButton.performClick()
-        val preferences = repository.active().configuration.preferences.getValue("xcertplay_airplay")
-        assertEquals("test-hotspot", preferences["manual_hotspot_ssid"])
-        assertEquals("test-secret", preferences["manual_hotspot_passphrase"])
-        assertEquals("WPA2", preferences["manual_hotspot_security"])
-        assertEquals("AUTO", preferences["manual_hotspot_band"])
-        assertEquals(0, preferences["manual_hotspot_channel"])
-        page.close()
+        val preferences = activity.getSharedPreferences("xcertplay_airplay", 0)
+        assertEquals("test-hotspot", preferences.getString("manual_hotspot_ssid", null))
+        assertEquals("test-secret", preferences.getString("manual_hotspot_passphrase", null))
+        assertEquals("WPA2", preferences.getString("manual_hotspot_security", null))
+        assertEquals("AUTO", preferences.getString("manual_hotspot_band", null))
+        assertEquals(0, preferences.getInt("manual_hotspot_channel", -1))
+        assertEquals(original, repository.refresh())
+        assertEquals("l7", repository.active().template)
     }
     private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()

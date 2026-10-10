@@ -7,7 +7,7 @@ import com.shilapi.xcertplay.host.R
 
 /** 只有当前配置；车型弹窗确认后覆盖，后续参数编辑仍先写草稿。 */
 internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
-    private val credentials: () -> Unit = {}, private val changed: () -> Unit) {
+    private val changed: () -> Unit) {
     private val repository = GalaxyProfiles(activity)
     private val state = ViewModelProvider(activity)[GalaxyConfigurationState::class.java]
     private var draft: GalaxyConfigurationContext? = null
@@ -65,9 +65,8 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val context = draft ?: return
         view.fields.removeAllViews()
         view.category(state.group)
-        GalaxyConfigurationSections.add(context, view.fields, state.group,
-            credentials = { requestLeave(credentials) })
-        if (state.group == 4 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
+        GalaxyConfigurationSections.add(context, view.fields, state.group)
+        if (state.group == 2 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
         view.scroll.post { view.scroll.scrollTo(0, state.scroll[state.group] ?: 0) }
     }

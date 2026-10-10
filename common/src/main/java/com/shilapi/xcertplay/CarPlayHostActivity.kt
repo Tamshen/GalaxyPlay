@@ -525,8 +525,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun loadPersistedSettings() {
         displayScaleTenths = AirPlayPersistence.loadDisplayScaleTenths(this)
-        // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
-        uiScalePercent = CarPlayUiScale.DEFAULT
+        // Galaxy 使用独立图标比例，其他宿主保留上游默认行为。
+        uiScalePercent = if (GalaxyProjectionScale.enabled(this)) AirPlayPersistence.loadUiScalePercent(this) else CarPlayUiScale.DEFAULT
         hevcEnabled = AirPlayPersistence.loadHevcEnabled(this)
         hevcSoftwareDecoderEnabled =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -2943,9 +2943,9 @@ class CarPlayHostActivity : ComponentActivity() {
             heightPhysicalMm = physical.heightMm,
             fps = fps,
         )
-        val resolutionDisplay = CarPlayDisplayScale.apply(baseDisplay, displayScaleTenths)
+        val resolutionDisplay = GalaxyProjectionScale.resolution(this, baseDisplay, displayScaleTenths)
         val requestedPercent = uiScalePercent
-        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, requestedPercent)
+        var scaledDisplay = GalaxyProjectionScale.icons(resolutionDisplay, requestedPercent)
         var effectivePercent = requestedPercent
         val candidate = scaledDisplay
         val support = when {
@@ -2963,7 +2963,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     android.widget.Toast.LENGTH_LONG).show()
             }
         }
-        appendLog("CarPlay size=${CarPlayUiScale.label(effectivePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
+        appendLog("CarPlay size=${GalaxyProjectionScale.label(effectivePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
         var effectiveHevc = hevcEnabled && !sessionAvcFallback
         val capabilityLog = mutableListOf<String>()
         fun support(mime: String, rate: Int, software: Boolean): Boolean? {

@@ -22,7 +22,15 @@ package = 'com.ecarx.carplay'
 
 
 def adb(*command, binary=False):
-    result = subprocess.run([args.adb, '-s', args.serial, *command], check=True, capture_output=True)
+    # 模拟器偶发拒绝滑动注入，仅对可重复的滑动重试；点击不能重试以免重复提交。
+    attempts = 3 if command[:3] == ('shell', 'input', 'swipe') else 1
+    for attempt in range(attempts):
+        result = subprocess.run([args.adb, '-s', args.serial, *command], capture_output=True, timeout=30)
+        if result.returncode == 0:
+            break
+        if attempt == attempts - 1:
+            result.check_returncode()
+        time.sleep(.5)
     return result.stdout if binary else result.stdout.decode('utf-8')
 
 
@@ -94,8 +102,12 @@ labels = {
     'reset_confirm': ('确认重置', 'Reset configuration'),
     'smoothness': ('画面流畅度', 'Picture smoothness'), 'fps60': ('更流畅 · 60 fps', 'Smoother · 60 fps'),
     'vehicle': ('车型 · ', 'Vehicle · '), 'template_apply': ('应用模板', 'Apply template'),
-    'more': ('更多', 'More'), 'common': ('常用', 'Common'),
+    'more': ('上报', 'Reporting'), 'common': ('常用', 'Common'),
     'hotspot': ('热点名称与密码', 'Hotspot name and password'), 'audio': ('音频', 'Audio'),
+    'controls': ('方控', 'Controls'), 'steering': ('方向盘按键控制', 'Steering wheel controls'),
+    'media_report': ('原车音乐与媒体上报', 'Report music and media to the car'),
+    'navigation_report': ('原车导航上报', 'Report navigation to the car'),
+    'authentication': ('CarPlay 认证', 'CarPlay authentication'),
     'quality': ('画面清晰度', 'Picture quality'), 'custom': ('自定义百分比…', 'Custom percentage…'),
     'confirm': ('确定', 'Confirm'),
     'cancel': ('取消', 'Cancel'), 'keep': ('继续编辑', 'Keep editing'),
@@ -106,6 +118,7 @@ labels = {
     'language': ('应用语言', 'App language'), 'apply': ('应用', 'Apply'),
     'system': ('跟随系统', 'System default'), 'title': ('车型配置', 'Vehicle configuration'),
     'app': ('应用设置', 'App settings'), 'size': ('界面大小', 'Interface size'), 'large': ('大 · 320 DPI', 'Large · 320 DPI'),
+    'icon': ('CarPlay 图标大小', 'CarPlay icon size'), 'icon_large': ('大 · 125%', 'Large · 125%'),
 }
 english = False
 
@@ -187,9 +200,9 @@ def app_values(values):
         root = ET.fromstring(raw) if raw else []
         for item in root:
             key = item.get('name')
-            allowed = space in {'l7_ui', 'l7_floating_navigation', 'l7_remote_log'} or (
-                space == 'diplay' and key == 'app_language') or (
-                space == 'xcertplay_airplay' and key in {'debug_logs_enabled', 'carplay_night_mode', 'ambient_delay_seconds', 'ambient_lux_threshold'})
+            allowed = space in {'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'l7_authentication', 'carplay_picture'} or (
+                space == 'diplay' and key in {'app_language', 'auto_connect'}) or (
+                space == 'xcertplay_airplay' and key in {'ui_scale_percent', 'debug_logs_enabled', 'carplay_night_mode', 'ambient_delay_seconds', 'ambient_lux_threshold', 'manual_hotspot_ssid', 'manual_hotspot_passphrase', 'manual_hotspot_security', 'manual_hotspot_band', 'manual_hotspot_channel', 'wireless_enabled', 'wireless_hotspot_mode', 'auto_start_on_boot', 'mfi_target', 'mfi_i2c_path', 'remote_mfi_server', 'remote_mfi_token', 'existing_wifi_ssid', 'existing_wifi_passphrase', 'wifi_p2p_preferred_channel', 'manufacturer', 'model', 'oem_label'})
             if allowed:
                 result[(space, key)] = ET.tostring(item)
     return result
@@ -218,10 +231,22 @@ assert re.fullmatch(r'[a-z0-9_]{1,64}', original_id)
 path = f'files/configurations/{original_id}.json'
 original = private(path).encode('utf-8')
 previous = read_optional(path + '.previous')
-application = {name: read_optional('shared_prefs/' + name + '.xml') for name in ['diplay', 'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'xcertplay_airplay']}
+application = {name: read_optional('shared_prefs/' + name + '.xml') for name in ['diplay', 'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'l7_authentication', 'xcertplay_airplay', 'carplay_picture']}
 audio = {name: read_optional('files/' + name) for name in ['audio-template.json', 'audio-template-l6.json', 'audio-template-custom.json']}
 original_files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
 try:
+    # 用合成热点凭据验证模板与重置保留，不显示原用户名称或操作系统热点。
+    saved_main = application['xcertplay_airplay']
+    preferences = ET.fromstring(saved_main) if saved_main else ET.Element('map')
+    for key, value in {'manual_hotspot_ssid': 'UX-test-hotspot', 'manual_hotspot_passphrase': 'UX-test-password',
+                       'manual_hotspot_security': 'WPA2', 'manual_hotspot_band': 'AUTO'}.items():
+        item = next((n for n in preferences if n.get('name') == key), None)
+        if item is None:
+            item = ET.SubElement(preferences, 'string', {'name': key})
+        item.text = value
+    adb('shell', 'am', 'force-stop', package)
+    restore_file('shared_prefs/xcertplay_airplay.xml', ET.tostring(preferences, encoding='utf-8'))
+    launch()
     if args.language:
         language(args.language)
     launch('settings')
@@ -233,6 +258,8 @@ try:
     click(label('size')); click(label('large')); click(label('save'))
     time.sleep(2)
     assert b'value="320"' in private('shared_prefs/l7_ui.xml').encode('utf-8')
+    click(label('icon')); click(label('icon_large')); click(label('save'))
+    assert b'name="ui_scale_percent" value="125"' in private('shared_prefs/xcertplay_airplay.xml').encode('utf-8')
     screenshot('02-app-settings')
     launch()
     screenshot('02-configuration')
@@ -275,6 +302,10 @@ try:
     # 独立应用偏好不应出现在当前车型文件，也不会被模板或普通参数保存覆盖。
     assert not applied['configuration']['preferences']['diplay'].get('app_language')
     assert not applied['configuration']['preferences']['l7_ui'].get('density')
+    vehicle_main = applied['configuration']['preferences']['xcertplay_airplay']
+    assert not any(key in vehicle_main for key in ['manual_hotspot_ssid', 'manual_hotspot_passphrase',
+        'wireless_enabled', 'auto_start_on_boot', 'mfi_target', 'remote_mfi_token', 'ui_scale_percent']), '车型文件含独立连接或认证设置'
+    assert not applied['configuration']['preferences']['diplay'].get('auto_connect')
     before = private(path)
     category('common')
     click(label('quality')); click(label('custom')); click(label('confirm'))
@@ -307,13 +338,24 @@ try:
     click(label('undo')); click(label('keep'))
     click(label('undo')); click(label('discard'))
     assert private(path) == before
-    category('connection')
+    category('controls')
+    assert label('steering') in texts()
+    assert label('hotspot') not in texts() and label('authentication') not in texts()
+    screenshot('05-controls-direct')
+    category('more')
+    assert label('media_report') in texts() and label('navigation_report') in texts()
+    screenshot('05-reporting-direct')
+    launch('settings-connection')
+    assert label('authentication') in texts(), '独立连接页缺少认证入口'
+    screenshot('05-external-connection')
+    launch('settings-connection-wireless')
     click(label('hotspot'))
     assert len([n for n in tree().iter('node') if n.get('class') == 'android.widget.EditText']) == 2, '热点不是两项输入'
     screenshot('05-hotspot-modal')
     click(label('cancel'))
     assert not any(value in texts() for value in ['热点频段', '热点通道', '热点安全方式', 'Hotspot band', 'Hotspot channel', 'Hotspot security'])
-    screenshot('05-connection-details')
+    assert current_app_values() == independent, '取消热点输入修改独立设置'
+    launch()
     category('audio')
     screenshot('05-audio-direct')
     category('video')
@@ -380,4 +422,4 @@ finally:
     assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6/自定义确认覆盖同一文件、重置当前配置确认与取消、修改保存自动显示并选中自定义且保留实际车型适配、后续编辑保存、横向 TAB 滚动切换、各模块参数直接显示、自定义百分比取消、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
+print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6/自定义确认覆盖同一文件、重置当前配置确认与取消、修改保存自动显示并选中自定义且保留实际车型适配、后续编辑保存、横向 TAB 滚动切换、方控及上报开关直接显示、各模块参数直接显示、自定义百分比取消、独立连接页认证入口和热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用／热点／连接／认证设置保留与测试前配置恢复。', flush=True)
