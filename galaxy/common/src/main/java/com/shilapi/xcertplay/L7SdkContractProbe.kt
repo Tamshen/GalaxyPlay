@@ -13,27 +13,13 @@ internal object L7SdkContractProbe {
             val callback = Class.forName("com.ecarx.eas.sdk.ECarXApiClient\$Callback", false, loader)
             type.getMethod("get", Context::class.java)
             type.getMethod("init", Context::class.java, callback)
-            type.getMethod("registerMusic", String::class.java, client)
-            result["mediaRegistration"] = if (type.methods.any { it.name == "registerMusic" &&
-                it.parameterTypes.contentEquals(arrayOf(String::class.java, client, String::class.java)) })
+            val contract = GalaxyOemMediaContract(type, client, info)
+            result["mediaRegistration"] = if (contract.linkedSession)
                 "OWN_PACKAGE_MEDIASESSION_LINK_AVAILABLE" else "OWN_PACKAGE_ONLY"
             if (result["mediaProviderEasSupport"] == "1") info.getField("SOURCE_TYPE_ONLINE")
-            type.getMethod("requestPlay", Any::class.java)
-            type.getMethod("updateCurrentSourceType", Any::class.java, Int::class.javaPrimitiveType)
-            client.getConstructor()
-            info.getConstructor()
-            for (name in listOf("onPlay", "onPause", "onNext", "onPrevious"))
-                require(client.getMethod(name).returnType == Boolean::class.javaPrimitiveType)
-            for (name in listOf("getTitle", "getArtist", "getAlbum", "getUuid"))
-                require(info.getMethod(name).returnType == String::class.java)
-            require(info.getMethod("getDuration").returnType == Long::class.javaPrimitiveType)
-            require(info.getMethod("getPlaybackStatus").returnType == Int::class.javaPrimitiveType)
-            require(info.getMethod("getArtwork").returnType == android.net.Uri::class.java)
-            type.getMethod("updateMusicPlaybackState", Any::class.java, info)
-            type.getMethod("updateMediaSourceTypeList", Any::class.java, IntArray::class.java)
-            type.getMethod("updateCurrentProgress", Any::class.java, Long::class.javaPrimitiveType)
-            type.getMethod("queryCurrentFocusClient", Any::class.java)
-            type.getMethod("unregister", Any::class.java)
+            result["mediaPlaybackContract"] = "APP_ICON_LAUNCH_PLAYER_INTENT_AND_SUPPORTED_CAPABILITIES"
+            result["mediaCustomAction"] = if (contract.clientMethods.any { it.name == "onCustomAction" }) "VISIBLE" else "NOT_IN_THIS_SDK"
+            result["mediaVehicleContract"] = "L6_L7_MATCHING_OEM_PUBLIC_SDK"
             result["mediaCallbackKind"] = if (client.isInterface) "INTERFACE" else "CLASS"
             result["mediaSourceEvidence"] = if (result["mediaProviderEasSupport"] == "1")
                 "L7_EAS_ONLINE_6_CACHE_COMPATIBILITY_DISPLAY_UNTESTED"

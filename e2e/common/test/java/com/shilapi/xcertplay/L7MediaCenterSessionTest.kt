@@ -38,12 +38,18 @@ class L7MediaCenterSessionTest {
         var failUnregister = false
         var currentFocus: String? = null
         var duringRegister: () -> Unit = {}
+        var registerFailures = 0
+        var duringSources: () -> Unit = {}
         override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean, focus: (String?) -> Unit, selected: (Int) -> Boolean) {
             this.ready = ready; this.command = command; this.focus = focus; this.selected = selected; calls += "init"
         }
         override fun prepare(value: CarPlayNowPlaying, artwork: Uri?) { calls += "prepare"; duringPrepare() }
-        override fun register(): Boolean { calls += "register"; duringRegister(); return token }
-        override fun sources(values: IntArray): Boolean { calls += "sources:${values.joinToString()}"; return acceptSource }
+        override fun register(): Boolean {
+            calls += "register"; duringRegister()
+            if (registerFailures > 0) { registerFailures--; throw SecurityException("private-registration") }
+            return token
+        }
+        override fun sources(values: IntArray): Boolean { calls += "sources:${values.joinToString()}"; duringSources(); return acceptSource }
         override fun currentSource() { calls += "current" }
         override fun requestPlay(): Boolean {
             calls += "request"
@@ -125,6 +131,54 @@ class L7MediaCenterSessionTest {
 
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
+
+    @Test fun registrationExceptionRetriesWithoutDependingOnAnotherReadyCallback() {
+        port.registerFailures = 2
+        connect()
+        repeat(2) { retries.removeFirst().run(); worker.drain() }
+        session.update(playing()); worker.drain()
+        assertEquals(3, port.calls.count { it == "register" })
+        assertTrue(port.calls.contains("state"))
+        assertTrue(retries.isEmpty())
+        assertFalse(logs.any { "private-registration" in it })
+    }
+
+    @Test fun acceptedMetadataAllowsMoreThanThreeHealthyServiceRestarts() {
+        connect(); session.update(playing(10)); worker.drain()
+        repeat(5) { port.ready(false); worker.drain(); port.ready(true); worker.drain() }
+        assertEquals(6, port.calls.count { it == "register" })
+        assertEquals(6, port.updates.size)
+        assertEquals(playing(10), port.updates.last())
+        assertFalse(logs.any { "registerLimit" in it })
+    }
+
+    @Test fun oldCommandQueuedBeforeServiceRecoveryCannotControlRecoveredRegistration() {
+        connect()
+        assertTrue(port.command(CarPlayMediaButton.NEXT))
+        port.ready(false); worker.drain(); port.ready(true); worker.drain(); main.drain()
+        assertTrue(sent.isEmpty())
+        assertTrue(port.command(CarPlayMediaButton.NEXT)); main.drain()
+        assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
+    }
+
+    @Test fun oldFocusQueuedAfterDisconnectCannotPauseRecoveredRegistration() {
+        connect(); session.update(playing()); worker.drain()
+        port.focus("own"); worker.drain()
+        port.ready(false)
+        port.focus("other")
+        port.ready(true)
+        worker.drain(); main.drain()
+        assertTrue(sent.isEmpty())
+        assertTrue(port.command(CarPlayMediaButton.NEXT)); main.drain()
+        assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
+    }
+
+    @Test fun sourceListAcceptanceMustFinishBeforeControlsBecomeAvailable() {
+        port.duringSources = { assertFalse(port.command(CarPlayMediaButton.NEXT)) }
+        connect()
+        assertTrue(port.command(CarPlayMediaButton.NEXT)); main.drain()
+        assertEquals(listOf(CarPlayMediaButton.NEXT), sent)
+    }
 
     @Test fun aNewTransferDoesNotReusePreviousArtworkWhileProgressKeepsCurrentArtwork() {
         connect()

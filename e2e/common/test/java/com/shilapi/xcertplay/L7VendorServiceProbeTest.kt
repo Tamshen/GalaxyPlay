@@ -38,7 +38,17 @@ class L7VendorServiceProbeTest {
         assertEquals("UNTESTED_NO_BINDER_CALL", facts["mediaServiceAuthorization"])
         assertEquals("0", facts["mediaProviderEasSupport"])
         verify(context, times(2)).getPackageManager()
+        verify(context).checkSelfPermission("vendor.permission.MEDIA")
         verifyNoMoreInteractions(context)
+    }
+
+    @Test fun deniedComponentPermissionDoesNotClaimSdkAdmission() {
+        installed(permission = "vendor.permission.MEDIA")
+        `when`(context.checkSelfPermission("vendor.permission.MEDIA")).thenReturn(PackageManager.PERMISSION_DENIED)
+        val facts = L7VendorServiceProbe.inspect(context)
+        assertEquals("false", facts["mediaServicePermissionGranted"])
+        assertEquals("VISIBLE", facts["mediaServiceQuery"])
+        assertEquals("UNTESTED_NO_BINDER_CALL", facts["mediaServiceAuthorization"])
     }
 
     @Test fun absentMetadataAndNoComponentPermissionStaySeparateFromZeroAndAdmission() {

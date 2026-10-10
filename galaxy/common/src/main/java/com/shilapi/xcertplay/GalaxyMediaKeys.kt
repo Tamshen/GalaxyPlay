@@ -141,7 +141,7 @@ internal object GalaxyMediaKeys {
         covers = coverOwner
         pendingArtwork?.let { (id, bytes) -> coverOwner.submit(id, bytes) }
         pendingArtwork = null
-        mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext), context.packageName,
+        mediaCenter = L7MediaCenterSession(L7ReflectiveMediaCenter(context.applicationContext, next.localMediaAudioEnabled), context.packageName,
             { synchronized(this) { controller === next && next.hasActiveSession() } }, dispatch, traceSend = traced, localPlayback = next.localMediaAudioEnabled).also { it.start(); it.update(mediaInfo, null) }
         coverOwner.select(mediaInfo.artworkTransferId)
     }

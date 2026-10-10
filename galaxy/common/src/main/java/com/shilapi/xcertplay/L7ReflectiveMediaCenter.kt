@@ -2,7 +2,6 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.net.Uri
-import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.vendor.SdkSubclass
@@ -10,16 +9,27 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
 /** 使用已安装 SDK，所有服务调用保留本应用包名和 UID，不使用旧的空实现重载。 */
-internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
+internal class L7ReflectiveMediaCenter(
+    context: Context,
+    private val localPlayback: Boolean = true,
+    private val sdkLoader: () -> L7VendorSdk.Loaded = { L7VendorSdk(context.applicationContext).load(API) },
+    private val serviceEvidence: () -> Int? = { L7VendorServiceProbe.inspect(context.applicationContext)["mediaProviderEasSupport"]?.toIntOrNull() },
+) : L7MediaCenterPort {
     private val app = context.applicationContext
     private var api: Any? = null
     private var apiType: Class<*>? = null
     private var client: Any? = null
     private var token: Any? = null
-    private var loader: ClassLoader? = null
+    private var contract: GalaxyOemMediaContract? = null
+    private var clientHandler: ((Long) -> InvocationHandler)? = null
+    @Volatile private var registration = 0L
+    private var tokenBinder: android.os.IBinder? = null
+    private var tokenDeath: android.os.IBinder.DeathRecipient? = null
+    private var apiReady: ((Boolean) -> Unit)? = null
     private var infoClass: Class<*>? = null
     @Volatile private var latest = CarPlayNowPlaying()
     @Volatile private var info: Any? = null
+    @Volatile private var snapshotRevision = 0L
     private val trackSession = java.util.UUID.randomUUID().toString()
     private var track = 0L
     override var source = L7MediaCenterPort.CARPLAY_SOURCE
@@ -29,41 +39,38 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
     override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean,
                             focus: (String?) -> Unit, selected: (Int) -> Boolean) {
         if (!valid) return
-        val sdk = L7VendorSdk(app).load(API)
-        loader = sdk.loader
+        val sdk = sdkLoader()
+        apiReady = ready
         val apiClass = Class.forName(API, true, sdk.loader)
         apiType = apiClass
         val clientClass = Class.forName(CLIENT, false, sdk.loader)
         infoClass = Class.forName(INFO, false, sdk.loader)
-        source = L7MediaSourcePolicy.resolve(
-            L7VendorServiceProbe.inspect(app)["mediaProviderEasSupport"]?.toIntOrNull(), requireNotNull(infoClass))
+        val verified = GalaxyOemMediaContract(apiClass, clientClass, requireNotNull(infoClass))
+        contract = verified
+        source = L7MediaSourcePolicy.resolve(serviceEvidence(), requireNotNull(infoClass))
         val callbackClass = Class.forName("com.ecarx.eas.sdk.ECarXApiClient\$Callback", false, sdk.loader)
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
-        val names = setOf("onPlay", "onPause", "onNext", "onPrevious", "onMediaCenterFocusChanged",
-            "onSourceSelected", "getCurrentSourceType", "getMediaSourceTypeList", "getCurrentProgress", "getMusicPlaybackInfo") +
-            if (L7AudioTemplates.model(app) != L7AudioTemplates.Model.L7) setOf("onCustomAction") else emptySet()
-        val methods = clientClass.methods.filter { it.name in names && (it.name != "onCustomAction" ||
-            (it.returnType == Void.TYPE && it.parameterTypes.contentEquals(arrayOf(android.os.Bundle::class.java)) &&
-                !java.lang.reflect.Modifier.isFinal(it.modifiers) && !java.lang.reflect.Modifier.isStatic(it.modifiers))) }
-        if (L7AudioTemplates.model(app) != L7AudioTemplates.Model.L7)
-            L7SteeringDiagnostics.store.state("customActionObserver", "available=${methods.any { it.name == "onCustomAction" }}")
-        client = SdkSubclass.create(clientClass, methods.toTypedArray(), InvocationHandler { _, method, args ->
+        L7SteeringDiagnostics.store.state("customActionObserver", "available=${verified.clientMethods.any { it.name == "onCustomAction" }}")
+        clientHandler = { epoch -> InvocationHandler { _, method, args ->
+            val active = valid && registration == epoch
             when (method.name) {
-                "onCustomAction" -> { if (valid) VehicleSteeringInputLog.customAction(args?.firstOrNull() as? android.os.Bundle); null }
-                "onPlay" -> valid && command(CarPlayMediaButton.PLAY)
-                "onPause" -> valid && command(CarPlayMediaButton.PAUSE)
-                "onNext" -> valid && command(CarPlayMediaButton.NEXT)
-                "onPrevious" -> valid && command(CarPlayMediaButton.PREVIOUS)
-                "onMediaCenterFocusChanged" -> { if (valid) focus(args?.firstOrNull() as? String); null }
-                "onSourceSelected" -> valid && selected(args?.firstOrNull() as? Int ?: -1)
-                "getCurrentSourceType" -> if (valid) source else -1
-                "getMediaSourceTypeList" -> if (valid) intArrayOf(source) else intArrayOf()
-                "getCurrentProgress" -> if (valid) latest.elapsedMillis ?: 0L else 0L
-                "getMusicPlaybackInfo" -> if (valid) info else null
+                "onCustomAction" -> { if (active) VehicleSteeringInputLog.customAction(args?.firstOrNull() as? android.os.Bundle); null }
+                "onPlay" -> active && command(CarPlayMediaButton.PLAY)
+                "onPause" -> active && command(CarPlayMediaButton.PAUSE)
+                "onNext" -> active && command(CarPlayMediaButton.NEXT)
+                "onPrevious" -> active && command(CarPlayMediaButton.PREVIOUS)
+                "onMediaCenterFocusChanged" -> { if (active) focus(args?.firstOrNull() as? String); null }
+                "onSourceSelected" -> active && selected(args?.firstOrNull() as? Int ?: -1)
+                // 此回调包含来源与前一应用，不等同于用户选择，不能再次发播放命令。
+                "onSourceChanged" -> { if (active) L7DebugLog.record("MediaCenter: sourceChanged source=${args?.firstOrNull() as? Int ?: -1}"); false }
+                "getCurrentSourceType" -> if (active) source else -1
+                "getMediaSourceTypeList" -> if (active) intArrayOf(source) else intArrayOf()
+                "getCurrentProgress" -> if (active) latest.elapsedMillis ?: 0L else 0L
+                "getMusicPlaybackInfo" -> if (active) info else null
                 else -> null
             }
-        })
+        } }
         val callback = Proxy.newProxyInstance(sdk.loader, arrayOf(callbackClass)) { proxy, method, args ->
             when (method.name) {
                 "onAPIReady" -> { if (valid) ready(args?.firstOrNull() == true); null }
@@ -79,15 +86,27 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
 
     override fun register(): Boolean {
         if (!valid) return false
-        val client = client ?: return false
-        val type = requireNotNull(apiType)
-        val linked = type.methods.singleOrNull { it.name == "registerMusic" &&
-            it.parameterTypes.contentEquals(arrayOf(String::class.java, client.javaClass.superclass, String::class.java)) }
-        token = if (linked != null) linked.invoke(api, app.packageName, client, app.packageName)
-            else type.getMethod("registerMusic", String::class.java, client.javaClass.superclass)
-                .invoke(api, app.packageName, client)
-        L7DebugLog.record("MediaCenter: registration mediaSessionLinked=${linked != null} source=$source tokenValid=${token != null}")
-        return token != null
+        forgetToken()
+        val verified = requireNotNull(contract)
+        val epoch = ++registration
+        val callback = SdkSubclass.create(verified.client, verified.clientMethods, requireNotNull(clientHandler)(epoch))
+        client = callback
+        val received = verified.register(requireNotNull(api), app.packageName, callback)
+        val binder = (received as? android.os.IInterface)?.asBinder()
+        if (binder == null || !binder.isBinderAlive) {
+            registration++
+            L7DebugLog.record("MediaCenter: registration tokenValid=false reason=INVALID_OR_DEAD_BINDER")
+            return false
+        }
+        token = received
+        val death = android.os.IBinder.DeathRecipient {
+            if (valid && registration == epoch) apiReady?.invoke(false)
+        }
+        tokenBinder = binder
+        tokenDeath = death
+        binder.linkToDeath(death, 0)
+        L7DebugLog.record("MediaCenter: registration mediaSessionLinked=${verified.linkedSession} source=$source tokenValid=true")
+        return true
     }
     override fun sources(values: IntArray) = call("updateMediaSourceTypeList", arrayOf(Any::class.java, IntArray::class.java), token, values) == true
     override fun currentSource() { call("updateCurrentSourceType", arrayOf(Any::class.java, Int::class.javaPrimitiveType!!), token, source) }
@@ -100,6 +119,7 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
         if (latest.title != value.title || latest.artist != value.artist || latest.album != value.album ||
             latest.artworkTransferId != value.artworkTransferId || latest.durationMillis != value.durationMillis) track++
         latest = value
+        val revision = ++snapshotRevision
         // 初始化时手机播放状态可能尚未回传，不能让 SDK getter 把它解释成暂停。
         if (!value.playbackKnown) { info = null; return }
         // 封面会由 EAS 转交媒体中心读取；只给已确认的链路包读取权，不开放 provider。
@@ -115,22 +135,10 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
         val cls = requireNotNull(infoClass)
         val snapshotTrack = "$trackSession:$track"
         val artworkGetterReported = java.util.concurrent.atomic.AtomicBoolean()
-        val getters = setOf("getTitle", "getArtist", "getAlbum", "getDuration", "getArtwork", "getSourceType",
-            "getPlaybackStatus", "getPackageName", "getAppName", "getUuid", "isSupportCollect", "isSupportDownload", "isSupportLoopModeSwitch")
-        info = SdkSubclass.create(cls, cls.methods.filter { it.name in getters }.toTypedArray(), InvocationHandler { _, method, _ ->
-            if (!valid) return@InvocationHandler when (method.returnType) {
-                java.lang.Long.TYPE -> 0L
-                java.lang.Integer.TYPE -> 0
-                java.lang.Boolean.TYPE -> false
-                else -> null
-            }
-            when (method.name) {
-                "getTitle" -> value.title
-                "getArtist" -> value.artist
-                "getAlbum" -> value.album
-                "getDuration" -> value.durationMillis ?: 0L
-                "getArtwork" -> synchronized(this) {
-                    if (!valid) null else {
+        info = SdkSubclass.create(cls, requireNotNull(contract).infoMethods,
+            GalaxyOemPlaybackSnapshot(app, value, source, snapshotTrack, { valid && snapshotRevision == revision }, {
+                synchronized(this) {
+                    if (!valid || snapshotRevision != revision) null else {
                         val caller = android.os.Binder.getCallingUid()
                         var failures = 0
                         try {
@@ -140,7 +148,6 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                                 } catch (_: Exception) { failures++ }
                             }
                         } catch (_: Exception) { failures++ }
-                        // 每个快照只记一次 getter；授权失败不抛出 Binder 回调，读取结果由 provider 记录。
                         if (artworkGetterReported.compareAndSet(false, true)) {
                             L7DebugLog.record("MediaCenter: artworkGetter transferId=${value.artworkTransferId ?: "none"} " +
                                 "coverKey=${artwork?.let(L7MediaArtworkProvider::diagnosticKey) ?: "none"} " +
@@ -149,14 +156,7 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
                         artwork
                     }
                 }
-                "getSourceType" -> source
-                "getPlaybackStatus" -> if (value.playing) 1 else 0
-                "getPackageName" -> app.packageName
-                "getAppName" -> app.getString(R.string.app_name)
-                "getUuid" -> snapshotTrack
-                else -> false
-            }
-        })
+            }, localPlayback && GalaxyVehiclePreferences.steering(app)))
     }
 
     override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
@@ -170,22 +170,35 @@ internal class L7ReflectiveMediaCenter(context: Context) : L7MediaCenterPort {
 
     override fun unregister(): Boolean {
         val old = token ?: return false
-        token = null
+        registration++
+        snapshotRevision++
+        info = null
+        forgetToken()
         return call("unregister", arrayOf(Any::class.java), old) == true
+    }
+    private fun forgetToken() {
+        tokenDeath?.let { death -> runCatching { tokenBinder?.unlinkToDeath(death, 0) } }
+        tokenDeath = null
+        tokenBinder = null
+        token = null
     }
     @Synchronized override fun invalidate() {
         valid = false
+        snapshotRevision++
         info = null
         latest = CarPlayNowPlaying()
     }
     override fun close() {
         invalidate()
-        token = null
+        forgetToken()
         client = null
+        clientHandler = null
+        apiReady = null
         info = null
         latest = CarPlayNowPlaying()
-        api?.let { target -> apiType?.methods?.find { it.name == "release" && it.parameterCount == 0 }?.invoke(target) }
+        api?.let { target -> requireNotNull(apiType).getMethod("release").invoke(target) }
         api = null
+        contract = null
     }
     companion object {
         const val API = "com.ecarx.eas.sdk.mediacenter.MediaCenterAPI"

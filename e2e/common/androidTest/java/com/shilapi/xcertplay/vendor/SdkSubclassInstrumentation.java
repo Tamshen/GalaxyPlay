@@ -9,7 +9,11 @@ public class SdkSubclassInstrumentation extends Instrumentation {
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
-        try { testGeneratedSubclassCallbacksAndOldInstanceIsolation(); result.putString("stream", "SDK_SUBCLASS_OK"); finish(-1, result); }
+        try {
+            testGeneratedSubclassCallbacksAndOldInstanceIsolation();
+            com.shilapi.xcertplay.GalaxyOemMediaIntegrationChecks.run(getTargetContext());
+            result.putString("stream", "SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK"); finish(-1, result);
+        }
         catch (Throwable error) { result.putString("stream", "SDK_SUBCLASS_FAILED " + error); finish(0, result); }
     }
     private void assertEquals(Object expected, Object actual) { if (!expected.equals(actual)) throw new AssertionError(expected + " != " + actual); }
