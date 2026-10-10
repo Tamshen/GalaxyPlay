@@ -12,6 +12,8 @@
 
 [sync-upstream-core.py](../scripts/sync-upstream-core.py) 的覆盖、冲突、漂移和目录隔离由 `checks/test_upstream_sync.py` 使用临时 Git 仓库验证；不读取或复制认证、签名、日志和构建产物。
 
+原厂媒体接入回归包括 `GalaxyOemMediaContractTest`（精确公开重载、本应用 MediaSession、拒绝占位入口）、`GalaxyOemPlaybackSnapshotTest`（图标／immutable 返回入口、能力字段与失效对象）、`L7MediaCenterSessionTest`（来源接受、异常重试、健康服务多次恢复、旧控制／焦点隔离），并由 `GalaxyProfilesTest` 验证旧音频保留、明确应用的新焦点与会话冻结。Android VM 测试源集中的 `com.ecarx.eas.sdk` 为自写公开签名替身，禁止进入正式 APK，也不作为原厂 SDK 或实车成功证据。Docker 构建 `:common:assembleDebugAndroidTest`，在独占 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，再执行 `adb -s emulator-5556 shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，成功标记为 `SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK`。配置设备脚本增加 L7 模板焦点实际落盘断言，单次点击后等待界面完成转换，失败截图保留且恢复原设置。
+
 ## 目录与检阅顺序
 
 ```text
