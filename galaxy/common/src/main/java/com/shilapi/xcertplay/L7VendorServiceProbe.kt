@@ -11,7 +11,7 @@ internal object L7VendorServiceProbe {
     val factKeys = setOf("mediaProviderPackage", "mediaProviderQuery", "mediaProviderExceptionType",
         "mediaProviderEnabled", "mediaProviderEasSupport", "mediaProviderEasSupportPresent", "mediaProviderEasSupportReason",
         "mediaServiceQuery", "mediaServiceExceptionType", "mediaServiceExported", "mediaServiceEnabled",
-        "mediaServicePermission", "mediaServicePermissionDeclared", "mediaServiceAuthorization")
+        "mediaServicePermission", "mediaServicePermissionDeclared", "mediaServicePermissionGranted", "mediaServiceAuthorization")
 
     fun inspect(context: Context): Map<String, String?> {
         val result = linkedMapOf<String, String?>("mediaProviderPackage" to PACKAGE,
@@ -36,6 +36,9 @@ internal object L7VendorServiceProbe {
             result["mediaServiceEnabled"] = info.enabled.toString()
             result["mediaServicePermissionDeclared"] = (!info.permission.isNullOrEmpty()).toString()
             result["mediaServicePermission"] = info.permission?.takeIf(String::isNotEmpty)
+            result["mediaServicePermissionGranted"] = info.permission?.takeIf(String::isNotEmpty)?.let {
+                (context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED).toString()
+            }
         }
         return result
     }
