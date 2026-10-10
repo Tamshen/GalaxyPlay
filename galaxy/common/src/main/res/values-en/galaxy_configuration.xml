@@ -2,8 +2,8 @@
 <resources>
     <string name="config_page_credentials">Local authentication material</string>
     <string name="config_page_credentials_hint">Managed by this device; model templates keep it unchanged</string>
-    <string name="config_page_title">Vehicle configuration</string>
-    <string name="config_page_entry_hint">Choose a vehicle template and adjust audio, controls, reporting and display</string>
+    <string name="config_page_title">Preferences</string>
+    <string name="config_page_entry_hint">Adjust audio, display, steering wheel controls and the car display</string>
     <string name="config_page_value_hint">Confirm your choice, then tap Save on the configuration page.</string>
     <string name="config_page_restore">Undo edits</string>
     <string name="config_page_common">Common</string>
@@ -17,15 +17,16 @@
     <string name="template_l7">Galaxy L7</string>
     <string name="template_l6">Galaxy L6</string>
     <string name="template_quick">Built-in quick settings</string>
-    <string name="template_overwrite">Apply the template to replace vehicle parameters and unsaved edits. Hotspot, connection, authentication, language, interface and icon size are kept.</string>
+    <string name="template_overwrite">Applying a template replaces current preferences and unsaved edits. You can adjust them afterward. Connection settings, app settings, authentication material and logs are kept.</string>
     <string name="template_saved">Saved · Current model: %1$s</string>
     <string name="template_pending_connection">Saved · The current connection keeps its settings; changes apply next time</string>
     <string name="application_settings_title">App settings</string>
+    <string name="application_settings_entry_hint">Adjust language, interface size and appearance</string>
     <string name="application_settings_hint">Language, interface, icon and button sizes and appearance are saved separately from vehicle templates and included with uploaded logs.</string>
     <string name="template_choose">Choose vehicle</string>
     <string name="template_apply">Apply template</string>
     <string name="template_current">Vehicle · %1$s</string>
-    <string name="template_hint">Choose a vehicle to fill in adaptation parameters. Set hotspot and connection details separately from Connection in the left menu.</string>
+    <string name="template_hint">Choose L7 or L6 to fill in preferences, then adjust them as needed. Set hotspot and connection details separately in Connection setup.</string>
     <string name="config_hotspot_title">Hotspot name and password</string>
     <string name="config_hotspot_hint">Enter the car hotspot name and password. Leave the password blank for an open hotspot; other settings are automatic.</string>
     <string name="config_auth_default_hint">Keep the defaults for everyday use. Adjust these only when changing authentication methods.</string>
@@ -52,7 +53,7 @@
     <string name="template_custom">Custom</string>
     <string name="config_reset_current">Reset current configuration</string>
     <string name="config_reset_confirm">Reset configuration</string>
-    <string name="config_reset_message">Restore default audio, controls, reporting and display parameters for %1$s, replacing saved vehicle settings and unsaved edits. Hotspot name and password, connection, authentication, language, interface and icon size and logs are kept. The current connection continues; defaults apply on the next connection.</string>
+    <string name="config_reset_message">Restore default audio, controls, reporting and display parameters for %1$s, replacing saved preferences and unsaved edits. Connection settings, app settings, local authentication material and logs are kept. The current connection continues; defaults apply on the next connection.</string>
     <string name="config_page_steering">Controls</string>
     <string name="config_page_reporting">Reporting</string>
     <string name="config_steering_control">Steering wheel controls</string>

@@ -88,9 +88,9 @@ original = {path: read(path) for path in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
     'zh': ('车型', '银河 L6', '银河 L7', '当前方案', 'L6 配置', 'L7 配置',
-           '自定义模板', '保存，下次连接生效', '取消', '编辑配置文件', '自动识别车型', '车型设置', 'CarPlay 认证', '返回设置'),
+           '自定义模板', '保存，下次连接生效', '取消', '编辑配置文件', '自动识别车型', '偏好设置', 'CarPlay 认证', '返回设置'),
     'en': ('Vehicle model', 'Galaxy L6', 'Galaxy L7', 'Current profile', 'L6 profile', 'L7 profile',
-           'Custom template', 'Save for next connection', 'Cancel', 'Edit configuration file', 'Detect vehicle model', 'Vehicle settings', 'CarPlay authentication', 'Back to settings'),
+           'Custom template', 'Save for next connection', 'Cancel', 'Edit configuration file', 'Detect vehicle model', 'Preferences', 'CarPlay authentication', 'Back to settings'),
 }
 
 try:
@@ -112,7 +112,7 @@ try:
         launch("settings")
         entries = {n.get('text'): n for n in nodes().iter('node') if n.get('text') in (category, auth)}
         assert len(entries) == 2, '首页首项或认证入口不可见'
-        assert int(re.findall(r'\d+', entries[category].get('bounds'))[1]) < int(re.findall(r'\d+', entries[auth].get('bounds'))[1]), '车型设置不是首项'
+        assert int(re.findall(r'\d+', entries[category].get('bounds'))[1]) < int(re.findall(r'\d+', entries[auth].get('bounds'))[1]), '偏好设置不是首项'
         screenshot(language + '-settings-day.png')
         tap(category)
         assert model in visible() and detect in visible() and profile not in visible()

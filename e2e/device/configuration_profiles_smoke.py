@@ -130,7 +130,8 @@ labels = {
     'bluetooth': ('暂停手机蓝牙音乐', 'Pause phone Bluetooth music'),
     'right': ('右舵布局', 'Right-hand drive layout'), 'back': ('返回设置', 'Back to settings'),
     'language': ('应用语言', 'App language'), 'apply': ('应用', 'Apply'),
-    'system': ('跟随系统', 'System default'), 'title': ('车型配置', 'Vehicle configuration'),
+    'system': ('跟随系统', 'System default'), 'title': ('偏好设置', 'Preferences'),
+    'connection_settings': ('连接设置', 'Connection setup'),
     'app': ('应用设置', 'App settings'), 'size': ('界面大小', 'Interface size'), 'large': ('大 · 320 DPI', 'Large · 320 DPI'),
     'icon': ('CarPlay 图标大小', 'CarPlay icon size'), 'icon_large': ('大 · 125%', 'Large · 125%'),
 }
@@ -138,7 +139,7 @@ english = False
 
 
 def detect_language():
-    return 'Vehicle configuration' in texts()
+    return 'Preferences' in texts()
 
 
 def label(key):
@@ -267,7 +268,26 @@ def configuration_smoke():
     launch('settings')
     assert label('title') in texts() and label('app') in texts()
     assert '车型设置' not in texts() and 'Vehicle settings' not in texts()
+    root = tree()
+    titles = [label(key) for key in ('title', 'connection_settings', 'app')]
+    ys = [int(re.findall(r'\d+', next(n for n in root.iter('node') if n.get('text') == title).get('bounds'))[1]) for title in titles]
+    assert ys == sorted(ys) and len(set(ys)) == 3, '三个设置入口顺序不符'
+    hints = [('调整音频、画面、方向盘按键与原车显示', 'Adjust audio, display, steering wheel controls and the car display'),
+             ('设置手机连接方式、热点与自动连接', 'Set phone connection methods, hotspot and automatic connection'),
+             ('调整语言、界面大小与显示习惯', 'Adjust language, interface size and appearance')]
+    current_texts = texts()
+    assert all(pair[int(english)] in current_texts for pair in hints), '首页说明不一致'
     screenshot('01-settings')
+    click(label('title'))
+    assert label('title') in texts()
+    click(label('back'))
+    click(label('connection_settings'))
+    assert label('connection_settings') in texts()
+    click(label('authentication'))
+    assert label('authentication') in texts()
+    screenshot('01-connection-authentication')
+    click(label('back'))
+    assert label('title') in texts()
     click(label('app'))
     assert label('language') in texts()
     click(label('authentication'))
@@ -280,7 +300,12 @@ def configuration_smoke():
     click(label('icon')); click(label('icon_large')); click(label('save'))
     assert b'name="ui_scale_percent" value="125"' in private('shared_prefs/xcertplay_airplay.xml').encode('utf-8')
     screenshot('02-app-settings')
-    launch()
+    launch('settings')
+    current_texts = texts()
+    assert all(pair[int(english)] in current_texts for pair in hints), '大尺寸首页说明缺失'
+    screenshot('02-settings-large')
+    click(label('title'))
+    assert label('title') in texts()
     screenshot('02-configuration')
     independent = current_app_values()
     click(label('vehicle'), contains=True)
