@@ -2,8 +2,8 @@
 <resources>
     <string name="config_page_credentials">Local authentication material</string>
     <string name="config_page_credentials_hint">Managed by this device; model templates keep it unchanged</string>
-    <string name="config_page_title">Configuration</string>
-    <string name="config_page_entry_hint">Edit current settings with L7 and L6 quick templates</string>
+    <string name="config_page_title">Vehicle configuration</string>
+    <string name="config_page_entry_hint">Edit connection, audio and video settings with L7 and L6 quick templates</string>
     <string name="config_page_value_hint">Update the draft, then save on the configuration page.</string>
     <string name="config_page_restore">Undo edits</string>
     <string name="config_page_common">Common</string>
@@ -17,7 +17,9 @@
     <string name="template_l7">Galaxy L7</string>
     <string name="template_l6">Galaxy L6</string>
     <string name="template_quick">Built-in quick settings</string>
-    <string name="template_overwrite">Tap a model to overwrite current settings. You can edit them afterwards.</string>
+    <string name="template_overwrite">Tap a model to overwrite current vehicle settings. You can edit them afterwards.</string>
     <string name="template_saved">Saved · Current model: %1$s</string>
     <string name="template_pending_connection">Saved · The current connection keeps its settings; changes apply next time</string>
+    <string name="application_settings_title">App settings</string>
+    <string name="application_settings_hint">Language, interface size and appearance are saved separately from vehicle templates and included with uploaded logs.</string>
 </resources>

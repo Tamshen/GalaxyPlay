@@ -104,7 +104,7 @@ internal data class GalaxyProfile(val id: String, val name: String, val revision
 internal class GalaxyConfigurationContext(base: Context, val profile: GalaxyProfile,
     val editable: Boolean = false, private val runtimeOnly: Boolean = false) : ContextWrapper(base) {
     private val groups = GalaxyConfigurationFields.names.associateWith { name ->
-        GalaxyScopedPreferences(name, GalaxyMemoryPreferences(profile.configuration.preferences[name].orEmpty()),
+        GalaxyScopedPreferences(name, GalaxyMemoryPreferences(profile.configuration.preferences[name].orEmpty().filterKeys { GalaxyConfigurationFields.vehicleAllowed(name, it) }),
             base.getSharedPreferences(name, 0), writeThrough = runtimeOnly)
     }.toMutableMap()
     val audio = profile.configuration.audio.toMutableMap()
@@ -115,7 +115,7 @@ internal class GalaxyConfigurationContext(base: Context, val profile: GalaxyProf
         if (name in GalaxyConfigurationFields.names && (!runtimeOnly || name in setOf("xcertplay_airplay", "l7_audio_templates"))) groups.getValue(name)
         else super.getSharedPreferences(name, mode)
     fun configuration() = GalaxyConfiguration(groups.mapValues { (name, prefs) ->
-        (profile.configuration.preferences[name].orEmpty().keys + prefs.all.keys).associateWith { prefs.all[it] }
+        (profile.configuration.preferences[name].orEmpty().keys + prefs.all.keys).filter { GalaxyConfigurationFields.vehicleAllowed(name, it) }.associateWith { prefs.all[it] }
     }, audio.toMap(), audioRecovery.toSet())
 }
 

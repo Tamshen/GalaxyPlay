@@ -7,7 +7,7 @@ import com.shilapi.xcertplay.host.R
 
 /** 应用字号、悬浮导航与投屏参数分别分组，沿用各自已有保存时机。 */
 internal object L7DisplaySettings {
-    fun add(activity: Activity, parent: LinearLayout) {
+    fun addApplication(activity: Activity, parent: LinearLayout) {
         fun text(id: Int) = activity.getString(id)
         L7SettingsSection.add(parent, text(R.string.l7_section_app_ui), footer = text(R.string.l7_ui_density_hint)) {
             L7UiDensitySettings.add(activity, it)
@@ -25,6 +25,10 @@ internal object L7DisplaySettings {
                 L7FloatingNavigationPreferences.saveTransparency(activity, presets[it])
             }
         }
+    }
+    fun add(activity: Activity, parent: LinearLayout) {
+        addApplication(activity, parent)
+        fun text(id: Int) = activity.getString(id)
         L7SettingsSection.add(parent, text(R.string.l7_section_projection), footer = text(R.string.l7_setting_apply_hint)) { card ->
             val panel = L7DisplayGeometry.panelSize
             card.addView(L7SettingRow(activity, text(R.string.carplay_size), text(R.string.l7_physical_size_description)).apply {

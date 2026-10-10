@@ -62,8 +62,7 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
             1 -> listOf(R.string.automatic_connection, R.string.l7_start_wireless)
             2 -> listOf(R.string.l7_template_title)
             3 -> listOf(R.string.l7_section_projection)
-            4 -> listOf(R.string.l7_section_app_ui, R.string.l7_section_floating)
-            else -> listOf(R.string.l7_auth_title, R.string.l7_logs_title)
+            else -> listOf(R.string.l7_auth_title)
         }
         groups.forEach { group -> GalaxyProfileFieldsView.add(context, view.fields, group,
             if (state.group == 0) setOf("display_scale_percent", "display_fps") else null) }
@@ -81,9 +80,9 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
             GalaxyProfileFieldsView.add(context, view.fields, R.string.automatic_connection, setOf("wireless_enabled"))
             view.fields.addView(L7Components.note(activity, text(R.string.config_page_next_connection)))
         }
-        if (state.group == 5 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
+        if (state.group == 4 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
-        if (state.group == 5) view.fields.addView(L7Components.actionRow(activity,
+        if (state.group == 4) view.fields.addView(L7Components.actionRow(activity,
             text(R.string.config_page_credentials), text(R.string.config_page_credentials_hint)) { requestLeave(credentials) })
         view.scroll.post { view.scroll.scrollTo(0, state.scroll[state.group] ?: 0) }
     }

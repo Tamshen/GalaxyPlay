@@ -42,6 +42,36 @@ class GalaxyConfigurationEvidenceTest {
         assertEquals(value.id, DiagnosticRedactor.redact("config_ref=${value.id}")!!.substringAfter('='))
         assertTrue(value.text.length > DiagnosticRedactor.MAX_LINE)
     }
+    @Test fun completeAttachmentIncludesIndependentAppSettingsWithoutPuttingThemInVehicleConfiguration() {
+        AppLocale.save(app, "zh"); L7UiDensity.save(app, 320)
+        app.getSharedPreferences("l7_remote_log", 0).edit().putString("endpoint", "https://PRIVATE_SERVER.example/api/test")
+            .putString("authorization", "PRIVATE_AUTHORIZATION").commit()
+        val value = GalaxyConfigurationEvidence.capture(app)
+        val data = JSONObject(value.text)
+        val prefs = data.getJSONObject("application_preferences")
+        assertEquals("zh", prefs.getJSONObject("diplay").getJSONObject("app_language").getString("value"))
+        assertEquals(320, prefs.getJSONObject("l7_ui").getJSONObject("density").getInt("value"))
+        assertFalse(data.getJSONObject("configuration").getJSONObject("preferences").getJSONObject("diplay").has("app_language"))
+        assertFalse(value.text.contains("PRIVATE_SERVER")); assertFalse(value.text.contains("PRIVATE_AUTHORIZATION"))
+        assertEquals(value, GalaxyConfigurationEvidence.read(value.text))
+    }
+    @Test fun uploadPreservesHistoricalAppSettingsAndIncludesNewAppSettingsWithSameVehicleRevision() {
+        AppLocale.save(app, "zh"); L7UiDensity.save(app, 240)
+        val vehicle = GalaxyProfiles(app).active()
+        val old = GalaxyConfigurationEvidence.capture(app)
+        SessionLogFile(File(app.filesDir, "logs/diplay.log")).append("test=app_preferences", old)
+        AppLocale.save(app, "en"); L7UiDensity.save(app, 320)
+        assertEquals(vehicle, GalaxyProfiles(app).refresh())
+        val rows = records(RemoteLogReport.collect(app))
+        val historical = rows.first { it.optString("configuration_role") == "at_event" }.getJSONObject("configuration_file")
+        val current = rows.first { it.optString("configuration_role") == "saved_at_upload" }.getJSONObject("configuration_file")
+        assertEquals(240, historical.getJSONObject("application_preferences").getJSONObject("l7_ui").getJSONObject("density").getInt("value"))
+        assertEquals("zh", historical.getJSONObject("application_preferences").getJSONObject("diplay").getJSONObject("app_language").getString("value"))
+        assertEquals(320, current.getJSONObject("application_preferences").getJSONObject("l7_ui").getJSONObject("density").getInt("value"))
+        assertEquals("en", current.getJSONObject("application_preferences").getJSONObject("diplay").getJSONObject("app_language").getString("value"))
+        assertEquals(historical.getInt("revision"), current.getInt("revision"))
+        assertNotEquals(historical.getString("config_id"), current.getString("config_id"))
+    }
     @Test fun rotationRewritesFullHeaderAndAsyncQueueKeepsCapturedConfiguration() {
         val first = evidence()
         val next = evidence("l6")

@@ -33,7 +33,12 @@ internal class GalaxyProfiles(private val context: Context,
             val previous = parse(File(target.path + ".previous"))
             persist(AtomicFile(target), previous.json().toString())
             previous
-        }.also { check(it.id == id) }
+        }.let { profile ->
+            check(profile.id == id)
+            val vehicle = GalaxyApplicationPreferences.vehicle(profile.configuration)
+            if (vehicle == profile.configuration) profile else profile.copy(configuration = vehicle,
+                revision = profile.revision + 1, updatedAt = System.currentTimeMillis()).also(::saveFile)
+        }
     }
     private fun parse(file: File): GalaxyProfile = AtomicFile(file).openRead().use { stream ->
         val output = java.io.ByteArrayOutputStream()
@@ -84,7 +89,7 @@ internal class GalaxyProfiles(private val context: Context,
         if (list().any { it.id != draft.id && it.name.trim().equals(draft.name.trim(), true) }) throw GalaxyProfileNameConflict()
         GalaxyConfigurationFields.validate(draft.configuration)
         // 序列化回读同时验证类型、音频及文件预算；失败不写兼容存储。
-        val next = GalaxyProfile.parse(draft.copy(revision = draft.revision + 1,
+        val next = GalaxyProfile.parse(draft.copy(configuration = GalaxyApplicationPreferences.vehicle(draft.configuration), revision = draft.revision + 1,
             updatedAt = System.currentTimeMillis()).json().toString())
         val old = if (file(next.id).exists()) read(next.id) else null
         check(old?.revision == draft.revision || (old == null && draft.revision == 0)) { "CONFIG_EDIT_CONFLICT" }
@@ -124,12 +129,9 @@ internal class GalaxyProfiles(private val context: Context,
             GalaxyConfigurationFields.names.forEach { name ->
                 val prefs = context.getSharedPreferences(name, 0)
                 val edit = prefs.edit()
-                prefs.all.keys.filter { GalaxyConfigurationFields.allowed(name, it) }.forEach(edit::remove)
-                configuration.preferences[name].orEmpty().forEach { (key, value) -> put(edit, key, value) }
+                prefs.all.keys.filter { GalaxyConfigurationFields.vehicleAllowed(name, it) }.forEach(edit::remove)
+                configuration.preferences[name].orEmpty().filterKeys { GalaxyConfigurationFields.vehicleAllowed(name, it) }.forEach { (key, value) -> put(edit, key, value) }
                 check(edit.commit()) { "CONFIG_COMPAT_WRITE_FAILED" }
-            }
-            if (android.os.Build.VERSION.SDK_INT >= 33) configuration.preferences["diplay"]?.get("app_language")?.let {
-                AppLocale.save(context, it as String)
             }
             L7AudioTemplates.Model.entries.forEach { model ->
                 // 旧损坏文件保留供核对；沿用原播放器的内置回退，并在配置及界面明确标记。

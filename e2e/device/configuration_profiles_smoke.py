@@ -90,13 +90,14 @@ labels = {
     'bluetooth': ('蓝牙音乐互斥', 'Bluetooth media coordination'),
     'right': ('右舵布局', 'Right-hand drive layout'), 'back': ('返回设置', 'Back to settings'),
     'language': ('应用语言', 'App language'), 'apply': ('应用', 'Apply'),
-    'system': ('跟随系统', 'System default'), 'title': ('配置', 'Configuration'),
+    'system': ('跟随系统', 'System default'), 'title': ('车型配置', 'Vehicle configuration'),
+    'app': ('应用设置', 'App settings'), 'size': ('界面大小', 'Interface size'), 'large': ('大 · 320 DPI', 'Large · 320 DPI'),
 }
 english = False
 
 
 def detect_language():
-    return 'Configuration' in texts()
+    return 'Vehicle configuration' in texts()
 
 
 def label(key):
@@ -133,6 +134,24 @@ def read_optional(path):
         return None
 
 
+def app_values(values):
+    result = {}
+    for space, raw in values.items():
+        root = ET.fromstring(raw) if raw else []
+        for item in root:
+            key = item.get('name')
+            allowed = space in {'l7_ui', 'l7_floating_navigation', 'l7_remote_log'} or (
+                space == 'diplay' and key == 'app_language') or (
+                space == 'xcertplay_airplay' and key in {'debug_logs_enabled', 'carplay_night_mode', 'ambient_delay_seconds', 'ambient_lux_threshold'})
+            if allowed:
+                result[(space, key)] = ET.tostring(item)
+    return result
+
+
+def current_app_values():
+    return app_values({name: read_optional('shared_prefs/' + name + '.xml') for name in application})
+
+
 def restore_file(path, value):
     if value is None:
         adb('shell', 'run-as', package, 'rm', '-f', path)
@@ -152,26 +171,35 @@ assert re.fullmatch(r'[a-z0-9_]{1,64}', original_id)
 path = f'files/configurations/{original_id}.json'
 original = private(path).encode('utf-8')
 previous = read_optional(path + '.previous')
+application = {name: read_optional('shared_prefs/' + name + '.xml') for name in ['diplay', 'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'xcertplay_airplay']}
 audio = {name: read_optional('files/' + name) for name in ['audio-template.json', 'audio-template-l6.json', 'audio-template-custom.json']}
 original_files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
 try:
     if args.language:
         language(args.language)
     launch('settings')
-    assert label('title') in texts()
+    assert label('title') in texts() and label('app') in texts()
     assert '车型设置' not in texts() and 'Vehicle settings' not in texts()
     screenshot('01-settings')
-    click(label('title'))
+    click(label('app'))
+    assert label('language') in texts()
+    click(label('size')); click(label('large')); click(label('save'))
+    time.sleep(2)
+    assert b'value="320"' in private('shared_prefs/l7_ui.xml').encode('utf-8')
+    screenshot('02-app-settings')
+    launch()
     screenshot('02-configuration')
+    independent = current_app_values()
     click(label('l6'))
-    english = detect_language()
+    assert english == detect_language(), '车型模板改变了语言'
+    assert current_app_values() == independent, '车型模板改变了应用偏好'
     assert active() == original_id, '模板另建或切换了文件'
     applied = json.loads(private(path))
     assert applied['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
     screenshot('03-l6-applied')
-    # 模板默认语言可能跟随系统；重新设置本轮展示语言后仍只编辑当前文件。
-    if args.language:
-        language(args.language)
+    # 独立应用偏好不应出现在当前车型文件，也不会被模板或普通参数保存覆盖。
+    assert not applied['configuration']['preferences']['diplay'].get('app_language')
+    assert not applied['configuration']['preferences']['l7_ui'].get('density')
     before = private(path)
     click(label('bluetooth'))
     assert private(path) == before, '普通参数提前写入文件'
@@ -190,6 +218,7 @@ try:
     assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
     assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
     assert active() == original_id
+    assert current_app_values() == independent
     screenshot('06-edited')
     click(label('right'))
     saved = private(path)
@@ -200,17 +229,23 @@ try:
     launch()
     click(label('l7'))
     assert json.loads(private(path))['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l7'
-    assert set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines()) - original_files <= {original_id + '.json.previous'}
+    assert current_app_values() == independent
+    # 旧版其他文件首次读取会升级并保留上一份，不能把迁移备份误判成新配置。
+    allowed_backups = {name + '.previous' for name in original_files if name.endswith('.json')}
+    assert set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines()) - original_files <= allowed_backups, '创建了额外配置文件'
 finally:
-    # 本轮会覆盖当前设置；在内存保留原件，恢复该文件及三份兼容音频文件后重启。
+    # 本轮会覆盖当前设置；在内存保留原件，恢复当前文件、应用偏好及三份兼容音频文件后重启。
     adb('shell', 'am', 'force-stop', package)
     restore_file(path, original)
+    for name, value in application.items():
+        restore_file('shared_prefs/' + name + '.xml', value)
     for name, value in audio.items():
         restore_file('files/' + name, value)
     launch()
     assert active() == original_id
     assert json.loads(private(path))['configuration'] == json.loads(original)['configuration'], '原配置未恢复'
     restore_file(path + '.previous', previous)
+    assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、L7/L6 一键覆盖同一文件、后续编辑保存、分类直接切换、撤销、固定操作、离开草稿确认与测试前配置恢复。', flush=True)
+print('配置 UX 通过：单一配置入口、L7/L6 一键覆盖同一文件、后续编辑保存、分类直接切换、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
