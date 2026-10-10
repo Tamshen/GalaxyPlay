@@ -27,6 +27,7 @@ internal class GalaxyConfigurationEvidence private constructor(val id: String, v
             val data = profile.json().put("profile_name", "[redacted]")
                 .put("model", profile.model).put("app_version", version.take(80))
                 .put("core_version", context.getString(R.string.l7_core_source_info).take(120))
+                .put("application_preferences", GalaxyApplicationPreferences.capture(context))
             return sanitize(data)
         }
         /** 日志文件也视为不可信输入：回读必须重新按字段遮盖，不能绕过常规脱敏。 */
@@ -42,6 +43,27 @@ internal class GalaxyConfigurationEvidence private constructor(val id: String, v
             val profile = GalaxyProfile.parse(input.toString())
             val data = profile.json().put("profile_name", "[redacted]")
             val groups = data.getJSONObject("configuration").getJSONObject("preferences")
+            sanitizePreferences(groups, input.optJSONObject("configuration")?.optJSONObject("preferences"))
+            if (input.has("application_preferences")) {
+                val original = input.getJSONObject("application_preferences")
+                val application = GalaxyApplicationPreferences.read(original)
+                sanitizePreferences(application, original)
+                data.put("application_preferences", application)
+            }
+            val audio = data.getJSONObject("configuration").getJSONObject("audio_templates")
+            audio.keys().forEach { audio.getJSONObject(it).put("name", "[redacted]") }
+            data.put("model", profile.model.takeIf { it in setOf("l7", "l6", "custom") } ?: "unknown")
+                .put("app_version", DiagnosticRedactor.redact(input.optString("app_version"))?.take(80).orEmpty())
+                .put("core_version", DiagnosticRedactor.redact(input.optString("core_version"))?.take(120).orEmpty())
+            val digest = MessageDigest.getInstance("SHA-256").digest(data.toString().toByteArray())
+            val id = "cfg_" + digest.joinToString("") { byte ->
+                "${('g'.code + ((byte.toInt() and 255) shr 4)).toChar()}${('g'.code + (byte.toInt() and 15)).toChar()}"
+            }
+            val text = data.put("config_id", id).toString()
+            require(text.toByteArray().size <= MAX_BYTES)
+            return GalaxyConfigurationEvidence(id, text)
+        }
+        private fun sanitizePreferences(groups: JSONObject, original: JSONObject?) {
             groups.keys().forEach { space ->
                 val group = groups.getJSONObject(space)
                 group.keys().forEach { key ->
@@ -62,25 +84,12 @@ internal class GalaxyConfigurationEvidence private constructor(val id: String, v
                                 item.put("value", if (value is org.json.JSONArray) org.json.JSONArray().put("[redacted]") else "[redacted]")
                             }
                             // 未设置与已设置可区分；再次脱敏不改变已有状态。
-                            val wasSet = input.optJSONObject("configuration")?.optJSONObject("preferences")
-                                ?.optJSONObject(space)?.optJSONObject(key)?.optBoolean("is_set", value.toString().isNotEmpty())
+                            val wasSet = original?.optJSONObject(space)?.optJSONObject(key)?.optBoolean("is_set", value.toString().isNotEmpty())
                             item.put("is_set", wasSet ?: value.toString().isNotEmpty())
                         }
                     }
                 }
             }
-            val audio = data.getJSONObject("configuration").getJSONObject("audio_templates")
-            audio.keys().forEach { audio.getJSONObject(it).put("name", "[redacted]") }
-            data.put("model", profile.model.takeIf { it in setOf("l7", "l6", "custom") } ?: "unknown")
-                .put("app_version", DiagnosticRedactor.redact(input.optString("app_version"))?.take(80).orEmpty())
-                .put("core_version", DiagnosticRedactor.redact(input.optString("core_version"))?.take(120).orEmpty())
-            val digest = MessageDigest.getInstance("SHA-256").digest(data.toString().toByteArray())
-            val id = "cfg_" + digest.joinToString("") { byte ->
-                "${('g'.code + ((byte.toInt() and 255) shr 4)).toChar()}${('g'.code + (byte.toInt() and 15)).toChar()}"
-            }
-            val text = data.put("config_id", id).toString()
-            require(text.toByteArray().size <= MAX_BYTES)
-            return GalaxyConfigurationEvidence(id, text)
         }
     }
 }

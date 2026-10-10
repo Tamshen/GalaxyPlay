@@ -14,7 +14,7 @@ internal object GalaxyProfileFieldsView {
     val groups = listOf(R.string.l7_template_model, R.string.l7_section_projection, R.string.l7_template_title,
         R.string.l7_section_app_ui, R.string.l7_section_floating, R.string.automatic_connection,
         R.string.l7_start_wireless, R.string.l7_auth_title, R.string.l7_logs_title)
-    fun add(context: GalaxyConfigurationContext, parent: LinearLayout, group: Int, keys: Set<String>? = null) {
+    fun add(context: Context, parent: LinearLayout, group: Int, keys: Set<String>? = null) {
         if (group == R.string.l7_template_model) {
             val models = L7AudioTemplates.Model.entries
             L7Components.choice(parent, context.getString(group), models.map { L7AudioModelConfirmation.name(context, it) },
@@ -30,6 +30,7 @@ internal object GalaxyProfileFieldsView {
         }
         if (group == R.string.l7_section_projection && keys == null) GalaxyVideoDecoderSettings.add(context, parent)
         GalaxyConfigurationFields.fields.filter { it.group == group && it.key != "display_scale_tenths" &&
+            (if (context is GalaxyConfigurationContext) GalaxyConfigurationFields.vehicleAllowed(it.space, it.key) else GalaxyApplicationPreferences.contains(it.space, it.key)) &&
             (keys == null || it.key in keys) }.forEach { field ->
             val prefs = context.getSharedPreferences(field.space, 0)
             fun value(): Any? = prefs.all[field.key] ?: field.default
@@ -53,7 +54,7 @@ internal object GalaxyProfileFieldsView {
                             field.labels.getOrNull(index)?.let(context::getString) ?: option.toString()
                         }
                         L7Components.select(context, title, labels, field.choices.indexOf(value()),
-                            context.getString(R.string.profile_update_draft)) { selected ->
+                            context.getString(if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.save)) { selected ->
                             val edit = prefs.edit()
                             GalaxyProfiles.put(edit, field.key, field.choices[selected]); edit.commit()
                             row.setValue(label())
@@ -77,8 +78,8 @@ internal object GalaxyProfileFieldsView {
             filters = arrayOf(InputFilter.LengthFilter(if (field.default is Int) 8 else 2048))
             setTextColor(context.getColor(R.color.product_ui_text)); maxLines = 3
         }
-        val dialog = L7Dialogs.builder(context).setTitle(title).setMessage(R.string.config_page_value_hint).setView(input)
-            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.profile_update_draft, null).create()
+        val dialog = L7Dialogs.builder(context).setTitle(title).setMessage(if (context is GalaxyConfigurationContext) R.string.config_page_value_hint else R.string.application_settings_hint).setView(input)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.save, null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val text = input.text.toString()

@@ -501,7 +501,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         "settings-connection-usb" -> R.string.l7_home_usb
         "settings-display" -> R.string.display_and_performance
         "settings-audio" -> R.string.audio_routing
-        "settings-general" -> R.string.l7_general_settings
+        "settings-general" -> R.string.application_settings_title
         "settings-permissions" -> R.string.permissions_and_connection_help
         "settings" -> R.string.settings
         "settings-debug" -> R.string.l7_probe_title
@@ -522,12 +522,13 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun settingsL7(content: LinearLayout) {
         val entries = listOf(
             Triple("settings-vehicle", R.string.config_page_title, R.drawable.ic_l7_vehicle),
+            Triple("settings-general", R.string.application_settings_title, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
             Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
             Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
-        val hints = listOf(R.string.config_page_entry_hint,
+        val hints = listOf(R.string.config_page_entry_hint, R.string.application_settings_hint,
             R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_logs_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))
@@ -623,21 +624,7 @@ class GalaxySettingsActivity : ComponentActivity() {
                 }.apply { if (setupError != null) setFeedback(getString(R.string.l7_auth_not_ready), error = true) })
                 card.addView(L7Components.actionRow(this, getString(R.string.l7_auth_quick_import), getString(R.string.l7_auth_import_row_hint)) { authenticationDialog().quickImport() })
             }
-            "settings-general" -> {
-                section(content, getString(R.string.automatic_connection), R.drawable.ic_dp_automation) { card ->
-                    toggle(card, getString(R.string.connect_when_diplay_opens), getString(R.string.use_your_last_connection_type_and_selected_iphone), DiPlayPreferences.autoConnect(this)) { DiPlayPreferences.saveAutoConnect(this, it) }
-                    toggle(card, getString(R.string.open_after_the_car_starts), getString(R.string.availability_depends_on_your_head_unit_s_startup_settings), AirPlayPersistence.loadAutoStartOnBoot(this)) { AirPlayPersistence.saveAutoStartOnBoot(this, it) }
-                    card.addView(L7Components.valueRow(this, getString(R.string.choose_iphone), DiPlayPreferences.phoneName(this)) { choosePhone() })
-                }
-                section(content, getString(R.string.location)) { card ->
-                    toggle(card, getString(R.string.report_location_to_iphone), getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th), AirPlayPersistence.loadLocationReportingEnabled(this)) { enabled ->
-                        AirPlayPersistence.saveLocationReportingEnabled(this, enabled)
-                        if (enabled && !hasPreciseLocation()) locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                        else reconnectForLocation()
-                    }
-                }
-                languageSettings(content)
-            }
+            "settings-general" -> GalaxyApplicationSettingsPage.add(this, content)
             "settings-permissions" -> section(content, getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
                 card.addView(L7Components.actionRow(this, getString(R.string.app_permissions)) { openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) })
                 card.addView(L7Components.actionRow(this, getString(R.string.bluetooth_settings)) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) })

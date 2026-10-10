@@ -31,7 +31,7 @@ internal class GalaxyConfigurationFrame(context: Context, applyTemplate: (String
         })
         addView(status, LayoutParams(-1, -2).apply { topMargin = dp(12); bottomMargin = dp(12) })
         val titles = listOf(R.string.config_page_common, R.string.config_page_connection, R.string.config_page_audio,
-            R.string.config_page_video, R.string.config_page_interface, R.string.config_page_more)
+            R.string.config_page_video, R.string.config_page_more)
         titles.chunked(3).forEachIndexed { rowIndex, rowTitles ->
             addView(LinearLayout(context).apply {
                 rowTitles.forEachIndexed { column, title ->

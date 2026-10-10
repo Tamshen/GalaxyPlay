@@ -131,6 +131,32 @@ class GalaxyConfigurationPageTest {
         assertEquals(original, repository.active())
         rebuilt.close()
     }
+    @Test fun configurationPageHasNoLanguageOrDensityControlsAndTemplateKeepsBoth() {
+        val activity = activity()
+        AppLocale.save(activity, "en"); L7UiDensity.save(activity, 320)
+        val page = GalaxyConfigurationPage(activity) {}
+        assertFalse(descendants(page.view).filterIsInstance<android.widget.Button>().any {
+            it.text.toString() == activity.getString(R.string.config_page_interface)
+        })
+        for (button in listOf(page.view.l6, page.view.l7)) {
+            button.performClick()
+            assertEquals("en", AppLocale.preference(activity))
+            assertEquals(320, L7UiDensity.value(activity))
+        }
+        page.close()
+    }
+    @Test fun applicationPageOffersLanguageAndNativeSizePickerWithCancelKeepingOldValue() {
+        val activity = activity()
+        L7UiDensity.save(activity, 280)
+        val parent = android.widget.LinearLayout(activity)
+        GalaxyApplicationSettingsPage.add(activity, parent)
+        val rows = descendants(parent).filterIsInstance<L7SettingRow>()
+        assertTrue(rows.any { it.titleView.text.toString() == activity.getString(R.string.language_app_language) })
+        rows.first { it.titleView.text.toString() == activity.getString(R.string.l7_ui_size) }.performClick()
+        dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertEquals(280, L7UiDensity.value(activity))
+        assertFalse(GalaxyProfiles(activity).active().configuration.preferences.getValue("l7_ui").containsKey("density"))
+    }
     private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
 }

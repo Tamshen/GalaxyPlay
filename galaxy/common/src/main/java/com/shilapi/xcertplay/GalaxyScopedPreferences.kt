@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 /** 配对、身份和恢复标记透传原存储，不能被配置切换清除或生成新身份。 */
 internal class GalaxyScopedPreferences(private val name: String, private val local: SharedPreferences,
     private val protected: SharedPreferences, private val writeThrough: Boolean = false) : SharedPreferences by local {
-    private fun source(key: String) = if (GalaxyConfigurationFields.allowed(name, key)) local else protected
+    private fun source(key: String) = if (GalaxyConfigurationFields.vehicleAllowed(name, key)) local else protected
     override fun contains(key: String) = source(key).contains(key)
     override fun getString(key: String, defValue: String?) = source(key).getString(key, defValue)
     override fun getStringSet(key: String, defValues: MutableSet<String>?) = source(key).getStringSet(key, defValues)
@@ -16,7 +16,7 @@ internal class GalaxyScopedPreferences(private val name: String, private val loc
     override fun edit(): SharedPreferences.Editor = object : SharedPreferences.Editor {
         val current = if (writeThrough) protected.edit() else local.edit()
         val other = protected.edit()
-        private fun target(key: String) = if (GalaxyConfigurationFields.allowed(name, key)) current else other
+        private fun target(key: String) = if (GalaxyConfigurationFields.vehicleAllowed(name, key)) current else other
         override fun putString(key: String, value: String?) = apply { target(key).putString(key, value) }
         override fun putStringSet(key: String, value: MutableSet<String>?) = apply { target(key).putStringSet(key, value) }
         override fun putInt(key: String, value: Int) = apply { target(key).putInt(key, value) }
@@ -25,7 +25,7 @@ internal class GalaxyScopedPreferences(private val name: String, private val loc
         override fun putBoolean(key: String, value: Boolean) = apply { target(key).putBoolean(key, value) }
         override fun remove(key: String) = apply { target(key).remove(key) }
         override fun clear() = apply {
-            if (writeThrough) protected.all.keys.filter { GalaxyConfigurationFields.allowed(name, it) }.forEach(current::remove)
+            if (writeThrough) protected.all.keys.filter { GalaxyConfigurationFields.vehicleAllowed(name, it) }.forEach(current::remove)
             else current.clear()
         }
         override fun commit() = current.commit() && other.commit()

@@ -43,6 +43,50 @@ class GalaxyProfilesTest {
         assertEquals(setOf("synthetic_pair"), prefs.getStringSet("pairing_ids", null))
         assertEquals("TEXT", app.getSharedPreferences("l7_authentication", 0).getString("source", null))
     }
+    @Test fun vehicleTemplatesAndEditsNeverReplaceApplicationPreferences() {
+        AppLocale.save(app, "en")
+        L7UiDensity.save(app, 320)
+        app.getSharedPreferences("l7_floating_navigation", 0).edit().putFloat("x", .7f).putInt("transparency", 75).commit()
+        app.getSharedPreferences("xcertplay_airplay", 0).edit().putString("carplay_night_mode", "night").putBoolean("debug_logs_enabled", true).commit()
+        app.getSharedPreferences("l7_remote_log", 0).edit().putString("endpoint", "https://synthetic.example/api/test").putString("authorization", "Basic synthetic").commit()
+        val expected = GalaxyApplicationPreferences.capture(app).toString()
+        for (model in listOf("l6", "l7")) {
+            val applied = repository.applyTemplate(model)
+            val draft = GalaxyConfigurationContext(app, applied, true)
+            AirPlayPersistence.saveFps(draft, 60)
+            repository.save(applied.copy(configuration = draft.configuration()))
+            repository.restore()
+            assertEquals(expected, GalaxyApplicationPreferences.capture(app).toString())
+            assertFalse(repository.active().configuration.preferences.values.any { it.containsKey("app_language") || it.containsKey("density") })
+            assertFalse(repository.active().configuration.preferences.getValue("xcertplay_airplay").containsKey("carplay_night_mode"))
+            assertEquals(60, AirPlayPersistence.loadFps(app))
+        }
+    }
+    @Test fun upgradingBundledConfigurationPreservesLiveAppPreferencesAndRemovesBundledValues() {
+        val current = repository.active()
+        val preferences = current.configuration.preferences.toMutableMap()
+        preferences["diplay"] = preferences.getValue("diplay") + ("app_language" to "zh")
+        preferences["l7_ui"] = mapOf("density" to 240)
+        File(app.filesDir, "configurations/current.json").writeText(current.copy(configuration = current.configuration.copy(preferences = preferences)).json().toString())
+        AppLocale.save(app, "en"); L7UiDensity.save(app, 320)
+        repository.restore()
+        val upgraded = repository.active()
+        assertEquals(current.id, upgraded.id)
+        assertEquals(current.revision + 1, upgraded.revision)
+        assertEquals("en", AppLocale.preference(app)); assertEquals(320, L7UiDensity.value(app))
+        assertFalse(upgraded.configuration.preferences.getValue("diplay").containsKey("app_language"))
+        assertTrue(upgraded.configuration.preferences.getValue("l7_ui").isEmpty())
+        assertTrue(File(app.filesDir, "configurations/current.json.previous").isFile)
+    }
+    @Test fun independentAppChangesDoNotReviseVehicleFileAndRemainVisibleToFrozenContext() {
+        val saved = repository.applyTemplate("l7")
+        val frozen = GalaxyConfigurationContext(app, saved)
+        AppLocale.save(app, "zh"); L7UiDensity.save(app, 240)
+        assertEquals(saved, repository.refresh())
+        assertEquals("zh", AppLocale.preference(frozen))
+        assertEquals(240, L7UiDensity.value(frozen))
+        assertEquals(saved.configuration, frozen.configuration())
+    }
     @Test fun draftDoesNotWritePreferencesOrFilesAndSavedInactiveFileDoesNotSwitch() {
         val initial = repository.active()
         val original = File(app.filesDir, "configurations/current.json").readText()

@@ -68,6 +68,8 @@ internal object GalaxyConfigurationFields {
         }
     }
 
+    fun vehicleAllowed(space: String, key: String) = allowed(space, key) && !GalaxyApplicationPreferences.contains(space, key)
+
     fun defaults(context: Context): Map<String, Map<String, Any?>> {
         val groups = names.associateWith { mutableMapOf<String, Any?>() }
         fields.forEach { groups.getValue(it.space)[it.key] = it.default }
@@ -97,15 +99,14 @@ internal object GalaxyConfigurationFields {
         CarPlayPicture.keys.forEach { groups.getValue("carplay_picture")[it] = CarPlayPicture.defaultValue(it) }
         groups.getValue("l7_remote_log")["endpoint"] = context.getString(R.string.l7_log_default_url)
         groups.getValue("l7_remote_log")["authorization"] = context.getString(R.string.l7_log_default_authorization)
-        return groups
+        return groups.mapValues { (space, values) -> values.filterKeys { vehicleAllowed(space, it) } }
     }
 
     fun capture(context: Context): GalaxyConfiguration {
         val groups = defaults(context).mapValues { (_, values) -> values.toMutableMap() }
         names.forEach { name -> context.getSharedPreferences(name, 0).all.forEach { (key, value) ->
-            if (allowed(name, key)) groups.getValue(name)[key] = value
+            if (vehicleAllowed(name, key)) groups.getValue(name)[key] = value
         } }
-        groups.getValue("diplay")["app_language"] = AppLocale.preference(context)
         val audio = mutableMapOf<String, String>()
         val recovery = mutableSetOf<String>()
         if (!context.getSharedPreferences(MAIN, 0).contains("display_scale_percent"))
