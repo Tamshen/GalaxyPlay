@@ -3620,8 +3620,9 @@ class CarPlayHostActivity : ComponentActivity() {
             )
             maybeStartCarPlay()
         } else if (display != null && !layoutChanged &&
-            size.width <= display.windowWidth && size.height <= display.windowHeight) {
-            // 原窗口范围内的缩小与恢复只调整显示；超过启动窗口时才重新协商画布。
+            (resources.getBoolean(R.bool.config_l7_product_ui) ||
+                size.width <= display.windowWidth && size.height <= display.windowHeight)) {
+            // Flyme 前后台切换会临时扩窗；产品画布已独立协商，只调整视口，不重建连接。
             val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
                 "keeping CarPlay session canvas=${display.width}x${display.height}"
             appendLog(message)
@@ -4247,7 +4248,8 @@ class CarPlayHostActivity : ComponentActivity() {
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val RECONNECT_DELAY_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
-        const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
+        // 多地址 Bonjour 退出及控制器释放可超过四秒；只在后台线程有限等待。
+        const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 12_000L
         const val AUDIO_CAPTURE_MARKER = "audio-capture.enabled"
         const val AUDIO_CAPTURE_DIRECTORY = "audio-captures"
         const val PROTOCOL_TRACE_PREFIX = "TRACE "

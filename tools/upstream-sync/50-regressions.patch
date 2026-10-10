@@ -11,7 +11,32 @@
          }
 --- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
-@@ -62,17 +62,18 @@
+@@ -48,6 +48,24 @@
+         missingServiceFailsNormally(CarPlayTransport.WIRED, MfiTarget.LOCAL)
+     }
+ 
++    @Test fun wirelessAudioExclusionStartsWithAirPlayEvenWithoutATunnelAndEndsWithTheSession() {
++        val controller = controller(UsbContext(false), CarPlayTransport.WIRELESS, MfiTarget.LOCAL)
++        val events = mutableListOf<Boolean>()
++        controller.audioConnectionListener = events::add
++        val listener = controller.javaClass.getDeclaredField("sessionListener").apply { isAccessible = true }
++            .get(controller) as AirPlaySessionListener
++        val session = org.mockito.Mockito.mock(AirPlaySession::class.java)
++        listener.onSessionActive(session)
++        assertTrue(controller.hasActiveSession())
++        assertEquals(listOf(true), events)
++        listener.onSessionEnded(session)
++        assertEquals(listOf(true, false), events)
++        controller.close()
++        listener.onSessionActive(session)
++        assertFalse(controller.hasActiveSession())
++        assertEquals(listOf(true, false, false), events)
++    }
++
+     @Test fun wirelessCh341ReportsMissingUsbServiceWithoutRegisteringReceivers() {
+         missingServiceFailsNormally(CarPlayTransport.WIRELESS, MfiTarget.USB_CH341)
+     }
+@@ -62,17 +80,18 @@
          assertEquals(0, context.receivers.size)
      }
  

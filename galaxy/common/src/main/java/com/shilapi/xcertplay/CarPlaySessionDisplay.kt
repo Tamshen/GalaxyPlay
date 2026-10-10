@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay
 
-/** 保存协商画布与启动窗口；环视缩窗不改变画布，真正旋转或扩窗才重建会话。 */
+/** 保存协商画布与启动窗口；产品临时扩缩窗只调整视口，旋转或显式画布布局变化才重建。 */
 internal data class CarPlaySessionDisplay(
     val width: Int,
     val height: Int,

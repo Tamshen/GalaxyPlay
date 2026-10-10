@@ -158,6 +158,26 @@ class CarPlayHostDisplaySizeTest {
         assertNull(getField("sessionDisplay"))
     }
 
+    @Test fun galaxySettingsWindowGrowthAndReturnKeepTheControllerAndNegotiatedCanvas() {
+        val resources = org.mockito.Mockito.spy(activity.resources)
+        org.mockito.Mockito.`when`(resources.getBoolean(R.bool.config_l7_product_ui)).thenReturn(true)
+        activity = org.mockito.Mockito.spy(activity)
+        org.mockito.Mockito.doReturn(resources).`when`(activity).resources
+        CarPlayBackgroundSession::class.java.getDeclaredField("owner").apply { isAccessible = true }
+            .set(CarPlayBackgroundSession, activity)
+        val display = startSession(windowWidth = 1440, windowHeight = 1696,
+            canvasWidth = 1440, canvasHeight = 1696)
+        val controller = org.mockito.Mockito.mock(CarPlayController::class.java)
+        setField("controller", controller)
+        applySize(1440, 1784)
+        applySize(1440, 1696)
+        assertSame(controller, getField("controller"))
+        assertSame(display, getField("sessionDisplay"))
+        assertFalse(getField("handshakeResetInProgress") as Boolean)
+        assertEquals(0, getField("restartGeneration"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+    }
+
     @Test fun aScaledDownCanvasKeepsTheSessionWhenTheOriginalWindowReturns() {
         val display = startSession(canvasWidth = 1536, canvasHeight = 792)
         applySize(700, 990)
