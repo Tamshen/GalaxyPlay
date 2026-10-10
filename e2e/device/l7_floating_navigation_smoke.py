@@ -176,7 +176,7 @@ def check_home():
         adb('shell', 'input', 'swipe', str((x1+x2)//2), str((y1+y2)//2), str((ox1+ox2)//2), str((oy1+oy2)//2), '650')
     tap('展开菜单')
     tap('设置')
-    assert find('车型设置') is not None, '首页菜单无法进入设置'
+    assert find('偏好设置') is not None, '首页菜单无法进入设置'
     assert menu_bounds() == fixed_menu, '进入设置后菜单位置变化或重复建立'
     assert find('设置').attrib.get('selected') == 'true', '设置菜单没有选中当前分类'
     require_no_connection_footer()
@@ -193,14 +193,14 @@ def check_home():
     screenshot('settings-child-menu-night')
     adb('shell', 'cmd', 'uimode', 'night', 'no')
     tap('设置')
-    assert find('车型设置') is not None, '重新点击设置没有返回分类首页'
+    assert find('偏好设置') is not None, '重新点击设置没有返回分类首页'
     adb('shell', 'input', 'keyevent', '4')
     assert find('无线连接') is not None and find('展开菜单') is not None, '设置返回没有恢复首页'
     tap('展开菜单')
     tap('画面')
     assert find('展开菜单') is not None and find('画面') is None
     tap('设置')
-    assert find('车型设置') is not None, '首页设置按钮没有进入统一分类页'
+    assert find('偏好设置') is not None, '首页设置按钮没有进入统一分类页'
     require_menu(fixed_menu, '首页设置按钮进入后菜单位置变化')
     adb('shell', 'input', 'keyevent', '4')
     tap('无线连接')
@@ -213,7 +213,7 @@ def check_home():
 
 def check_settings():
     launch('settings')
-    assert find('车型设置') is not None and find('返回设置') is None, '设置首页入口或 Header 不符合约定'
+    assert find('偏好设置') is not None and find('返回设置') is None, '设置首页入口或 Header 不符合约定'
     fixed_menu = menu_bounds()
     assert [label for label, _ in fixed_menu] == ["画面", "连接", "设置", "车机", "退出"]
     screenshot('settings-day')
@@ -236,7 +236,7 @@ def check_settings():
     assert bounds(find('返回设置')) == header
     screenshot('settings-scrolled-night')
     tap('返回设置')
-    assert find('车型设置') is not None and find('返回设置') is None
+    assert find('偏好设置') is not None and find('返回设置') is None
     screenshot('settings-night')
     tap('画面')
     assert find('无线连接') is not None and find('展开菜单') is not None

@@ -20,7 +20,7 @@
     <string name="l7_general_settings">通用设置</string>
     <string name="l7_settings_groups">功能设置</string>
     <string name="l7_auth_import_row_hint">粘贴认证文本，校验后应用</string>
-    <string name="l7_connection_row_hint">车机热点、USB 与已配对 iPhone</string>
+    <string name="l7_connection_row_hint">设置手机连接方式、热点与自动连接</string>
     <string name="l7_display_row_hint">画面尺寸、分辨率与帧率</string>
     <string name="l7_audio_row_hint">音频焦点、媒体与导航声道</string>
     <string name="l7_general_row_hint">自动连接、位置与语言</string>

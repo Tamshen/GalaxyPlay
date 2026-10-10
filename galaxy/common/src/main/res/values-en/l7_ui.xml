@@ -15,7 +15,7 @@
     <string name="l7_general_settings">General settings</string>
     <string name="l7_settings_groups">Settings categories</string>
     <string name="l7_auth_import_row_hint">Paste authentication text to validate and apply</string>
-    <string name="l7_connection_row_hint">Vehicle hotspot, USB and paired iPhones</string>
+    <string name="l7_connection_row_hint">Set phone connection methods, hotspot and automatic connection</string>
     <string name="l7_display_row_hint">Display size, resolution and frame rate</string>
     <string name="l7_audio_row_hint">Audio focus, media and navigation routing</string>
     <string name="l7_general_row_hint">Automatic connection, location and language</string>

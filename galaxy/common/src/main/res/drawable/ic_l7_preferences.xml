@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 偏好入口使用滑杆，车型图标继续用于页内快速模板。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@android:color/transparent"
+        android:strokeColor="@color/product_ui_text" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M3,6h3M10,6h11M3,12h11M18,12h3M3,18h5M12,18h9M6,4h4v4H6zM14,10h4v4h-4zM8,16h4v4H8z" />
+</vector>
