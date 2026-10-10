@@ -69,14 +69,14 @@ internal object GalaxyProfileFieldsView {
             }
         }
     }
-    private fun edit(context: Context, title: String, field: GalaxyConfigurationFields.Field,
+    fun edit(context: Context, title: String, field: GalaxyConfigurationFields.Field,
         value: Any?, changed: (Any) -> Unit) {
         val input = EditText(context).apply {
             setText(value?.toString().orEmpty())
             inputType = if (field.default is Int) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT or
                 if (field.sensitive) InputType.TYPE_TEXT_VARIATION_PASSWORD else InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             filters = arrayOf(InputFilter.LengthFilter(if (field.default is Int) 8 else 2048))
-            setTextColor(context.getColor(R.color.product_ui_text)); maxLines = 3
+            L7Ui.input(this); maxLines = 3
         }
         val dialog = L7Dialogs.builder(context).setTitle(title).setMessage(if (context is GalaxyConfigurationContext) R.string.config_page_value_hint else R.string.application_settings_hint).setView(input)
             .setNegativeButton(R.string.cancel, null).setPositiveButton(if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.save, null).create()

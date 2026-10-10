@@ -11,12 +11,12 @@ import com.shilapi.xcertplay.host.R
 internal object L7BluetoothAudioSettings {
     @Volatile var status = BluetoothMediaStatus.IDLE
 
-    fun add(context: Context, parent: LinearLayout) {
+    fun add(context: Context, parent: LinearLayout, showExclusive: Boolean = true) {
         parent.addView(L7SettingRow(context, context.getString(R.string.galaxy_music_owner)).apply {
             setValue(context.getString(R.string.galaxy_music_local))
         })
         parent.addView(L7SettingRow(context, context.getString(R.string.galaxy_music_guide), context.getString(R.string.galaxy_music_guide_body)))
-        parent.addView(L7Components.switchRow(context, context.getString(R.string.l7_bt_media_auto),
+        if (showExclusive) parent.addView(L7Components.switchRow(context, context.getString(R.string.l7_bt_media_auto),
             context.getString(R.string.l7_bt_media_auto_desc), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
             AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
         })
