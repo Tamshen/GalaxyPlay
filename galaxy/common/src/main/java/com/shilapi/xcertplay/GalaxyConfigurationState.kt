@@ -8,6 +8,7 @@ internal class GalaxyConfigurationState : ViewModel() {
     var draft: GalaxyProfile? = null
     var group = 0
     val scroll = mutableMapOf<Int, Int>()
+    val advanced = mutableSetOf<Int>()
     val dirty get() = draft?.json()?.toString() != original?.json()?.toString()
     fun load(profile: GalaxyProfile) {
         original = profile

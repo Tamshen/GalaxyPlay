@@ -3,8 +3,8 @@
     <string name="config_page_credentials">本地认证材料</string>
     <string name="config_page_credentials_hint">由本机统一管理，不随车型模板覆盖</string>
     <string name="config_page_title">车型配置</string>
-    <string name="config_page_entry_hint">修改连接与音视频适配，支持 L7、L6 快速模板</string>
-    <string name="config_page_value_hint">先更新草稿，再在配置页面保存。</string>
+    <string name="config_page_entry_hint">选择车型模板，修改连接与音视频适配</string>
+    <string name="config_page_value_hint">先确定，再在配置页面保存。</string>
     <string name="config_page_restore">撤销修改</string>
     <string name="config_page_common">常用</string>
     <string name="config_page_connection">连接</string>
@@ -17,9 +17,41 @@
     <string name="template_l7">银河 L7</string>
     <string name="template_l6">银河 L6</string>
     <string name="template_quick">内置快速设置</string>
-    <string name="template_overwrite">点击车型，覆盖当前车型配置。之后可继续修改。</string>
+    <string name="template_overwrite">应用模板会覆盖当前车型参数及未保存修改，之后可继续调整。语言和界面尺寸等应用设置保持不变。</string>
     <string name="template_saved">已保存 · 当前车型：%1$s</string>
     <string name="template_pending_connection">已保存 · 当前连接保持原配置，下次连接生效</string>
     <string name="application_settings_title">应用设置</string>
     <string name="application_settings_hint">语言、界面尺寸与显示偏好独立保存，不随车型模板覆盖；上传日志时一并附带。</string>
+    <string name="template_choose">选择车型</string>
+    <string name="template_apply">应用模板</string>
+    <string name="template_current">车型 · %1$s</string>
+    <string name="template_hint">选车型、填热点，再开始连接；需要时可展开高级设置。</string>
+    <string name="config_hotspot_title">热点名称与密码</string>
+    <string name="config_hotspot_hint">填写车机热点名称和密码；无密码热点可留空，其余参数自动处理。</string>
+    <string name="config_advanced_open">高级设置</string>
+    <string name="config_advanced_close">收起高级设置</string>
+    <string name="config_common_details">自定义清晰度等具体参数；默认值适合日常使用。</string>
+    <string name="config_connection_details">开机启动与车辆位置上报。</string>
+    <string name="config_audio_details">音频方案、输出设备、用途路由、缓冲与焦点。</string>
+    <string name="config_video_details">硬件解码、编码格式、画面比例与安全区域。</string>
+    <string name="config_auth_details">更换认证来源或配置远程认证服务。</string>
+    <string name="config_auth_default_hint">日常使用保持默认即可；需要更换认证方式时再调整。</string>
+    <string name="config_quality">画面清晰度</string>
+    <string name="config_quality_clear" formatted="false">清晰 · 100%（推荐）</string>
+    <string name="config_quality_balanced" formatted="false">均衡 · 80%</string>
+    <string name="config_quality_light" formatted="false">省资源 · 60%</string>
+    <string name="config_smoothness">画面流畅度</string>
+    <string name="config_smoothness_standard">标准 · 30 fps（推荐）</string>
+    <string name="config_smoothness_high">更流畅 · 60 fps</string>
+    <string name="config_music_stability">音乐播放</string>
+    <string name="config_music_fast">反应更快 · 300 ms（推荐）</string>
+    <string name="config_music_stable">更稳定 · 500 ms</string>
+    <string name="config_music_safest">优先稳定 · 1000 ms</string>
+    <string name="config_bluetooth_music">暂停手机蓝牙音乐</string>
+    <string name="config_bluetooth_hint">连接 CarPlay 时避免蓝牙与 CarPlay 同时播放音乐。</string>
+    <string name="config_icon_size">CarPlay 图标大小</string>
+    <string name="config_size_default" formatted="false">默认 · 100%（推荐）</string>
+    <string name="config_size_large" formatted="false">大 · 125%</string>
+    <string name="config_size_larger" formatted="false">更大 · 150%</string>
+    <string name="config_custom_value">自定义 · %1$d</string>
 </resources>

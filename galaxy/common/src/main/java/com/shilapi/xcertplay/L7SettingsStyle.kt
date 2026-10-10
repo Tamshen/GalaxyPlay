@@ -36,7 +36,7 @@ internal object L7SettingsStyle {
     }
 
     fun card(view: View) = L7Ui.bind(view) {
-        view.background = L7Ui.rounded(view.context, view.context.getColor(R.color.l7_settings_card), 16).apply {
+        view.background = L7Ui.rounded(view.context, view.context.getColor(R.color.l7_settings_card), 4).apply {
             setStroke(L7Components.dp(view.context, 1).coerceAtLeast(1), view.context.getColor(R.color.l7_settings_card_border))
         }
     }

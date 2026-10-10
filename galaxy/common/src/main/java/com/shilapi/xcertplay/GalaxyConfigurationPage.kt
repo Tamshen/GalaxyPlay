@@ -1,17 +1,20 @@
 package com.shilapi.xcertplay
 
+import android.app.AlertDialog
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.ViewModelProvider
 import com.shilapi.xcertplay.host.R
 
-/** 只有当前配置；内置车型模板立即覆盖，后续参数编辑仍先写草稿。 */
+/** 只有当前配置；车型弹窗确认后覆盖，后续参数编辑仍先写草稿。 */
 internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private val credentials: () -> Unit = {}, private val changed: () -> Unit) {
     private val repository = GalaxyProfiles(activity)
     private val state = ViewModelProvider(activity)[GalaxyConfigurationState::class.java]
     private var draft: GalaxyConfigurationContext? = null
     private val observers = mutableListOf<android.content.SharedPreferences.OnSharedPreferenceChangeListener>()
-    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::applyTemplate, ::category, ::restore, ::commit)
+    private var templateDialog: AlertDialog? = null
+    private var closed = false
+    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::restore, ::commit)
     val dirty get() = state.dirty
     init {
         if (state.draft == null || !state.dirty) runCatching { repository.refresh() }.onSuccess { current ->
@@ -43,11 +46,15 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val profile = state.draft ?: return
         val active = runCatching { repository.active() }.getOrNull()
         val effective = CarPlayBackgroundSession.configuration
+        val model = L7AudioTemplates.model(activity)
+        val name = GalaxyVehicleTemplates.find(model.id)?.let { text(it.title) }
+            ?: L7AudioModelConfirmation.name(activity, model)
+        view.vehicleButton.text = activity.getString(R.string.template_current, name)
         val hint = when {
             dirty -> text(R.string.config_page_unsaved)
             effective != null && (effective.id != active?.id || effective.revision != active?.revision) ->
                 text(R.string.template_pending_connection)
-            else -> activity.getString(R.string.template_saved, L7AudioModelConfirmation.name(activity, L7AudioTemplates.model(activity)))
+            else -> activity.getString(R.string.template_saved, name)
         }
         view.feedback(hint)
         view.resetButton.isEnabled = dirty
@@ -57,33 +64,14 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val context = draft ?: return
         view.fields.removeAllViews()
         view.category(state.group)
-        val groups = when (state.group) {
-            0 -> listOf(R.string.l7_section_projection)
-            1 -> listOf(R.string.automatic_connection, R.string.l7_start_wireless)
-            2 -> listOf(R.string.l7_template_title)
-            3 -> listOf(R.string.l7_section_projection)
-            else -> listOf(R.string.l7_auth_title)
-        }
-        groups.forEach { group -> GalaxyProfileFieldsView.add(context, view.fields, group,
-            if (state.group == 0) setOf("display_scale_percent", "display_fps") else null) }
-        if (state.group == 0) {
-            val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            L7Components.choice(view.fields, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
-                text(R.string.s_500_ms), text(R.string.s_1000_ms_most_stable)),
-                presets.indexOf(AirPlayPersistence.loadMediaBufferMillis(context))) {
-                AirPlayPersistence.saveMediaBufferMillis(context, presets[it])
-            }
-            view.fields.addView(L7Components.switchRow(context, text(R.string.l7_bt_media_auto), "",
-                AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
-                AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
-            })
-            GalaxyProfileFieldsView.add(context, view.fields, R.string.automatic_connection, setOf("wireless_enabled"))
-            view.fields.addView(L7Components.note(activity, text(R.string.config_page_next_connection)))
-        }
+        GalaxyConfigurationSections.add(context, view.fields, state.group, state.group in state.advanced,
+            expand = {
+                if (!state.advanced.add(state.group)) state.advanced.remove(state.group)
+                state.scroll[state.group] = view.scroll.scrollY
+                renderFields()
+            }, credentials = { requestLeave(credentials) })
         if (state.group == 4 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
-        if (state.group == 4) view.fields.addView(L7Components.actionRow(activity,
-            text(R.string.config_page_credentials), text(R.string.config_page_credentials_hint)) { requestLeave(credentials) })
         view.scroll.post { view.scroll.scrollTo(0, state.scroll[state.group] ?: 0) }
     }
     private fun category(index: Int) {
@@ -104,6 +92,34 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
             .setMessage(R.string.profile_discard_message)
             .setNegativeButton(R.string.profile_keep_editing, null)
             .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let(state::load); bind(); action() }.show()
+    }
+    private fun chooseTemplate() {
+        if (closed || templateDialog?.isShowing == true) return
+        val entries = GalaxyVehicleTemplates.entries
+        var pending = entries.indexOfFirst { it.id == L7AudioTemplates.model(activity).id }
+        var applied = false
+        val dialog = L7Dialogs.builder(activity).setTitle(R.string.template_choose)
+            .setMessage(R.string.template_overwrite)
+            .setSingleChoiceItems(entries.map { text(it.title) }.toTypedArray(), pending) { dialog, index ->
+                pending = index
+                (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.template_apply, null).create()
+        templateDialog = dialog
+        dialog.setOnDismissListener { if (templateDialog === dialog) templateDialog = null }
+        dialog.setOnShowListener {
+            val apply = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            apply.isEnabled = pending >= 0
+            apply.setOnClickListener {
+                if (closed || applied || pending !in entries.indices) return@setOnClickListener
+                applied = true
+                dialog.dismiss()
+                applyTemplate(entries[pending].id)
+            }
+            L7Components.styleDialog(dialog)
+        }
+        dialog.show()
     }
     private fun applyTemplate(model: String) {
         val result = runCatching { repository.applyTemplate(model) }
@@ -129,5 +145,11 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         }
         observers.clear()
     }
-    fun close() { state.scroll[state.group] = view.scroll.scrollY; detach() }
+    fun close() {
+        closed = true
+        templateDialog?.dismiss()
+        templateDialog = null
+        state.scroll[state.group] = view.scroll.scrollY
+        detach()
+    }
 }

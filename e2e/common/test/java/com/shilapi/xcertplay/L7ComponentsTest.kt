@@ -111,6 +111,38 @@ class L7ComponentsTest {
         reopened.dismiss()
     }
 
+    @Test fun flymeSwitchHasNativeGeometryAndRefreshPreservesCheckedValueWithoutSubmitting() {
+        val context = activity()
+        var submitted = 0
+        val row = L7Components.switchRow(context, "开关", "说明", false) { submitted++ }
+        val controls = arrayListOf<View>()
+        row.findViewsWithText(controls, "开关", View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION)
+        val control = controls.filterIsInstance<Switch>().single()
+        assertEquals(L7Components.dp(context, 58), control.switchMinWidth)
+        assertTrue(kotlin.math.abs(L7Components.dp(context, 21) - control.thumbDrawable.intrinsicWidth) <= 1)
+        assertTrue(kotlin.math.abs(L7Components.dp(context, 30) - control.thumbDrawable.intrinsicHeight) <= 1)
+        assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, row.importantForAccessibility)
+        assertFalse(row.isFocusable)
+        assertTrue(control.isFocusable)
+        row.measure(View.MeasureSpec.makeMeasureSpec(L7Components.dp(context, 420), View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        row.layout(0, 0, row.measuredWidth, row.measuredHeight)
+        assertTrue(row.getChildAt(0) is android.widget.FrameLayout)
+        assertTrue(row.getChildAt(0).right <= row.getChildAt(1).left)
+        assertEquals(L7Components.dp(context, 102), row.textInset)
+        assertTrue(control.measuredHeight >= L7Components.dp(context, 64))
+        row.setSwitchChecked(true)
+        L7Ui.refresh(row)
+        assertTrue(control.isChecked)
+        assertEquals(0, submitted)
+        control.performClick()
+        assertEquals(1, submitted)
+        row.isEnabled = false
+        row.setFeedback("需要授权")
+        row.performClick()
+        assertEquals(1, submitted)
+        assertEquals("需要授权", row.feedbackView.text.toString())
+    }
     @Test fun changedChoiceCommitsOnceEvenWithRepeatedConfirmation() {
         val commits = mutableListOf<Int>()
         val dialog = L7Components.select(activity(), "帧率", listOf("30", "60"), 0, "保存") { commits.add(it) }

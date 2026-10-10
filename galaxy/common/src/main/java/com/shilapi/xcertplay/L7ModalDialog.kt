@@ -60,7 +60,7 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
         val panel = BoundedPanel(uiContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(20), dp(24), dp(24))
-            L7MenuSurface.apply(this, radius = 8)
+            L7MenuSurface.apply(this, radius = 4)
         }
         panel.addView(header())
         val body = LinearLayout(uiContext).apply { orientation = LinearLayout.VERTICAL }
@@ -191,18 +191,12 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
         actions[which]?.isEnabled = false
         value.click?.onClick(this, which)
         dismiss()
-    }.also { actions[which] = it; L7Ui.button(it, primary = which == BUTTON_POSITIVE, radius = 8) }
+    }.also { actions[which] = it; L7Ui.button(it, primary = which == BUTTON_POSITIVE, radius = 4) }
 
     private fun styleInputs(view: View) {
         if (view is EditText) {
             view.textSize = 18f
-            L7Ui.bind(view) {
-                view.setTextColor(uiContext.getColor(R.color.product_ui_text))
-                view.setHintTextColor(uiContext.getColor(R.color.product_ui_muted))
-                view.backgroundTintList = ColorStateList.valueOf(uiContext.getColor(R.color.product_ui_accent))
-            }
-            // 使用 View 的最低高度，不能覆盖 EditText 以行数保存的 minLines。
-            view.minimumHeight = dp(64)
+            L7Ui.input(view)
         } else if (view is Button) {
             // 已由组件绑定的按钮保留主次样式，不能用正文颜色覆盖其状态与主题绑定。
             if (view.getTag(R.id.l7_palette_binding) == null) L7Ui.button(view)

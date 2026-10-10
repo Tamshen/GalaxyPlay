@@ -31,7 +31,7 @@
     <string name="profile_name">Configuration name</string>
     <string name="profile_category">Settings category</string>
     <string name="profile_view_category">View category</string>
-    <string name="profile_update_draft">Update draft</string>
+    <string name="profile_update_draft">Confirm</string>
     <string name="profile_draft_hint">This window edits a draft. Changing categories keeps your edits. Save writes the complete file; Cancel preserves the original file.</string>
     <string name="profile_discard_title">Discard these changes?</string>
     <string name="profile_discard_message">Unsaved edits will be discarded. The saved file keeps its original values.</string>
