@@ -85,7 +85,7 @@ def click(text, contains=False):
 def tap(node):
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
-    time.sleep(.4)
+    time.sleep(.8)
 
 
 def screenshot(name):
@@ -449,6 +449,10 @@ def configuration_smoke():
     launch()
     template('l7')
     assert json.loads(private(path))['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l7'
+    native = json.loads(private(path))['configuration']
+    assert native['preferences']['l7_audio_templates']['mode']['value'] == 'custom', '原厂焦点未保存到现有音频方案'
+    assert native['audio_templates']['l7']['focusGains']['navigation'] == 3
+    assert native['audio_templates']['l7']['focusGains']['ringtone'] == 3
     assert current_app_values() == independent
     # 旧版其他文件首次读取会升级并保留上一份，不能把迁移备份误判成新配置。
     allowed_backups = {name + '.previous' for name in original_files if name.endswith('.json')}
@@ -511,6 +515,12 @@ try:
     if args.language:
         language(args.language)
     audio_auth_smoke() if args.audio_auth_only else configuration_smoke()
+except Exception:
+    try:
+        screenshot('failed')
+    except Exception:
+        pass
+    raise
 finally:
     # 本轮会覆盖当前设置；在内存保留原件，恢复当前文件、应用偏好及三份兼容音频文件后重启。
     adb('shell', 'am', 'force-stop', package)

@@ -5,7 +5,7 @@ import android.media.MediaRecorder
 import org.json.JSONObject
 import java.io.File
 
-/** 音频配置读取参考 carlito12345/DiPlay v0.2.11；仅接入 L7，不读取身份与图标配置。 */
+/** 音频配置读取参考 carlito12345/DiPlay v0.2.11；接入 L6／L7，不读取身份与图标配置。 */
 class L7FactoryAudioProfile internal constructor(
     private val attrs: JSONObject?,
     private val framework: (Class<*>, String) -> Int? = { type, name ->
@@ -33,15 +33,17 @@ class L7FactoryAudioProfile internal constructor(
 
     override fun attributes(channel: AudioChannel, contentType: Int, choice: Int): AudioAttributes {
         val fallback = AudioOutputPolicy.usage(channel, choice)
+        // 两车型原厂 STREAM_RING 使用提示音内容，不能沿用语音解码角色的 contentType。
+        val outputContent = if (channel == AudioChannel.RINGTONE) AudioAttributes.CONTENT_TYPE_SONIFICATION else contentType
         // 电话的旧默认保持标准通信；显式路由选择与其它用途走同一输出策略。
         val usage = if (channel != AudioChannel.PHONE &&
             (choice == AudioOutputPolicy.BUILTIN || AudioOutputPolicy.isLegacy(choice))) usage(channel) else fallback
         val result = runCatching {
-            AudioAttributes.Builder().setUsage(usage).setContentType(contentType).build()
+            AudioAttributes.Builder().setUsage(usage).setContentType(outputContent).build()
         }.getOrNull()
         // 与博越实现一致：系统不接受厂商 usage 时回退标准用途，不猜测私有数值。
         return if (result?.usage == usage) result else AudioAttributes.Builder()
-            .setUsage(fallback).setContentType(contentType).build()
+            .setUsage(fallback).setContentType(outputContent).build()
     }
 
     override fun microphoneSource(audioType: String, sampleRate: Int, wireless: Boolean): Int? {
