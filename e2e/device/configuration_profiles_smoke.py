@@ -90,6 +90,9 @@ def active():
 
 labels = {
     'l7': ('银河 L7', 'Galaxy L7'), 'l6': ('银河 L6', 'Galaxy L6'),
+    'custom_vehicle': ('自定义', 'Custom'), 'reset': ('重置当前配置', 'Reset current configuration'),
+    'reset_confirm': ('确认重置', 'Reset configuration'),
+    'smoothness': ('画面流畅度', 'Picture smoothness'), 'fps60': ('更流畅 · 60 fps', 'Smoother · 60 fps'),
     'vehicle': ('车型 · ', 'Vehicle · '), 'template_apply': ('应用模板', 'Apply template'),
     'more': ('更多', 'More'), 'common': ('常用', 'Common'),
     'hotspot': ('热点名称与密码', 'Hotspot name and password'), 'audio': ('音频', 'Audio'),
@@ -247,6 +250,28 @@ try:
     applied = json.loads(private(path))
     assert applied['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
     screenshot('03-l6-applied')
+    template('custom_vehicle')
+    assert json.loads(private(path))['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'custom'
+    assert active() == original_id and current_app_values() == independent
+    screenshot('03-custom-applied')
+    category('common')
+    click(label('smoothness')); click(label('fps60')); click(label('confirm')); click(label('save'))
+    custom_saved = private(path)
+    click(label('bluetooth'))
+    click(label('reset'))
+    screenshot('03-reset-confirmation')
+    click(label('cancel'))
+    assert private(path) == custom_saved, '取消重置改变了文件'
+    assert '有未保存的修改' in texts() or 'Unsaved changes' in texts(), '取消重置丢失了草稿'
+    click(label('reset')); click(label('reset_confirm'))
+    reset = json.loads(private(path))['configuration']['preferences']
+    assert reset['l7_audio_templates']['model']['value'] == 'custom', '重置切换了车型'
+    assert reset['xcertplay_airplay']['display_fps']['value'] == 30
+    assert reset['xcertplay_airplay']['bluetooth_media_exclusive']['value'] is True
+    assert active() == original_id and current_app_values() == independent
+    assert '有未保存的修改' not in texts() and 'Unsaved changes' not in texts()
+    screenshot('03-custom-reset')
+    template('l6')
     # 独立应用偏好不应出现在当前车型文件，也不会被模板或普通参数保存覆盖。
     assert not applied['configuration']['preferences']['diplay'].get('app_language')
     assert not applied['configuration']['preferences']['l7_ui'].get('density')
@@ -303,16 +328,29 @@ try:
     adb('shell', 'input', 'swipe', '1000', '1450', '1000', '750', '300')
     assert fixed == (bounds('vehicle'), bounds('save')), '模板或底部操作随参数滚动'
     screenshot('05-display-scrolled')
-    for _ in range(3):
-        adb('shell', 'input', 'swipe', '1000', '750', '1000', '1450', '200')
+    # 固定车型与重置按钮会改变正文起点，手势必须从实际滚动区内部开始。
+    for _ in range(8):
+        root = tree()
+        if any(node.get('text') in labels['right'] for node in root.iter('node')):
+            break
+        areas = [list(map(int, re.findall(r'\d+', node.get('bounds'))))
+                 for node in root.iter('node') if node.get('class') == 'android.widget.ScrollView']
+        x1, y1, x2, y2 = max(areas, key=lambda bounds: bounds[2] - bounds[0])
+        adb('shell', 'input', 'swipe', str((x1 + x2) // 2), str(y1 + (y2 - y1) // 5),
+            str((x1 + x2) // 2), str(y2 - (y2 - y1) // 5), '300')
     assert not any(value in texts() for value in ['高级设置', 'Advanced settings', '收起高级设置', 'Hide advanced settings'])
     screenshot('05-display-direct')
     click(label('right')); click(label('save'))
     edited = json.loads(private(path))
+    assert edited['template_id'] == 'custom', '保存改动未切换为自定义配置'
+    assert any(value.startswith(label('vehicle')) and label('custom_vehicle') in value for value in texts()), '保存后车型仍显示模板'
     assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
     assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
     assert active() == original_id
     assert current_app_values() == independent
+    click(label('vehicle'), contains=True)
+    assert any(node.get('text') in labels['custom_vehicle'] and node.get('checked') == 'true' for node in tree().iter('node')), '保存后车型候选未选中自定义'
+    click(label('cancel'))
     screenshot('06-edited')
     click(label('right'))
     saved = private(path)
@@ -342,4 +380,4 @@ finally:
     assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6 确认覆盖同一文件、后续编辑保存、横向 TAB 滚动切换、各模块参数直接显示、自定义百分比取消、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)
+print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6/自定义确认覆盖同一文件、重置当前配置确认与取消、修改保存自动显示并选中自定义且保留实际车型适配、后续编辑保存、横向 TAB 滚动切换、各模块参数直接显示、自定义百分比取消、热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用偏好保留与测试前配置恢复。', flush=True)

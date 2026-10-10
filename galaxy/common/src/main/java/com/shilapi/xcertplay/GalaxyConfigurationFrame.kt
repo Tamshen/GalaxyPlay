@@ -8,8 +8,9 @@ import com.shilapi.xcertplay.host.R
 
 /** 快速模板与分类固定在上方，参数独立滚动，主要操作始终可达。 */
 internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> Unit,
-    changeGroup: (Int) -> Unit, reset: () -> Unit, commit: () -> Unit) : LinearLayout(context) {
+    changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit) : LinearLayout(context) {
     val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), click = chooseTemplate)
+    val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_reset_current), click = resetCurrent)
     val tabs = GalaxyConfigurationTabs(context, changeGroup)
     val status = L7Typography.text(context, "", L7Typography.Role.FEEDBACK)
     val fields = LinearLayout(context).apply { orientation = VERTICAL }
@@ -24,6 +25,7 @@ internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> 
         addView(L7Typography.text(context, context.getString(R.string.template_hint), L7Typography.Role.DESCRIPTION),
             LayoutParams(-1, -2).apply { topMargin = dp(4); bottomMargin = dp(12) })
         addView(vehicleButton, LayoutParams(-1, -2))
+        addView(defaultsButton, LayoutParams(-1, -2).apply { topMargin = dp(8) })
         addView(status, LayoutParams(-1, -2).apply { topMargin = dp(12); bottomMargin = dp(12) })
         addView(tabs, LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         addView(scroll, LayoutParams(-1, 0, 1f).apply { topMargin = dp(4); bottomMargin = dp(12) })

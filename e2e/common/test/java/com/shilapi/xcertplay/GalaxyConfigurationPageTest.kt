@@ -62,6 +62,124 @@ class GalaxyConfigurationPageTest {
         assertEquals(l6.revision + 1, repository.active().revision)
         page.close()
     }
+    @Test fun customVehicleUsesSystemDefaultsAndStillSavesToTheSameFile() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val original = repository.active()
+        val page = GalaxyConfigurationPage(activity) {}
+        template(page, "custom")
+        assertEquals(original.id, repository.active().id)
+        assertEquals("custom", repository.active().model)
+        assertTrue(page.view.vehicleButton.text.toString().contains(activity.getString(R.string.template_custom)))
+        assertEquals(GalaxyConfiguration.parse(GalaxyConfigurationFields.factory(activity, "custom").json()),
+            repository.active().configuration)
+        modify(page, activity)
+        page.view.commitButton.performClick()
+        assertEquals("custom", repository.active().model)
+        assertEquals(1, repository.list().size)
+        page.close()
+    }
+    @Test fun savingEditedTemplatesMarksCustomWithoutChangingVehicleAdaptation() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        AppLocale.save(activity, "en"); L7UiDensity.save(activity, 320)
+        for (model in listOf("l7", "l6")) {
+            var page = GalaxyConfigurationPage(activity) {}
+            template(page, model)
+            val applied = repository.active()
+            assertEquals(model, applied.template)
+            assertEquals(model, repository.save(applied).template)
+            page.close()
+            page = GalaxyConfigurationPage(activity) {}
+            modify(page, activity)
+            assertEquals(model, repository.active().template)
+            assertTrue(page.view.vehicleButton.text.toString().contains(activity.getString(GalaxyVehicleTemplates.find(model)!!.title)))
+            page.view.commitButton.performClick()
+            val saved = repository.active()
+            assertEquals("custom", saved.template)
+            assertEquals(model, saved.model)
+            assertEquals(applied.configuration.audio, saved.configuration.audio)
+            assertEquals(60, saved.configuration.preferences.getValue("xcertplay_airplay")["display_fps"])
+            assertEquals(saved, GalaxyProfile.parse(saved.json().toString()))
+            assertTrue(page.view.vehicleButton.text.toString().contains(activity.getString(R.string.template_custom)))
+            page.close()
+            page = GalaxyConfigurationPage(activity) {}
+            page.view.vehicleButton.performClick()
+            val picker = dialog()
+            assertEquals(2, picker.listView.checkedItemPosition)
+            picker.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            page.view.defaultsButton.performClick()
+            dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            assertEquals("custom", repository.active().template)
+            assertEquals("custom", repository.active().model)
+            assertEquals("en", AppLocale.preference(activity))
+            assertEquals(320, L7UiDensity.value(activity))
+            page.close()
+        }
+    }
+    @Test fun resetBelowVehicleKeepsDraftOnCancelAndRestoresEachCurrentVehicleOnce() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        AppLocale.save(activity, "en"); L7UiDensity.save(activity, 320)
+        var changes = 0
+        val page = GalaxyConfigurationPage(activity) { changes++ }
+        activity.setContentView(page.view)
+        page.view.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(1600, View.MeasureSpec.EXACTLY))
+        page.view.layout(0, 0, 1000, 1600)
+        assertTrue(page.view.defaultsButton.top >= page.view.vehicleButton.bottom)
+        for (model in listOf("l7", "l6", "custom")) {
+            template(page, model)
+            modify(page, activity)
+            val saved = repository.active()
+            descendants(page.view.fields).filterIsInstance<L7SettingRow>()
+                .first { it.titleView.text.toString() == activity.getString(R.string.config_bluetooth_music) }.performClick()
+            page.view.defaultsButton.performClick()
+            val cancel = dialog()
+            page.view.defaultsButton.performClick()
+            assertSame(cancel, dialog())
+            cancel.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            assertTrue(page.dirty)
+            assertEquals(saved, repository.active())
+            shadowOf(Looper.getMainLooper()).idle()
+            val beforeChanges = changes
+            page.view.defaultsButton.performClick()
+            val reset = dialog()
+            reset.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            reset.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            val current = repository.active()
+            assertEquals(saved.id, current.id)
+            assertEquals(saved.revision + 1, current.revision)
+            assertEquals(model, current.model)
+            assertEquals(GalaxyConfiguration.parse(GalaxyConfigurationFields.factory(activity, model).json()),
+                current.configuration)
+            assertFalse(page.dirty)
+            assertEquals(beforeChanges + 1, changes)
+            assertEquals("en", AppLocale.preference(activity))
+            assertEquals(320, L7UiDensity.value(activity))
+            assertEquals(1, repository.list().size)
+        }
+        page.close()
+    }
+    @Test fun closedOrStaleResetDialogCannotOverwriteConfiguration() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val page = GalaxyConfigurationPage(activity) {}
+        template(page, "l7")
+        page.view.defaultsButton.performClick()
+        val stale = dialog()
+        val latest = repository.applyTemplate("l6")
+        stale.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(latest, repository.active())
+        assertTrue(page.view.status.text.isNotBlank())
+        page.view.defaultsButton.performClick()
+        val closed = dialog()
+        page.close()
+        assertFalse(closed.isShowing)
+        closed.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(latest, repository.active())
+    }
     @Test fun editsAfterApplyingTemplateSaveToTheSameCompleteConfigurationExactlyOnce() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)

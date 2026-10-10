@@ -49,4 +49,8 @@
     <string name="config_custom_value">自定义 · %1$d</string>
     <string name="config_custom_percent">自定义百分比…</string>
     <string name="config_percent_value">自定义 · %1$d%%</string>
+    <string name="template_custom">自定义</string>
+    <string name="config_reset_current">重置当前配置</string>
+    <string name="config_reset_confirm">确认重置</string>
+    <string name="config_reset_message">恢复“%1$s”的默认车型参数，覆盖已保存设置和未保存修改，包括热点名称、密码及自定义音频参数。语言、界面尺寸等应用设置、本地认证材料和日志保留。当前连接不会中断，下次连接使用默认参数。</string>
 </resources>

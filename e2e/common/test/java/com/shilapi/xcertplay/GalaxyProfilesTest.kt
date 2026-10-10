@@ -83,9 +83,15 @@ class GalaxyProfilesTest {
         val frozen = GalaxyConfigurationContext(app, saved)
         AppLocale.save(app, "zh"); L7UiDensity.save(app, 240)
         assertEquals(saved, repository.refresh())
+        assertEquals("l7", repository.active().template)
         assertEquals("zh", AppLocale.preference(frozen))
         assertEquals(240, L7UiDensity.value(frozen))
         assertEquals(saved.configuration, frozen.configuration())
+        AirPlayPersistence.saveFps(app, 60)
+        val edited = repository.refresh()
+        assertEquals("custom", edited.template)
+        assertEquals("l7", edited.model)
+        assertEquals(30, AirPlayPersistence.loadFps(frozen))
     }
     @Test fun draftDoesNotWritePreferencesOrFilesAndSavedInactiveFileDoesNotSwitch() {
         val initial = repository.active()

@@ -34,6 +34,7 @@ class GalaxyConfigurationEvidenceTest {
         val value = evidence()
         for (secret in listOf("Private name", "PRIVATE_WIFI", "PRIVATE_PASSWORD", "PRIVATE_TOKEN", "PRIVATE_DEVICE", "PRIVATE_ADDRESS"))
             assertFalse(secret, secret in value.text)
+        assertFalse(JSONObject(value.text).has("template_id"))
         val data = JSONObject(value.text).getJSONObject("configuration")
         assertEquals(30, data.getJSONObject("preferences").getJSONObject("xcertplay_airplay")
             .getJSONObject("display_fps").getInt("value"))
@@ -41,6 +42,23 @@ class GalaxyConfigurationEvidenceTest {
         assertEquals(value, GalaxyConfigurationEvidence.read(value.text))
         assertEquals(value.id, DiagnosticRedactor.redact("config_ref=${value.id}")!!.substringAfter('='))
         assertTrue(value.text.length > DiagnosticRedactor.MAX_LINE)
+    }
+    @Test fun editedConfigurationEvidenceMarksCustomAndKeepsOriginalAdaptationAndLegacyHeader() {
+        val repository = GalaxyProfiles(app)
+        val applied = repository.applyTemplate("l6")
+        val legacy = GalaxyConfigurationEvidence.from(app, applied.copy(templateId = null))
+        assertFalse(JSONObject(legacy.text).has("template_id"))
+        assertEquals(legacy, GalaxyConfigurationEvidence.read(legacy.text))
+        val draft = GalaxyConfigurationContext(app, applied, true)
+        AirPlayPersistence.saveFps(draft, 60)
+        val saved = repository.save(applied.copy(configuration = draft.configuration()))
+        val current = GalaxyConfigurationEvidence.from(app, saved)
+        val data = JSONObject(current.text)
+        assertEquals("custom", data.getString("template_id"))
+        assertEquals("l6", data.getString("model"))
+        assertEquals(current, GalaxyConfigurationEvidence.read(current.text))
+        assertEquals(legacy, GalaxyConfigurationEvidence.read(legacy.text))
+        assertTrue(runCatching { GalaxyProfile.parse(saved.json().put("template_id", "PRIVATE_VALUE").toString()) }.isFailure)
     }
     @Test fun completeAttachmentIncludesIndependentAppSettingsWithoutPuttingThemInVehicleConfiguration() {
         AppLocale.save(app, "zh"); L7UiDensity.save(app, 320)
