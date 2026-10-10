@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 偏好入口使用滑杆，车型图标继续用于页内快速模板。 -->
+<!-- Flyme Auto fa_ic_common_adjust 默认版；保留 80 单位原几何与留白，颜色跟随主题。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="@android:color/transparent"
-        android:strokeColor="@color/product_ui_text" android:strokeWidth="2"
-        android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M3,6h3M10,6h11M3,12h11M18,12h3M3,18h5M12,18h9M6,4h4v4H6zM14,10h4v4h-4zM8,16h4v4H8z" />
+    android:width="80dp" android:height="80dp"
+    android:viewportWidth="80" android:viewportHeight="80">
+    <path android:fillColor="@color/product_ui_text" android:pathData="M33 20C33.5523 20 34 20.4477 34 21V33C34 33.5523 33.5523 34 33 34H31C30.4477 34 30 33.5523 30 33V21C30 20.4477 30.4477 20 31 20H33Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M26 25.0002H17C16.4477 25.0002 16 25.448 16 26.0002V28.0002C16 28.5525 16.4477 29.0002 17 29.0002H26V25.0002Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M38 29.0002H63C63.5523 29.0002 64 28.5525 64 28.0002V26.0002C64 25.448 63.5523 25.0002 63 25.0002H38V29.0002Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M49 46C49.5523 46 50 46.4477 50 47V59C50 59.5523 49.5523 60 49 60H47C46.4477 60 46 59.5523 46 59L46 47C46 46.4477 46.4477 46 47 46H49Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M42 55V51H17C16.4477 51 16 51.4477 16 52V54C16 54.5523 16.4477 55 17 55H42Z" />
+    <path android:fillColor="@color/product_ui_text" android:pathData="M54 55H63C63.5523 55 64 54.5523 64 54V52C64 51.4477 63.5523 51 63 51H54V55Z" />
 </vector>
