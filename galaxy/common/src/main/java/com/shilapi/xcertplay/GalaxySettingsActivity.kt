@@ -521,13 +521,14 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun settingsL7(content: LinearLayout) {
         val entries = listOf(
             Triple("settings-vehicle", R.string.config_page_title, R.drawable.ic_l7_vehicle),
+            Triple("settings-connection", R.string.connection_setup, R.drawable.ic_l7_connection),
             Triple("settings-general", R.string.application_settings_title, R.drawable.ic_l7_settings),
             Triple("settings-permissions", R.string.permissions_and_connection_help, R.drawable.ic_l7_permissions),
             Triple("settings-debug", R.string.l7_probe_title, R.drawable.ic_l7_debug),
             Triple("settings-logs", R.string.l7_logs_title, R.drawable.ic_l7_agreement),
             Triple("settings-about", R.string.about, R.drawable.ic_dp_about)
         )
-        val hints = listOf(R.string.config_page_entry_hint, R.string.application_settings_hint,
+        val hints = listOf(R.string.config_page_entry_hint, R.string.l7_connection_row_hint, R.string.application_settings_hint,
             R.string.l7_permissions_row_hint, R.string.l7_probe_entry_hint, R.string.l7_logs_entry_hint, R.string.l7_about_row_hint)
         content.addView(label(getString(R.string.l7_settings_navigation_hint), 17, MUTED).apply {
             setPadding(0, 0, 0, dp(16))
