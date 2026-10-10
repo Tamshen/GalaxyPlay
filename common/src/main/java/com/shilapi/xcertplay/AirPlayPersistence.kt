@@ -145,14 +145,14 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_HEVC_ENABLED, false)
 
-    fun loadUiScalePercent(context: Context): Int = CarPlayUiScale.sanitize(
+    fun loadUiScalePercent(context: Context): Int = GalaxyProjectionScale.sanitize(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getInt(KEY_UI_SCALE_PERCENT, CarPlayUiScale.DEFAULT),
     )
 
     fun saveUiScalePercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_UI_SCALE_PERCENT, CarPlayUiScale.sanitize(percent)).apply()
+            .putInt(KEY_UI_SCALE_PERCENT, GalaxyProjectionScale.sanitize(percent)).apply()
     }
 
     fun saveHevcEnabled(context: Context, enabled: Boolean) {

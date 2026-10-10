@@ -35,7 +35,14 @@ internal class GalaxyProfiles(private val context: Context,
             previous
         }.let { profile ->
             check(profile.id == id)
-            val vehicle = GalaxyApplicationPreferences.vehicle(profile.configuration)
+            val filtered = GalaxyApplicationPreferences.vehicle(profile.configuration)
+            val groups = filtered.preferences.toMutableMap()
+            val current = groups["xcertplay_airplay"].orEmpty()
+            val additions = GalaxyConfigurationFields.fields.filter { it.key in setOf(
+                "galaxy_steering_enabled", "galaxy_media_reporting_enabled", "galaxy_navigation_reporting_enabled") }
+                .associate { it.key to (current[it.key] ?: it.default) }
+            groups["xcertplay_airplay"] = current + additions
+            val vehicle = filtered.copy(preferences = groups)
             if (vehicle == profile.configuration) profile else profile.copy(configuration = vehicle,
                 revision = profile.revision + 1, updatedAt = System.currentTimeMillis()).also(::saveFile)
         }

@@ -18,8 +18,8 @@ internal class GalaxyConfigurationTabs(context: Context, select: (Int) -> Unit) 
         isHorizontalScrollBarEnabled = false
         isFillViewport = false
         addView(row)
-        listOf(R.string.config_page_common, R.string.config_page_connection, R.string.config_page_audio,
-            R.string.config_page_video, R.string.config_page_more).forEachIndexed { index, title ->
+        listOf(R.string.config_page_common, R.string.config_page_steering, R.string.config_page_audio,
+            R.string.config_page_video, R.string.config_page_reporting).forEachIndexed { index, title ->
             val button = L7Components.actionButton(context, context.getString(title)) { select(index) }.apply {
                 textSize = 18f
                 minWidth = dp(112)

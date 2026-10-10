@@ -23,6 +23,8 @@ internal object L7HotspotEditor {
                     else InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
                 isSaveEnabled = false
                 setSingleLine()
+                // 单行设置会替换密码变换，最后显式恢复遮罩，与关闭的显示开关保持一致。
+                if (secret) transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
                 setText(value)
                 fields.addView(this, LinearLayout.LayoutParams(-1, -2).apply {
                     topMargin = L7Components.dp(context, 8); bottomMargin = L7Components.dp(context, 16)

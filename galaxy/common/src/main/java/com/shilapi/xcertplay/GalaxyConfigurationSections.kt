@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.host.R
 
 /** 参数按模块直接呈现；快捷预设与精确编辑共用一个入口。 */
 internal object GalaxyConfigurationSections {
-    fun add(context: Context, parent: LinearLayout, group: Int, credentials: () -> Unit) {
+    fun add(context: Context, parent: LinearLayout, group: Int) {
         fun text(id: Int) = context.getString(id)
         when (group) {
             0 -> {
@@ -20,13 +20,10 @@ internal object GalaxyConfigurationSections {
                     text(R.string.config_bluetooth_hint), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
                     AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
                 })
-                GalaxyProfileFieldsView.add(context, parent, R.string.automatic_connection, setOf("wireless_enabled"))
             }
             1 -> {
-                GalaxyHotspotSettings.add(context, parent)
-                GalaxyProfileFieldsView.add(context, parent, R.string.automatic_connection, setOf("auto_connect"))
-                GalaxyProfileFieldsView.add(context, parent, R.string.automatic_connection,
-                    setOf("auto_start_on_boot", "location_reporting_enabled"))
+                parent.addView(L7Components.note(context, text(R.string.config_steering_hint)))
+                GalaxyProfileFieldsView.add(context, parent, R.string.config_page_steering)
             }
             2 -> {
                 val audio = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -38,8 +35,6 @@ internal object GalaxyConfigurationSections {
                 }
             }
             3 -> {
-                quickChoice(context, parent, "ui_scale_percent", R.string.config_icon_size,
-                    listOf(100, 125, 150), listOf(R.string.config_size_default, R.string.config_size_large, R.string.config_size_larger))
                 GalaxyProfileFieldsView.add(context, parent, R.string.l7_section_projection,
                     setOf("hide_top_bar", "hide_bottom_bar", "right_hand_drive"))
                 GalaxyVideoDecoderSettings.add(context, parent)
@@ -47,10 +42,8 @@ internal object GalaxyConfigurationSections {
                     setOf("hevc_enabled", "hevc_software_decoder", "safe_area_draw_outside", "adapt_pip_resolution"))
             }
             else -> {
-                parent.addView(L7Components.note(context, text(R.string.config_auth_default_hint)))
-                parent.addView(L7Components.actionRow(context, text(R.string.config_page_credentials),
-                    text(R.string.config_page_credentials_hint), click = credentials))
-                GalaxyProfileFieldsView.add(context, parent, R.string.l7_auth_title)
+                parent.addView(L7Components.note(context, text(R.string.config_reporting_hint)))
+                GalaxyProfileFieldsView.add(context, parent, R.string.config_page_reporting)
             }
         }
         parent.addView(L7Components.note(context, text(R.string.config_page_next_connection)))

@@ -97,6 +97,24 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(1920, config.main.heightPixels)
     }
 
+    @Test fun galaxyHostNegotiatesSavedResolutionAndIndependentExactIconPercent() {
+        val resources = org.mockito.Mockito.spy(activity.resources)
+        org.mockito.Mockito.`when`(resources.getBoolean(R.bool.config_l7_product_ui)).thenReturn(true)
+        activity = org.mockito.Mockito.spy(activity)
+        org.mockito.Mockito.doReturn(resources).`when`(activity).resources
+        allowStartup()
+        AirPlayPersistence.saveUiScalePercent(activity, 137)
+        AirPlayPersistence.saveDisplayScalePercent(activity, 73)
+        activity.javaClass.getDeclaredMethod("loadPersistedSettings").apply { isAccessible = true }.invoke(activity)
+        assertEquals(137, getField("uiScalePercent"))
+        val method = activity.javaClass.getDeclaredMethod("createAirPlayConfig", sizeClass).apply { isAccessible = true }
+        val config = method.invoke(activity, size(1440, 1920)) as AirPlayConfig
+        assertEquals(768, config.main.widthPixels)
+        assertEquals(1024, config.main.heightPixels)
+        assertEquals(137, AirPlayPersistence.loadUiScalePercent(activity))
+        assertEquals(73, AirPlayPersistence.loadDisplayScalePercent(activity))
+    }
+
     @Test fun surroundViewOpenAndCloseKeepsTheNegotiatedCanvas() {
         val display = startSession()
         applySize(1920, 942)

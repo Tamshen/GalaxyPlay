@@ -4,7 +4,7 @@ import android.content.Context
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** 同一参数共用快捷档位和精确输入，取消任一弹窗均不改变草稿。 */
+/** 同一参数共用快捷档位和精确输入，取消任一弹窗均不保存；车型修改草稿，独立设置直接确认保存。 */
 internal object GalaxyConfigurationChoice {
     fun add(context: Context, parent: LinearLayout, key: String, title: Int,
             values: List<Int>, labels: List<Int>) {
@@ -24,9 +24,9 @@ internal object GalaxyConfigurationChoice {
         row = L7Components.valueRow(context, context.getString(title), value()) {
             val options = names + if (field != null) listOf(context.getString(R.string.config_custom_percent)) else emptyList()
             L7Components.select(context, context.getString(title), options, values.indexOf(current()),
-                context.getString(R.string.profile_update_draft)) { index ->
+                context.getString(if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.save)) { index ->
                 if (index < values.size) save(values[index])
-                else if (field != null) GalaxyProfileFieldsView.edit(context, context.getString(field.title), field, current()) {
+                else if (field != null) GalaxyProfileFieldsView.edit(context, context.getString(title), field, current()) {
                     save(it as Int)
                 }
             }

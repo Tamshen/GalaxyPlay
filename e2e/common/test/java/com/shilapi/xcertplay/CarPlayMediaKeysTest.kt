@@ -143,6 +143,74 @@ class GalaxyMediaKeysTest {
             assertNull(bridge.session)
         } finally { GalaxyMediaKeys.detach(controller); construction.close() }
     }
+    @Test fun vehicleReportingSwitchesIndependentlyCreateOnlyEnabledSessionsAndReleaseOnce() {
+        val app = RuntimeEnvironment.getApplication()
+        val resources = spy(app.resources)
+        `when`(resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)).thenReturn(true)
+        val base = object : ContextWrapper(app) { override fun getResources(): Resources = resources }
+        for (media in listOf(false, true)) for (navigation in listOf(false, true)) {
+            val profile = GalaxyProfile("test_scope", "Scope", 1, 1, GalaxyConfigurationFields.factory(app, "l7"))
+            val context = GalaxyConfigurationContext(base, profile, editable = true)
+            context.getSharedPreferences("xcertplay_airplay", 0).edit()
+                .putBoolean("galaxy_media_reporting_enabled", media)
+                .putBoolean("galaxy_navigation_reporting_enabled", navigation).commit()
+            val controller = mock(CarPlayController::class.java)
+            `when`(controller.hasActiveSession()).thenReturn(true)
+            `when`(controller.navigationSnapshot()).thenReturn(com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot())
+            var connection: ((Boolean) -> Unit)? = null
+            doAnswer { connection = it.getArgument(0); null }.`when`(controller).sessionStateListener = any()
+            mockConstruction(L7MediaCenterSession::class.java).use { centers ->
+                mockConstruction(L7NavigationSession::class.java).use { routes ->
+                    GalaxyMediaKeys.attach(context, controller, {})
+                    val oldConnection = connection!!
+                    try {
+                        assertEquals(if (media) 1 else 0, centers.constructed().size)
+                        assertEquals(if (navigation) 1 else 0, routes.constructed().size)
+                        // 改动本机下一次配置不影响本会话开关。
+                        app.getSharedPreferences("xcertplay_airplay", 0).edit()
+                            .putBoolean("galaxy_media_reporting_enabled", !media)
+                            .putBoolean("galaxy_navigation_reporting_enabled", !navigation).commit()
+                        assertEquals(media, GalaxyVehiclePreferences.mediaReporting(context))
+                        assertEquals(navigation, GalaxyVehiclePreferences.navigationReporting(context))
+                    } finally { GalaxyMediaKeys.detach(controller); GalaxyMediaKeys.detach(controller) }
+                    oldConnection(true) // 迟到旧监听不得重新创建已释放的上报服务。
+                    assertEquals(if (media) 1 else 0, centers.constructed().size)
+                    assertEquals(if (navigation) 1 else 0, routes.constructed().size)
+                    centers.constructed().forEach { verify(it, times(1)).close() }
+                    routes.constructed().forEach { verify(it, times(1)).close() }
+                }
+            }
+        }
+    }
+    @Test fun disabledVehicleControlsKeepLocalPlaybackButNeverForwardSteeringCommands() {
+        val app = RuntimeEnvironment.getApplication()
+        val resources = spy(app.resources)
+        `when`(resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)).thenReturn(true)
+        val base = object : ContextWrapper(app) { override fun getResources(): Resources = resources }
+        val profile = GalaxyProfile("test_controls", "Controls", 1, 1, GalaxyConfigurationFields.factory(app, "l6"))
+        val context = GalaxyConfigurationContext(base, profile, editable = true)
+        context.getSharedPreferences("xcertplay_airplay", 0).edit().putBoolean("galaxy_steering_enabled", false)
+            .putBoolean("galaxy_media_reporting_enabled", false).putBoolean("galaxy_navigation_reporting_enabled", false).commit()
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.hasActiveSession()).thenReturn(true)
+        `when`(controller.localMediaAudioEnabled).thenReturn(true)
+        mockConstruction(MediaSession::class.java).use { sessions ->
+            mockConstruction(L7SteeringWheel::class.java).use { wheels ->
+                GalaxyMediaKeys.attach(context, controller, {})
+                try {
+                    shadowOf(Looper.getMainLooper()).idle()
+                    assertEquals(0, wheels.constructed().size)
+                    val session = sessions.constructed().single()
+                    val callback = mockingDetails(session).invocations.first { it.method.name == "setCallback" }
+                        .getArgument<MediaSession.Callback>(0)
+                    callback.onSkipToNext()
+                    callback.onPlay()
+                    assertFalse(GalaxyMediaKeys.onVoiceKey(controller))
+                    assertFalse(mockingDetails(controller).invocations.any { it.method.name == "sendMediaButton" || it.method.name == "requestSiri" })
+                } finally { GalaxyMediaKeys.detach(controller) }
+            }
+        }
+    }
     @Test fun stockBluetoothMetadataDoesNotCreateLocalSessionOrResumePhone() {
         val app = RuntimeEnvironment.getApplication()
         val controller = mock(CarPlayController::class.java)
