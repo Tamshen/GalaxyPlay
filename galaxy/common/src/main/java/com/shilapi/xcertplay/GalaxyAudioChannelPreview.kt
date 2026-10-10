@@ -30,6 +30,8 @@ internal class GalaxyAudioChannelPreview(
         Thread(task, "diplay-channel-preview").apply { isDaemon = true }
     }
     private val generation = AtomicInteger()
+    private val session = android.os.SystemClock.elapsedRealtimeNanos()
+    val evidenceId: String get() = "$session-${generation.get()}"
     private val activeTrack = AtomicReference<AudioTrack?>()
     private var pending: Future<*>? = null
     @Volatile private var closed = false
@@ -44,6 +46,7 @@ internal class GalaxyAudioChannelPreview(
         val navigationDevice = context?.let { GalaxyNavigationOutput.load(it) }
         val focusEnabled = context?.let { AirPlayPersistence.loadAudioFocusEnabled(it) } ?: true
         val request = generation.incrementAndGet()
+        val evidence = "$session-$request"
         pending?.cancel(true)
         activeTrack.get()?.let { runCatching { it.stop() } }
         pending = worker.submit {
@@ -62,7 +65,7 @@ internal class GalaxyAudioChannelPreview(
                 context?.let {
                     route = AudioPreviewRoute(it, built, role, SAMPLE_RATE, channels, channel,
                         template = template, focusEnabled = focusEnabled, navigationDevice = navigationDevice) { line ->
-                        L7DebugLog.record("Audio preview stream=$channel $line")
+                        L7DebugLog.record("Audio preview id=$evidence choice=$channel role=$role $line")
                     }
                 }
                 built.play()
@@ -77,8 +80,8 @@ internal class GalaxyAudioChannelPreview(
                 if (!closed && generation.get() == request && written == pcm.size) {
                     route?.reportActual()
                     val device = runCatching { built.routedDevice }.getOrNull()
-                    Log.i(TAG, "Preview sent channel=$channel role=$role usage=${built.audioAttributes.usage} deviceId=${device?.id ?: -1} type=${device?.type ?: -1}")
-                    L7DebugLog.record("Audio preview sent stream=$channel role=$role usage=${built.audioAttributes.usage} deviceId=${device?.id ?: -1} type=${device?.type ?: -1}")
+                    Log.i(TAG, "Preview sent choice=$channel role=$role usage=${built.audioAttributes.usage} deviceId=${device?.id ?: -1} type=${device?.type ?: -1}")
+                    L7DebugLog.record("Audio preview sent id=$evidence choice=$channel role=$role usage=${built.audioAttributes.usage} deviceId=${device?.id ?: -1} type=${device?.type ?: -1}")
                     mainHandler.post {
                         if (!closed && generation.get() == request) onResult(device?.id ?: -1, device?.type ?: -1)
                     }
@@ -87,8 +90,8 @@ internal class GalaxyAudioChannelPreview(
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             } catch (error: Exception) {
-                Log.w(TAG, "Channel preview unavailable channel=$channel", error)
-                L7DebugLog.record("Audio preview failed stream=$channel error=${error.javaClass.simpleName}")
+                Log.w(TAG, "Channel preview unavailable choice=$channel", error)
+                L7DebugLog.record("Audio preview failed id=$evidence choice=$channel role=$role error=${error.javaClass.simpleName}")
                 mainHandler.post {
                     if (!closed && generation.get() == request) onUnavailable(channel)
                 }
@@ -118,7 +121,7 @@ internal class GalaxyAudioChannelPreview(
             createLegacy = { AudioTrack(channel, SAMPLE_RATE, mask, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM) },
             isInitialized = { it.state == AudioTrack.STATE_INITIALIZED }, release = { it.release() },
             createFallback = {
-                L7DebugLog.record("Audio preview stream=$channel rejected; fallback=usage ${attributes.usage}")
+                L7DebugLog.record("Audio preview choice=$channel rejected; fallback=usage ${attributes.usage}")
                 usageTrack()
             },
         ) else usageTrack()

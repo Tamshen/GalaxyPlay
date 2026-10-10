@@ -630,7 +630,9 @@ class GalaxySettingsActivity : ComponentActivity() {
                 }.apply { if (setupError != null) setFeedback(getString(R.string.l7_auth_not_ready), error = true) })
                 card.addView(L7Components.actionRow(this, getString(R.string.l7_auth_quick_import), getString(R.string.l7_auth_import_row_hint)) { authenticationDialog().quickImport() })
             }
-            "settings-general" -> GalaxyApplicationSettingsPage.add(this, content)
+            "settings-general" -> GalaxyApplicationSettingsPage.add(this, content) {
+                page = "settings-auth"; render()
+            }
             "settings-permissions" -> section(content, getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
                 card.addView(L7Components.actionRow(this, getString(R.string.app_permissions)) { openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) })
                 card.addView(L7Components.actionRow(this, getString(R.string.bluetooth_settings)) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) })

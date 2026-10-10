@@ -13,6 +13,7 @@ parser.add_argument('--adb', required=True)
 parser.add_argument('--serial', default='emulator-5556')
 parser.add_argument('--output-dir', type=Path)
 parser.add_argument('--language', choices=['zh', 'en'])
+parser.add_argument('--audio-auth-only', action='store_true', help='仅检查授权入口、四用途试听与电话草稿／保存')
 args = parser.parse_args()
 if not re.fullmatch(r'emulator-\d+', args.serial):
     parser.error('仅允许模拟器')
@@ -71,7 +72,13 @@ def click(text, contains=False):
             if (node.get('clickable') == 'true' or node.get('checkable') == 'true') and node.get('enabled') == 'true':
                 tap(node)
                 return
-        adb('shell', 'input', 'swipe', '1000', '1600', '1000', '750', '300')
+        scroll = next((node for node in root.iter('node') if node.get('class') in
+                       {'android.widget.ScrollView', 'android.widget.ListView'} and node.get('scrollable') == 'true'), None)
+        if scroll is None:
+            break
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', scroll.get('bounds')))
+        adb('shell', 'input', 'swipe', str((x1+x2)//2), str(y2-40),
+            str((x1+x2)//2), str(y1+40), '300')
     raise AssertionError(f'未找到可操作项：{text}')
 
 
@@ -108,6 +115,13 @@ labels = {
     'media_report': ('原车音乐与媒体上报', 'Report music and media to the car'),
     'navigation_report': ('原车导航上报', 'Report navigation to the car'),
     'authentication': ('CarPlay 认证', 'CarPlay authentication'),
+    'music_route': ('媒体音乐', 'Media music'), 'navigation_route': ('导航播报', 'Navigation prompts'),
+    'assistant_route': ('语音助手（Siri）', 'Voice assistant (Siri)'), 'phone_route': ('电话', 'Phone calls'),
+    'route_select': ('输出路由', 'Output routing'), 'route_choose': ('确定', 'Confirm'),
+    'route_music': ('音乐 · usage 1', 'Music · usage 1'),
+    'route_preview': ('试听此声道（2 秒）', 'Play test tone (2 seconds)'),
+    'route_stop': ('停止试听', 'Stop test tone'), 'route_heard': ('听到了', 'Heard it'),
+    'route_unheard': ('没听到', 'No sound'), 'draft_apply': ('确定', 'Confirm'),
     'quality': ('画面清晰度', 'Picture quality'), 'custom': ('自定义百分比…', 'Custom percentage…'),
     'confirm': ('确定', 'Confirm'),
     'cancel': ('取消', 'Cancel'), 'keep': ('继续编辑', 'Keep editing'),
@@ -221,40 +235,45 @@ def restore_file(path, value):
                        input=value, capture_output=True, check=True, timeout=15)
 
 
-if 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package):
-    raise AssertionError('模拟器有活动连接服务')
-adb('shell', 'am', 'force-stop', package)
-launch()
-english = detect_language()
-original_id = active()
-assert re.fullmatch(r'[a-z0-9_]{1,64}', original_id)
-path = f'files/configurations/{original_id}.json'
-original = private(path).encode('utf-8')
-previous = read_optional(path + '.previous')
-application = {name: read_optional('shared_prefs/' + name + '.xml') for name in ['diplay', 'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'l7_authentication', 'xcertplay_airplay', 'carplay_picture']}
-audio = {name: read_optional('files/' + name) for name in ['audio-template.json', 'audio-template-l6.json', 'audio-template-custom.json']}
-original_files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
-try:
-    # 用合成热点凭据验证模板与重置保留，不显示原用户名称或操作系统热点。
-    saved_main = application['xcertplay_airplay']
-    preferences = ET.fromstring(saved_main) if saved_main else ET.Element('map')
-    for key, value in {'manual_hotspot_ssid': 'UX-test-hotspot', 'manual_hotspot_passphrase': 'UX-test-password',
-                       'manual_hotspot_security': 'WPA2', 'manual_hotspot_band': 'AUTO'}.items():
-        item = next((n for n in preferences if n.get('name') == key), None)
-        if item is None:
-            item = ET.SubElement(preferences, 'string', {'name': key})
-        item.text = value
-    adb('shell', 'am', 'force-stop', package)
-    restore_file('shared_prefs/xcertplay_airplay.xml', ET.tostring(preferences, encoding='utf-8'))
-    launch()
-    if args.language:
-        language(args.language)
+
+def exercise_audio_routes():
+    for key in ('music_route', 'navigation_route', 'assistant_route', 'phone_route'):
+        click(label(key))
+        assert label('route_preview') in texts() and label('route_stop') in texts()
+        assert label('draft_apply') in texts()
+        screenshot('05-' + key)
+        click(label('cancel'))
+    # 电话候选选择只更新弹窗；取消不写文件，外层确认只更新车型草稿。
+    before_phone = private(path)
+    click(label('phone_route'))
+    click(label('route_select')); click(label('route_music')); click(label('route_choose'))
+    click(label('cancel'))
+    assert private(path) == before_phone
+    click(label('phone_route'))
+    click(label('route_select')); click(label('route_music')); click(label('route_choose'))
+    click(label('route_preview'))
+    time.sleep(3)
+    assert any(node.get('text') == label('route_unheard') and node.get('enabled') == 'true'
+               for node in tree().iter('node')), '试听未返回可记录结果'
+    # 只记录模拟器流程测试结果，不把它当作车机实际听感。
+    click(label('route_unheard'))
+    screenshot('05-phone-preview-result')
+    click(label('draft_apply'))
+    assert private(path) == before_phone, '电话弹窗绕过车型保存'
+
+
+
+def configuration_smoke():
     launch('settings')
     assert label('title') in texts() and label('app') in texts()
     assert '车型设置' not in texts() and 'Vehicle settings' not in texts()
     screenshot('01-settings')
     click(label('app'))
     assert label('language') in texts()
+    click(label('authentication'))
+    assert label('authentication') in texts()
+    screenshot('02-app-authentication')
+    launch('settings-general')
     click(label('size')); click(label('large')); click(label('save'))
     time.sleep(2)
     assert b'value="320"' in private('shared_prefs/l7_ui.xml').encode('utf-8')
@@ -358,6 +377,7 @@ try:
     launch()
     category('audio')
     screenshot('05-audio-direct')
+    exercise_audio_routes()
     category('video')
     for _ in range(8):
         if any(value in texts() for value in ['HEVC 软件解码', 'HEVC software decoding']):
@@ -387,6 +407,7 @@ try:
     assert edited['template_id'] == 'custom', '保存改动未切换为自定义配置'
     assert any(value.startswith(label('vehicle')) and label('custom_vehicle') in value for value in texts()), '保存后车型仍显示模板'
     assert edited['configuration']['preferences']['xcertplay_airplay']['right_hand_drive']['value'] is True
+    assert edited['configuration']['audio_templates']['l6']['choices']['phone'] == 101, '电话路由未随车型保存'
     assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
     assert active() == original_id
     assert current_app_values() == independent
@@ -407,6 +428,64 @@ try:
     # 旧版其他文件首次读取会升级并保留上一份，不能把迁移备份误判成新配置。
     allowed_backups = {name + '.previous' for name in original_files if name.endswith('.json')}
     assert set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines()) - original_files <= allowed_backups, '创建了额外配置文件'
+
+
+def audio_auth_smoke():
+    launch('settings-general')
+    screenshot('01-app-entry')
+    click(label('authentication'))
+    assert label('authentication') in texts()
+    screenshot('02-app-authentication')
+    launch('settings-general')
+    click(label('size'))
+    selected = any(node.get('text') == label('large') and node.get('checked') == 'true'
+                   for node in tree().iter('node'))
+    if selected:
+        click(label('cancel'))
+    else:
+        click(label('large')); click(label('save'))
+    launch()
+    independent = current_app_values()
+    template('l6')
+    category('audio')
+    exercise_audio_routes()
+    click(label('save'))
+    edited = json.loads(private(path))
+    assert edited['template_id'] == 'custom'
+    assert edited['configuration']['audio_templates']['l6']['choices']['phone'] == 101
+    assert edited['configuration']['preferences']['l7_audio_templates']['model']['value'] == 'l6'
+    assert current_app_values() == independent
+    screenshot('06-phone-saved')
+
+if 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package):
+    raise AssertionError('模拟器有活动连接服务')
+adb('shell', 'am', 'force-stop', package)
+launch()
+english = detect_language()
+original_id = active()
+assert re.fullmatch(r'[a-z0-9_]{1,64}', original_id)
+path = f'files/configurations/{original_id}.json'
+original = private(path).encode('utf-8')
+previous = read_optional(path + '.previous')
+application = {name: read_optional('shared_prefs/' + name + '.xml') for name in ['diplay', 'l7_ui', 'l7_floating_navigation', 'l7_remote_log', 'l7_authentication', 'xcertplay_airplay', 'carplay_picture']}
+audio = {name: read_optional('files/' + name) for name in ['audio-template.json', 'audio-template-l6.json', 'audio-template-custom.json']}
+original_files = set(adb('shell', 'run-as', package, 'ls', 'files/configurations').splitlines())
+try:
+    # 用合成热点凭据验证模板与重置保留，不显示原用户名称或操作系统热点。
+    saved_main = application['xcertplay_airplay']
+    preferences = ET.fromstring(saved_main) if saved_main else ET.Element('map')
+    for key, value in {'manual_hotspot_ssid': 'UX-test-hotspot', 'manual_hotspot_passphrase': 'UX-test-password',
+                       'manual_hotspot_security': 'WPA2', 'manual_hotspot_band': 'AUTO'}.items():
+        item = next((n for n in preferences if n.get('name') == key), None)
+        if item is None:
+            item = ET.SubElement(preferences, 'string', {'name': key})
+        item.text = value
+    adb('shell', 'am', 'force-stop', package)
+    restore_file('shared_prefs/xcertplay_airplay.xml', ET.tostring(preferences, encoding='utf-8'))
+    launch()
+    if args.language:
+        language(args.language)
+    audio_auth_smoke() if args.audio_auth_only else configuration_smoke()
 finally:
     # 本轮会覆盖当前设置；在内存保留原件，恢复当前文件、应用偏好及三份兼容音频文件后重启。
     adb('shell', 'am', 'force-stop', package)
@@ -422,4 +501,4 @@ finally:
     assert current_app_values() == app_values(application), '应用偏好未恢复'
     for name, value in audio.items():
         assert read_optional('files/' + name) == value, '兼容音频文件未恢复'
-print('配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6/自定义确认覆盖同一文件、重置当前配置确认与取消、修改保存自动显示并选中自定义且保留实际车型适配、后续编辑保存、横向 TAB 滚动切换、方控及上报开关直接显示、各模块参数直接显示、自定义百分比取消、独立连接页认证入口和热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用／热点／连接／认证设置保留与测试前配置恢复。', flush=True)
+print('音频与授权 UX 通过：应用设置授权入口、四用途弹窗、电话试听结果记录、取消不保存、外层更新草稿、底部保存读回、自定义标记和独立偏好／原设置恢复。' if args.audio_auth_only else '配置 UX 通过：单一配置入口、车型模态选择与取消保留草稿、L7/L6/自定义确认覆盖同一文件、重置当前配置确认与取消、修改保存自动显示并选中自定义且保留实际车型适配、后续编辑保存、横向 TAB 滚动切换、方控及上报开关直接显示、各模块参数直接显示、自定义百分比取消、独立连接页认证入口和热点双输入弹窗取消、撤销、固定操作、离开草稿确认、独立应用／热点／连接／认证设置保留与测试前配置恢复。', flush=True)

@@ -28,10 +28,8 @@ internal object GalaxyConfigurationSections {
             2 -> {
                 val audio = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
                 parent.addView(audio)
-                L7AudioSettings.page(context, audio) { title, current, _, apply ->
-                    val choices = com.shilapi.xcertplay.media.AudioOutputPolicy.choices
-                    L7Components.select(context, title, choices.map { L7AudioSettings.label(context, it) },
-                        choices.indexOf(current), text(R.string.profile_update_draft)) { apply(choices[it]) }
+                L7AudioSettings.page(context, audio) { title, current, role, apply ->
+                    L7AudioRouteDialog.show(context, title, current, role, apply)
                 }
             }
             3 -> {

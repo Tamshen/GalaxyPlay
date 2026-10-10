@@ -23,7 +23,7 @@ class L7AudioSettingsTest {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
     }
 
-    @Test fun builtinsHideTechnicalRowsAndCustomShowsThem() {
+    @Test fun allModesOfferFourEditableRolesAndOnlyCustomOffersFileTools() {
         val context = context()
         val parent = LinearLayout(context)
         for (mode in L7AudioTemplates.Mode.entries) {
@@ -37,7 +37,9 @@ class L7AudioSettingsTest {
             L7AudioSettings.page(context, parent, {}, {}) { _, _, _, _ -> }
             val custom = mode == L7AudioTemplates.Mode.CUSTOM
             for (id in listOf(R.string.l7_audio_media, R.string.l7_audio_navigation, R.string.l7_audio_assistant,
-                R.string.l7_audio_phone, R.string.l7_audio_bus, R.string.l7_template_edit,
+                R.string.l7_audio_phone))
+                assertNotNull("mode=$mode id=$id", row(parent, context.getString(id)))
+            for (id in listOf(R.string.l7_audio_bus, R.string.l7_template_edit,
                 R.string.l7_template_import, R.string.l7_template_export))
                 assertEquals("mode=$mode id=$id", custom, row(parent, context.getString(id)) != null)
             assertNull(row(parent, context.getString(R.string.l7_template_model)))
@@ -99,7 +101,7 @@ class L7AudioSettingsTest {
         selector.listView.performItemClick(selector.listView.adapter.getView(1, null, selector.listView), 1, 1L)
         selector.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertEquals(L7AudioTemplates.Mode.BUS, L7AudioTemplates.mode(context))
-        assertNull(row(parent, context.getString(R.string.l7_audio_navigation)))
+        assertNotNull(row(parent, context.getString(R.string.l7_audio_navigation)))
         assertEquals(context.getString(R.string.l7_template_bus),
             row(parent, context.getString(R.string.l7_template_select))!!.valueView.text.toString())
     }
@@ -120,7 +122,7 @@ class L7AudioSettingsTest {
         ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(L7AudioTemplates.Mode.L7, L7AudioTemplates.mode(context))
-        assertNull(row(parent, context.getString(R.string.l7_audio_media)))
+        assertNotNull(row(parent, context.getString(R.string.l7_audio_media)))
         L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
         assertEquals(3, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
     }
@@ -144,6 +146,24 @@ class L7AudioSettingsTest {
         assertEquals(context.getString(R.string.l7_template_system),
             row(parent, context.getString(R.string.l7_template_select))!!.valueView.text.toString())
         assertEquals(previous, file.readText())
+    }
+
+    @Test fun editingPhoneFromBuiltinDerivesCustomAndLeavesOtherRoutesUnchanged() {
+        val context = context()
+        val parent = LinearLayout(context)
+        val before = L7AudioTemplates.load(context)
+        var selectedRole: com.shilapi.xcertplay.media.AudioOutputRole? = null
+        L7AudioSettings.page(context, parent) { _, _, role, apply ->
+            selectedRole = role
+            apply(com.shilapi.xcertplay.media.AudioOutputPolicy.NAVIGATION)
+        }
+        row(parent, context.getString(R.string.l7_audio_phone))!!.performClick()
+        assertEquals(com.shilapi.xcertplay.media.AudioOutputRole.PHONE, selectedRole)
+        assertEquals(L7AudioTemplates.Mode.CUSTOM, L7AudioTemplates.mode(context))
+        assertEquals(103, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.PHONE))
+        assertEquals(before.choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA),
+            L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
+        assertNotNull(row(parent, context.getString(R.string.l7_template_edit)))
     }
 
     private fun row(view: View, label: String): L7SettingRow? {

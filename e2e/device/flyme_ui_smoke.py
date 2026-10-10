@@ -256,7 +256,15 @@ def audio_smoke():
     assert any(n.attrib.get('text', '').startswith('测试音已发送，请确认是否听到。') for n in nodes())
     screenshot('navigation-preview-night')
     tap('取消')
-    print('三用途交互检查通过：媒体/助手/导航播放调用、用途策略选择、立即停止、主题状态保留、取消恢复；未保存参数，未验证实车出声。', flush=True)
+    tap('电话')
+    tap('试听此声道（2 秒）')
+    time.sleep(3)
+    assert any(n.attrib.get('text', '').startswith('测试音已发送，请确认是否听到。') for n in nodes())
+    tap('没听到')
+    assert any(n.attrib.get('text', '').startswith('已记录：没听到') for n in nodes())
+    screenshot('phone-preview-night')
+    tap('取消')
+    print('四用途交互检查通过：媒体/助手/导航/电话播放调用、用途策略选择、立即停止、主题状态保留、取消恢复；未保存参数，未验证实车出声。', flush=True)
 
 
 def bluetooth_smoke():

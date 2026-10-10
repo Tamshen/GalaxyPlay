@@ -405,6 +405,7 @@ class AndroidMediaSink(
             ::audioRecoveryState,
             communicationResources::started,
             communicationResources::released,
+            phoneChannel = audioRoutingTemplate?.choice(AudioOutputRole.PHONE) ?: 0,
         ).also { audioRenderers[id] = it }
     }
 }
@@ -1021,6 +1022,7 @@ private class AudioRenderer(
     private val audioRecoveryState: () -> String,
     private val onCallStarted: (Any) -> Unit,
     private val onCallReleased: (Any) -> Unit,
+    private val phoneChannel: Int = 0,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
 
@@ -1330,12 +1332,13 @@ private class AudioRenderer(
         )
     }
 
-    /** 输出策略可修改，电话保持协议用途；未知持久化值退回内置推荐。 */
+    /** 输出路由独立于协议角色；电话仍参与通话资源与焦点协调。 */
     private fun channelOverride(channel: AudioChannel): Int = when (channel) {
         AudioChannel.MEDIA -> mediaChannel
         AudioChannel.NAVIGATION -> navigationChannel
         AudioChannel.ASSISTANT -> assistantChannel
-        AudioChannel.PHONE, AudioChannel.RINGTONE -> 0
+        AudioChannel.PHONE -> phoneChannel
+        AudioChannel.RINGTONE -> 0
     }.takeIf(AudioOutputPolicy::valid) ?: 0
 
     private fun audioAttributesFor(

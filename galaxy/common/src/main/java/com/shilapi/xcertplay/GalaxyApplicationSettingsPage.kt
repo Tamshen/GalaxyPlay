@@ -6,8 +6,12 @@ import com.shilapi.xcertplay.host.R
 
 /** 语言、大小和显示偏好独立保存，不进入车型草稿。 */
 internal object GalaxyApplicationSettingsPage {
-    fun add(activity: Activity, parent: LinearLayout) {
+    fun add(activity: Activity, parent: LinearLayout, onAuthentication: () -> Unit = {}) {
         parent.addView(L7Components.note(activity, activity.getString(R.string.application_settings_hint)))
+        L7SettingsSection.add(parent, activity.getString(R.string.l7_auth_title)) { card ->
+            card.addView(L7Components.categoryRow(activity, activity.getString(R.string.l7_auth_title),
+                activity.getString(R.string.config_auth_default_hint), R.drawable.ic_l7_settings, onAuthentication))
+        }
         L7SettingsSection.add(parent, activity.getString(R.string.language_section_title)) { card ->
             card.addView(L7Components.valueRow(activity, activity.getString(R.string.language_app_language),
                 AppLocale.displayName(activity, AppLocale.preference(activity))) { AppLocale.showPicker(activity) })

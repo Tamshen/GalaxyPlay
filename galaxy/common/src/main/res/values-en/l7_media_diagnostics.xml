@@ -5,6 +5,7 @@
         <item>Music · usage 1</item>
         <item>Navigation · usage 12</item>
         <item>Siri · usage 16</item>
+        <item>Calls · usage 2</item>
         <item>Factory usage (advanced)</item>
         <item>Legacy 1 · System sounds</item>
         <item>Legacy 2 · Ringtone</item>
@@ -33,7 +34,7 @@
     <string name="l7_audio_roles_note">The head unit assigns speakers by usage: music 1, navigation 12, calls 2 and Siri 16. These are usage values, not device IDs. Changes apply on the next connection.</string>
     <string name="l7_audio_route_select">Output routing</string>
     <string name="l7_audio_route_choose">Select</string>
-    <string name="l7_audio_route_help">Standard usage lets the head unit assign the output. Factory usage and legacy streams are advanced compatibility options. Legacy streams 1–20 are not usage values, device IDs or speaker positions. Preview does not save; saved changes apply on the next connection.</string>
+    <string name="l7_audio_route_help">1. Choose a route. 2. Preview and record. 3. Confirm.\nPreview does not save. Also save on the vehicle page.</string>
     <string name="l7_audio_test_play">Play test tone (2 seconds)</string>
     <string name="l7_audio_test_stop">Stop test tone</string>
     <string name="l7_audio_test_ready">Previewing does not save settings. Make sure vehicle audio is audible and operate only while parked.</string>
@@ -61,11 +62,16 @@
     <string name="l7_audio_headrest_note">L7 headrest check: enable the vehicle’s driver audio mode and check navigation, Siri and calls separately. Music ducking follows Boyue focus behavior. Turning audio focus off affects all audio; the head unit may still apply its own mixing policy.</string>
     <string name="l7_audio_phone">Phone calls</string>
     <string name="l7_audio_phone_usage">Calls · usage 2</string>
-    <string name="l7_audio_phone_note">Uses system communication usage. Verify headrest output during a real call.</string>
+    <string name="l7_audio_phone_note">Choose and preview an output route. Save, reconnect, then verify during a real call.</string>
     <string name="l7_video_failed_title">Video is temporarily unavailable</string>
     <string name="l7_video_failed_message">The connection is retained. Retry video without restarting existing audio. Confirm recovery from the actual picture. If it does not recover, reconnect manually from connection settings.</string>
     <string name="l7_video_retry">Retry video</string>
     <string name="l7_video_retrying">Retry requested. Waiting for video.</string>
     <string name="l7_video_retry_unavailable">Retry was not started or is already pending. Try later or open connection settings.</string>
     <string name="l7_video_settings">Open connection settings</string>
+    <string name="l7_audio_test_heard">Heard it</string>
+    <string name="l7_audio_test_unheard">No sound</string>
+    <string name="l7_audio_test_recorded">Recorded: %1$s. Choose another route to try again.</string>
+    <string name="l7_audio_test_phone_hint">Plays a test tone without calling or recording. Save and reconnect to verify a real call.</string>
+    <string name="l7_audio_test_unavailable">Cannot preview “%1$s” right now. Try another route; details are in the log.</string>
 </resources>

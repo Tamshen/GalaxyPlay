@@ -33,7 +33,7 @@ class AudioRoutingTemplateTest {
     }
 
     @Test fun allTwentyStreamsAndFactoryStrategyRoundTripIndependently() {
-        for (choice in listOf(0) + (1..20) + listOf(101, 102, 103)) {
+        for (choice in listOf(0) + (1..20) + listOf(101, 102, 103, 104)) {
             val old = AudioRoutingTemplate.system()
             val edited = old.withChoice(AudioOutputRole.NAVIGATION, choice)
             assertEquals(choice, AudioRoutingTemplate.parse(edited.toJson()).choice(AudioOutputRole.NAVIGATION))
@@ -42,14 +42,28 @@ class AudioRoutingTemplateTest {
         }
     }
 
-    @Test fun rejectsUnsupportedSchemaChoicesAndPhoneOverrides() {
+    @Test fun rejectsUnsupportedSchemaAndInvalidPhoneChoices() {
         rejected(base().put("version", 2))
         rejected(base().put("deviceId", 17))
         rejected(base().apply { getJSONObject("choices").put("media", 21) })
         rejected(base().apply { getJSONObject("choices").put("navigation", "12") })
-        rejected(base().apply { getJSONObject("choices").put("phone", 101) })
+        rejected(base().apply { getJSONObject("choices").put("phone", 21) })
         rejected(base().put("preferBus", "true"))
         rejected(base().put("preferBus", true))
+    }
+
+    @Test fun oldThreeRoleFilesKeepTheirSerializedEvidenceAndPhoneDefaults() {
+        val obj = base().apply { getJSONObject("choices").remove("phone") }
+        val old = AudioRoutingTemplate.parse(obj.toString())
+        val canonical = old.toJson()
+        assertEquals(0, old.choice(AudioOutputRole.PHONE))
+        assertFalse(JSONObject(canonical).getJSONObject("choices").has("phone"))
+        assertEquals(canonical, AudioRoutingTemplate.parse(canonical).toJson())
+        for (choice in AudioOutputPolicy.choices) {
+            val edited = AudioRoutingTemplate.parse(old.withChoice(AudioOutputRole.PHONE, choice).toJson())
+            assertEquals(choice, edited.choice(AudioOutputRole.PHONE))
+            assertEquals(old.choice(AudioOutputRole.MEDIA), edited.choice(AudioOutputRole.MEDIA))
+        }
     }
 
     @Test fun rejectsPrivateAddressesAndInputGuesses() {

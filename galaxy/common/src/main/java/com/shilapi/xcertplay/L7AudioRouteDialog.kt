@@ -21,22 +21,31 @@ internal object L7AudioRouteDialog {
         fun add(view: android.view.View) = body.addView(view,
             LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = L7Components.dp(context, 12) })
         add(L7Components.text(context, context.getString(R.string.l7_audio_route_help), secondary = true))
+        if (role == AudioOutputRole.PHONE)
+            add(L7Components.note(context, context.getString(R.string.l7_audio_test_phone_hint)))
         val status = L7Components.text(context, context.getString(R.string.l7_audio_test_ready), secondary = true)
         val stop = L7Components.actionButton(context, context.getString(R.string.l7_audio_test_stop)) {}
+        val heard = L7Components.actionButton(context, context.getString(R.string.l7_audio_test_heard)) {}
+        val unheard = L7Components.actionButton(context, context.getString(R.string.l7_audio_test_unheard)) {}
+        fun allowResult(enabled: Boolean) { heard.isEnabled = enabled; unheard.isEnabled = enabled }
+        allowResult(false)
         val preview = GalaxyAudioChannelPreview(
             onUnavailable = {
-                status.text = context.getString(R.string.contrib_audio_home_channel_preview_unavailable, it)
+                status.text = context.getString(R.string.l7_audio_test_unavailable, L7AudioSettings.label(context, it))
                 stop.isEnabled = false
+                allowResult(false)
             },
             context = context,
             onResult = { _, type ->
                 status.text = context.getString(R.string.l7_audio_test_sent, deviceLabel(context, type))
                 stop.isEnabled = false
+                allowResult(true)
             },
         )
         lateinit var route: L7SettingRow
         route = L7Components.valueRow(context, context.getString(R.string.l7_audio_route_select), L7AudioSettings.label(context, pending)) {
             preview.stop()
+            allowResult(false)
             stop.isEnabled = false
             status.setText(R.string.l7_audio_test_stopped)
             selector = L7Components.select(context, context.getString(R.string.l7_audio_route_select),
@@ -51,22 +60,42 @@ internal object L7AudioRouteDialog {
         add(L7Components.actionButton(context, context.getString(R.string.l7_audio_test_play), primary = true) {
             status.text = context.getString(R.string.l7_audio_test_playing, L7AudioSettings.label(context, pending))
             stop.isEnabled = true
+            allowResult(false)
             preview.play(pending, role)
         })
         stop.isEnabled = false
-        stop.setOnClickListener {
+        fun stopPreview() {
             preview.stop()
             stop.isEnabled = false
+            allowResult(false)
             status.setText(R.string.l7_audio_test_stopped)
         }
+        stop.setOnClickListener { stopPreview() }
         add(stop)
         add(status)
+        val results = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        results.addView(heard, LinearLayout.LayoutParams(0, -2, 1f))
+        results.addView(unheard, LinearLayout.LayoutParams(0, -2, 1f).apply {
+            marginStart = L7Components.dp(context, 12)
+        })
+        add(results)
+        fun recordResult(audible: Boolean) {
+            if (!heard.isEnabled) return
+            allowResult(false)
+            L7DebugLog.record("Audio preview feedback id=${preview.evidenceId} role=$role choice=$pending heard=$audible")
+            status.text = context.getString(R.string.l7_audio_test_recorded,
+                context.getString(if (audible) R.string.l7_audio_test_heard else R.string.l7_audio_test_unheard))
+        }
+        heard.setOnClickListener { recordResult(true) }
+        unheard.setOnClickListener { recordResult(false) }
+        val applyLabel = if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.l7_save_next_connection
         dialog = L7Dialogs.builder(context).setTitle(title).setView(body)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.l7_save_next_connection) { _, _ ->
+            .setPositiveButton(applyLabel) { _, _ ->
                 if (pending != current && !committed) { committed = true; onApply(pending) }
             }.create()
-        dialog.setOnDismissListener { selector?.dismiss(); preview.close() }
+        val lifecycle = GalaxyAudioPreviewLifecycle(context, ::stopPreview, { dialog.dismiss() })
+        dialog.setOnDismissListener { selector?.dismiss(); preview.close(); lifecycle.close() }
         dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false }
         dialog.show()
         return dialog
