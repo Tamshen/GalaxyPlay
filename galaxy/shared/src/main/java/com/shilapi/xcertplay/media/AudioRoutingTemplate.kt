@@ -11,7 +11,8 @@ class AudioRoutingTemplate private constructor(
     private val buses: Map<String, String>,
     private val focusGains: Map<String, Int> = emptyMap(),
 ) {
-    fun choice(role: AudioOutputRole): Int = choices.getValue(role.name.lowercase())
+    // 旧三用途文件保持原样序列化，避免历史日志配置的证据摘要改变。
+    fun choice(role: AudioOutputRole): Int = choices[role.name.lowercase()] ?: AudioOutputPolicy.BUILTIN
 
     internal fun bus(channel: AudioChannel, input: Boolean): String? =
         if (input) null else buses[channel.name.lowercase()]
@@ -44,7 +45,7 @@ class AudioRoutingTemplate private constructor(
         private val busPattern = Regex("(?i)bus[a-z0-9_]{1,95}")
 
         fun system(): AudioRoutingTemplate = AudioRoutingTemplate("L7", false,
-            mapOf("media" to 101, "navigation" to 103, "assistant" to 102), emptyMap())
+            mapOf("media" to 101, "navigation" to 103, "assistant" to 102, "phone" to 104), emptyMap())
 
         fun parse(json: String): AudioRoutingTemplate {
             require(json.toByteArray(Charsets.UTF_8).size <= MAX_BYTES)
@@ -58,8 +59,8 @@ class AudioRoutingTemplate private constructor(
             require(name.isNotBlank() && name.length <= 64 && name.none { it.isISOControl() })
             val enabled = obj.get("preferBus") as? Boolean ?: error("BUS 开关必须是布尔值")
             val rawChoices = obj.getJSONObject("choices")
-            require(keys(rawChoices) == roles)
-            val choices = roles.associateWith { role ->
+            require(keys(rawChoices).containsAll(roles) && keys(rawChoices).all { it in roles || it == "phone" })
+            val choices = keys(rawChoices).associateWith { role ->
                 val value = rawChoices.get(role)
                 require(value is Int && AudioOutputPolicy.valid(value))
                 value as Int

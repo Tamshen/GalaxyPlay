@@ -110,7 +110,7 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 在中文、已同意协议且未连接手机的 AVD 覆盖安装后运行 `python3 e2e/device/debug_probe_smoke.py`。检查设置首页「调试」入口、关于无重复入口和旧路由、Header/系统多级返回、显式扫描、全量紧凑表格、状态筛选、重新收集重置筛选、逐项日志落盘与两批保留、单项复查、历史列表、本地 JSON 实际写入及日志入口保留；同时核对三项上报专项结果位于顶部、系统媒体显示待验提示和专项权限日志，不点击上传。会新增模拟器检查报告和 Downloads/GalaxyPlay 导出文件，不清除既有报告；截图及检查结果保留在忽略目录 `build/previews/debug-probe/`。追加英文表格昼夜检查后恢复中文和原昼夜模式；界面排版仍需目视检查。
 
-`L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 隐藏细节、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
+`L7FactoryAudioProfileTest` 检查固件 usage 优先、模板错误回退和有线/无线输入源隔离；`TelephonyMicrophoneTest` 同时验证厂商输入源拒绝后标准源回退及音效释放。中文 AVD 运行 `python3 e2e/device/audio_profile_smoke.py`，检查 L7／L7 BUS 四用途可达、自定义文件编辑／导入导出选择器取消与导航 usage 12 试听，结束恢复原方案；不连接手机、不上传，截图留在忽略目录。
 
 `L7VehicleSettingsTest` 核对独立车型页的确认／取消、识别复查与未知结果回退；`L7AudioSettingsTest` 核对音频页不再包含车型选择、L6 方案恢复和自定义保留。`L7AudioModelDetectionTest` 在 API 29／30 核对 g636／g733、完整标识／大小写、未知／冲突、二次确认、保留当前车型、重复恢复和旧回调失效；`L6AudioTemplatesTest` 核对车型文件与方案隔离、旧 L7 迁移、损坏回退和备份恢复。已同意协议的 AVD 运行 `python3 e2e/device/l6_audio_model_smoke.py`，检查中英文设置首页首项、独立车型页及返回、车型选择／取消、昼夜、自定义编辑取消及切换保留，结束恢复原偏好、两份模板和昼夜；不连接手机或上传。模拟器没有车型标识时只验证手动路径，自动识别结果不冒充实车通过。
 
@@ -271,13 +271,13 @@ python3 e2e/device/flyme_ui_smoke.py \
 
 仅检查分类层级时追加 `--navigation-only`，覆盖分类尾部不显示「进入」文字、首页无返回按钮、十类导航及设置首页的「调试」和「日志」入口、子页 Header 返回、重选设置侧栏回首页、离开后恢复子页，并核对全屏、音频声道、自动连接、认证来源、连接配置、诊断日志及使用协议入口可达；入口识别同时支持文字与无障碍名称。只查看认证来源后取消，不打开含已保存令牌的远程配置；保存昼夜与大字截图供人工检阅，并在 1.5 倍字体下检查 Siri 长路由值换到名称下方、左侧对齐和完整可见（场景要求该项为内置推荐长名称）。
 
-仅检查声道交互时追加 `--audio-only`：临时切换为 L7 自定义模式，检查媒体/语音助手/导航两秒试听、立即停止、输出路由选择与保存分离、主题切换保留状态和取消恢复。原方案偏好与 L7 自定义文件／备份只在内存暂存，结束逐字节恢复；不保存路由参数，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。内置方案按产品设计隐藏逐用途编辑，不能把隐藏项当入口缺失。
+仅检查声道交互时追加 `--audio-only`：临时切换为 L7 自定义模式，检查媒体/语音助手/导航/电话两秒试听、立即停止、输出路由选择与保存分离、主题切换保留状态和取消恢复。原方案偏好与 L7 自定义文件／备份只在内存暂存，结束逐字节恢复；不保存路由参数，不以 AVD 的 PCM 写入或输出设备报告作为实车听感验收。0.1.109 起四种用途在所有方案下都可编辑，车型页回归使用 configuration_profiles_smoke.py，覆盖应用设置授权入口、四种路由弹窗以及电话试听、听感记录、草稿确认、车型保存后读回；点击搜索的滑动按真实 ScrollView 边界计算，避免较大界面尺寸下碰到固定操作区。 本项可运行 `python3 e2e/device/configuration_profiles_smoke.py --adb ../tools/scripts/adb.sh --audio-auth-only --language zh`，英文使用 `--language en`；两者覆盖 320 DPI 下的四用途模态框，电话使用合成音检查调用与结果记录，取消／草稿不写文件，保存后读回并标为自定义，同时保留实际 L6 参数与独立应用偏好。原配置、上一备份、应用偏好与音频兼容文件只在内存暂存，结束恢复；不连接手机或上传。
 
-[MediaCodecSupportTest.kt](shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt) 覆盖 hvcC、混合起始码 Annex B、参数集缺失/类型错误/截断拒绝；字节夹具只检查封装，不验证实际 HEVC 硬件解码。[VideoStartupWatchdogTest.kt](shared/test/java/com/shilapi/xcertplay/media/VideoStartupWatchdogTest.kt) 检查无输入/帧不足不误报、超时只报一次、区分输出与呈现，以及 reset 后等待新输入。[L7AudioRouteDialogTest.kt](common/test/java/com/shilapi/xcertplay/L7AudioRouteDialogTest.kt) 检查内层选流不保存、外层取消恢复、外层确认只提交一次。模态框回归同时检查自定义内容中的主按钮主题和可用状态。
+[MediaCodecSupportTest.kt](shared/test/java/com/shilapi/xcertplay/media/MediaCodecSupportTest.kt) 覆盖 hvcC、混合起始码 Annex B、参数集缺失/类型错误/截断拒绝；字节夹具只检查封装，不验证实际 HEVC 硬件解码。[VideoStartupWatchdogTest.kt](shared/test/java/com/shilapi/xcertplay/media/VideoStartupWatchdogTest.kt) 检查无输入/帧不足不误报、超时只报一次、区分输出与呈现，以及 reset 后等待新输入。[L7AudioRouteDialogTest.kt](common/test/java/com/shilapi/xcertplay/L7AudioRouteDialogTest.kt) 检查内层选流不保存、外层取消恢复、外层确认只提交一次、电话弹窗仅更新车型草稿以及后台停止。PhoneOutputRoutingTest 在 API 29/30 验证真实 renderer 读取电话模板选择、标准与原厂适配分支输出属性及通话资源启动／释放；AudioRoutingTemplateTest 验证旧三用途 JSON 保持证据序列化。模态框回归同时检查自定义内容中的主按钮主题和可用状态。
 
 筛选测试后必须核对 XML 中确有该类；多个 `--tests` 条件只要有其他匹配项，整体成功也可能掩盖某一类未被发现。若已有增量编译产物缺类，针对 `:shared:compileDebugUnitTestKotlin --rerun` 重新编译，再用单个类过滤验证；不要将“没有发现测试”记为通过。
 
-[AudioOutputPolicyTest.kt](shared/test/java/com/shilapi/xcertplay/media/AudioOutputPolicyTest.kt) 检查内置三用途、覆盖后的路由用途与协议角色/优先级分离、电话保持独立以及旧传统流编号不与新预设冲突。[L7AudioPreferencesTest.kt](common/test/java/com/shilapi/xcertplay/L7AudioPreferencesTest.kt) 检查旧值保留、助手独立保存、恢复默认、预设保存与无效值回退。`--audio-only` 同时查看三用途入口，临时选择其他用途后试听并取消，不保存音频参数。
+[AudioOutputPolicyTest.kt](shared/test/java/com/shilapi/xcertplay/media/AudioOutputPolicyTest.kt) 检查内置四用途、覆盖后的路由用途与协议角色/优先级分离、电话可调整且铃声保持独立以及旧传统流编号不与新预设冲突。[L7AudioPreferencesTest.kt](common/test/java/com/shilapi/xcertplay/L7AudioPreferencesTest.kt) 检查旧值保留、助手独立保存、恢复默认、预设保存与无效值回退。`--audio-only` 同时查看四用途入口，临时选择其他用途后试听并取消，不保存音频参数。
 
 仅检查连接等待页时追加 `--connection-only`：从模拟器无会话冷启动，检查 USB 等待页的昼夜与 1.5 倍字体、返回保留服务，以及在原等待页取消后释放服务；不接入真实 USB 设备，不替代有线 CarPlay 验收。此模式会先强制结束模拟器上的应用，以排除预览启动时的自动连接，结束时恢复字号和主题。
 

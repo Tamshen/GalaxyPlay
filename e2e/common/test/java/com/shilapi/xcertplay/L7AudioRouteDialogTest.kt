@@ -84,4 +84,39 @@ class L7AudioRouteDialogTest {
         assertFalse(dialog.isShowing)
     }
 
+    @Test fun phoneConfirmationUpdatesOnlyVehicleDraftAndPausingStopsPreview() {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        val activity = controller.get().apply { setTheme(android.R.style.Theme_Material_Light_NoActionBar) }
+        val repository = GalaxyProfiles(activity)
+        val original = repository.applyTemplate("l7")
+        val context = GalaxyConfigurationContext(activity, original, editable = true)
+        val dialog = L7AudioRouteDialog.show(context, activity.getString(R.string.l7_audio_phone),
+            L7AudioTemplates.load(context).choice(AudioOutputRole.PHONE), AudioOutputRole.PHONE) {
+            L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(AudioOutputRole.PHONE, it))
+        }
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(context.getString(R.string.profile_update_draft),
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).text.toString())
+        assertNotNull(find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_phone_hint)))
+        assertFalse(find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_heard))!!.isEnabled)
+        find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_heard))!!.performClick()
+        assertNotNull(find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_ready)))
+        find(dialog.window!!.decorView, context.getString(R.string.l7_audio_route_select))!!.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val selector = ShadowAlertDialog.getLatestAlertDialog()
+        val index = AudioOutputPolicy.choices.indexOf(AudioOutputPolicy.MEDIA)
+        selector.listView.performItemClick(selector.listView.adapter.getView(index, null, selector.listView), index, index.toLong())
+        selector.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        controller.pause()
+        assertNotNull(find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_stopped)))
+        assertFalse(find(dialog.window!!.decorView, context.getString(R.string.l7_audio_test_stop))!!.isEnabled)
+        controller.resume()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(101, L7AudioTemplates.load(context).choice(AudioOutputRole.PHONE))
+        assertEquals(original, repository.refresh())
+        val saved = repository.save(original.copy(configuration = context.configuration()))
+        assertEquals("custom", saved.templateId)
+        assertEquals(101, L7AudioTemplates.load(GalaxyConfigurationContext(activity, saved)).choice(AudioOutputRole.PHONE))
+    }
 }

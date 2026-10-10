@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AVD 检查内置方案隐藏细节、自定义模板展开及试听取消；结束恢复原方案，不连接手机。"""
+"""AVD 检查内置方案四用途可达、自定义文件工具及试听取消；结束恢复原方案，不连接手机。"""
 import argparse
 from pathlib import Path
 import re
@@ -78,9 +78,13 @@ try:
     for label, screenshot in zip(profiles[:2], ('l7-settings.png', 'l7-bus-settings.png')):
         select(label)
         visible = texts()
-        for detail in ('媒体音乐', '导航播报', '语音助手（Siri）', '编辑配置文件', '尝试 L7 BUS 路由', '通话 · usage 2'):
+        for detail in ('编辑配置文件', '尝试 BUS 路由'):
             assert detail not in visible, label + ' 显示了调试细节：' + detail
         (output/screenshot).write_bytes(adb('exec-out', 'screencap', '-p'))
+        for role in ('媒体音乐', '导航播报', '语音助手（Siri）', '电话'):
+            tap(role)
+            assert '试听此声道（2 秒）' in texts(), role + ' 没有试听入口'
+            tap('取消')
     select('自定义模板')
     assert '编辑配置文件' in texts()
     (output/'custom-settings.png').write_bytes(adb('exec-out', 'screencap', '-p'))
@@ -112,7 +116,7 @@ try:
         adb('shell', 'input', 'keyevent', '4')
         assert adb('exec-out', 'run-as', package, 'cat', 'files/audio-template.json') == custom_before
 
-    print('AVD 通过：L7／L7 BUS 隐藏细节、自定义编辑／文件选择器取消与导航试听，原文件不变；不代表实车发声。')
+    print('AVD 通过：L7／L7 BUS 四用途可达、自定义编辑／文件选择器取消与导航试听，原文件不变；不代表实车发声。')
 finally:
     adb('shell', 'input', 'keyevent', '4')
     adb('shell', 'am', 'start', '-W', '-n', package+'/com.shilapi.xcertplay.GalaxySettingsActivity', '--es', 'page', 'settings-audio')

@@ -283,6 +283,19 @@ class GalaxyConfigurationPageTest {
         assertEquals(280, L7UiDensity.value(activity))
         assertFalse(GalaxyProfiles(activity).active().configuration.preferences.getValue("l7_ui").containsKey("density"))
     }
+    @Test fun applicationPageOpensAuthenticationWithoutChangingVehicleConfiguration() {
+        val activity = activity()
+        val before = GalaxyProfiles(activity).active()
+        val parent = android.widget.LinearLayout(activity)
+        var opened = 0
+        GalaxyApplicationSettingsPage.add(activity, parent) { opened++ }
+        descendants(parent).filterIsInstance<L7SettingRow>().single {
+            it.titleView.text.toString() == activity.getString(R.string.l7_auth_title)
+        }.performClick()
+        assertEquals(1, opened)
+        assertEquals(before, GalaxyProfiles(activity).refresh())
+    }
+
     @Test fun iconSizeIsOnlyInApplicationSettingsAndExactPercentNeverEditsVehicle() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)

@@ -11,12 +11,15 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30], manifest = Config.NONE)
 class L7FactoryAudioProfileTest {
-    @Test fun standardUsageChoicesAndCallsIgnoreVendorRemapping() {
+    @Test fun standardChoicesAndDefaultCallsIgnoreVendorRemapping() {
         val profile = L7FactoryAudioProfile(null) { _, _ -> 4 }
         assertEquals(1, profile.attributes(AudioOutputRole.MEDIA, AudioOutputPolicy.MEDIA).usage)
         assertEquals(12, profile.attributes(AudioOutputRole.NAVIGATION, AudioOutputPolicy.NAVIGATION).usage)
         assertEquals(16, profile.attributes(AudioOutputRole.ASSISTANT, AudioOutputPolicy.ASSISTANT).usage)
         assertEquals(2, profile.attributes(AudioChannel.PHONE, AudioAttributes.CONTENT_TYPE_SPEECH, 0).usage)
+        assertEquals(1, profile.attributes(AudioOutputRole.PHONE, AudioOutputPolicy.MEDIA).usage)
+        assertEquals(12, profile.attributes(AudioOutputRole.PHONE, AudioOutputPolicy.NAVIGATION).usage)
+        assertEquals(2, profile.attributes(AudioOutputRole.PHONE, AudioOutputPolicy.PHONE).usage)
         assertEquals(4, profile.attributes(AudioOutputRole.NAVIGATION, 0).usage)
     }
     @Test fun mediaTemplateCannotCollapseSpeechOrNavigationIntoMusic() {

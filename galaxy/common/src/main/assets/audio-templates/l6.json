@@ -5,7 +5,8 @@
   "choices": {
     "media": 101,
     "navigation": 103,
-    "assistant": 102
+    "assistant": 102,
+    "phone": 104
   },
   "outputBuses": {},
   "focusGains": {

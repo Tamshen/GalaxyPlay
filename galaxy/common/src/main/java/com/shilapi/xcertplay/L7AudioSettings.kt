@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AudioOutputPolicy
 import com.shilapi.xcertplay.media.AudioOutputRole
 
-/** 内置方案只显示日常设置；自定义方案才展开配置文件与三用途调试。 */
+/** 四种用途都可调整和试听；确认路由后才派生自定义音频方案。 */
 internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
              onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null,
@@ -60,13 +60,12 @@ internal object L7AudioSettings {
             })
         }
         L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
-        if (custom) L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
+        L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
             description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
-            add(context, card, custom = true, open = open)
-            card.addView(L7SettingRow(context, text(R.string.l7_audio_phone), text(R.string.l7_audio_phone_note)).apply {
-                setValue(text(R.string.l7_audio_phone_usage))
+            add(context, card, custom = true, open = { title, current, role, apply ->
+                open(title, current, role) { value -> apply(value); refresh() }
             })
-            card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
+            if (custom) card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
                 text(R.string.l7_template_bus_custom_note), L7AudioTemplates.load(context).preferBus) {
                 change(context) {
                     L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withBusEnabled(it))
@@ -104,11 +103,12 @@ internal object L7AudioSettings {
 
     fun add(context: Context, parent: LinearLayout,
             custom: Boolean = false, open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
-        listOf(AudioOutputRole.MEDIA, AudioOutputRole.NAVIGATION, AudioOutputRole.ASSISTANT).forEach { role ->
+        listOf(AudioOutputRole.MEDIA, AudioOutputRole.NAVIGATION, AudioOutputRole.ASSISTANT, AudioOutputRole.PHONE).forEach { role ->
             val title = context.getString(when (role) {
                 AudioOutputRole.MEDIA -> R.string.l7_audio_media
                 AudioOutputRole.ASSISTANT -> R.string.l7_audio_assistant
                 AudioOutputRole.NAVIGATION -> R.string.l7_audio_navigation
+                AudioOutputRole.PHONE -> R.string.l7_audio_phone
             })
             lateinit var row: L7SettingRow
             row = L7Components.valueRow(context, title, label(context, load(context, role, custom))) {
@@ -132,6 +132,7 @@ internal object L7AudioSettings {
         AudioOutputRole.MEDIA -> AirPlayPersistence.loadMediaAudioChannel(context)
         AudioOutputRole.ASSISTANT -> AirPlayPersistence.loadAssistantAudioChannel(context)
         AudioOutputRole.NAVIGATION -> AirPlayPersistence.loadNavigationAudioChannel(context)
+        AudioOutputRole.PHONE -> L7AudioTemplates.load(context).choice(role)
     }
 
     private fun change(context: Context, action: () -> Unit) {
@@ -143,5 +144,6 @@ internal object L7AudioSettings {
         AudioOutputRole.MEDIA -> AirPlayPersistence.saveMediaAudioChannel(context, value)
         AudioOutputRole.ASSISTANT -> AirPlayPersistence.saveAssistantAudioChannel(context, value)
         AudioOutputRole.NAVIGATION -> AirPlayPersistence.saveNavigationAudioChannel(context, value)
+        AudioOutputRole.PHONE -> L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(role, value))
     }
 }
