@@ -18,6 +18,31 @@ class CarPlayNavigationInputTest {
         assertEquals(CarPlayNavigationSnapshot(true, "中文路名"), input.snapshot())
         assertNull(input.accept(Iap2Frame(0x5001, byteArrayOf())))
     }
+
+    @Test fun activeRoadReportsWithoutAnyManeuverDetailAndStopsOnArrival() {
+        input.accept(Iap2Frame(0x5201, tlv(1, 1) + tlv(3, "当前路名\u0000".toByteArray())))
+        assertEquals(CarPlayNavigationSnapshot(true, "当前路名"), input.snapshot())
+        input.accept(Iap2Frame(0x5201, tlv(1, 2)))
+        assertFalse(input.snapshot().active)
+    }
+
+    @Test fun activeRouteWithoutRoadStillReportsStartAndMalformedUpdateDoesNotRefreshExpiry() {
+        input.accept(Iap2Frame(0x5201, tlv(1, 1)))
+        assertEquals(CarPlayNavigationSnapshot(true, null), input.snapshot())
+        time = 30_000_000_000L
+        input.accept(Iap2Frame(0x5201, byteArrayOf(0, 8, 0, 1, 1)))
+        assertFalse(input.snapshot().active)
+    }
+
+    @Test fun diagnosticsDistinguishNoRouteAndMissingManeuverWithoutExposingRoadOrPayload() {
+        val logs = mutableListOf<String>()
+        val observed = CarPlayNavigationInput(report = logs::add)
+        observed.accept(Iap2Frame(0x5201, tlv(1, 0)))
+        observed.accept(Iap2Frame(0x5201, tlv(1, 1) + tlv(3, "隐私路名\u0000".toByteArray())))
+        assertTrue(logs.any { "routeState=0" in it })
+        assertTrue(logs.any { "routeState=1 roadField=true maneuverList=false" in it })
+        assertFalse(logs.joinToString().contains("隐私路名"))
+    }
     @Test fun arrivedAndDisconnectClearOldRouteEvenIfOnlyKeepaliveArrives() {
         active(); input.accept(Iap2Frame(0x5201, tlv(1, 2)))
         assertFalse(input.snapshot().active)

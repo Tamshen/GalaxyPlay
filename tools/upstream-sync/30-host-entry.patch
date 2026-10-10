@@ -3751,13 +3751,16 @@
          recordDetectedMaximum(size)
          updateResolutionMenu()
          if (previous == null) {
-@@ -4361,13 +3621,12 @@
+@@ -4360,14 +3620,14 @@
+             )
              maybeStartCarPlay()
          } else if (display != null && !layoutChanged &&
-             size.width <= display.windowWidth && size.height <= display.windowHeight) {
+-            size.width <= display.windowWidth && size.height <= display.windowHeight) {
 -            // Keep camera shrink/restore cycles within the original window connected. If the
 -            // session started in a camera window, growth beyond it needs a full-size canvas.
-+            // 原窗口范围内的缩小与恢复只调整显示；超过启动窗口时才重新协商画布。
++            (resources.getBoolean(R.bool.config_l7_product_ui) ||
++                size.width <= display.windowWidth && size.height <= display.windowHeight)) {
++            // Flyme 前后台切换会临时扩窗；产品画布已独立协商，只调整视口，不重建连接。
              val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
                  "keeping CarPlay session canvas=${display.width}x${display.height}"
              appendLog(message)
@@ -3767,7 +3770,7 @@
          } else {
              restartCarPlay(
                  "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}",
-@@ -4375,123 +3634,18 @@
+@@ -4375,123 +3635,18 @@
          }
      }
  
@@ -3896,7 +3899,7 @@
      }
  
      private fun recordDetectedMaximum(size: DisplaySize) {
-@@ -4504,22 +3658,13 @@
+@@ -4504,22 +3659,13 @@
      }
  
      private fun maybeStartCarPlay() {
@@ -3921,7 +3924,7 @@
          val transportReady = if (wirelessEnabled) wirelessPermissionsReady else vpnReady
          val locationReady = !locationReportingEnabled || locationPermissionAvailable
          if (
-@@ -4532,46 +3677,62 @@
+@@ -4532,46 +3678,62 @@
              pendingDisplaySize != null ||
              controller != null
          ) {
@@ -4003,7 +4006,7 @@
                  ) {
                      return@postDelayed
                  }
-@@ -4586,40 +3747,40 @@
+@@ -4586,40 +3748,40 @@
          if (!CarPlayBackgroundSession.isOwner(this)) return
          if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
          val size = activeDisplaySize ?: return
@@ -4061,7 +4064,7 @@
                      maybeStartCarPlay()
                  }
              }
-@@ -4627,71 +3788,12 @@
+@@ -4627,71 +3789,12 @@
      }
  
      private fun showDiPlayHome(page: String = "home") {
@@ -4136,7 +4139,7 @@
  
      private fun saveSettingsAndReconnect() {
          if (!menuOpen) return
-@@ -4699,46 +3801,31 @@
+@@ -4699,46 +3802,31 @@
          if (!validateManualHotspotSettings()) return
          persistMenuSettings()
          settingsBaseline = null
@@ -4191,7 +4194,7 @@
          } else {
              maybeStartCarPlay()
          }
-@@ -4752,24 +3839,30 @@
+@@ -4752,24 +3840,30 @@
      }
  
      private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
@@ -4227,7 +4230,7 @@
              airPlayCommandExecutor.shutdown()
              if (terminateProcess) {
                  applicationContext.stopService(Intent(applicationContext, CarPlayVpnService::class.java))
-@@ -4782,76 +3875,140 @@
+@@ -4782,76 +3876,140 @@
          }
      }
  
@@ -4423,7 +4426,7 @@
          }
      }
  
-@@ -4864,23 +4021,20 @@
+@@ -4864,23 +4022,20 @@
                  gestureTracking = false
              }
              MotionEvent.ACTION_POINTER_DOWN -> {
@@ -4451,7 +4454,7 @@
                  if (event.actionMasked == MotionEvent.ACTION_UP ||
                      event.actionMasked == MotionEvent.ACTION_CANCEL
                  ) {
-@@ -4895,8 +4049,8 @@
+@@ -4895,8 +4050,8 @@
                  val deltaX = Math.abs(pointerCentroid(event, horizontal = true) - gestureStartX)
                  val deltaY = pointerCentroid(event, horizontal = false) - gestureStartY
                  if (
@@ -4462,7 +4465,7 @@
                  ) {
                      gestureSequenceActive = false
                      gestureTracking = false
-@@ -4907,18 +4061,8 @@
+@@ -4907,18 +4062,8 @@
              return true
          }
  
@@ -4483,7 +4486,7 @@
          val queued = controller?.sendTouch(contacts) ?: false
          when (event.actionMasked) {
              MotionEvent.ACTION_DOWN,
-@@ -4954,14 +4098,6 @@
+@@ -4954,14 +4099,6 @@
                  Log.i(ClusterMapPresentation.TAG, "cluster stream active=$active")
                  appendLog("Cluster map: stream active=$active")
                  clusterPresentation?.setStreamActive(active)
@@ -4498,7 +4501,7 @@
              }
              updateDebugOverlays()
          }
-@@ -4976,7 +4112,7 @@
+@@ -4976,7 +4113,7 @@
  
      private fun setConnectionStage(message: String) {
          latestStage = message
@@ -4507,7 +4510,7 @@
          updateDebugOverlays()
      }
  
-@@ -4986,8 +4122,6 @@
+@@ -4986,8 +4123,6 @@
      }
  
      private fun friendlyStage(message: String): String = when {
@@ -4516,7 +4519,7 @@
          message.contains("Turn on Wi-Fi", true) -> getString(R.string.turn_on_wi_fi_in_the_head_unit_s_settings_to_connect)
          message.contains("Allow precise Location", true) -> getString(R.string.allow_precise_location_for_diplay_in_the_head_unit_s_app_p)
          message.contains("Allow Nearby devices", true) -> getString(R.string.allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per)
-@@ -5007,11 +4141,15 @@
+@@ -5007,11 +4142,15 @@
  
      private fun appendLog(message: String) {
          val safe = DiagnosticRedactor.redact(message) ?: return
@@ -4534,7 +4537,7 @@
      }
  
      private fun formattedLogLine(message: String, nowMillis: Long): String =
-@@ -5053,9 +4191,8 @@
+@@ -5053,9 +4192,8 @@
      }
  
      private fun applyFullscreenMode() {
@@ -4546,7 +4549,7 @@
          WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
          val controller = WindowInsetsControllerCompat(window, window.decorView)
          if (hideTop) {
-@@ -5072,23 +4209,21 @@
+@@ -5072,23 +4210,21 @@
              WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
      }
  
@@ -4575,7 +4578,7 @@
          CarPlayStatus.DiscoveringIphone -> getString(R.string.discovering_iphone)
          CarPlayStatus.WaitingForIphone -> getString(R.string.waiting_for_iphone_over_usb)
          CarPlayStatus.RequestingIphonePermission -> getString(R.string.requesting_iphone_usb_permission)
-@@ -5101,36 +4236,32 @@
+@@ -5101,36 +4237,33 @@
              if (wirelessEnabled) getString(R.string.starting_airplay_service) else getString(R.string.status_attaching_ncm)
          CarPlayStatus.RunningControl -> getString(R.string.carplay_control_running)
          CarPlayStatus.ControlEnded -> getString(R.string.carplay_control_window_ended)
@@ -4603,7 +4606,9 @@
 -        const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L
          const val RECONNECT_DELAY_MILLIS = 2_000L
          const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
-         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
+-        const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
++        // 多地址 Bonjour 退出及控制器释放可超过四秒；只在后台线程有限等待。
++        const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 12_000L
          const val AUDIO_CAPTURE_MARKER = "audio-capture.enabled"
          const val AUDIO_CAPTURE_DIRECTORY = "audio-captures"
          const val PROTOCOL_TRACE_PREFIX = "TRACE "
@@ -4623,7 +4628,7 @@
          val NO_VIDEO_BACKGROUND = Color.rgb(0x16, 0x16, 0x18)
      }
  
-@@ -5145,89 +4276,4 @@
+@@ -5145,89 +4278,4 @@
      )
  }
  

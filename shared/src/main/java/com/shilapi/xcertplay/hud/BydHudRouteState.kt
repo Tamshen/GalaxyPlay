@@ -81,6 +81,14 @@ internal class BydHudRouteState(
         )
     }
 
+    /** 原厂仅上报启停与路名时，不要求手机同时提供转向详情。 */
+    fun currentRouteRoad(): String? {
+        if (!routeActive) return null
+        val updated = lastRouteUpdateNs ?: return null
+        if (nanoTime() - updated >= staleRouteNs) return null
+        return activeManeuver()?.let(::roadFor) ?: currentRoad
+    }
+
     fun clear(): Boolean {
         val wasActive = routeActive
         routeActive = false

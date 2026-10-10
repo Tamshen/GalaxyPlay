@@ -8133,6 +8133,23 @@
              println("text=${if (text.size > ClusterSongState.MAX_TEXT_BYTES) "ERR too long" else setInfo.invoke(device, DEVICE, TEXT, text)}")
          }
      }
+--- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydHudRouteState.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydHudRouteState.kt
+@@ -79,6 +79,14 @@
+             distanceMeters, maneuver.type, maneuver.drivingSide,
+             roadFor(maneuver), remainingSeconds, remainingMeters, arrivalEpochSeconds,
+         )
++    }
++
++    /** 原厂仅上报启停与路名时，不要求手机同时提供转向详情。 */
++    fun currentRouteRoad(): String? {
++        if (!routeActive) return null
++        val updated = lastRouteUpdateNs ?: return null
++        if (nanoTime() - updated >= staleRouteNs) return null
++        return activeManeuver()?.let(::roadFor) ?: currentRoad
+     }
+ 
+     fun clear(): Boolean {
 --- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydNavigationOutputs.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydNavigationOutputs.kt
 @@ -2,11 +2,13 @@

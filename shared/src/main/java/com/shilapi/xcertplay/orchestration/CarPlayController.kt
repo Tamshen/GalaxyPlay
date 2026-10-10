@@ -316,6 +316,7 @@ class CarPlayController(
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
+            if (closed) return
             val replacement = activeSession !== session
             if (replacement) {
                 if (activeSession != null) {
@@ -332,7 +333,8 @@ class CarPlayController(
             }
             activeSession = session
             sessionStateListener?.invoke(true)
-            if (config.transport == CarPlayTransport.WIRED) audioConnectionListener?.invoke(true)
+            // A2DP 与 RFCOMM 控制属于不同 profile；媒体互斥不依赖可选 iAP2 隧道交接。
+            audioConnectionListener?.invoke(true)
             if (replacement) restoreDashboardContent(session)
             debugLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
@@ -1397,6 +1399,10 @@ class CarPlayController(
             startedBonjour = bonjourClient
             diagnostics.start()
             debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
+            // 能力与广播存活分开留证，不输出名称、设备标识或配对材料。
+            debugLog("AirPlayDiscovery: publication=ACTIVE " +
+                "features=${com.shilapi.xcertplay.airplay.AirPlayInfoPlist.features(advertisedAirPlayConfig)} " +
+                "audioOutput=${!advertisedAirPlayConfig.disableAudioOutput} ${bonjourClient.diagnosticSnapshot()}")
             if (isStaleWirelessRun(generation)) {
                 return
             }
@@ -2507,7 +2513,10 @@ class CarPlayController(
 
             val activeBonjour = bonjour
             bonjour = null
-            if (activeBonjour != null) closeBestEffort("Bonjour") { activeBonjour.close() }
+            if (activeBonjour != null) closeBestEffort("Bonjour") {
+                activeBonjour.close()
+                debugLog("AirPlayDiscovery: publication=WITHDRAWN ${activeBonjour.diagnosticSnapshot()}")
+            }
 
             val activeHotspot = hotspot
             hotspot = null
