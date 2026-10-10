@@ -22,6 +22,34 @@ class GalaxyProfilesTest {
         GalaxyConfigurationFields.names.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() }
         L7AudioTemplates.Model.entries.forEach { AtomicFile(File(app.filesDir, GalaxyConfigurationFields.audioFile(it.id))).delete() }
     }
+    @Test fun originalL7ConfigurationKeepsItsFocusUntilTemplateIsExplicitlyApplied() {
+        val old = repository.active()
+        val before = L7AudioTemplates.load(GalaxyConfigurationContext(app, old)).toJson()
+        assertFalse(org.json.JSONObject(before).has("focusGains"))
+        repository.restore()
+        assertEquals(before, L7AudioTemplates.load(app).toJson())
+        val frozen = GalaxyConfigurationContext(app, old, runtimeOnly = true)
+        val applied = repository.applyTemplate("l7")
+        val native = org.json.JSONObject(L7AudioTemplates.load(app).toJson()).getJSONObject("focusGains")
+        assertEquals(3, native.getInt("navigation")); assertEquals(3, native.getInt("ringtone"))
+        assertEquals(2, native.getInt("assistant")); assertEquals(1, native.getInt("media"))
+        assertEquals("l7", applied.template)
+        assertEquals(before, L7AudioTemplates.load(frozen).toJson())
+        repository.restore()
+        assertEquals(3, org.json.JSONObject(L7AudioTemplates.load(app).toJson()).getJSONObject("focusGains").getInt("navigation"))
+    }
+    @Test fun existingCustomAudioRemainsUnchangedAcrossSaveAndRestore() {
+        repository.active()
+        L7AudioTemplates.saveCustom(app, L7AudioTemplates.load(app).withChoice(AudioOutputRole.NAVIGATION, 19))
+        val saved = repository.refresh()
+        val audio = L7AudioTemplates.load(app).toJson()
+        val draft = GalaxyConfigurationContext(app, saved, editable = true)
+        AirPlayPersistence.saveFps(draft, 60)
+        repository.save(saved.copy(configuration = draft.configuration()))
+        repository.restore()
+        assertEquals(audio, L7AudioTemplates.load(app).toJson())
+        assertEquals(19, L7AudioTemplates.load(app).choice(AudioOutputRole.NAVIGATION))
+    }
     @Test fun migrationCapturesOneCompleteCurrentConfigurationWithoutConfirmingModel() {
         val prefs = app.getSharedPreferences("xcertplay_airplay", 0)
         prefs.edit().putInt("display_scale_tenths", 8).putInt("media_buffer_ms", 500)

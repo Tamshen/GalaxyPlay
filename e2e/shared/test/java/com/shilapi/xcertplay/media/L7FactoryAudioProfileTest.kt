@@ -11,6 +11,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30], manifest = Config.NONE)
 class L7FactoryAudioProfileTest {
+    @Test fun oemRingtoneUsesSonificationWithoutChangingSpeechRoles() {
+        val profile = L7FactoryAudioProfile(null) { _, _ -> null }
+        val ring = profile.attributes(AudioChannel.RINGTONE, AudioAttributes.CONTENT_TYPE_SPEECH, 0)
+        assertEquals(AudioAttributes.USAGE_NOTIFICATION_RINGTONE, ring.usage)
+        assertEquals(AudioAttributes.CONTENT_TYPE_SONIFICATION, ring.contentType)
+        for (role in listOf(AudioOutputRole.PHONE, AudioOutputRole.ASSISTANT, AudioOutputRole.NAVIGATION))
+            assertEquals(AudioAttributes.CONTENT_TYPE_SPEECH, profile.attributes(role, AudioOutputPolicy.BUILTIN).contentType)
+    }
     @Test fun standardChoicesAndDefaultCallsIgnoreVendorRemapping() {
         val profile = L7FactoryAudioProfile(null) { _, _ -> 4 }
         assertEquals(1, profile.attributes(AudioOutputRole.MEDIA, AudioOutputPolicy.MEDIA).usage)

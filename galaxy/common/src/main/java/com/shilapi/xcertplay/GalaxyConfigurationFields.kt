@@ -155,6 +155,14 @@ internal object GalaxyConfigurationFields {
         val templates = L7AudioTemplates.Model.entries.associate { entry -> entry.id to
             context.assets.open("audio-templates/${if (entry.id == "custom") "system" else entry.id}.json")
                 .use { L7AudioTemplates.parse(it).toJson() } }
+        // 明确应用 L7 快速模板才启用已核实的原厂焦点；沿用现有自定义方案格式，旧内置配置不变。
+        if (model == "l7") {
+            groups.getValue("l7_audio_templates")["mode"] = "custom"
+            val native = org.json.JSONObject(templates.getValue("l7"))
+                .put("focusGains", org.json.JSONObject(mapOf("media" to 1, "navigation" to 3,
+                    "assistant" to 2, "phone" to 2, "ringtone" to 3)))
+            return GalaxyConfiguration(groups, templates + ("l7" to native.toString()))
+        }
         return GalaxyConfiguration(groups, templates)
     }
 
