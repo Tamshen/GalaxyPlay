@@ -49,4 +49,8 @@
     <string name="config_custom_value">Custom · %1$d</string>
     <string name="config_custom_percent">Custom percentage…</string>
     <string name="config_percent_value">Custom · %1$d%%</string>
+    <string name="template_custom">Custom</string>
+    <string name="config_reset_current">Reset current configuration</string>
+    <string name="config_reset_confirm">Reset configuration</string>
+    <string name="config_reset_message">Restore the default vehicle parameters for %1$s, replacing saved settings and unsaved edits, including hotspot details and custom audio parameters. App settings such as language and interface size, local authentication materials and logs are kept. The current connection continues; defaults apply on the next connection.</string>
 </resources>

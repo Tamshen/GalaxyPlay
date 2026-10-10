@@ -13,8 +13,9 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private var draft: GalaxyConfigurationContext? = null
     private val observers = mutableListOf<android.content.SharedPreferences.OnSharedPreferenceChangeListener>()
     private var templateDialog: AlertDialog? = null
+    private var resetDialog: AlertDialog? = null
     private var closed = false
-    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::restore, ::commit)
+    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::resetCurrent, ::restore, ::commit)
     val dirty get() = state.dirty
     init {
         if (state.draft == null || !state.dirty) runCatching { repository.refresh() }.onSuccess { current ->
@@ -47,7 +48,7 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val active = runCatching { repository.active() }.getOrNull()
         val effective = CarPlayBackgroundSession.configuration
         val model = L7AudioTemplates.model(activity)
-        val name = GalaxyVehicleTemplates.find(model.id)?.let { text(it.title) }
+        val name = GalaxyVehicleTemplates.find(active?.template ?: model.id)?.let { text(it.title) }
             ?: L7AudioModelConfirmation.name(activity, model)
         view.vehicleButton.text = activity.getString(R.string.template_current, name)
         val hint = when {
@@ -89,10 +90,37 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
             .setNegativeButton(R.string.profile_keep_editing, null)
             .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let(state::load); bind(); action() }.show()
     }
+    private fun resetCurrent() {
+        if (closed || resetDialog?.isShowing == true || templateDialog?.isShowing == true) return
+        val profile = state.original ?: return
+        val model = L7AudioTemplates.model(activity)
+        val name = GalaxyVehicleTemplates.find(profile.template)?.let { text(it.title) }
+            ?: L7AudioModelConfirmation.name(activity, model)
+        var applied = false
+        val dialog = L7Dialogs.builder(activity).setTitle(R.string.config_reset_current)
+            .setMessage(activity.getString(R.string.config_reset_message, name))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.config_reset_confirm, null).create()
+        resetDialog = dialog
+        dialog.setOnDismissListener { if (resetDialog === dialog) resetDialog = null }
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (closed || applied) return@setOnClickListener
+                applied = true
+                dialog.dismiss()
+                val result = runCatching { repository.resetCurrent(profile) }
+                if (result.isFailure) { view.feedback(text(R.string.profile_save_failed), true); return@setOnClickListener }
+                state.load(result.getOrThrow())
+                bind()
+                changed()
+            }
+        }
+        dialog.show()
+    }
     private fun chooseTemplate() {
-        if (closed || templateDialog?.isShowing == true) return
+        if (closed || templateDialog?.isShowing == true || resetDialog?.isShowing == true) return
         val entries = GalaxyVehicleTemplates.entries
-        var pending = entries.indexOfFirst { it.id == L7AudioTemplates.model(activity).id }
+        var pending = entries.indexOfFirst { it.id == (state.original?.template?.takeUnless { id -> id == "unconfirmed" } ?: L7AudioTemplates.model(activity).id) }
         var applied = false
         val dialog = L7Dialogs.builder(activity).setTitle(R.string.template_choose)
             .setMessage(R.string.template_overwrite)
@@ -145,6 +173,8 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         closed = true
         templateDialog?.dismiss()
         templateDialog = null
+        resetDialog?.dismiss()
+        resetDialog = null
         state.scroll[state.group] = view.scroll.scrollY
         detach()
     }

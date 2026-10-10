@@ -82,10 +82,12 @@ internal data class GalaxyConfiguration(
 }
 
 internal data class GalaxyProfile(val id: String, val name: String, val revision: Int,
-    val updatedAt: Long, val configuration: GalaxyConfiguration) {
+    val updatedAt: Long, val configuration: GalaxyConfiguration, val templateId: String? = null) {
     val model get() = configuration.preferences["l7_audio_templates"]?.get("model") as? String ?: "unconfirmed"
+    val template get() = templateId ?: model
     fun json() = JSONObject().put("schema_version", 1).put("profile_id", id).put("profile_name", name)
         .put("revision", revision).put("updated_at", updatedAt).put("configuration", configuration.json())
+        .also { data -> templateId?.let { data.put("template_id", it) } }
     companion object {
         fun parse(text: String): GalaxyProfile {
             require(text.toByteArray().size <= GalaxyConfiguration.MAX_BYTES)
@@ -95,7 +97,9 @@ internal data class GalaxyProfile(val id: String, val name: String, val revision
             val name = data.getString("profile_name").also { require(it.isNotBlank() && it.length <= 40 && it.none { c -> c.code < 32 }) }
             val revision = data.getInt("revision").also { require(it > 0) }
             return GalaxyProfile(id, name, revision, data.getLong("updated_at"),
-                GalaxyConfiguration.parse(data.getJSONObject("configuration")))
+                GalaxyConfiguration.parse(data.getJSONObject("configuration")),
+                if (data.has("template_id")) data.getString("template_id").also {
+                    require(it in setOf("l7", "l6", "custom")) } else null)
         }
     }
 }

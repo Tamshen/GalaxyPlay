@@ -68,7 +68,15 @@ internal class GalaxyProfiles(private val context: Context,
     fun applyTemplate(model: String): GalaxyProfile = synchronized(lock) {
         val template = requireNotNull(GalaxyVehicleTemplates.find(model))
         val current = refresh()
-        save(current.copy(configuration = template.create(context)))
+        write(current.copy(configuration = template.create(context), templateId = template.id))
+    }
+    /** 重置只覆盖当前车型；确认期间文件变化时拒绝覆盖，仍保留应用偏好及身份。 */
+    fun resetCurrent(expected: GalaxyProfile): GalaxyProfile = synchronized(lock) {
+        val current = refresh()
+        check(current.id == expected.id && current.revision == expected.revision) { "CONFIG_EDIT_CONFLICT" }
+        val template = GalaxyVehicleTemplates.find(current.template)
+            ?: GalaxyVehicleTemplates.find(L7AudioTemplates.model(context).id)!!
+        write(current.copy(configuration = template.create(context), templateId = template.id))
     }
     fun draft(model: String, name: String): GalaxyProfile = synchronized(lock) {
         val configuration = if (model == "current") refresh().configuration else GalaxyConfigurationFields.factory(context, model)
@@ -79,11 +87,20 @@ internal class GalaxyProfiles(private val context: Context,
         val old = active()
         val actual = GalaxyConfigurationFields.capture(context)
         if (actual.json().toString() == old.configuration.json().toString()) return@synchronized old
-        val next = old.copy(revision = old.revision + 1, updatedAt = System.currentTimeMillis(), configuration = actual)
+        val next = old.copy(revision = old.revision + 1, updatedAt = System.currentTimeMillis(), configuration = actual, templateId = "custom")
         saveFile(next)
         next
     }
+    /** 模板标识只描述整套参数是否仍为默认值，手动保存不改变实际车型适配。 */
     fun save(draft: GalaxyProfile): GalaxyProfile = synchronized(lock) {
+        require(draft.id.matches(Regex("[a-z0-9_]{1,64}")))
+        initialize()
+        val old = if (file(draft.id).exists()) read(draft.id) else null
+        val changed = old != null && GalaxyApplicationPreferences.vehicle(draft.configuration).json().toString() !=
+            old.configuration.json().toString()
+        write(if (changed) draft.copy(templateId = "custom") else draft)
+    }
+    private fun write(draft: GalaxyProfile): GalaxyProfile = synchronized(lock) {
         initialize()
         require(draft.name.isNotBlank() && draft.name.length <= 40 && draft.name.none { it.code < 32 })
         if (list().any { it.id != draft.id && it.name.trim().equals(draft.name.trim(), true) }) throw GalaxyProfileNameConflict()
