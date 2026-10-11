@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 只在用户确认安装更新时申请此来源的系统安装授权。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- VPN 控制候选权限需由系统授予；声明不能替代 ACTIVATE_VPN 的 AppOps 授权。 -->
     <uses-permission android:name="android.permission.CONTROL_VPN" tools:ignore="ProtectedPermissions" />
     <!-- 用户主动授予，用于尝试开启 Android 原生热点；不代表获得配置写入权限。 -->
@@ -36,6 +38,12 @@
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <application>
+        <provider android:name="com.shilapi.xcertplay.GalaxyUpdateFileProvider"
+            android:authorities="${applicationId}.app-updates"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/galaxy_update_paths" />
+        </provider>
         <provider android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"
             android:exported="false" android:grantUriPermissions="true">

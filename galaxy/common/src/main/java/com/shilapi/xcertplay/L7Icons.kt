@@ -9,6 +9,11 @@ import com.shilapi.xcertplay.host.R
 /** 业务动作使用具名图形，不用字符或 emoji 代替；文字仍是独立的可访问名称。 */
 internal object L7Icons {
     private val actions = mapOf(
+        R.string.update_check to R.drawable.ic_l7_refresh,
+        R.string.update_download to R.drawable.ic_l7_import,
+        R.string.update_install to R.drawable.ic_l7_check,
+        R.string.update_stop to R.drawable.ic_l7_close,
+        R.string.update_open_permission to R.drawable.ic_l7_permissions,
         R.string.l7_start_wireless to R.drawable.ic_dp_connection,
         R.string.l7_entry_connect to R.drawable.ic_l7_projection,
         R.string.l7_home_usb to R.drawable.ic_l7_usb,

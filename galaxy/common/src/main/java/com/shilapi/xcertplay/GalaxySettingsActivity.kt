@@ -76,6 +76,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private var phoneDialog: AlertDialog? = null
     private var pendingWireless = false
     private var initialLaunch = true
+    private val appUpdate = GalaxyAppUpdate(this)
     private val audioModelConfirmation = L7AudioModelConfirmation(this)
     private var notificationTransport = true
     private var exportInProgress = false
@@ -685,7 +686,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         logView = L7LogView(this).also { it.show() }
     }
 
-    private fun about(content: LinearLayout) = L7AboutSettings.add(this, content, version())
+    private fun about(content: LinearLayout) = L7AboutSettings.add(this, content, version(), appUpdate::check)
 
     // The car hotspot link needs the hotspot on; DiPlay only checks it (turning it on needs ADB-only permission).
     private fun carHotspotOff(): Boolean =
