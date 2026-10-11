@@ -29,7 +29,7 @@
     <string name="l7_debug_copied">日志已复制</string>
     <string name="l7_debug_clear">清空</string>
     <string name="l7_debug_refresh">刷新</string>
-    <string name="l7_debug_drag">L7 日志 · 拖动移动</string>
+    <string name="l7_debug_drag">GalaxyPlay 日志 · 拖动移动</string>
     <string name="l7_debug_connected">已连接</string>
     <string name="l7_debug_connecting">连接中</string>
     <string name="l7_debug_disconnected">未连接</string>
