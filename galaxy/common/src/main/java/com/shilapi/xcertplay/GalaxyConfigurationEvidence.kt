@@ -20,7 +20,7 @@ internal class GalaxyConfigurationEvidence private constructor(val id: String, v
         private val enums = setOf("system", "zh", "en", "l7", "l6", "custom", "l7-bus", "day", "night", "ambient",
             "BUILT_IN", "TEXT", "LOCAL", "USB", "USB_CH341", "I2C", "REMOTE", "MANUAL", "WIFI_P2P", "LOCAL_ONLY",
             "OPEN", "WPA2", "WPA3", "WPA3_TRANSITION", "AUTO", "GHZ_2_4", "GHZ_5", "MAP", "INSTRUMENTS",
-            "DEFAULT", "C2", "OMX", "CURRENT", "NETEASE_COMPAT")
+            "DEFAULT", "C2", "OMX", "CURRENT", "NETEASE_COMPAT", "QQ_COMPAT")
         fun capture(context: Context): GalaxyConfigurationEvidence = from(context,
             (context as? GalaxyConfigurationContext)?.profile ?: GalaxyProfiles(context).refresh())
         fun from(context: Context, profile: GalaxyProfile): GalaxyConfigurationEvidence {

@@ -15,6 +15,20 @@ class L7ProbeLogTest {
     private fun report(items: List<L7ProbeItem>) = L7ProbeReport(UUID.randomUUID().toString(), "generation", "test", 1,
         L7ProbePhase.COMPLETED, items, items.size, 2)
 
+    @Test fun savedChannelsAndActualSdkProviderRemainAvailableInSanitizedDiagnostics() {
+        for (mode in GalaxyMediaReportingChannel.Mode.entries) {
+            val text = L7ProbeLog.lines(report(listOf(L7ProbeItem("ENV-SDK-CONTRACT", "SDK", "ENVIRONMENT",
+                L7ProbeOutcome.UNKNOWN, "SDK_CONTRACT_CHECKED", mapOf(
+                    "mediaReportingChannel" to mode.name, "mediaSdkSource" to "com.netease.cloudmusic.iot",
+                    "mediaRegistration" to "OWN_PACKAGE_ONLY", "mediaSourceEvidence" to "L6_L7_ONLINE_6_DISPLAY_UNTESTED",
+                    "serial" to "private-number"))))).joinToString("\n")
+            assertTrue(text.contains("mediaReportingChannel=${mode.name}"))
+            assertTrue(text.contains("mediaSdkSource=com.netease.cloudmusic.iot"))
+            assertTrue(text.contains("mediaRegistration=OWN_PACKAGE_ONLY"))
+            assertFalse(text.contains("private-number"))
+        }
+    }
+
     @Test fun logsPreserveBatchEvidenceButNeverIncludePrivateFieldsOrSecretValues() {
         val report = report(listOf(L7ProbeItem("ENV-SYSTEM", "system", "ENVIRONMENT", L7ProbeOutcome.VERIFIED,
             "QUERY_ONLY", mapOf("api" to "30", "model" to "token=synthetic-secret", "serial" to "private-number", "rawName" to "private-name"))))
