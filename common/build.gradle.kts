@@ -39,6 +39,9 @@ android {
     // 原生组件回归使用实际合并资源，不能用单测占位 R 代替主题。
     testOptions { unitTests.isIncludeAndroidResources = true }
     // 测试集中存放，源集映射保留模块依赖与 internal 可见性。
+    testOptions.unitTests.all {
+        it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+    }
     sourceSets {
         getByName("main").kotlin.directories.add(rootProject.file("galaxy/common/src/main/java").path)
         getByName("main").java.directories.add(rootProject.file("galaxy/common/src/main/java").path)

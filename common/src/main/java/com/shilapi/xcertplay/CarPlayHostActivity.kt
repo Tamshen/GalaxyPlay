@@ -3007,7 +3007,8 @@ class CarPlayHostActivity : ComponentActivity() {
         val opusOutput = wirelessEnabled && com.shilapi.xcertplay.media.AudioCodecCapabilities.opusOutputAvailable()
         val opusInput = microphoneAvailable && com.shilapi.xcertplay.media.AudioCodecCapabilities.opusInputAvailable()
         appendLog("Audio: codec offer codec=OPUS output=$opusOutput input=$opusInput " +
-            "transport=${if (wirelessEnabled) "WIRELESS" else "WIRED"} fallback=LPCM")
+            "transport=${if (wirelessEnabled) "WIRELESS" else "WIRED"} softwareOutput=${com.shilapi.xcertplay.media.SoftwareOpusSupport.outputAvailable} " +
+            "softwareInput=${com.shilapi.xcertplay.media.SoftwareOpusSupport.inputAvailable}")
         return AirPlayConfig(
             deviceName = getString(R.string.app_name),
             deviceId = DiPlayBootstrap.deviceId(airPlayIdentity),
