@@ -32,9 +32,11 @@ def adb(*parts):
 def nodes():
     for attempt in range(3):
         try:
-            adb('shell', 'uiautomator', 'dump', '/sdcard/galaxy-update.xml')
+            result = adb('shell', 'uiautomator', 'dump', '/sdcard/galaxy-update.xml')
+            if b'dumped to:' not in result:
+                raise RuntimeError('未取得新节点树，不读取旧转储')
             return ET.fromstring(adb('shell', 'cat', '/sdcard/galaxy-update.xml'))
-        except (subprocess.CalledProcessError, ET.ParseError):
+        except (subprocess.CalledProcessError, ET.ParseError, RuntimeError):
             if attempt == 2:
                 raise
             time.sleep(.3)
@@ -135,4 +137,8 @@ try:
         'installedFromUpdater': args.install_update}, ensure_ascii=False, indent=2) + '\n')
     print('AVD 正式 HTTPS 检查、下载校验、授权取消／返回、系统覆盖安装及最新版本复查通过' if args.install_update else 'AVD 正式 HTTPS 检查与关闭通过')
 finally:
-    adb('shell', 'cmd', 'appops', 'set', package, 'REQUEST_INSTALL_PACKAGES', original_mode)
+    current_appop = adb('shell', 'cmd', 'appops', 'get', package, 'REQUEST_INSTALL_PACKAGES').decode()
+    current_match = re.search(r'REQUEST_INSTALL_PACKAGES:\s*(\w+)', current_appop)
+    current_mode = current_match.group(1) if current_match else 'default'
+    if current_mode != original_mode:
+        adb('shell', 'cmd', 'appops', 'set', package, 'REQUEST_INSTALL_PACKAGES', original_mode)

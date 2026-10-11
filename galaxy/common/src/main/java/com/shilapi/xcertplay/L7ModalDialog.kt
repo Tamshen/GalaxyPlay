@@ -91,7 +91,8 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
         window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             val width = (uiContext.resources.displayMetrics.widthPixels * .88f).toInt().coerceAtMost(dp(720))
-            setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+            setLayout(width, if (content.fixedHeight) (uiContext.resources.displayMetrics.heightPixels * .72f).toInt()
+                else WindowManager.LayoutParams.WRAP_CONTENT)
             setDimAmount(.48f)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
@@ -208,12 +209,12 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
         if (view is ViewGroup) for (index in 0 until view.childCount) styleInputs(view.getChildAt(index))
     }
 
-    private class BoundedPanel(context: Context) : LinearLayout(context) {
+    private inner class BoundedPanel(context: Context) : LinearLayout(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val max = (resources.displayMetrics.heightPixels * .82f).toInt()
             val available = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) max
                 else MeasureSpec.getSize(heightMeasureSpec).coerceAtMost(max)
-            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(available, MeasureSpec.AT_MOST))
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(available, if (content.fixedHeight) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))
         }
     }
 }

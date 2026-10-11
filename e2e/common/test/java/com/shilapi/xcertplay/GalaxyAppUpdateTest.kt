@@ -49,7 +49,7 @@ class GalaxyAppUpdateTest {
         }
         override fun download(release: GalaxyUpdateRelease, directory: File, request: GalaxyUpdateRequest, progress: (Long) -> Unit): File {
             downloads++; directory.mkdirs()
-            return File(directory, "test.apk").apply { writeBytes(byteArrayOf(1, 2, 3)); progress(3) }
+            return File(directory, "download-test.apk").apply { writeBytes(byteArrayOf(1, 2, 3)); progress(3) }
         }
     }
     private fun texts(view: View): String = (if (view is TextView) view.text.toString() else "") +
@@ -61,11 +61,12 @@ class GalaxyAppUpdateTest {
         @Suppress("DEPRECATION")
         val installed = activity.packageManager.getPackageInfo(activity.packageName, 0).apply { versionCode = 146 }
         shadowOf(activity.packageManager).installPackage(installed)
+        GalaxyUpdateCache.clear(activity)
         val queue = Queue(); val source = Source()
         val update = GalaxyAppUpdate(activity, source, queue) { _, _, token -> token.check() }
         host.start().resume()
         try { test(update, queue, source, activity) { host.pause().stop() } }
-        finally { host.pause().stop().destroy() }
+        finally { host.pause().stop().destroy(); GalaxyUpdateCache.clear(activity) }
     }
     @Test fun newReleaseRequiresExplicitDownloadThenExplicitInstall() = fixture { update, queue, source, activity, _ ->
         update.check(); update.check(); assertEquals(1, queue.tasks.size)
@@ -95,6 +96,32 @@ class GalaxyAppUpdateTest {
         assertTrue(texts(dialog().window!!.decorView).contains(activity.getString(R.string.update_stopped)))
         assertEquals(0, source.downloads)
         assertNull(shadowOf(activity).nextStartedActivity)
+    }
+    @Test fun recreatedActivityRestoresVerifiedApkWithoutAutomaticInstallation() {
+        val host = Robolectric.buildActivity(ComponentActivity::class.java).create()
+        val activity = host.get().apply { setTheme(android.R.style.Theme_Material_Light_NoActionBar) }
+        @Suppress("DEPRECATION")
+        val installed = activity.packageManager.getPackageInfo(activity.packageName, 0).apply { versionCode = 146 }
+        shadowOf(activity.packageManager).installPackage(installed)
+        val source = Source(); val token = GalaxyUpdateRequest()
+        val release = source.latest(activity.packageName, token)
+        val file = source.download(release, File(activity.cacheDir, "app-updates"), token) {}
+        GalaxyUpdateCache.save(activity, file, release)
+        assertTrue(L7Agreement.accept(activity))
+        val queue = Queue(); var verified = 0
+        GalaxyAppUpdate(activity, source, queue) { candidate, value, request ->
+            assertEquals(file, candidate); assertEquals(release, value); request.check(); verified++
+        }
+        try {
+            host.start().resume(); assertEquals(1, queue.tasks.size); queue.run()
+            assertEquals(1, verified)
+            assertEquals(activity.getString(R.string.update_install), dialog().getButton(AlertDialog.BUTTON_POSITIVE).text.toString())
+            assertNull(shadowOf(activity).nextStartedActivity)
+            assertEquals(1, source.downloads)
+        } finally {
+            host.pause().stop().destroy(); GalaxyUpdateCache.clear(activity)
+            activity.getSharedPreferences("l7_agreement", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        }
     }
     @Test fun sameOrOlderStoreVersionDoesNotOfferDownload() = fixture { update, queue, source, activity, _ ->
         @Suppress("DEPRECATION")
