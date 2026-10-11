@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.TETHER_PRIVILEGED" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.NETWORK_STACK" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
-    <!-- 只让诊断读取已核对的参考包，避免 Android 11 包可见性过滤造成误判。 -->
+    <!-- 仅查询和加载已核对的参考 SDK 包，避免 Android 11 包可见性过滤造成误判。 -->
     <queries>
         <package android:name="com.android.settings" />
         <package android:name="com.ecarx.android.auto" />
@@ -23,6 +23,8 @@
         <package android:name="com.flyme.auto.map" />
         <package android:name="com.flyme.auto.settings" />
         <package android:name="com.geely.linkhmi" />
+        <package android:name="com.netease.cloudmusic.iot" />
+        <package android:name="com.flyme.auto.music" />
         <package android:name="com.huawei.dmsdpdevice" />
         <package android:name="com.huawei.nearby" />
         <package android:name="com.lge.car" />

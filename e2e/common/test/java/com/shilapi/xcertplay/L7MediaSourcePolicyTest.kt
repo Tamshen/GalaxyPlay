@@ -19,6 +19,7 @@ class L7MediaSourcePolicyTest {
     @Test fun compatibilityChannelsUseVerifiedSourceCategoriesWithoutAutomaticEasSelection() {
         for (eas in listOf(null, 0, 1)) {
             assertEquals(6, L7MediaSourcePolicy.resolve(eas, Online::class.java, GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT))
+            assertEquals(6, L7MediaSourcePolicy.resolve(eas, Online::class.java, GalaxyMediaReportingChannel.Mode.QQ_COMPAT))
             assertEquals(0, L7MediaSourcePolicy.resolve(eas, Online::class.java, GalaxyMediaReportingChannel.Mode.LOCAL))
         }
     }

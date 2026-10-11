@@ -36,7 +36,7 @@ class GalaxyMediaReportingChannelTest {
     private fun choose(page: GalaxyConfigurationPage, mode: GalaxyMediaReportingChannel.Mode) {
         row(page.view.fields)!!.performClick()
         val picker = dialog()
-        assertEquals(3, picker.listView.adapter.count)
+        assertEquals(4, picker.listView.adapter.count)
         picker.listView.performItemClick(picker.listView.adapter.getView(mode.ordinal, null, picker.listView), mode.ordinal, mode.ordinal.toLong())
     }
 
@@ -66,6 +66,11 @@ class GalaxyMediaReportingChannelTest {
         page.view.commitButton.performClick()
         assertFalse(page.dirty)
         assertEquals(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.load(context))
+        choose(page, GalaxyMediaReportingChannel.Mode.QQ_COMPAT)
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.load(context))
+        page.view.commitButton.performClick()
+        assertEquals(GalaxyMediaReportingChannel.Mode.QQ_COMPAT, GalaxyMediaReportingChannel.load(context))
         choose(page, GalaxyMediaReportingChannel.Mode.LOCAL)
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         page.view.commitButton.performClick()

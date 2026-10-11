@@ -74,7 +74,7 @@ class GalaxyOemMediaContractTest {
         assertEquals("synthetic.own", api.packageName)
     }
     @Test fun compatibilityChannelsUseDirectMusicClientInsteadOfLinkedMediaSessionOverload() {
-        for (channel in listOf(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.Mode.LOCAL)) {
+        for (channel in GalaxyMediaReportingChannel.Mode.entries.filter { it != GalaxyMediaReportingChannel.Mode.CURRENT }) {
             val contract = GalaxyOemMediaContract(Modern::class.java, Client::class.java, Info::class.java, channel.linkMediaSession)
             val api = Modern(); val client = Client()
             assertFalse(contract.linkedSession)

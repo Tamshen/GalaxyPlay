@@ -2,7 +2,6 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.net.Uri
-import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.vendor.SdkSubclass
 import java.lang.reflect.InvocationHandler
@@ -12,11 +11,12 @@ import java.lang.reflect.Proxy
 internal class L7ReflectiveMediaCenter(
     context: Context,
     private val localPlayback: Boolean = true,
-    private val sdkLoader: () -> L7VendorSdk.Loaded = { L7VendorSdk(context.applicationContext).load(API) },
+    private val sdkLoader: (() -> L7VendorSdk.Loaded)? = null,
     private val serviceEvidence: () -> Int? = { L7VendorServiceProbe.inspect(context.applicationContext)["mediaProviderEasSupport"]?.toIntOrNull() },
 ) : L7MediaCenterPort {
     private val app = context.applicationContext
     private val channel = GalaxyMediaReportingChannel.load(context)
+    private val vehicle = L7AudioTemplates.model(context).id
     private var api: Any? = null
     private var apiType: Class<*>? = null
     private var client: Any? = null
@@ -40,8 +40,8 @@ internal class L7ReflectiveMediaCenter(
     override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean,
                             focus: (String?) -> Unit, selected: (Int) -> Boolean) {
         if (!valid) return
-        L7DebugLog.record("MediaCenter: channel selected=${channel.name}")
-        val sdk = sdkLoader()
+        L7DebugLog.record("MediaCenter: channel selected=${channel.name} vehicle=$vehicle")
+        val sdk = sdkLoader?.invoke() ?: GalaxyMediaSdk.load(app, channel)
         apiReady = ready
         val apiClass = Class.forName(API, true, sdk.loader)
         apiType = apiClass
@@ -54,25 +54,8 @@ internal class L7ReflectiveMediaCenter(
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
         L7SteeringDiagnostics.store.state("customActionObserver", "available=${verified.clientMethods.any { it.name == "onCustomAction" }}")
-        clientHandler = { epoch -> InvocationHandler { _, method, args ->
-            val active = valid && registration == epoch
-            when (method.name) {
-                "onCustomAction" -> { if (active) VehicleSteeringInputLog.customAction(args?.firstOrNull() as? android.os.Bundle); null }
-                "onPlay" -> active && command(CarPlayMediaButton.PLAY)
-                "onPause" -> active && command(CarPlayMediaButton.PAUSE)
-                "onNext" -> active && command(CarPlayMediaButton.NEXT)
-                "onPrevious" -> active && command(CarPlayMediaButton.PREVIOUS)
-                "onMediaCenterFocusChanged" -> { if (active) focus(args?.firstOrNull() as? String); null }
-                "onSourceSelected" -> active && selected(args?.firstOrNull() as? Int ?: -1)
-                // 此回调包含来源与前一应用，不等同于用户选择，不能再次发播放命令。
-                "onSourceChanged" -> { if (active) L7DebugLog.record("MediaCenter: sourceChanged source=${args?.firstOrNull() as? Int ?: -1}"); false }
-                "getCurrentSourceType" -> if (active) source else -1
-                "getMediaSourceTypeList" -> if (active) intArrayOf(source) else intArrayOf()
-                "getCurrentProgress" -> if (active) latest.elapsedMillis ?: 0L else 0L
-                "getMusicPlaybackInfo" -> if (active) info else null
-                else -> null
-            }
-        } }
+        clientHandler = { epoch -> GalaxyOemMediaCallbacks(channel, source, { valid && registration == epoch },
+            { latest }, { info }, command, focus, selected) }
         val callback = Proxy.newProxyInstance(sdk.loader, arrayOf(callbackClass)) { proxy, method, args ->
             when (method.name) {
                 "onAPIReady" -> { if (valid) ready(args?.firstOrNull() == true); null }
@@ -114,7 +97,9 @@ internal class L7ReflectiveMediaCenter(
     override fun sources(values: IntArray) = call("updateMediaSourceTypeList", arrayOf(Any::class.java, IntArray::class.java), token, values) == true
     override fun currentSource() { call("updateCurrentSourceType", arrayOf(Any::class.java, Int::class.javaPrimitiveType!!), token, source) }
     override fun focusClient() = call("queryCurrentFocusClient", arrayOf(Any::class.java), token) as? String
-    override fun requestPlay() = call("requestPlay", arrayOf(Any::class.java), token) == true
+    override fun requestPlay() = GalaxyOemMediaPublication.requestPlay(channel, app.packageName, ::focusClient) {
+        call("requestPlay", arrayOf(Any::class.java), token) == true
+    }
     override fun progress(milliseconds: Long) { latest = latest.copy(elapsedMillis = milliseconds); call("updateCurrentProgress", arrayOf(Any::class.java, Long::class.javaPrimitiveType!!), token, milliseconds) }
 
     override fun prepare(value: CarPlayNowPlaying, artwork: Uri?) {
@@ -163,6 +148,8 @@ internal class L7ReflectiveMediaCenter(
     }
 
     override fun update(value: CarPlayNowPlaying, artwork: Uri?): Boolean {
+        if (!valid) return false
+        GalaxyOemMediaPublication.beforeState(channel, localPlayback, app.packageName, ::focusClient, ::currentSource)
         if (!valid) return false
         return call("updateMusicPlaybackState", arrayOf(Any::class.java, requireNotNull(infoClass)), token, info) == true
     }
