@@ -10,7 +10,7 @@
     <string name="l7_section_floating">Floating menu</string>
     <string name="l7_section_projection">CarPlay display</string>
     <string name="l7_section_audio_playback">Playback and audio focus</string>
-    <string name="l7_section_audio_routes">Audio routing and previews</string>
+    <string name="l7_section_audio_routes">Sound routing</string>
     <string name="l7_section_bluetooth_audio">Bluetooth media coordination</string>
     <string name="l7_section_product">App information</string>
     <string name="l7_section_agreement">User agreement</string>

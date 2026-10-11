@@ -9,41 +9,13 @@ import com.shilapi.xcertplay.media.AudioOutputRole
 /** 频道直接编辑；车型模板提供初始值，旧方案标识仅用于兼容读取。 */
 internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
-             onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null,
              open: (String, Int, AudioOutputRole, (Int) -> Unit) -> Unit) {
         fun text(id: Int) = context.getString(id)
-        val applyLabel = if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.l7_save_next_connection
         val applyHint = if (context is GalaxyConfigurationContext) "" else text(R.string.l7_setting_apply_hint)
-        fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, open) }
-        val model = L7AudioTemplates.model(context)
-        val modelName = L7AudioModelConfirmation.name(context, model)
-        val summary = if (L7AudioTemplates.customInvalid(context))
-            R.string.l7_template_recovery else R.string.l7_template_custom_note
-        L7SettingsSection.add(parent, text(R.string.l7_template_title),
-            description = context.getString(summary, modelName), footer = applyHint) { card ->
-            card.addView(L7Components.actionRow(context, text(R.string.l7_template_edit),
-                text(R.string.l7_template_file_note)) { L7AudioTemplateEditor.show(context, ::refresh) })
-            onImport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_import),
-                text(R.string.l7_template_import_note), click = it)) }
-            onExport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_export),
-                text(R.string.l7_template_export_note), click = it)) }
-            card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
-                context.getString(R.string.l7_template_restore_note, modelName)) {
-                L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
-                    .setMessage(context.getString(R.string.l7_template_restore_confirm, modelName))
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(applyLabel) { _, _ ->
-                        change(context) {
-                            AirPlayPersistence.restoreUsageAudioDefaults(context)
-                            L7AudioTemplates.select(context, L7AudioTemplates.defaultMode(context))
-                            refresh()
-                        }
-                    }.show()
-            })
-        }
-        L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
+        fun refresh() { parent.removeAllViews(); page(context, parent, open) }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_routes),
-            description = text(R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
+            description = text(if (L7AudioTemplates.customInvalid(context)) R.string.l7_template_recovery
+                else R.string.l7_audio_roles_note), footer = text(R.string.l7_audio_headrest_note)) { card ->
             add(context, card, custom = true, open = { title, current, role, apply ->
                 open(title, current, role) { value -> apply(value); refresh() }
             })
@@ -56,7 +28,9 @@ internal object L7AudioSettings {
                 }
                 refresh()
             }.apply { isEnabled = routing.hasOutputBuses })
+            restore(context, card, ::refresh)
         }
+        L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = applyHint) { card ->
             val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
             if (context !is GalaxyConfigurationContext) L7Components.choice(card, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
@@ -75,6 +49,23 @@ internal object L7AudioSettings {
 
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it, showExclusive = context !is GalaxyConfigurationContext) }
+    }
+
+    private fun restore(context: Context, card: LinearLayout, refresh: () -> Unit) {
+        card.addView(L7Components.actionRow(context, context.getString(R.string.l7_audio_restore),
+            context.getString(R.string.l7_template_restore_note)) {
+            L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
+                .setMessage(R.string.l7_template_restore_confirm)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(if (context is GalaxyConfigurationContext) R.string.profile_update_draft
+                    else R.string.l7_save_next_connection) { _, _ ->
+                    change(context) {
+                        AirPlayPersistence.restoreUsageAudioDefaults(context)
+                        L7AudioTemplates.select(context, L7AudioTemplates.defaultMode(context))
+                        refresh()
+                    }
+                }.show()
+        })
     }
 
     fun modeName(mode: L7AudioTemplates.Mode): Int = when (mode) {
