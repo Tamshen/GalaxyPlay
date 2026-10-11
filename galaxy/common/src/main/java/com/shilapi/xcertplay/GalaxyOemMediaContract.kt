@@ -7,8 +7,10 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 /** L6／L7 原厂样本共用的公开 SDK 契约；旧接口占位重载不能用于注册或上报。 */
-internal class GalaxyOemMediaContract(val api: Class<*>, val client: Class<*>, val info: Class<*>) {
+internal class GalaxyOemMediaContract(val api: Class<*>, val client: Class<*>, val info: Class<*>,
+                                    linkMediaSession: Boolean = true) {
     val registration: Method = api.methods.firstOrNull {
+        linkMediaSession &&
         it.name == "registerMusic" && it.parameterTypes.contentEquals(arrayOf(String::class.java, client, String::class.java))
     } ?: api.getMethod("registerMusic", String::class.java, client)
     val linkedSession = registration.parameterCount == 3

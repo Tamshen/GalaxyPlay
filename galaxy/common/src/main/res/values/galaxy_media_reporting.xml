@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_media_channel_title">音乐上报渠道</string>
+    <string name="galaxy_media_channel_current">当前模式（Flyme Auto）</string>
+    <string name="galaxy_media_channel_netease">网易云音乐兼容</string>
+    <string name="galaxy_media_channel_local">本地音乐</string>
+    <string name="galaxy_media_channel_hint">上报失败时可尝试切换，保存后重新连接生效。</string>
+</resources>

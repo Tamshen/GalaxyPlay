@@ -15,11 +15,12 @@ internal class GalaxyConfigurationEvidence private constructor(val id: String, v
         const val MAX_BYTES = 32 * 1024
         private val publicStrings = setOf("app_language", "model", "mode", "mode_l6", "mode_custom", "source",
             "wireless_hotspot_mode", "manual_hotspot_security", "manual_hotspot_band", "mfi_target",
-            "carplay_night_mode", "cluster_content", "cluster_turn_card_overlay_position", "display_physical_size_basis")
+            "carplay_night_mode", "cluster_content", "cluster_turn_card_overlay_position", "display_physical_size_basis",
+            GalaxyMediaReportingChannel.KEY)
         private val enums = setOf("system", "zh", "en", "l7", "l6", "custom", "l7-bus", "day", "night", "ambient",
             "BUILT_IN", "TEXT", "LOCAL", "USB", "USB_CH341", "I2C", "REMOTE", "MANUAL", "WIFI_P2P", "LOCAL_ONLY",
             "OPEN", "WPA2", "WPA3", "WPA3_TRANSITION", "AUTO", "GHZ_2_4", "GHZ_5", "MAP", "INSTRUMENTS",
-            "DEFAULT", "C2", "OMX")
+            "DEFAULT", "C2", "OMX", "CURRENT", "NETEASE_COMPAT")
         fun capture(context: Context): GalaxyConfigurationEvidence = from(context,
             (context as? GalaxyConfigurationContext)?.profile ?: GalaxyProfiles(context).refresh())
         fun from(context: Context, profile: GalaxyProfile): GalaxyConfigurationEvidence {

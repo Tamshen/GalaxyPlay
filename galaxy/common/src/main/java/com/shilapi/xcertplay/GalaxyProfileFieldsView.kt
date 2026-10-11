@@ -49,7 +49,8 @@ internal object GalaxyProfileFieldsView {
                     return if (index >= 0 && index < field.labels.size) context.getString(field.labels[index]) else
                         current.toString().ifEmpty { context.getString(R.string.profile_unset) }
                 }
-                row = L7Components.valueRow(context, title, label()) {
+                val detail = if (field.key == GalaxyMediaReportingChannel.KEY) context.getString(R.string.galaxy_media_channel_hint) else ""
+                row = L7Components.actionRow(context, title, detail) {
                     if (field.choices.isNotEmpty()) {
                         val labels = field.choices.mapIndexed { index, option ->
                             field.labels.getOrNull(index)?.let(context::getString) ?: option.toString()
@@ -65,7 +66,7 @@ internal object GalaxyProfileFieldsView {
                         GalaxyProfiles.put(edit, field.key, selected); edit.commit()
                         row.setValue(label())
                     }
-                }
+                }.apply { setValue(label()) }
                 parent.addView(row)
             }
         }
