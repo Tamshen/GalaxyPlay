@@ -9,21 +9,20 @@ internal object GalaxyConfigurationSections {
     fun add(context: Context, parent: LinearLayout, group: Int) {
         fun text(id: Int) = context.getString(id)
         when (group) {
-            0 -> {
-                quickChoice(context, parent, "display_scale_percent", R.string.config_quality,
+            0 -> L7SettingsSection.add(parent) { card ->
+                quickChoice(context, card, "display_scale_percent", R.string.config_quality,
                     listOf(100, 80, 60), listOf(R.string.config_quality_clear, R.string.config_quality_balanced, R.string.config_quality_light))
-                quickChoice(context, parent, "display_fps", R.string.config_smoothness,
+                quickChoice(context, card, "display_fps", R.string.config_smoothness,
                     listOf(30, 60), listOf(R.string.config_smoothness_standard, R.string.config_smoothness_high))
-                quickChoice(context, parent, "media_buffer_ms", R.string.config_music_stability,
+                quickChoice(context, card, "media_buffer_ms", R.string.config_music_stability,
                     listOf(300, 500, 1000), listOf(R.string.config_music_fast, R.string.config_music_stable, R.string.config_music_safest))
-                parent.addView(L7Components.switchRow(context, text(R.string.config_bluetooth_music),
+                card.addView(L7Components.switchRow(context, text(R.string.config_bluetooth_music),
                     text(R.string.config_bluetooth_hint), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
                     AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
                 })
             }
-            1 -> {
-                parent.addView(L7Components.note(context, text(R.string.config_steering_hint)))
-                GalaxyProfileFieldsView.add(context, parent, R.string.config_page_steering)
+            1 -> L7SettingsSection.add(parent, description = text(R.string.config_steering_hint)) { card ->
+                GalaxyProfileFieldsView.add(context, card, R.string.config_page_steering)
             }
             2 -> {
                 val audio = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -32,16 +31,15 @@ internal object GalaxyConfigurationSections {
                     L7AudioRouteDialog.show(context, title, current, role, apply)
                 }
             }
-            3 -> {
-                GalaxyProfileFieldsView.add(context, parent, R.string.l7_section_projection,
+            3 -> L7SettingsSection.add(parent) { card ->
+                GalaxyProfileFieldsView.add(context, card, R.string.l7_section_projection,
                     setOf("hide_top_bar", "hide_bottom_bar", "right_hand_drive"))
-                GalaxyVideoDecoderSettings.add(context, parent)
-                GalaxyProfileFieldsView.add(context, parent, R.string.l7_section_projection,
+                GalaxyVideoDecoderSettings.add(context, card)
+                GalaxyProfileFieldsView.add(context, card, R.string.l7_section_projection,
                     setOf("hevc_enabled", "hevc_software_decoder", "safe_area_draw_outside", "adapt_pip_resolution"))
             }
-            else -> {
-                parent.addView(L7Components.note(context, text(R.string.config_reporting_hint)))
-                GalaxyProfileFieldsView.add(context, parent, R.string.config_page_reporting)
+            else -> L7SettingsSection.add(parent, description = text(R.string.config_reporting_hint)) { card ->
+                GalaxyProfileFieldsView.add(context, card, R.string.config_page_reporting)
             }
         }
         parent.addView(L7Components.note(context, text(R.string.config_page_next_connection)))
