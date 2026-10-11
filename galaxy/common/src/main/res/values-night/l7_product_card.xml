@@ -2,6 +2,6 @@
     <color name="l7_product_card_start">#223C38</color>
     <color name="l7_product_card_end">#293648</color>
     <color name="l7_product_card_border">#3E5356</color>
-    <color name="l7_product_card_badge">#26FFFFFF</color>
+    <color name="l7_product_card_version">#A8BED6</color>
     <color name="l7_product_card_detail">#A9D8C9</color>
 </resources>
