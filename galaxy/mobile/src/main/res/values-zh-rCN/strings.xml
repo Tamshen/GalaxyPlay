@@ -1,6 +1,7 @@
 <resources>
     <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">调整 CarPlay 图标和文字的大小，保存后在下次连接时应用。</string>
     <string name="app_name">GalaxyPlay</string>
+    <string name="app_description">GalaxyPlay 是面向吉利银河 L7／L6 安卓车机的 CarPlay 接收端，支持无线与 USB 连接，提供音频、画面、方向盘按键和车型偏好设置。使用需要兼容的车机、系统权限与认证配置。当前为测试版本，原车媒体／导航显示、蓝牙交接及稳定性仍需按车型与固件验证。</string>
     <string name="diplay">GalaxyPlay</string>
     <string name="about_diplay">关于 GalaxyPlay</string>
     <string name="carplay_at_home_in_your_car">银河车机 CarPlay</string>

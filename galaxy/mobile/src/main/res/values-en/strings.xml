@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GalaxyPlay</string>
+    <string name="app_description">GalaxyPlay is a CarPlay receiver for Geely Galaxy L7 and L6 Android head units. It supports wireless and USB connections, with audio, display, steering wheel button and vehicle preference settings. A compatible head unit, system permissions and authentication configuration are required. This is a test version; OEM media and navigation displays, Bluetooth handoff and stability still require validation for each vehicle and firmware.</string>
     <string name="diplay">GalaxyPlay</string>
     <string name="home_public_preview">GalaxyPlay ·\u0020</string>
     <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">Adjust CarPlay icon and text size. Saved changes apply on the next connection.</string>
