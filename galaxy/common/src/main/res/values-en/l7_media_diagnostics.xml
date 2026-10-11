@@ -31,7 +31,7 @@
     <string name="l7_audio_media">Media music</string>
     <string name="l7_audio_assistant">Voice assistant (Siri)</string>
     <string name="l7_audio_navigation">Navigation prompts</string>
-    <string name="l7_audio_roles_note">The head unit assigns speakers by usage: music 1, navigation 12, calls 2 and Siri 16. These are usage values, not device IDs. Changes apply on the next connection.</string>
+    <string name="l7_audio_roles_note">Choose and preview sound routing for music, navigation, Siri and calls. Save changes to apply them on the next connection.</string>
     <string name="l7_audio_route_select">Output routing</string>
     <string name="l7_audio_route_choose">Select</string>
     <string name="l7_audio_route_help">1. Choose a route. 2. Preview and record. 3. Confirm.\nPreview does not save. Also save on the vehicle page.</string>

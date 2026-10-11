@@ -101,9 +101,6 @@ class GalaxySettingsActivity : ComponentActivity() {
         voiceDebugPage?.permissionResult(granted)
         fullDebugPage?.permissionResult(granted)
     }
-    private val audioTemplateFiles = L7AudioTemplateFiles(this) {
-        if (page == "settings-audio") render()
-    }
     private val probeState = L7ProbeUiState()
     private val debugTasks by lazy { L7DebugTasks(this) {
         probeState.showCurrent(); page = "settings-debug-results"; render()
@@ -168,7 +165,6 @@ class GalaxySettingsActivity : ComponentActivity() {
         probeState.query = savedInstanceState?.getString("probe_query").orEmpty()
         probeState.selectedReport = savedInstanceState?.getString("probe_selected_report")
         probeExporter.pendingId = savedInstanceState?.getString("probe_export_id")
-        audioTemplateFiles.restore(savedInstanceState)
         if (l7Ui) L7DebugLog.record("GalaxyPlay 打开 version=${version()} Android=${Build.VERSION.RELEASE}")
         languagePreferenceAtCreate = AppLocale.preference(this)
         WindowCompat.setDecorFitsSystemWindows(window, true)
@@ -220,7 +216,6 @@ class GalaxySettingsActivity : ComponentActivity() {
         outState.putString("probe_query", probeState.query)
         outState.putString("probe_selected_report", probeState.selectedReport)
         outState.putString("probe_export_id", probeExporter.pendingId)
-        audioTemplateFiles.save(outState)
         super.onSaveInstanceState(outState)
     }
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -317,7 +312,6 @@ class GalaxySettingsActivity : ComponentActivity() {
         steeringDebugPage?.close(); steeringDebugPage = null
         debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
         audioModelConfirmation.close()
-        audioTemplateFiles.close()
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         codecProbePage?.close(); codecProbePage = null
@@ -616,7 +610,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun settings(content: LinearLayout) {
         when (page) {
             "settings-display" -> L7DisplaySettings.add(this, content)
-            "settings-audio" -> L7AudioSettings.page(this, content, audioTemplateFiles::importFile, audioTemplateFiles::exportFile) { title, current, role, save ->
+            "settings-audio" -> L7AudioSettings.page(this, content) { title, current, role, save ->
                 channelDialog?.dismiss()
                 channelDialog = L7AudioRouteDialog.show(this, title, current, role, save)
             }

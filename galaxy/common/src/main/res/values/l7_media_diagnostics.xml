@@ -30,7 +30,7 @@
     <string name="l7_audio_media">媒体音乐</string>
     <string name="l7_audio_assistant">语音助手（Siri）</string>
     <string name="l7_audio_navigation">导航播报</string>
-    <string name="l7_audio_roles_note">默认按音频用途交给车机分配扬声器。音乐 1、导航 12、电话 2、Siri 16 均为 usage 编号，不是设备 ID。修改下次连接生效。</string>
+    <string name="l7_audio_roles_note">选择音乐、导航、Siri 与通话的声音路由，可分别试听。修改后保存，下次连接生效。</string>
     <string name="l7_audio_route_select">输出路由</string>
     <string name="l7_audio_route_choose">选择</string>
     <string name="l7_audio_route_help">① 选择路由；② 试听并记录；③ 确定修改。\n试听不保存，车型页还需点击底部“保存”。</string>
