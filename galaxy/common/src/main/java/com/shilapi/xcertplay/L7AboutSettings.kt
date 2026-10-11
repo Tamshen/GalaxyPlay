@@ -12,8 +12,8 @@ internal object L7AboutSettings {
             card.addView(L7SettingRow(activity, text(R.string.diplay), text(R.string.carplay_at_home_in_your_car))
                 .apply { setValue(version) })
         }
-        L7SettingsSection.actions(parent) { actions ->
-            actions.addView(L7Components.actionButton(activity, text(R.string.update_check), click = checkUpdate))
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, text(R.string.update_check), click = checkUpdate))
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_agreement)) { card ->
             card.addView(L7Components.actionRow(activity, text(R.string.l7_agreement_entry),
