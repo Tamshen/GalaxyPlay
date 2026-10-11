@@ -4,6 +4,9 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.TextView
 import java.lang.ref.WeakReference
 import com.shilapi.xcertplay.host.R
 
@@ -34,6 +37,7 @@ internal object L7Dialogs {
         var checked = -1
         var singleChoice = false
         var itemClick: DialogInterface.OnClickListener? = null
+        var itemEnabled: ((Int) -> Boolean)? = null
         var fixedHeight = false
         var cancelable = true
         var cancel: DialogInterface.OnCancelListener? = null
@@ -66,9 +70,24 @@ internal object L7Dialogs {
             platform.setItems(items, click)
         }
 
-        fun setSingleChoiceItems(items: Array<out CharSequence>, checked: Int, click: DialogInterface.OnClickListener) = apply {
+        fun setSingleChoiceItems(items: Array<out CharSequence>, checked: Int, click: DialogInterface.OnClickListener) =
+            setSingleChoiceItems(items, checked, null, click)
+
+        fun setSingleChoiceItems(items: Array<out CharSequence>, checked: Int, enabled: ((Int) -> Boolean)?,
+                                 click: DialogInterface.OnClickListener) = apply {
             content.items = items; content.checked = checked; content.itemClick = click; content.singleChoice = true
-            platform.setSingleChoiceItems(items, checked, click)
+            content.itemEnabled = enabled
+            if (enabled == null) platform.setSingleChoiceItems(items, checked, click)
+            else platform.setSingleChoiceItems(object : ArrayAdapter<CharSequence>(context,
+                android.R.layout.simple_list_item_single_choice, items) {
+                override fun areAllItemsEnabled() = false
+                override fun isEnabled(position: Int) = enabled(position)
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                    super.getView(position, convertView, parent).apply {
+                        isEnabled = enabled(position)
+                        L7Ui.text(this as TextView, if (isEnabled) R.color.product_ui_text else R.color.product_ui_disabled)
+                    }
+            }, checked) { dialog, index -> if (enabled(index)) click.onClick(dialog, index) }
         }
 
         private fun action(which: Int, label: CharSequence, click: DialogInterface.OnClickListener?) = apply {
