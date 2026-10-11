@@ -1038,6 +1038,8 @@ private class AudioRenderer(
     @Volatile private var running = true
     @Volatile private var started = false
     private var codec: MediaCodec? = null
+    private var softwareOpus: SoftwareOpusDecoder? = null
+    private var softwareDecodeErrors = 0
     private var track: AudioTrack? = null
     private var pcm = ByteArray(64 * 1024)
     private var playbackStarted = false
@@ -1233,8 +1235,13 @@ private class AudioRenderer(
         } catch (error: Exception) {
             if (mime == MediaFormat.MIMETYPE_AUDIO_OPUS) {
                 AudioCodecCapabilities.rejectOpusDecoder()
+                softwareOpus = runCatching { SoftwareOpusDecoder(format.sampleRate, format.channels) }.getOrNull()
+                if (softwareOpus != null) {
+                    runCatching { report("Audio: decoder ready audioType=${format.audioType} codec=OPUS backend=SOFTWARE") }
+                    return
+                }
                 runCatching { report("Audio: codec offer codec=OPUS direction=OUTPUT outcome=REJECTED " +
-                    "nextConnection=LPCM reason=ALL_CANDIDATES_FAILED stage=$diagnosticStage") }
+                    "reason=ALL_BACKENDS_FAILED stage=$diagnosticStage") }
             }
             Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
             reportFailure(error)
@@ -1501,9 +1508,26 @@ private class AudioRenderer(
                     }
                     return
                 }
-                feedCodec(accessUnit, timestampUs)
+                val software = softwareOpus
+                if (software == null) feedCodec(accessUnit, timestampUs)
+                else decodeSoftwareOpus(software, accessUnit)
             }
         }
+    }
+
+    private fun decodeSoftwareOpus(decoder: SoftwareOpusDecoder, payload: ByteArray) {
+        diagnosticStage = "decoder-software"
+        val size = try { decoder.decode(payload) } catch (error: Exception) {
+            inputDropped++
+            softwareDecodeErrors++
+            if (softwareDecodeErrors <= 3) runCatching {
+                report("Audio: decoder packet rejected codec=OPUS backend=SOFTWARE error=${error.javaClass.simpleName}")
+            }
+            return
+        }
+        inputQueued++
+        outputBuffers++
+        writePcm(decoder.pcm, 0, size)
     }
 
     private fun sampleTimestampUs(sample: Int): Long =
@@ -1765,6 +1789,8 @@ private class AudioRenderer(
 
     @Synchronized
     private fun release() {
+        softwareOpus?.close()
+        softwareOpus = null
         routeBinding?.close()
         routeBinding = null
         val codec = codec
@@ -1806,7 +1832,7 @@ private class AudioRenderer(
     private companion object {
         const val TAG = "xcertplay-usb"
         const val AAC_OBJECT_TYPE_LC = 2
-        const val MIN_OPUS_PACKET_BYTES = 4
+        const val MIN_OPUS_PACKET_BYTES = 1
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
         const val INPUT_TIMEOUT_US = 10_000L

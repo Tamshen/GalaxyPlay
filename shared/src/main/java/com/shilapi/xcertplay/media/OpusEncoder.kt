@@ -28,22 +28,26 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
                 "error=${error.javaClass.simpleName}") })
     } catch (error: Exception) {
         AudioCodecCapabilities.rejectOpusEncoder()
-        Log.w(TAG, "Opus microphone encoder unavailable error=${error.javaClass.simpleName}; next connection uses PCM")
+        Log.w(TAG, "Opus microphone encoder unavailable error=${error.javaClass.simpleName}; trying software fallback")
         null
     }
+    private val software = if (codec == null) runCatching { SoftwareOpusEncoder(bitrate) }
+        .onSuccess { Log.i(TAG, "Opus microphone encoder backend=SOFTWARE") }
+        .getOrNull() else null
     private val bufferInfo = MediaCodec.BufferInfo()
     private var presentationTimeUs = 0L
     private var closed = false
     private var outputPackets = 0
 
-    val available: Boolean get() = codec != null && !closed
+    val available: Boolean get() = (codec != null || software?.available == true) && !closed
 
     /**
      * Queues one 20 ms PCM frame and returns all Opus access units made available by the codec.
      */
     fun encode(pcm: ByteArray): List<ByteArray> {
-        val codec = codec ?: return emptyList()
         if (closed) return emptyList()
+        software?.let { return it.encode(pcm) }
+        val codec = codec ?: return emptyList()
         val inputIndex = try {
             codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
         } catch (error: Exception) {
@@ -113,6 +117,7 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
     override fun close() {
         if (closed) return
         closed = true
+        software?.close()
         val codec = codec ?: return
         try {
             codec.stop()

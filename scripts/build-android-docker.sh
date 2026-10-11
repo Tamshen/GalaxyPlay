@@ -61,6 +61,8 @@ fi
 
 docker_args=(--mount "type=bind,source=$project_dir,target=/workspace"
     --mount "type=volume,source=$cache_volume,target=/var/cache/galaxyplay/gradle"
+    # Robolectric 单独使用 Maven 本地仓库，随项目缓存持久化，避免临时容器重复下载 Android 运行时。
+    --mount "type=volume,source=$cache_volume,target=/root/.m2"
     # 固定调试密钥，避免临时容器退出后重建密钥而无法覆盖安装。
     --mount type=volume,source=galaxyplay-debug-signing,target=/root/.android)
 needs_auth=false

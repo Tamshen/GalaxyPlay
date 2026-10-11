@@ -3,13 +3,13 @@ package com.shilapi.xcertplay.media
 import android.media.MediaCodecList
 import android.media.MediaFormat
 
-/** 上下行分别核对；当前进程已确认不可启动的 Opus 不再向下一次连接声明。 */
+/** 上下行分别核对；系统编解码器拒绝后仍可使用已内置的软件后备。 */
 object AudioCodecCapabilities {
     @Volatile private var decoderRejected = false
     @Volatile private var encoderRejected = false
 
-    fun opusOutputAvailable(): Boolean = !decoderRejected && opusCandidates(false).isNotEmpty()
-    fun opusInputAvailable(): Boolean = !encoderRejected && opusCandidates(true).isNotEmpty()
+    fun opusOutputAvailable(): Boolean = SoftwareOpusSupport.outputAvailable || (!decoderRejected && opusCandidates(false).isNotEmpty())
+    fun opusInputAvailable(): Boolean = SoftwareOpusSupport.inputAvailable || (!encoderRejected && opusCandidates(true).isNotEmpty())
     fun rejectOpusDecoder() { decoderRejected = true }
     fun rejectOpusEncoder() { encoderRejected = true }
 

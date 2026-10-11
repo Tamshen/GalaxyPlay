@@ -31,7 +31,7 @@
      }
  
      compileOptions {
-@@ -21,13 +36,24 @@
+@@ -21,13 +36,27 @@
      buildFeatures {
          compose = true
      }
@@ -43,6 +43,9 @@
 +    // 原生组件回归使用实际合并资源，不能用单测占位 R 代替主题。
 +    testOptions { unitTests.isIncludeAndroidResources = true }
 +    // 测试集中存放，源集映射保留模块依赖与 internal 可见性。
++    testOptions.unitTests.all {
++        it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
++    }
 +    sourceSets {
 +        getByName("main").kotlin.directories.add(rootProject.file("galaxy/common/src/main/java").path)
 +        getByName("main").java.directories.add(rootProject.file("galaxy/common/src/main/java").path)
@@ -61,7 +64,7 @@
  
  dependencies {
      api(project(":shared"))
-@@ -38,12 +64,13 @@
+@@ -38,12 +67,13 @@
      implementation(libs.androidx.compose.ui.graphics)
      implementation(libs.androidx.compose.ui.tooling.preview)
      implementation(libs.androidx.core.ktx)
@@ -83,7 +86,7 @@
  }
 --- a/gradle/libs.versions.toml
 +++ b/gradle/libs.versions.toml
-@@ -10,15 +10,20 @@
+@@ -10,15 +10,22 @@
  appAutomotive = "1.7.0"
  app = "1.4.0"
  junit = "4.13.2"
@@ -91,12 +94,14 @@
 +mockito = "5.20.0"
  bouncycastle = "1.79"
  jmdns = "3.6.3"
++concentus = "1.0.0"
 +
 +dexmaker = "2.28.6"
 +
  media3 = "1.11.1"
  
  [libraries]
++concentus = { group = "com.plasmoverse", name = "concentus", version.ref = "concentus" }
 +dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
  androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
  androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -105,7 +110,7 @@
  androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
  androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
  androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-@@ -30,8 +35,12 @@
+@@ -30,8 +37,12 @@
  androidx-app-automotive = { group = "androidx.car.app", name = "app-automotive", version.ref = "appAutomotive" }
  androidx-app = { group = "androidx.car.app", name = "app", version.ref = "app" }
  junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -305,7 +310,7 @@
          targetSdk = 37
  
          ndk {
-@@ -15,7 +15,7 @@
+@@ -15,11 +15,14 @@
  
          externalNativeBuild {
              ndkBuild {
@@ -314,7 +319,14 @@
              }
          }
  
-@@ -31,11 +31,22 @@
+         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
++    }
++    testOptions.unitTests.all {
++        systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
+     }
+     ndkVersion = '28.2.13676358'
+     externalNativeBuild {
+@@ -31,11 +34,23 @@
          sourceCompatibility = JavaVersion.VERSION_11
          targetCompatibility = JavaVersion.VERSION_11
      }
@@ -333,6 +345,7 @@
      implementation libs.androidx.app
      implementation libs.bouncycastle
      implementation libs.jmdns
++    implementation libs.concentus
      testImplementation libs.junit
 -    testImplementation 'org.robolectric:robolectric:4.17'
 +    testImplementation libs.robolectric

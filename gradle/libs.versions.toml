@@ -14,12 +14,14 @@ robolectric = "4.17"
 mockito = "5.20.0"
 bouncycastle = "1.79"
 jmdns = "3.6.3"
+concentus = "1.0.0"
 
 dexmaker = "2.28.6"
 
 media3 = "1.11.1"
 
 [libraries]
+concentus = { group = "com.plasmoverse", name = "concentus", version.ref = "concentus" }
 dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }

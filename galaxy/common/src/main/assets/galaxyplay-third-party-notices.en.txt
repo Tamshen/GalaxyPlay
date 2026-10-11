@@ -20,6 +20,10 @@ https://github.com/carlito12345/DiPlay/blob/0109cf7f6948ae1823099ca29170e83df3cd
 
 Runtime components
 
+Concentus 1.0.0 — BSD-3-Clause. Pure Java Opus encoder and decoder, published as com.plasmoverse:concentus:1.0.0. Software fallback for wireless audio and microphone streams when system Opus codecs cannot start; audio routing is unchanged. The original META-INF/LICENSE from the artifact is bundled as licenses/Concentus-LICENSE.txt.
+https://github.com/lostromb/concentus
+https://github.com/plasmoapp/concentus
+
 AndroidX — Apache-2.0. Android support components including Core, Activity, Lifecycle and Car App. Copyright notices remain with the respective Android Open Source Project sources.
 https://github.com/androidx/androidx
 
