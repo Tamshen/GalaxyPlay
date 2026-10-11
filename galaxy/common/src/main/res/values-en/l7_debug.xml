@@ -30,7 +30,7 @@
     <string name="l7_debug_copied">Logs copied</string>
     <string name="l7_debug_clear">Clear</string>
     <string name="l7_debug_refresh">Refresh</string>
-    <string name="l7_debug_drag">L7 logs · Drag to move</string>
+    <string name="l7_debug_drag">GalaxyPlay logs · Drag to move</string>
     <string name="l7_debug_connected">Connected</string>
     <string name="l7_debug_connecting">Connecting</string>
     <string name="l7_debug_disconnected">Disconnected</string>

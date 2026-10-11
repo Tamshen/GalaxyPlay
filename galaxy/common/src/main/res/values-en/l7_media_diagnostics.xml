@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_physical_size_automatic">Automatically matches the L7 display area. The panel is approximately %1$d×%2$d mm, calculated from the 13.2-inch specification. The floating sidebar does not change the projection size.</string>
+    <string name="l7_physical_size_automatic">Automatically matches the head unit display area. The current panel is approximately %1$d×%2$d mm, calculated from the configured screen specification. The floating sidebar does not change the projection size.</string>
     <string-array name="l7_audio_stream_names">
         <item>Music · usage 1</item>
         <item>Navigation · usage 12</item>
@@ -59,7 +59,7 @@
     <string name="l7_audio_restore">Restore usage routing</string>
     <string name="l7_audio_restore_hint">Apply recommended usage settings</string>
     <string name="l7_audio_restore_confirm">Restore music usage 1, navigation usage 12 and Siri usage 16; calls use usage 2. Enable audio focus and advanced mapping, disable extra BUS routing, and restore default buffering and call effects. Pairing, authentication and Bluetooth handoff settings stay unchanged. Applies on the next connection.</string>
-    <string name="l7_audio_headrest_note">L7 headrest check: enable the vehicle’s driver audio mode and check navigation, Siri and calls separately. Music ducking follows Boyue focus behavior. Turning audio focus off affects all audio; the head unit may still apply its own mixing policy.</string>
+    <string name="l7_audio_headrest_note">For vehicles with headrest speakers, enable the vehicle’s headrest audio mode, if available, and preview navigation, Siri and calls separately. Music ducking depends on audio focus and the vehicle’s mixing policy. Turning audio focus off affects all audio.</string>
     <string name="l7_audio_phone">Phone calls</string>
     <string name="l7_audio_phone_usage">Calls · usage 2</string>
     <string name="l7_audio_phone_note">Choose and preview an output route. Save, reconnect, then verify during a real call.</string>
