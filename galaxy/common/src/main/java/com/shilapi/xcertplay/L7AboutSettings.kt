@@ -9,10 +9,11 @@ internal object L7AboutSettings {
     fun add(activity: Activity, parent: LinearLayout, version: String, checkUpdate: () -> Unit = {}) {
         fun text(id: Int) = activity.getString(id)
         L7SettingsSection.add(parent, text(R.string.l7_section_product)) { card ->
-            card.addView(L7SettingRow(activity, text(R.string.diplay), text(R.string.carplay_at_home_in_your_car)))
-            card.addView(L7SettingRow(activity, text(R.string.l7_app_version)).apply { setValue(version) })
-            card.addView(L7Components.actionRow(activity, text(R.string.update_check),
-                text(R.string.update_check_hint), click = checkUpdate))
+            card.addView(L7SettingRow(activity, text(R.string.diplay), text(R.string.carplay_at_home_in_your_car))
+                .apply { setValue(version) })
+        }
+        L7SettingsSection.actions(parent) { actions ->
+            actions.addView(L7Components.actionButton(activity, text(R.string.update_check), click = checkUpdate))
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_agreement)) { card ->
             card.addView(L7Components.actionRow(activity, text(R.string.l7_agreement_entry),
