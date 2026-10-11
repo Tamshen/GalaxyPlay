@@ -29,14 +29,10 @@ internal object L7ProductInformationCard {
 private class ProductIdentity(context: Context, version: String) : LinearLayout(context) {
     private val header = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
     private val footer = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
-    private val versionBadge = LinearLayout(context).apply {
-        orientation = VERTICAL
-        gravity = Gravity.END
-        val inset = L7Components.dp(context, 12)
-        setPadding(inset, inset, inset, inset)
-        L7Ui.surface(this, R.color.l7_product_card_badge, radius = 6)
-        addView(L7Typography.text(context, context.getString(R.string.l7_app_version), L7Typography.Role.DESCRIPTION))
-        addView(L7Typography.text(context, version, L7Typography.Role.LABEL))
+    private val versionLabel = L7Typography.text(context,
+        context.getString(R.string.l7_product_version, version), L7Typography.Role.VALUE).apply {
+        contentDescription = "${context.getString(R.string.l7_app_version)} $version"
+        L7Ui.text(this, R.color.l7_product_card_version)
     }
     private var compact: Boolean? = null
 
@@ -64,8 +60,12 @@ private class ProductIdentity(context: Context, version: String) : LinearLayout(
         // 按实际文字缩放和卡片宽度判断，避免版本挤压品牌名称与说明。
         val narrow = MeasureSpec.getSize(widthMeasureSpec) < dp(480) * resources.configuration.fontScale
         if (compact != narrow) {
-            (versionBadge.parent as? LinearLayout)?.removeView(versionBadge)
-            (if (narrow) footer else header).addView(versionBadge, LayoutParams(-2, -2).apply { marginStart = dp(16) })
+            (versionLabel.parent as? LinearLayout)?.removeView(versionLabel)
+            (if (narrow) footer else header).addView(versionLabel, LayoutParams(-2, -2).apply {
+                marginStart = dp(16)
+                gravity = if (narrow) Gravity.CENTER_VERTICAL else Gravity.TOP
+                topMargin = if (narrow) 0 else dp(3)
+            })
             compact = narrow
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
