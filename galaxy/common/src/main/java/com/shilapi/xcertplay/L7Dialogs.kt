@@ -34,6 +34,7 @@ internal object L7Dialogs {
         var checked = -1
         var singleChoice = false
         var itemClick: DialogInterface.OnClickListener? = null
+        var fixedHeight = false
         var cancelable = true
         var cancel: DialogInterface.OnCancelListener? = null
         var dismiss: DialogInterface.OnDismissListener? = null
@@ -49,6 +50,7 @@ internal object L7Dialogs {
         fun setTitle(value: CharSequence) = apply { content.title = value; platform.setTitle(value) }
         fun setMessage(value: Int) = setMessage(context.getString(value))
         fun setMessage(value: CharSequence) = apply { content.message = value; platform.setMessage(value) }
+        fun setFixedHeight() = apply { content.fixedHeight = true }
         fun setView(view: View) = apply { content.view = view; platform.setView(view) }
         fun setCancelable(value: Boolean) = apply { content.cancelable = value; platform.setCancelable(value) }
         fun setOnCancelListener(listener: DialogInterface.OnCancelListener) = apply {

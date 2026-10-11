@@ -29,6 +29,7 @@ internal class L7TaskProgressDialog(
     private val onRetry: () -> Unit = {},
     private val onResult: () -> Unit = {},
     private val onDismiss: () -> Unit = {},
+    fixedHeight: Boolean = false,
 ) {
     private val main = Handler(Looper.getMainLooper())
     private var confirmation: AlertDialog? = null
@@ -52,7 +53,7 @@ internal class L7TaskProgressDialog(
         })
         addView(detail)
     }
-    internal val dialog: AlertDialog = L7Dialogs.builder(activity).setTitle(title).setView(body)
+    internal val dialog: AlertDialog = L7Dialogs.builder(activity).apply { if (fixedHeight) setFixedHeight() }.setTitle(title).setView(body)
         .setPositiveButton(stopLabel, null).setNegativeButton(R.string.close, null)
         .setOnCloseRequest { requestClose() }.setOnDismissListener {
             main.removeCallbacksAndMessages(null)

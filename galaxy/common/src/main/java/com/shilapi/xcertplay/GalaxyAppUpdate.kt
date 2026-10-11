@@ -31,6 +31,7 @@ internal class GalaxyAppUpdate(
     private var dialog: L7TaskProgressDialog? = null
     @Volatile private var closed = false
     private var ready: File? = null
+    private var restoreChecked = false
     private var retry: () -> Unit = {}
     private var result: () -> Unit = {}
 
@@ -86,6 +87,7 @@ internal class GalaxyAppUpdate(
         // 安装前重新验证私有缓存和当前已安装版本，授权或返回不自动触发安装。
         run(R.string.update_verifying, { install(latest, file) }) { token ->
             verify(file, latest, token)
+            GalaxyUpdateCache.save(activity.applicationContext, file, latest)
             main.post {
                 if (!current(token)) return@post
                 state = L7TaskProgress(false, text(R.string.update_ready, latest.version), detail = text(R.string.update_ready_hint),
@@ -112,7 +114,7 @@ internal class GalaxyAppUpdate(
                 }, onDismiss = {
                     // 旧窗口的延后关闭通知不能取消已经启动的下一阶段。
                     if (dialog === window) { stop(); dialog = null }
-                })
+                }, fixedHeight = true)
             dialog = window
             window.show()
         } else dialog?.resume()
@@ -151,7 +153,27 @@ internal class GalaxyAppUpdate(
         else -> R.string.update_network_error
     }
     override fun onPause(owner: LifecycleOwner) { dialog?.pause() }
-    override fun onResume(owner: LifecycleOwner) { dialog?.resume() }
+    override fun onResume(owner: LifecycleOwner) {
+        dialog?.resume()
+        if (restoreChecked || !L7Agreement.accepted(activity)) return
+        restoreChecked = true
+        val pending = GalaxyUpdateCache.load(activity) ?: return
+        ready = pending.file
+        restore(pending)
+    }
+    private fun restore(pending: GalaxyUpdateCache.Pending) {
+        run(R.string.update_verifying, { restore(pending) }) { token ->
+            verify(pending.file, pending.release, token)
+            main.post {
+                if (!current(token)) return@post
+                state = L7TaskProgress(false, text(R.string.update_ready, pending.release.version),
+                    detail = text(if (activity.packageManager.canRequestPackageInstalls()) R.string.update_permission_ready
+                        else R.string.update_ready_hint), result = true, resultLabel = R.string.update_install, showProgress = false)
+                result = { install(pending.release, pending.file) }
+                finish(token)
+            }
+        }
+    }
     override fun onStop(owner: LifecycleOwner) { stop() }
     override fun onDestroy(owner: LifecycleOwner) {
         closed = true; stop(); worker.shutdownNow()
