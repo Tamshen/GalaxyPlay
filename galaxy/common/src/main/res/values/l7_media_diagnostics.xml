@@ -55,9 +55,6 @@
     <string name="l7_call_processing_note">通话时使用系统支持的音效；若出现回声、音量或路由异常可关闭。修改下次连接生效。</string>
     <string name="l7_audio_bus">尝试 BUS 路由</string>
     <string name="l7_audio_bus_note">默认关闭，播放与录音交给系统，保持原版音频路径。仅在确认车机支持后开启；设备缺失或请求失败时回退系统。修改下次连接生效。</string>
-    <string name="l7_audio_restore">恢复用途路由</string>
-    <string name="l7_audio_restore_hint">使用推荐的 usage 配置</string>
-    <string name="l7_audio_restore_confirm">恢复音乐 usage 1、导航 usage 12、Siri usage 16；电话 usage 2。开启音频焦点与高级映射，关闭额外 BUS 路由，恢复默认缓冲与通话音效。配对、认证与蓝牙媒体交接设置保留。下次连接生效。</string>
     <string name="l7_audio_headrest_note">有头枕音响的车型，可开启原车头枕音响模式（如“驾享”），分别试听导航、Siri 和通话。音乐避让由音频焦点与车机混音策略共同决定；关闭音频焦点会影响全部音频。</string>
     <string name="l7_audio_phone">电话</string>
     <string name="l7_audio_phone_usage">通话 · usage 2</string>

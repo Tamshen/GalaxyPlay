@@ -1,8 +1,6 @@
 package com.shilapi.xcertplay
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -12,9 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowAlertDialog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
@@ -46,53 +42,12 @@ class L7AudioSettingsTest {
             assertNull(row(parent, context.getString(R.string.l7_template_detect)))
             assertNotNull(row(parent, context.getString(R.string.music_buffer)))
             assertNull(row(parent, context.getString(R.string.l7_template_select)))
+            assertNull(row(parent, "恢复用途路由"))
             assertEquals(mode, L7AudioTemplates.mode(context))
         }
     }
 
-    @Test fun l6ProfileRestoreKeepsItsModelAndCustomFile() {
-        val context = context()
-        val parent = LinearLayout(context)
-        L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.L6)
-        L7AudioSettings.page(context, parent) { _, _, _, _ -> }
-        assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
-        L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(
-            com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION, 19))
-        parent.removeAllViews(); L7AudioSettings.page(context, parent) { _, _, _, _ -> }
-        row(parent, context.getString(R.string.l7_audio_restore))!!.performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-        val restore = ShadowAlertDialog.getLatestAlertDialog()
-        assertEquals(context.getString(R.string.l7_template_restore_confirm),
-            restore.findViewById<android.widget.TextView>(android.R.id.message).text.toString())
-        restore.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(L7AudioTemplates.Mode.L6, L7AudioTemplates.mode(context))
-        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
-        assertEquals(19, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.NAVIGATION))
-    }
-
-    @Test fun restoringRequiresConfirmationAndPreservesCustomFile() {
-        val context = context()
-        AirPlayPersistence.saveMediaAudioChannel(context, 3)
-        val parent = LinearLayout(context)
-        L7AudioSettings.page(context, parent) { _, _, _, _ -> }
-        fun restore() {
-            row(parent, context.getString(R.string.l7_audio_restore))!!.performClick()
-            shadowOf(Looper.getMainLooper()).idle()
-        }
-        restore()
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
-        assertEquals(3, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
-        restore()
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(L7AudioTemplates.Mode.L7, L7AudioTemplates.mode(context))
-        assertNotNull(row(parent, context.getString(R.string.l7_audio_media)))
-        L7AudioTemplates.select(context, L7AudioTemplates.Mode.CUSTOM)
-        assertEquals(3, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
-    }
-
-    @Test fun customVehicleRestoresSystemDefaultsWithoutFileToolsOrDeletingItsFile() {
+    @Test fun openingCustomVehicleAudioKeepsItsRoutesAndFile() {
         val context = context()
         L7AudioTemplates.selectModel(context, L7AudioTemplates.Model.CUSTOM)
         L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withChoice(
@@ -102,12 +57,9 @@ class L7AudioSettingsTest {
         val parent = LinearLayout(context)
         L7AudioSettings.page(context, parent) { _, _, _, _ -> }
         assertNull(row(parent, context.getString(R.string.l7_template_edit)))
-        row(parent, context.getString(R.string.l7_audio_restore))!!.performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(L7AudioTemplates.Model.CUSTOM, L7AudioTemplates.model(context))
-        assertEquals(L7AudioTemplates.Mode.SYSTEM, L7AudioTemplates.mode(context))
+        assertEquals(L7AudioTemplates.Mode.CUSTOM, L7AudioTemplates.mode(context))
+        assertEquals(18, L7AudioTemplates.load(context).choice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA))
         assertNull(row(parent, context.getString(R.string.l7_template_select)))
         assertEquals(previous, file.readText())
     }

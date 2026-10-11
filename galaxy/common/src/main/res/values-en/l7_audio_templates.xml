@@ -22,15 +22,13 @@
     <string name="l7_template_l7_note">The vehicle handles music, navigation and call playback.</string>
     <string name="l7_template_bus_note">Uses BUS output addresses from the configuration. Falls back to system routing when unavailable.</string>
     <string name="l7_template_custom_note">Adjust music, navigation, Siri and call channels directly. Applying a vehicle template above replaces these settings. Save after editing.</string>
-    <string name="l7_template_recovery">Custom audio settings could not be read. Using default routing. Choose a channel and save, or restore default routing.</string>
+    <string name="l7_template_recovery">Custom audio settings could not be read. Using default routing. Choose a channel and save, or use “Reset current configuration” at the top.</string>
     <string name="l7_template_edit">Edit configuration file</string>
     <string name="l7_template_import">Import configuration file</string>
     <string name="l7_template_export">Export configuration file</string>
     <string name="l7_template_file_note">View and edit the current audio settings. The format is checked before saving.</string>
     <string name="l7_template_import_note">Choose a JSON file. Replace the current audio settings after validation and confirmation.</string>
     <string name="l7_template_export_note">Save the current audio settings as JSON for backup and debugging.</string>
-    <string name="l7_template_restore_note">Restore default channels and playback settings.</string>
-    <string name="l7_template_restore_confirm">Restore default channels, buffer, audio focus and call effects. Keep connection and app settings. Applies on the next connection.</string>
     <string name="l7_template_bus_custom_note">Try the audio paths provided by the current configuration. Fall back to system routing when unavailable. Applies on the next connection.</string>
     <string name="l7_template_schema_hint">version is 1. choices contains music, navigation and Siri policy keys: 0, 1–20 or 101–103. outputBuses contains output addresses. Optional focusGains accepts 1–4; phone focus stays at 2. Numbers are not speaker positions.</string>
     <string name="l7_template_invalid">Invalid configuration. Check the format, policy keys and BUS addresses. Maximum file size is 16 KB.</string>

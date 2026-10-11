@@ -56,9 +56,6 @@
     <string name="l7_call_processing_note">Use supported system effects during calls. Turn off if echo, volume or routing becomes worse. Applies on the next connection.</string>
     <string name="l7_audio_bus">Try BUS routing</string>
     <string name="l7_audio_bus_note">Off by default: playback and recording use system routing, matching the upstream audio path. Enable only after confirming vehicle support. Missing or rejected devices fall back to the system. Applies on the next connection.</string>
-    <string name="l7_audio_restore">Restore usage routing</string>
-    <string name="l7_audio_restore_hint">Apply recommended usage settings</string>
-    <string name="l7_audio_restore_confirm">Restore music usage 1, navigation usage 12 and Siri usage 16; calls use usage 2. Enable audio focus and advanced mapping, disable extra BUS routing, and restore default buffering and call effects. Pairing, authentication and Bluetooth handoff settings stay unchanged. Applies on the next connection.</string>
     <string name="l7_audio_headrest_note">For vehicles with headrest speakers, enable the vehicle’s headrest audio mode, if available, and preview navigation, Siri and calls separately. Music ducking depends on audio focus and the vehicle’s mixing policy. Turning audio focus off affects all audio.</string>
     <string name="l7_audio_phone">Phone calls</string>
     <string name="l7_audio_phone_usage">Calls · usage 2</string>

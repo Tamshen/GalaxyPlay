@@ -28,7 +28,6 @@ internal object L7AudioSettings {
                 }
                 refresh()
             }.apply { isEnabled = routing.hasOutputBuses })
-            restore(context, card, ::refresh)
         }
         L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = applyHint) { card ->
@@ -49,23 +48,6 @@ internal object L7AudioSettings {
 
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it, showExclusive = context !is GalaxyConfigurationContext) }
-    }
-
-    private fun restore(context: Context, card: LinearLayout, refresh: () -> Unit) {
-        card.addView(L7Components.actionRow(context, context.getString(R.string.l7_audio_restore),
-            context.getString(R.string.l7_template_restore_note)) {
-            L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
-                .setMessage(R.string.l7_template_restore_confirm)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(if (context is GalaxyConfigurationContext) R.string.profile_update_draft
-                    else R.string.l7_save_next_connection) { _, _ ->
-                    change(context) {
-                        AirPlayPersistence.restoreUsageAudioDefaults(context)
-                        L7AudioTemplates.select(context, L7AudioTemplates.defaultMode(context))
-                        refresh()
-                    }
-                }.show()
-        })
     }
 
     fun modeName(mode: L7AudioTemplates.Mode): Int = when (mode) {
