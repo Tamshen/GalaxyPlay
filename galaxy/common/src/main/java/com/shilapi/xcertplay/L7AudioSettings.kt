@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AudioOutputPolicy
 import com.shilapi.xcertplay.media.AudioOutputRole
 
-/** 四种用途都可调整和试听；确认路由后才派生自定义音频方案。 */
+/** 频道直接编辑；车型模板提供初始值，旧方案标识仅用于兼容读取。 */
 internal object L7AudioSettings {
     fun page(context: Context, parent: LinearLayout,
              onImport: (() -> Unit)? = null, onExport: (() -> Unit)? = null,
@@ -14,37 +14,19 @@ internal object L7AudioSettings {
         fun text(id: Int) = context.getString(id)
         val applyLabel = if (context is GalaxyConfigurationContext) R.string.profile_update_draft else R.string.l7_save_next_connection
         val applyHint = if (context is GalaxyConfigurationContext) "" else text(R.string.l7_setting_apply_hint)
-        val mode = L7AudioTemplates.mode(context)
-        val custom = mode == L7AudioTemplates.Mode.CUSTOM
         fun refresh() { parent.removeAllViews(); page(context, parent, onImport, onExport, open) }
         val model = L7AudioTemplates.model(context)
         val modelName = L7AudioModelConfirmation.name(context, model)
-        val modes = L7AudioTemplates.modes(context)
-        val names = modes.map { text(modeName(it)) }
-        val summary = when (mode) {
-            L7AudioTemplates.Mode.L7 -> R.string.l7_template_l7_note
-            L7AudioTemplates.Mode.L6 -> R.string.l7_template_l6_note
-            L7AudioTemplates.Mode.SYSTEM -> R.string.l7_template_system_note
-            L7AudioTemplates.Mode.BUS -> R.string.l7_template_bus_note
-            L7AudioTemplates.Mode.CUSTOM -> if (L7AudioTemplates.customInvalid(context))
-                R.string.l7_template_recovery else R.string.l7_template_custom_note
-        }
+        val summary = if (L7AudioTemplates.customInvalid(context))
+            R.string.l7_template_recovery else R.string.l7_template_custom_note
         L7SettingsSection.add(parent, text(R.string.l7_template_title),
             description = context.getString(summary, modelName), footer = applyHint) { card ->
-            card.addView(L7Components.valueRow(context, text(R.string.l7_template_select), names[modes.indexOf(mode)]) {
-                L7Components.select(context, text(R.string.l7_template_select), names, modes.indexOf(mode),
-                    text(applyLabel)) { selected ->
-                    change(context) { L7AudioTemplates.select(context, modes[selected]); refresh() }
-                }
-            })
-            if (custom) {
-                card.addView(L7Components.actionRow(context, text(R.string.l7_template_edit),
-                    text(R.string.l7_template_file_note)) { L7AudioTemplateEditor.show(context, ::refresh) })
-                onImport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_import),
-                    text(R.string.l7_template_import_note), click = it)) }
-                onExport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_export),
-                    text(R.string.l7_template_export_note), click = it)) }
-            }
+            card.addView(L7Components.actionRow(context, text(R.string.l7_template_edit),
+                text(R.string.l7_template_file_note)) { L7AudioTemplateEditor.show(context, ::refresh) })
+            onImport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_import),
+                text(R.string.l7_template_import_note), click = it)) }
+            onExport?.let { card.addView(L7Components.actionRow(context, text(R.string.l7_template_export),
+                text(R.string.l7_template_export_note), click = it)) }
             card.addView(L7Components.actionRow(context, text(R.string.l7_audio_restore),
                 context.getString(R.string.l7_template_restore_note, modelName)) {
                 L7Dialogs.builder(context).setTitle(R.string.l7_audio_restore)
@@ -65,13 +47,15 @@ internal object L7AudioSettings {
             add(context, card, custom = true, open = { title, current, role, apply ->
                 open(title, current, role) { value -> apply(value); refresh() }
             })
-            if (custom) card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
-                text(R.string.l7_template_bus_custom_note), L7AudioTemplates.load(context).preferBus) {
+            val routing = L7AudioTemplates.load(context)
+            card.addView(L7Components.switchRow(context, text(R.string.l7_audio_bus),
+                text(if (routing.hasOutputBuses) R.string.l7_template_bus_custom_note else R.string.l7_template_bus_unconfigured),
+                routing.preferBus) {
                 change(context) {
                     L7AudioTemplates.saveCustom(context, L7AudioTemplates.load(context).withBusEnabled(it))
                 }
                 refresh()
-            })
+            }.apply { isEnabled = routing.hasOutputBuses })
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = applyHint) { card ->
             val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
