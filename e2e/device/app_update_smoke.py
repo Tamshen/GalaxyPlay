@@ -121,13 +121,25 @@ try:
             tap('安装更新', 'Install update')
             wait_for('您要安装', 'Do you want', '更新此应用', 'update this')
         screenshot('system-installer')
+        install_process = adb('shell', 'pidof', package).decode().split()
         tap('安装', 'Install', '更新', 'Update')
         end = time.monotonic() + 45
         while version() != args.to_code and time.monotonic() < end:
             time.sleep(.5)
         assert version() == args.to_code, '系统安装未完成'
-        adb('shell', 'am', 'start', '-n', component, '--es', 'page', 'settings-about')
-        wait_for('检查更新', 'Check for updates')
+        # 包管理器版本先更新，随后才终止旧进程；此期间启动会被安装收尾关闭。
+        end = time.monotonic() + 15
+        while True:
+            try:
+                running = adb('shell', 'pidof', package).decode().split()
+            except subprocess.CalledProcessError:
+                running = []
+            if not set(install_process).intersection(running):
+                break
+            assert time.monotonic() < end, '系统尚未结束旧版进程'
+            time.sleep(.3)
+        adb('shell', 'am', 'start', '-W', '-n', component, '--es', 'page', 'settings-about')
+        wait_for('检查更新' , 'Check for updates')
         tap('检查更新', 'Check for updates')
         wait_for('当前已是最新版本', 'You are up to date')
         screenshot('current-after-install')

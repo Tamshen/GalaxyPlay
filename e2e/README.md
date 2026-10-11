@@ -16,9 +16,9 @@
 
 ## 在线更新验收
 
-`GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、长说明滚动／横竖屏大字号固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
+`GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、长说明滚动／横竖屏大字号与最大 480 dpi 界面尺寸固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
 
-`python3 e2e/device/app_update_smoke.py --adb ../tools/scripts/adb.sh` 仅允许 AVD，读取正式 HTTPS 商店，检查结果和关闭；需要在商店已有更高版本、模拟器安装含更新功能的旧版验收包时，显式加 `--install-update --from-code 旧代码 --to-code 新代码`，验证下载、APK 身份校验、安装授权取消／返回、系统覆盖安装和更新后版本复查。安装模式会更换模拟器应用版本，安装来源 AppOp 在结束时恢复；不清除配置、连接手机或上传日志。截图与结果保留于忽略目录 `build/previews/app-update/`。
+`python3 e2e/device/app_update_smoke.py --adb ../tools/scripts/adb.sh` 仅允许 AVD，读取正式 HTTPS 商店，检查结果和关闭；需要在商店已有更高版本、模拟器安装含更新功能的旧版验收包时，显式加 `--install-update --from-code 旧代码 --to-code 新代码`，验证下载、APK 身份校验、安装授权取消／返回、系统覆盖安装、旧进程结束后启动和更新后版本复查。安装模式会更换模拟器应用版本，安装来源 AppOp 在结束时恢复；不清除配置、连接手机或上传日志。截图与结果保留于忽略目录 `build/previews/app-update/`。
 
 `../tools/scripts/python-frida16.sh e2e/device/app_update_layout_smoke.py` 使用已转发到指定 AVD 的 Frida 16 服务，仅在真实更新弹窗内注入 120 条合成长说明，检查四种横竖屏／1.0 和 1.5 字号／昼夜组合的正文滚动、固定窗口和操作按钮。不下载、不安装、不改商店更新说明；结束恢复系统字号、旋转和昼夜。截图与几何结果保存在 `build/previews/app-update-layout/`，合成内容不代表真实版本变更。
 
