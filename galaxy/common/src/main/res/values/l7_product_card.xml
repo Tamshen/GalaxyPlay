@@ -1,0 +1,9 @@
+<resources>
+    <color name="l7_product_card_start">#E3F5ED</color>
+    <color name="l7_product_card_end">#EDF3FF</color>
+    <color name="l7_product_card_border">#CDDCD9</color>
+    <color name="l7_product_card_badge">#BFFFFFFF</color>
+    <color name="l7_product_card_detail">#35685C</color>
+    <string name="l7_product_receiver">CarPlay 接收端</string>
+    <string name="l7_product_connections">无线连接 · USB 连接</string>
+</resources>
