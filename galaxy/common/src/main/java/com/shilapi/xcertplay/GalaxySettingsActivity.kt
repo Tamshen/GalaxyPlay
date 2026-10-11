@@ -187,6 +187,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         menuExpanded = savedInstanceState?.getBoolean("home_menu_expanded") ?: false
         render()
         handleWirelessRecovery()
+        GalaxyMediaEntry.handle(intent, CarPlayBackgroundSession.active, CarPlayBackgroundSession.isStopping(), ::openProjection)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (page != "home") { page = if (l7Ui) L7Routes.back(page) else "home"; render() }
@@ -203,6 +204,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         if (l7Ui) page = L7Routes.normalize(page)
         render()
         handleWirelessRecovery()
+        GalaxyMediaEntry.handle(intent, CarPlayBackgroundSession.active, CarPlayBackgroundSession.isStopping(), ::openProjection)
     }
     override fun onSaveInstanceState(outState: Bundle) {
         debugGuides.save(outState)

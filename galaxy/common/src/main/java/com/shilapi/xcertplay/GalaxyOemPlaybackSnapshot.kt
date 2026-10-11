@@ -1,8 +1,6 @@
 package com.shilapi.xcertplay
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import java.lang.reflect.InvocationHandler
@@ -19,10 +17,8 @@ internal class GalaxyOemPlaybackSnapshot(
 ) : InvocationHandler {
     private val app = context.applicationContext
     private val appIcon = "android.resource://${app.packageName}/${app.applicationInfo.icon}"
-    private val open = PendingIntent.getActivity(app, 42,
-        Intent(app, GalaxySettingsActivity::class.java).putExtra("page", "home")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    private val home = GalaxyMediaEntry.pendingIntent(app, player = false)
+    private val player = GalaxyMediaEntry.pendingIntent(app, player = true)
 
     override fun invoke(proxy: Any?, method: java.lang.reflect.Method, args: Array<out Any?>?): Any? {
         if (!valid()) return when (method.returnType) {
@@ -42,7 +38,8 @@ internal class GalaxyOemPlaybackSnapshot(
             "getPackageName" -> app.packageName
             "getAppName" -> app.getString(R.string.app_name)
             "getAppIcon" -> appIcon
-            "getLaunchIntent", "getPlayerIntent" -> open
+            "getLaunchIntent" -> home
+            "getPlayerIntent" -> player
             "getUuid" -> uuid
             // 服务以 getVip()!=0 标记会员限制；SDK 默认 -1 不能沿用到本应用。
             "getVip", "getDisplayId" -> 0

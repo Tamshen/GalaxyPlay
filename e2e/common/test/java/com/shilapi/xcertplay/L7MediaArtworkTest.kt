@@ -54,6 +54,28 @@ class L7MediaArtworkTest {
         assertFalse(java.io.File(context.cacheDir, "l7-media-artwork").walkTopDown().any { it.isFile })
     }
 
+    @Test fun disconnectRevokesEveryGrantedReaderOfCurrentAndLateCovers() {
+        val revoked = mutableListOf<Uri>()
+        val tracking = object : android.content.ContextWrapper(context) {
+            override fun getApplicationContext(): android.content.Context = this
+            override fun revokeUriPermission(uri: Uri, flags: Int) {
+                assertEquals(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION, flags)
+                revoked += uri
+                super.revokeUriPermission(uri, flags)
+            }
+        }
+        var current: Uri? = null
+        val instance = L7MediaArtwork(tracking, worker, main, logs::add) { current = it }
+        instance.select(1); instance.submit(1, image()); worker.drain(); main.drain()
+        val first = current!!
+        instance.submit(2, image()); worker.drain()
+        instance.close(); main.drain()
+        assertTrue(first in revoked)
+        assertEquals(2, revoked.size)
+        assertEquals(2, revoked.toSet().size)
+        assertFalse(java.io.File(context.cacheDir, "l7-media-artwork").walkTopDown().any { it.isFile })
+    }
+
     @Test fun mediaResetInvalidatesUndeliveredImagesAndReusedTransferIds() {
         covers.select(1); covers.submit(1, image()); worker.drain(); main.drain()
         assertNotNull(published.last())
