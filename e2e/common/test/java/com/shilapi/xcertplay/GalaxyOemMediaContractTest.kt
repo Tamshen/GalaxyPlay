@@ -73,6 +73,17 @@ class GalaxyOemMediaContractTest {
         assertSame(client, contract.register(api, "synthetic.own", client))
         assertEquals("synthetic.own", api.packageName)
     }
+    @Test fun compatibilityChannelsUseDirectMusicClientInsteadOfLinkedMediaSessionOverload() {
+        for (channel in listOf(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.Mode.LOCAL)) {
+            val contract = GalaxyOemMediaContract(Modern::class.java, Client::class.java, Info::class.java, channel.linkMediaSession)
+            val api = Modern(); val client = Client()
+            assertFalse(contract.linkedSession)
+            assertSame(client, contract.register(api, "synthetic.own", client))
+            assertEquals("synthetic.own", api.packageName)
+            assertNull(api.sessionPackage)
+            assertSame(client, api.callback)
+        }
+    }
     @Test fun incompatibleRuntimeClientFailsBeforeRegistration() {
         // 该类型不能匹配注册重载，不能退回无包名的占位方法。
         assertTrue(runCatching { GalaxyOemMediaContract(Legacy::class.java, FinalCallback::class.java, Info::class.java) }.isFailure)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_media_channel_title">Music reporting channel</string>
+    <string name="galaxy_media_channel_current">Current mode (Flyme Auto)</string>
+    <string name="galaxy_media_channel_netease">NetEase Music compatibility</string>
+    <string name="galaxy_media_channel_local">Local music</string>
+    <string name="galaxy_media_channel_hint">Try another channel if reporting fails. Save and reconnect to apply.</string>
+</resources>

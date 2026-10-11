@@ -16,6 +16,7 @@ internal class L7ReflectiveMediaCenter(
     private val serviceEvidence: () -> Int? = { L7VendorServiceProbe.inspect(context.applicationContext)["mediaProviderEasSupport"]?.toIntOrNull() },
 ) : L7MediaCenterPort {
     private val app = context.applicationContext
+    private val channel = GalaxyMediaReportingChannel.load(context)
     private var api: Any? = null
     private var apiType: Class<*>? = null
     private var client: Any? = null
@@ -39,15 +40,16 @@ internal class L7ReflectiveMediaCenter(
     override fun initialize(ready: (Boolean) -> Unit, command: (Int) -> Boolean,
                             focus: (String?) -> Unit, selected: (Int) -> Boolean) {
         if (!valid) return
+        L7DebugLog.record("MediaCenter: channel selected=${channel.name}")
         val sdk = sdkLoader()
         apiReady = ready
         val apiClass = Class.forName(API, true, sdk.loader)
         apiType = apiClass
         val clientClass = Class.forName(CLIENT, false, sdk.loader)
         infoClass = Class.forName(INFO, false, sdk.loader)
-        val verified = GalaxyOemMediaContract(apiClass, clientClass, requireNotNull(infoClass))
+        val verified = GalaxyOemMediaContract(apiClass, clientClass, requireNotNull(infoClass), channel.linkMediaSession)
         contract = verified
-        source = L7MediaSourcePolicy.resolve(serviceEvidence(), requireNotNull(infoClass))
+        source = L7MediaSourcePolicy.resolve(serviceEvidence(), requireNotNull(infoClass), channel)
         val callbackClass = Class.forName("com.ecarx.eas.sdk.ECarXApiClient\$Callback", false, sdk.loader)
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
             ?: throw IllegalStateException("SDK_API_EMPTY")
@@ -80,7 +82,8 @@ internal class L7ReflectiveMediaCenter(
                 else -> null
             }
         }
-        L7DebugLog.record("MediaCenter: sdk source=${sdk.source} uid=${android.os.Process.myUid()} package=${app.packageName}")
+        L7DebugLog.record("MediaCenter: sdk source=${sdk.source} uid=${android.os.Process.myUid()} package=${app.packageName} " +
+            "channel=${channel.name} mediaSource=$source mediaSessionLinked=${verified.linkedSession}")
         if (valid) apiClass.getMethod("init", Context::class.java, callbackClass).invoke(api, app, callback)
     }
 
