@@ -60,6 +60,8 @@ class GalaxyUpdateLayoutTest {
             assertTrue(scroll.height > 0)
         } finally { dialog.dismiss(); host.pause().stop().destroy() }
     }
+    @Test @Config(qualifiers = "w480dp-h640dp-port-xxhdpi") fun largeInterfaceKeepsPortraitButtonsFixed() = verify(1.5f)
+    @Test @Config(qualifiers = "w640dp-h480dp-land-xxhdpi") fun largeInterfaceKeepsLandscapeButtonsFixed() = verify(1.5f)
     @Test @Config(qualifiers = "w600dp-h800dp-port") fun longNotesScrollInPortrait() = verify(1f)
     @Test @Config(qualifiers = "w800dp-h600dp-land") fun longNotesScrollInLandscape() = verify(1f)
     @Test @Config(qualifiers = "w600dp-h800dp-port") fun largeTextKeepsPortraitButtonsFixed() = verify(1.5f)
