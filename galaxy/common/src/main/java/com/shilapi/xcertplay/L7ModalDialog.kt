@@ -139,6 +139,8 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
                 override fun getItem(position: Int) = items[position]
                 override fun getItemId(position: Int) = position.toLong()
                 override fun hasStableIds() = true
+                override fun areAllItemsEnabled() = content.itemEnabled == null
+                override fun isEnabled(position: Int) = content.itemEnabled?.invoke(position) != false
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
                     (convertView as? CheckedTextView ?: CheckedTextView(uiContext)).apply {
                         text = items[position]
@@ -147,17 +149,20 @@ internal class L7ModalDialog(private val owner: Context, private val content: L7
                         setPadding(dp(12), dp(8), dp(12), dp(8))
                         minHeight = height
                         layoutParams = AbsListView.LayoutParams(-1, height)
-                        L7Ui.text(this)
+                        isEnabled = content.itemEnabled?.invoke(position) != false
+                        L7Ui.text(this, if (isEnabled) R.color.product_ui_text else R.color.product_ui_disabled)
                         if (content.singleChoice) {
                             checkMarkDrawable = StateListDrawable().apply {
                                 addState(intArrayOf(android.R.attr.state_checked), uiContext.getDrawable(R.drawable.ic_l7_radio_on))
                                 addState(intArrayOf(), uiContext.getDrawable(R.drawable.ic_l7_radio_off))
                             }
+                            checkMarkDrawable?.alpha = if (isEnabled) 255 else 80
                         }
                     }
             }
             if (content.singleChoice && content.checked in items.indices) setItemChecked(content.checked, true)
             setOnItemClickListener { _, _, index, _ ->
+                if (content.itemEnabled?.invoke(index) == false) return@setOnItemClickListener
                 content.itemClick?.onClick(this@L7ModalDialog, index)
                 if (!content.singleChoice) dismiss()
             }

@@ -126,11 +126,13 @@ internal object L7Components {
 
     /** 待选值只存在于本次弹窗；取消不保存，确认只提交发生变化的值。 */
     fun select(context: Context, title: String, options: List<String>, current: Int, applyLabel: String,
-               onPreview: (Int) -> Unit = {}, onDismiss: () -> Unit = {}, onApply: (Int) -> Unit): AlertDialog {
+               onPreview: (Int) -> Unit = {}, onDismiss: () -> Unit = {},
+               optionEnabled: ((Int) -> Boolean)? = null, onApply: (Int) -> Unit): AlertDialog {
         var pending = current
         var committed = false
         val dialog = L7Dialogs.builder(context).setTitle(title)
-            .setSingleChoiceItems(options.toTypedArray(), current) { dialog, index ->
+            .setSingleChoiceItems(options.toTypedArray(), current, optionEnabled) { dialog, index ->
+                if (optionEnabled?.invoke(index) == false) return@setSingleChoiceItems
                 pending = index
                 onPreview(index)
                 (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = pending != current
@@ -143,7 +145,7 @@ internal object L7Components {
             val apply = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             apply.isEnabled = false
             apply.setOnClickListener {
-                if (pending == current || committed) return@setOnClickListener
+                if (pending == current || committed || optionEnabled?.invoke(pending) == false) return@setOnClickListener
                 committed = true
                 // 先关闭，防止快速重复点击对一个任务提交两次。
                 dialog.dismiss()

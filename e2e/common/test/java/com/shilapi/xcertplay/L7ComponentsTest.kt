@@ -21,6 +21,21 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class L7ComponentsTest {
+    @Test fun optionBecomingUnavailableBeforeConfirmationCannotBeApplied() {
+        var available = true
+        val commits = mutableListOf<Int>()
+        val dialog = L7Components.select(activity(), "解码器", listOf("默认", "硬件"), 0, "保存",
+            optionEnabled = { it == 0 || available }) { commits.add(it) }
+        settle()
+        val list = dialog.listView
+        list.performItemClick(list.adapter.getView(1, null, list), 1, 1L)
+        assertTrue(dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
+        available = false
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertTrue(commits.isEmpty())
+        assertTrue(dialog.isShowing)
+        dialog.dismiss()
+    }
     private fun activity() = Robolectric.buildActivity(Activity::class.java).setup().get().apply {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
     }

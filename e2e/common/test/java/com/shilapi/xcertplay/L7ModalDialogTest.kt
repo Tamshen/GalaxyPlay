@@ -16,6 +16,33 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class L7ModalDialogTest {
+    @Test fun unavailableChoicesStayDisabledAfterPaletteRefreshAndViewReuse() {
+        val context = activity()
+        val selected = mutableListOf<Int>()
+        val content = L7Dialogs.Content().apply {
+            items = arrayOf("默认", "不可用", "可用")
+            singleChoice = true; checked = 0
+            itemEnabled = { it != 1 }
+            itemClick = android.content.DialogInterface.OnClickListener { _, index -> selected.add(index) }
+        }
+        val dialog = L7ModalDialog(context, content).apply { show() }
+        val list = dialog.listView!!
+        assertFalse(list.adapter.areAllItemsEnabled())
+        assertFalse(list.adapter.isEnabled(1))
+        val disabled = list.adapter.getView(1, null, list) as android.widget.CheckedTextView
+        assertFalse(disabled.isEnabled)
+        list.performItemClick(disabled, 1, 1L)
+        assertTrue(selected.isEmpty())
+        disabled.setTextColor(android.graphics.Color.MAGENTA)
+        L7Ui.refresh(disabled)
+        assertEquals(context.getColor(com.shilapi.xcertplay.host.R.color.product_ui_disabled), disabled.currentTextColor)
+        val enabled = list.adapter.getView(2, disabled, list) as android.widget.CheckedTextView
+        assertTrue(enabled.isEnabled)
+        assertEquals(context.getColor(com.shilapi.xcertplay.host.R.color.product_ui_text), enabled.currentTextColor)
+        list.performItemClick(enabled, 2, 2L)
+        assertEquals(listOf(2), selected)
+        dialog.dismiss()
+    }
     @Test fun messageDialogRepaintsOnOwnerNightModeChange() {
         val context = activity()
         val dialog = L7ModalDialog(context, L7Dialogs.Content().apply { message = "蓝牙媒体检查" })
