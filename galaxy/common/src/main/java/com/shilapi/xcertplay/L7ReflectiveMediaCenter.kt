@@ -110,16 +110,7 @@ internal class L7ReflectiveMediaCenter(
         val revision = ++snapshotRevision
         // 初始化时手机播放状态可能尚未回传，不能让 SDK getter 把它解释成暂停。
         if (!value.playbackKnown) { info = null; return }
-        // 封面会由 EAS 转交媒体中心读取；只给已确认的链路包读取权，不开放 provider。
-        if (artwork != null) for (name in listOf(L7VendorServiceProbe.PACKAGE, "com.ecarx.sdk.openapi")) {
-            try {
-                app.packageManager.getApplicationInfo(name, 0)
-                app.grantUriPermission(name, artwork, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                L7DebugLog.record("MediaCenter: artworkGrant transferId=${value.artworkTransferId ?: "none"} coverKey=${L7MediaArtworkProvider.diagnosticKey(artwork)} result=GRANTED target=$name")
-            } catch (error: Exception) {
-                L7DebugLog.record("MediaCenter: artworkGrant transferId=${value.artworkTransferId ?: "none"} result=FAILED target=$name exceptionType=${error.javaClass.simpleName}")
-            }
-        }
+        artwork?.let { GalaxyMediaArtworkAccess.grant(app, it, value.artworkTransferId) }
         val cls = requireNotNull(infoClass)
         val snapshotTrack = "$trackSession:$track"
         val artworkGetterReported = java.util.concurrent.atomic.AtomicBoolean()

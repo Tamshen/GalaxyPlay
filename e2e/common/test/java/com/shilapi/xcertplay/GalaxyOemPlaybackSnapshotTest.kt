@@ -45,7 +45,13 @@ class GalaxyOemPlaybackSnapshotTest {
         assertEquals("android.resource://${app.packageName}/123", get(snapshot, "getAppIcon"))
         assertEquals(app.packageName, get(snapshot, "getPackageName"))
         val intent = get(snapshot, "getLaunchIntent") as PendingIntent
-        assertEquals(intent, get(snapshot, "getPlayerIntent"))
+        val player = get(snapshot, "getPlayerIntent") as PendingIntent
+        assertNotEquals(intent, player)
+        assertNull(shadowOf(intent).savedIntent.action)
+        assertEquals(GalaxyMediaEntry.PLAYER_ACTION, shadowOf(player).savedIntent.action)
+        assertEquals(GalaxySettingsActivity::class.java.name, shadowOf(player).savedIntent.component?.className)
+        assertEquals("home", shadowOf(player).savedIntent.getStringExtra("page"))
+        assertTrue(shadowOf(player).flags and PendingIntent.FLAG_IMMUTABLE != 0)
         assertEquals(GalaxySettingsActivity::class.java.name, shadowOf(intent).savedIntent.component?.className)
         assertEquals("home", shadowOf(intent).savedIntent.getStringExtra("page"))
         assertTrue(shadowOf(intent).flags and PendingIntent.FLAG_IMMUTABLE != 0)

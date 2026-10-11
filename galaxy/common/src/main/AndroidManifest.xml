@@ -25,6 +25,7 @@
         <package android:name="com.geely.linkhmi" />
         <package android:name="com.netease.cloudmusic.iot" />
         <package android:name="com.flyme.auto.music" />
+        <package android:name="com.flyme.auto.mediacontrol" />
         <package android:name="com.huawei.dmsdpdevice" />
         <package android:name="com.huawei.nearby" />
         <package android:name="com.lge.car" />
