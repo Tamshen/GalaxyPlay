@@ -9,8 +9,7 @@ internal object L7AboutSettings {
     fun add(activity: Activity, parent: LinearLayout, version: String, checkUpdate: () -> Unit = {}) {
         fun text(id: Int) = activity.getString(id)
         L7SettingsSection.add(parent, text(R.string.l7_section_product)) { card ->
-            card.addView(L7SettingRow(activity, text(R.string.diplay), text(R.string.carplay_at_home_in_your_car))
-                .apply { setValue(version) })
+            L7ProductInformationCard.add(card, version)
         }
         L7SettingsSection.add(parent) { card ->
             card.addView(L7Components.actionRow(activity, text(R.string.update_check), click = checkUpdate))
