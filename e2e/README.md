@@ -14,6 +14,12 @@
 
 原厂媒体接入回归包括 `GalaxyOemMediaContractTest`（精确公开重载、本应用 MediaSession、拒绝占位入口）、`GalaxyOemPlaybackSnapshotTest`（图标／immutable 返回入口、能力字段与失效对象）、`L7MediaCenterSessionTest`（来源接受、异常重试、健康服务多次恢复、旧控制／焦点隔离），并由 `GalaxyProfilesTest` 验证旧音频保留、明确应用的新焦点与会话冻结。Android VM 测试源集中的 `com.ecarx.eas.sdk` 为自写公开签名替身，禁止进入正式 APK，也不作为原厂 SDK 或实车成功证据。Docker 构建 `:common:assembleDebugAndroidTest`，在独占 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，再执行 `adb -s emulator-5556 shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，成功标记为 `SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK`。配置设备脚本增加 L7 模板焦点实际落盘断言，单次点击后等待界面完成转换，失败截图保留且恢复原设置。
 
+## 在线更新验收
+
+`GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 和 `GalaxyUpdateInstallerTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权与仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
+
+`python3 e2e/device/app_update_smoke.py --adb ../tools/scripts/adb.sh` 仅允许 AVD，读取正式 HTTPS 商店，检查结果和关闭；需要在商店已有更高版本、模拟器安装含更新功能的旧版验收包时，显式加 `--install-update --from-code 旧代码 --to-code 新代码`，验证下载、APK 身份校验、安装授权取消／返回、系统覆盖安装和更新后版本复查。安装模式会更换模拟器应用版本，安装来源 AppOp 在结束时恢复；不清除配置、连接手机或上传日志。截图与结果保留于忽略目录 `build/previews/app-update/`。
+
 ## 目录与检阅顺序
 
 ```text

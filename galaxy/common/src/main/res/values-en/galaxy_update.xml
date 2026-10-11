@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_check">Check for updates</string>
+    <string name="update_check_hint">Check the latest version, then download and install</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_current">You are up to date (store version %1$s)</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_incompatible">Version %1$s requires a newer Android system</string>
+    <string name="update_summary">Version: %1$s\nSize: %2$s\n\nWhat’s new\n%3$s</string>
+    <string name="update_no_notes">No release notes for this version</string>
+    <string name="update_download">Download update</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_download_progress">Downloaded %1$d%%</string>
+    <string name="update_verifying">Verifying the APK…</string>
+    <string name="update_ready">Version %1$s downloaded and verified</string>
+    <string name="update_ready_hint">Tap Install and confirm the system prompt. Your app settings will be kept.</string>
+    <string name="update_install">Install update</string>
+    <string name="update_stop">Stop</string>
+    <string name="update_close_hint">Closing will stop this check or download. You can check for updates again later.</string>
+    <string name="update_stopped">Update stopped. You can retry.</string>
+    <string name="update_network_error">Could not reach the update server or the download was interrupted. Check your network and retry.</string>
+    <string name="update_bad_manifest">Update information is incomplete or belongs to another app. Try again later.</string>
+    <string name="update_bad_integrity">APK verification failed. Please download again.</string>
+    <string name="update_bad_apk">The APK version or system requirements do not match. Installation blocked.</string>
+    <string name="update_bad_signature">The APK signature is incompatible with this app. Installation blocked.</string>
+    <string name="update_no_storage">Not enough space or the APK could not be saved. Free some space and retry.</string>
+    <string name="update_end_connection">End the CarPlay connection before installing the update.</string>
+    <string name="update_install_permission">Allow update installation</string>
+    <string name="update_permission_hint">Allow GalaxyPlay to install apps in system settings, then return and tap Install update again.</string>
+    <string name="update_open_permission">Open install permission</string>
+    <string name="update_permission_ready">Installation allowed. Tap Install update again.</string>
+    <string name="update_permission_denied">Installation is not allowed. Tap Install update again to open permission settings.</string>
+    <string name="update_permission_unavailable">System install permission settings are unavailable. Allow GalaxyPlay to install apps in the vehicle settings.</string>
+    <string name="update_installer_unavailable">System installer is unavailable. Check vehicle installation restrictions and retry.</string>
+    <string name="update_installer_returned">Returned to the app. If the update was not completed, tap Install update again.</string>
+</resources>
