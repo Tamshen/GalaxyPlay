@@ -11,6 +11,8 @@ class AudioRoutingTemplate private constructor(
     private val buses: Map<String, String>,
     private val focusGains: Map<String, Int> = emptyMap(),
 ) {
+    val hasOutputBuses: Boolean get() = buses.isNotEmpty()
+
     // 旧三用途文件保持原样序列化，避免历史日志配置的证据摘要改变。
     fun choice(role: AudioOutputRole): Int = choices[role.name.lowercase()] ?: AudioOutputPolicy.BUILTIN
 
