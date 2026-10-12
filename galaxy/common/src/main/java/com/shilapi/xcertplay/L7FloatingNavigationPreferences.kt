@@ -7,6 +7,10 @@ internal object L7FloatingNavigationPreferences {
     private const val PREFS = "l7_floating_navigation"
     val transparencyPresets = listOf(0, 25, 50, 75)
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    fun inAppEnabled(context: Context): Boolean = prefs(context).getBoolean("in_app", true)
+    fun setInAppEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("in_app", enabled).apply()
+    }
     fun transparency(context: Context): Int = prefs(context).getInt("transparency", 50)
         .takeIf { it in transparencyPresets } ?: 50
     fun saveTransparency(context: Context, percent: Int) {

@@ -446,7 +446,9 @@ class GalaxySettingsActivity : ComponentActivity() {
             contentScroll = configurationPage!!.view.scroll
         } else body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(body, LinearLayout.LayoutParams(0, -1, 1f).apply {
-            if (settingsPage) marginStart = L7ProjectionNavigation.settingsColumnWidth(this@GalaxySettingsActivity)
+            // 关闭应用内悬浮后首页菜单固定显示，正文为菜单留位，不遮挡连接按钮。
+            if (settingsPage || !L7FloatingNavigationPreferences.inAppEnabled(this@GalaxySettingsActivity))
+                marginStart = L7ProjectionNavigation.settingsColumnWidth(this@GalaxySettingsActivity)
         })
         showL7Content(root)
         val expectedPage = page
@@ -478,7 +480,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         val container = pageContent ?: FrameLayout(this).also { holder ->
             pageContent = holder
             navigationDensity = resources.configuration.densityDpi
-            val navigation = L7ProjectionNavigation(this, {}, ::selectL7Destination).also {
+            val navigation = L7ProjectionNavigation(this, {}, navigate = ::selectL7Destination).also {
                 if (menuExpanded) it.expand() else it.collapse()
                 pageNavigation = it
             }
@@ -607,7 +609,9 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun homeL7(content: LinearLayout) {
         content.gravity = Gravity.CENTER
         val inset = if (resources.configuration.screenWidthDp < 600) 16 else 24
-        val width = dp((resources.configuration.screenWidthDp - inset * 2).coerceIn(1, 560))
+        val menuWidth = if (L7FloatingNavigationPreferences.inAppEnabled(this)) 0
+            else L7ProjectionNavigation.settingsColumnWidth(this)
+        val width = (dp(resources.configuration.screenWidthDp - inset * 2) - menuWidth).coerceIn(1, dp(560))
         homePanel = L7HomePanel(this,
             onQuickConnect = {
                 if (CarPlayBackgroundSession.hasSession()) openProjection()

@@ -2,7 +2,7 @@
 
 GalaxyPlay 是面向银河车机的 CarPlay 接收端，当前以银河 L7 适配为主，并提供 L6 独立音频方案及车型选择，接收核心沿用 [DiPlay](https://github.com/shihabal3amri/DiPlay)。目标为 Flyme OS / Android 11、1440×1920 竖屏，最低 Android 10，包名 `com.ecarx.carplay`。
 
-支持车机原生热点无线连接与 USB 有线连接，认证来源包括应用内置、文字导入、USB CH341 和 Remote MFi。应用版本与核心基线分别维护于 [版本配置](gradle/galaxyplay-version.properties)。实车 HEVC、语音及蓝牙焦点仍有待验项，详见开发说明。
+支持车机原生热点、可选 Wi-Fi Direct 无线连接与 USB 有线连接，认证来源包括应用内置、文字导入、USB CH341 和 Remote MFi。应用版本与核心基线分别维护于 [版本配置](gradle/galaxyplay-version.properties)。实车 HEVC、语音及蓝牙焦点仍有待验项，详见开发说明。
 
 **安装和使用前，请完整阅读下方的[首次使用须知与风险确认协议](#首次使用须知与风险确认协议)。应用内仍需主动阅读并确认，设置中可随时撤回。**
 

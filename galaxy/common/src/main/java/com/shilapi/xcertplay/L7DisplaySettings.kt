@@ -13,6 +13,10 @@ internal object L7DisplaySettings {
             L7UiDensitySettings.add(activity, it)
         }
         L7SettingsSection.add(parent, text(R.string.l7_section_floating), footer = text(R.string.l7_floating_hint)) { card ->
+            card.addView(L7Components.switchRow(activity, text(R.string.l7_in_app_title), text(R.string.l7_in_app_hint),
+                L7FloatingNavigationPreferences.inAppEnabled(activity)) {
+                L7FloatingNavigationPreferences.setInAppEnabled(activity, it)
+            })
             card.addView(L7Components.switchRow(activity, text(R.string.l7_desktop_title), text(R.string.l7_desktop_hint),
                 L7DesktopNavigation.enabled(activity)) { L7DesktopNavigation.setEnabled(activity, it) })
             if (!Settings.canDrawOverlays(activity)) card.addView(L7Components.actionRow(activity,

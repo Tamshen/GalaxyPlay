@@ -27,6 +27,7 @@ internal object GalaxyConfigurationFields {
         Field(R.string.l7_section_app_ui, MAIN, "carplay_night_mode", R.string.profile_night_mode, "system",
             listOf("system", "day", "night", "ambient"), listOf(R.string.profile_follow_system, R.string.profile_day, R.string.profile_night, R.string.profile_ambient)),
         Field(R.string.l7_section_app_ui, MAIN, "ambient_delay_seconds", R.string.profile_ambient_delay, 2, minimum = 0, maximum = 60),
+        Field(R.string.l7_section_floating, "l7_floating_navigation", "in_app", R.string.l7_in_app_title, true),
         Field(R.string.l7_section_floating, "l7_floating_navigation", "desktop", R.string.l7_desktop_title, true),
         Field(R.string.l7_section_floating, "l7_floating_navigation", "transparency", R.string.l7_floating_transparency, 50,
             listOf(0, 25, 50, 75)),
@@ -69,7 +70,7 @@ internal object GalaxyConfigurationFields {
             "l7_audio_templates" -> key in setOf("model", "mode", "mode_l6", "mode_custom")
             "l7_ui" -> key == "density"
             "l7_remote_log" -> key in setOf("endpoint", "authorization")
-            "l7_floating_navigation" -> key in setOf("desktop", "transparency", "x", "y")
+            "l7_floating_navigation" -> key in setOf("in_app", "desktop", "transparency", "x", "y")
             "carplay_picture" -> key in CarPlayPicture.keys
             else -> !Regex("(?i)identity|private|certificate|lockdown|pairing|uuid|device_id|consent|sharing|display_max_detected|l7_usage_audio_defaults|l7_boyue_audio").containsMatchIn(key)
         }

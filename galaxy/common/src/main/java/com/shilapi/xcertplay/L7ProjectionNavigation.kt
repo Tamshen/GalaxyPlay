@@ -15,6 +15,8 @@ import kotlin.math.abs
 internal class L7ProjectionNavigation(
     context: Context,
     private val releaseTouches: () -> Unit,
+    private val projection: Boolean = false,
+    private val returnHome: () -> Unit = {},
     navigate: (String) -> Unit,
 ) : FrameLayout(context) {
     companion object {
@@ -32,6 +34,7 @@ internal class L7ProjectionNavigation(
     internal val handle = ImageButton(context)
     private var settingsPage = false
     private var connected = false
+    private var floatingEnabled = L7FloatingNavigationPreferences.inAppEnabled(context)
     internal var expanded = true
         private set
     private var position = L7FloatingNavigationPreferences.position(context)
@@ -73,9 +76,18 @@ internal class L7ProjectionNavigation(
         showExpanded(!value)
     }
 
-    fun expand() = showExpanded(true)
+    fun expand() {
+        // 核心宿主将返回键委托到这里；隐藏应用内菜单时沿用首页路由，不停止会话。
+        if (projection && !L7FloatingNavigationPreferences.inAppEnabled(context)) returnHome()
+        else showExpanded(true)
+    }
     fun collapse() = showExpanded(false)
     fun refreshAppearance() {
+        val enabled = L7FloatingNavigationPreferences.inAppEnabled(context)
+        if (floatingEnabled != enabled) {
+            floatingEnabled = enabled
+            showExpanded(if (enabled) !connected else expanded)
+        }
         handle.alpha = 1f - L7FloatingNavigationPreferences.transparency(context) / 100f
         position = L7FloatingNavigationPreferences.position(context)
         positionHandle()
@@ -107,11 +119,14 @@ internal class L7ProjectionNavigation(
 
     private fun showExpanded(value: Boolean) {
         releaseTouches()
-        expanded = value || settingsPage
+        floatingEnabled = L7FloatingNavigationPreferences.inAppEnabled(context)
+        val hidden = projection && !floatingEnabled
+        val fixedMenu = !projection && !floatingEnabled
+        expanded = !hidden && (value || settingsPage || fixedMenu)
         panel.visibility = if (expanded) VISIBLE else GONE
-        // 设置左栏始终可用，右侧直接交给正文滚动与操作。
-        scrim.visibility = if (expanded && !settingsPage) VISIBLE else GONE
-        handle.visibility = if (expanded) GONE else VISIBLE
+        // 关闭悬浮后首页保留固定菜单，投屏完全透传；设置左栏始终可用。
+        scrim.visibility = if (expanded && !settingsPage && !fixedMenu) VISIBLE else GONE
+        handle.visibility = if (!expanded && !hidden) VISIBLE else GONE
         positionHandle()
     }
 
