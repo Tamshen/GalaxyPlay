@@ -122,7 +122,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     }
     private val tick = object : Runnable {
         override fun run() {
-            refreshStatus(); hotspotSettings?.update(); wirelessHotspotGate.update()
+            refreshStatus(); hotspotSettings?.update(); wirelessSettings?.update(); wirelessHotspotGate.update()
             if (hotspotSettings != null && hotspotError(storedSsid(), storedPassword()) == null) pendingCarHotspotSetup = false
             handler.postDelayed(this, 1000)
         }
@@ -132,6 +132,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private var wiredSettings: L7WiredSettings? = null
     private val wirelessHotspotGate by lazy { L7WirelessHotspotGate(this, hotspotTask) }
     private var hotspotSettings: L7HotspotSettings? = null
+    private var wirelessSettings: GalaxyWirelessSettings? = null
     private var wirelessPrerequisites: L7WirelessPrerequisiteView? = null
     private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) choosePhone() else permissionHelp(getString(R.string.nearby_devices), getString(R.string.allow_nearby_devices_so_diplay_can_connect_to_your_paired))
@@ -291,6 +292,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         codecProbePage?.background()
         fullDebugPage?.background()
         channelDialog?.dismiss()
+        wirelessSettings?.dismiss()
         channelDialog = null
         handler.removeCallbacks(tick)
         super.onPause()
@@ -321,6 +323,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         debugTasks.dispose(isChangingConfigurations)
         logView?.close(); logView = null
         hotspotSettings?.dispose()
+        wirelessSettings?.dispose()
         hotspotActions.close(); wiredSettings?.dispose()
         hotspotTask.close()
         super.onDestroy()
@@ -348,6 +351,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         codecProbePage?.close(); codecProbePage = null
         fullDebugPage?.close(); fullDebugPage = null
         hotspotSettings?.dispose(); hotspotSettings = null; wirelessPrerequisites = null
+        wirelessSettings?.dispose(); wirelessSettings = null
         wiredSettings?.dispose(); wiredSettings = null
         if (page != "settings-connection-wireless") { hotspotActions.close(); hotspotTask.cancel() }
         if (renderedPage?.let(L7Routes::isDebug) == true && !L7Routes.isDebug(page)) L7ProbeRunner.stop()
@@ -563,20 +567,32 @@ class GalaxySettingsActivity : ComponentActivity() {
     }
 
     private fun connectionSettingsL7(content: LinearLayout) {
-        content.addView(L7Components.sectionTitle(this, getString(R.string.l7_wireless_steps)))
+        val direct = AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.WIFI_P2P
+        content.addView(L7Components.sectionTitle(this, getString(if (direct) R.string.wifi_direct else R.string.l7_wireless_steps)))
         content.addView(L7Typography.text(this, getString(R.string.l7_connection_wireless_hint), L7Typography.Role.DESCRIPTION).apply {
             setPadding(0, 0, 0, dp(20))
         })
         wirelessPrerequisites = L7WirelessPrerequisiteView(this, content, ::choosePhone)
-        hotspotSettings = L7HotspotSettings(this, content, hotspotTask, hotspotActions) {
-            askHotspotCredentials { ssid, password ->
-                saveHotspotCredentials(ssid, password)
-                pendingCarHotspotSetup = false
-                applyWirelessLink(WirelessHotspotMode.MANUAL)
+        wirelessSettings = GalaxyWirelessSettings(this, content,
+            canEdit = { !hotspotTask.status.busy && !connectionRequestPending }) {
+            pendingCarHotspotSetup = false
+            wirelessHotspotGate.cancel()
+            render()
+            toast(getString(R.string.saved_for_your_next_connection))
+        }
+        if (direct) wirelessSettings?.addDirect(content)
+        else {
+            hotspotSettings = L7HotspotSettings(this, content, hotspotTask, hotspotActions) {
+                askHotspotCredentials { ssid, password ->
+                    saveHotspotCredentials(ssid, password)
+                    pendingCarHotspotSetup = false
+                    applyWirelessLink(WirelessHotspotMode.MANUAL)
+                }
             }
         }
-        L7SettingsSection.add(content, getString(R.string.l7_wireless_step3)) { card ->
-            card.addView(L7SettingRow(this, getString(R.string.l7_wireless_join_iphone), getString(R.string.l7_wireless_phone_hint)))
+        L7SettingsSection.add(content, getString(if (direct) R.string.l7_wireless_join_iphone else R.string.l7_wireless_step3)) { card ->
+            card.addView(L7SettingRow(this, getString(R.string.l7_wireless_join_iphone),
+                getString(if (direct) R.string.wifi_direct_phone_hint else R.string.l7_wireless_phone_hint)))
         }
         L7SettingsSection.actions(content) { actions ->
             connectButton = button(getString(R.string.l7_start_wireless), true) {
@@ -779,8 +795,10 @@ class GalaxySettingsActivity : ComponentActivity() {
         if (l7Ui && audioModelConfirmation.ensure { connect(wireless, nativeHotspotPrepared) }) return
         if (l7Ui && wireless && !CarPlayBackgroundSession.hasSession() &&
             !L7WirelessPrerequisites.ensure(this, ::choosePhone)) return
+        val direct = AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.WIFI_P2P
+        if (l7Ui && wireless && direct && !GalaxyWirelessSettings.ensure(this)) return
         if (wireless && hotspotTask.status.busy) { connectionProblem(getString(R.string.l7_hotspot_busy)); return }
-        if (l7Ui && wireless && !nativeHotspotPrepared && setupError == null && !CarPlayBackgroundSession.hasSession()) {
+        if (l7Ui && wireless && !direct && !nativeHotspotPrepared && setupError == null && !CarPlayBackgroundSession.hasSession()) {
             wirelessHotspotGate.start(onReady = {
                 if (hotspotError(storedSsid(), storedPassword()) == null) pendingCarHotspotSetup = false
                 connect(true, nativeHotspotPrepared = true)
@@ -788,7 +806,7 @@ class GalaxySettingsActivity : ComponentActivity() {
             return
         }
         if (l7Ui) L7DebugLog.record(if (wireless) "请求无线连接" else "请求 USB 有线连接")
-        if (wireless && pendingCarHotspotSetup) { page = if (l7Ui) "settings-connection-wireless" else "connection"; render(); connectionProblem(getString(R.string.save_your_hotspot_details_in_connection_setup_first)); return }
+        if (wireless && !direct && pendingCarHotspotSetup) { page = if (l7Ui) "settings-connection-wireless" else "connection"; render(); connectionProblem(getString(R.string.save_your_hotspot_details_in_connection_setup_first)); return }
         if (setupError != null) { connectionProblem(setupError!!); return }
         if (wireless && AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
             hotspotError(storedSsid(), storedPassword()) != null) {

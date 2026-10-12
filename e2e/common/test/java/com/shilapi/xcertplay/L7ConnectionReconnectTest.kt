@@ -1,6 +1,8 @@
 package com.shilapi.xcertplay
 
 import android.os.Looper
+import android.content.pm.PackageManager
+import android.net.wifi.WifiManager
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.AndroidMediaSink
@@ -37,6 +39,8 @@ class L7ConnectionReconnectTest {
         L7Agreement.accept(activity)
         // 无线用合成配置隔离热点操作；用例只验证旧会话停止和宿主重新打开。
         AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        shadowOf(activity.packageManager).setSystemFeature(PackageManager.FEATURE_WIFI_DIRECT, true)
+        activity.getSystemService(WifiManager::class.java).isWifiEnabled = true
         DiPlayPreferences.savePhone(activity, "02:00:00:00:00:01", "test phone")
     }
 
