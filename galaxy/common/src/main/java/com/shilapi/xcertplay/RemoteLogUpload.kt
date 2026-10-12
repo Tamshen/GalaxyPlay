@@ -1,6 +1,9 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /** 单个手动任务顺序发送各批；重试跳过已确认批次，保留未确认批次的事件编号。 */
 internal object RemoteLogUpload {
@@ -16,9 +19,12 @@ internal object RemoteLogUpload {
     private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport, var next: Int = 0)
     @Volatile var status = Status()
         private set
-    private var generation = 0L
+    @Volatile private var generation = 0L
     private var transport: RemoteLogTransport? = null
     private var pending: Pending? = null
+    // 取消后至多等待一个新任务，旧整理在检查点退出；反复点击不会堆叠整理线程。
+    private val worker = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(1),
+        { job -> Thread(job, "l7-manual-log-upload").apply { isDaemon = true } }, ThreadPoolExecutor.DiscardOldestPolicy())
 
     @Synchronized fun start(context: Context, retry: Boolean = false): Boolean {
         val app = context.applicationContext
@@ -30,15 +36,17 @@ internal object RemoteLogUpload {
         val run = ++generation
         val sender = RemoteLogTransport().also { transport = it }
         status = retained?.state(Phase.UPLOADING) ?: Status(Phase.UPLOADING)
-        Thread({ upload(app, config, retained, run, sender) }, "l7-manual-log-upload")
-            .apply { isDaemon = true; start() }
+        worker.execute { upload(app, config, retained, run, sender) }
         return true
     }
 
     private fun upload(app: Context, config: RemoteLogConfig, retained: Pending?, run: Long, sender: RemoteLogTransport) {
         var task = retained
         val code = runCatching {
-            val current = task ?: Pending(config, RemoteLogReport.collect(app)).also { task = it }
+            check(run == generation)
+            val current = task ?: Pending(config, RemoteLogReport.collect(app) {
+                check(run == generation && !L7AppExit.exiting && !L7ProbeRunner.clearing)
+            }).also { task = it }
             synchronized(this) {
                 check(run == generation && allowed(app))
                 pending = current
@@ -88,6 +96,7 @@ internal object RemoteLogUpload {
 
     @Synchronized fun cancel() {
         generation++
+        worker.queue.clear()
         // UI 不等待 socket 释放；代次检查阻止旧任务继续发送下一批或覆盖新状态。
         val old = transport
         transport = null

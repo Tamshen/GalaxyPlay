@@ -1,11 +1,14 @@
 package com.shilapi.xcertplay
 
+import android.content.Context
+import android.content.ContextWrapper
 import com.sun.net.httpserver.HttpServer
 import java.io.File
 import java.net.InetSocketAddress
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -25,6 +28,54 @@ class RemoteLogBatchTest {
     private val folder get() = File(app.filesDir, "logs")
     @Before fun before() { RemoteLogUpload.cancel(); folder.deleteRecursively(); folder.mkdirs(); L7DebugLog.buffer.clear() }
     @After fun after() { RemoteLogUpload.cancel(); server?.stop(0) }
+
+    @Test fun repeatedCancellationDoesNotCreateParallelCollectorsOrSendStaleSnapshots() {
+        val received = CopyOnWriteArrayList<String>()
+        configure { text, _ -> received += text; 200 }
+        File(folder, "diplay.log").writeText("synthetic latest upload\n")
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val calls = AtomicInteger()
+        val context = object : ContextWrapper(app) {
+            override fun getApplicationContext(): Context = this
+            override fun getFilesDir(): File {
+                if (calls.getAndIncrement() == 0) {
+                    entered.countDown()
+                    check(release.await(5, TimeUnit.SECONDS))
+                }
+                return app.filesDir
+            }
+        }
+        try {
+            assertTrue(RemoteLogUpload.start(context))
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            repeat(20) {
+                RemoteLogUpload.cancel()
+                assertTrue(RemoteLogUpload.start(context))
+            }
+            assertEquals(1, calls.get())
+            assertTrue(received.isEmpty())
+        } finally { release.countDown() }
+        await(RemoteLogUpload.Phase.SUCCESS)
+        assertEquals(1, received.size)
+        assertTrue(received.single().contains("synthetic latest upload"))
+    }
+
+    @Test fun fullRotatedHistoryKeepsRecentEvidenceAndBoundedJson() {
+        val configuration = GalaxyConfigurationEvidence.capture(app)
+        val text = configuration.header + "\n" + (0..1200).joinToString("\n") {
+            "config_ref=${configuration.id} event=$it codec=HEVC token=private-secret detail=" + "counter ".repeat(25)
+        }
+        assertTrue(text.toByteArray().size <= SessionLogFile.MAX_BYTES)
+        for (name in SessionLogFile.REPORT_NAMES + L7ProbeLog.files) File(folder, name).writeText(text)
+        val report = RemoteLogReport.collect(app)
+        assertTrue(report.omittedLines > 0)
+        assertTrue(report.batches.sumOf { it.body.size } <= RemoteLogReport.MAX_REPORT_BODY)
+        val records = report.batches.flatMap { it.entries }
+        assertTrue(records.any { it.source == "probe-latest.log" && "event=1200 " in it.message })
+        assertTrue(records.any { it.configurationRole == "at_event" && it.configurationId == configuration.id })
+        assertFalse(records.any { "private-secret" in it.message })
+    }
 
     @Test fun totalJsonIsOneMiBAndBatchesKeepLatestCountersAndExplicitOmissions() {
         val report = RemoteLogReport.create((0..4000).map { "event=$it codec=HEVC " + "解码\"".repeat(200) }, "test", "test")
