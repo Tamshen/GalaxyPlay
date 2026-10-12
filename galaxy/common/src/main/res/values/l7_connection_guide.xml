@@ -2,7 +2,7 @@
 <resources>
     <string name="l7_connection_choose">选择连接方式</string>
     <string name="l7_connection_choose_hint">无线与有线分别检查、分别引导。先选择本次使用的方式。</string>
-    <string name="l7_connection_wireless_hint">3 步：开启原生热点 → 核对名称密码 → 连接 iPhone。</string>
+    <string name="l7_connection_wireless_hint">选择原生热点或 Wi-Fi Direct，配对并连接 iPhone。</string>
     <string name="l7_connection_usb_hint">3 步：接入 USB 数据口 → 允许 USB 访问 → 在 iPhone 上允许 CarPlay。</string>
     <string name="l7_connection_back">返回连接方式</string>
     <string name="l7_reconnect_current">重新连接当前连接</string>
@@ -62,4 +62,13 @@
     <string name="l7_wireless_join_iphone">在 iPhone 上操作</string>
     <string name="l7_usb_permission_no_device">待检测：识别到 Apple USB 设备后才能检查访问权限。</string>
     <string name="l7_usb_vpn_adb_hint">若已通过电脑连接车机 ADB，可尝试执行：\nadb shell appops set com.ecarx.carplay ACTIVATE_VPN allow\n\n检查授权结果：\nadb shell appops get com.ecarx.carplay ACTIVATE_VPN\n\n返回应用点击“重新检查并授权”。命令获准不代表有线连接已成功。</string>
+    <string name="wireless_connection_method">无线连接方式</string>
+    <string name="wireless_connection_method_hint">选择 Android 原生热点或 Wi-Fi Direct，确认后下次无线连接生效。</string>
+    <string name="wifi_direct_wifi_off">请先开启车机 Wi-Fi 开关，再使用 Wi-Fi Direct 连接。</string>
+    <string name="wifi_direct_wifi_unknown">无法读取车机 Wi-Fi 状态，请在系统设置中确认已开启。</string>
+    <string name="wifi_direct_settings_missing">无法打开 Wi-Fi 设置，请在车机系统设置中开启 Wi-Fi。</string>
+    <string name="wifi_direct_phone_hint">保持 iPhone 蓝牙与 Wi-Fi 开启，点击连接后按手机提示允许 CarPlay，无需填写原生热点名称和密码。</string>
+    <string name="wifi_direct_channel_title">Wi-Fi Direct 首选频道</string>
+    <string name="wifi_direct_channel_choice">频道 %1$d · %2$s</string>
+    <string name="wifi_direct_channel_description">自动选择由系统安排频道；手动频道须由车机支持，修改后下次 Wi-Fi Direct 连接生效。</string>
 </resources>

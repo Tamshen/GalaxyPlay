@@ -2,7 +2,7 @@
 <resources>
     <string name="l7_connection_choose">Choose a connection method</string>
     <string name="l7_connection_choose_hint">Wireless and USB have separate checks and guides. Choose how to connect.</string>
-    <string name="l7_connection_wireless_hint">3 steps: enable the native hotspot → check credentials → connect iPhone.</string>
+    <string name="l7_connection_wireless_hint">Choose native hotspot or Wi-Fi Direct, then pair and connect iPhone.</string>
     <string name="l7_connection_usb_hint">3 steps: use a USB data port → allow USB access → allow CarPlay on iPhone.</string>
     <string name="l7_connection_back">Back to connection methods</string>
     <string name="l7_reconnect_current">Reconnect current connection</string>
@@ -62,4 +62,13 @@
     <string name="l7_wireless_join_iphone">On your iPhone</string>
     <string name="l7_usb_permission_no_device">Pending: USB access can be checked after an Apple USB device is detected.</string>
     <string name="l7_usb_vpn_adb_hint">With ADB connected to the head unit from a computer, try:\nadb shell appops set com.ecarx.carplay ACTIVATE_VPN allow\n\nCheck the result:\nadb shell appops get com.ecarx.carplay ACTIVATE_VPN\n\nReturn to the app and tap “Check and request consent again”. An allowed operation does not confirm a successful wired connection.</string>
+    <string name="wireless_connection_method">Wireless connection method</string>
+    <string name="wireless_connection_method_hint">Choose Android native hotspot or Wi-Fi Direct. Changes apply to the next wireless connection.</string>
+    <string name="wifi_direct_wifi_off">Turn on the car’s Wi-Fi switch before connecting with Wi-Fi Direct.</string>
+    <string name="wifi_direct_wifi_unknown">Could not read the car’s Wi-Fi state. Check that Wi-Fi is on in system settings.</string>
+    <string name="wifi_direct_settings_missing">Could not open Wi-Fi settings. Turn on Wi-Fi in the car’s system settings.</string>
+    <string name="wifi_direct_phone_hint">Keep Bluetooth and Wi-Fi on your iPhone on, then connect and allow CarPlay when prompted. Native hotspot details are not required.</string>
+    <string name="wifi_direct_channel_title">Preferred Wi-Fi Direct channel</string>
+    <string name="wifi_direct_channel_choice">Channel %1$d · %2$s</string>
+    <string name="wifi_direct_channel_description">Auto chooses a channel for you. Manual channels depend on what your car supports. Changes apply to the next Wi-Fi Direct connection.</string>
 </resources>
