@@ -8,6 +8,9 @@ import zlib
 
 
 def check(apk: Path) -> None:
+    # 与正式商店的十进制直链阈值一致，不能用 24 MiB 替代。
+    if apk.stat().st_size > 24_000_000:
+        raise ValueError("APK 超过 24,000,000 字节的直链上限，请清理旧打包产物或优化体积")
     with zipfile.ZipFile(apk) as archive:
         dex = [item for item in archive.infolist()
                if re.fullmatch(r"classes(?:\d+)?\.dex", item.filename)]

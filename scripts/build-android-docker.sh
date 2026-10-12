@@ -149,6 +149,15 @@ for variable in L7_LOG_SERVER_URL L7_LOG_AUTHORIZATION; do
 done
 # 两个容器不能同时写同一份 Gradle 输出；锁由容器进程持有，退出自动释放。
 # 中文文档会作为离线许可输入，JVM 的文件名编码必须由 UTF-8 locale 初始化。
+for task in "${gradle_tasks[@]}"; do
+    case "$task" in
+        :mobile:assembleDebug|:mobile:assembleStandaloneDebug|:mobile:assembleRelease|:mobile:assembleStandaloneRelease)
+            # 增量 APK 会保留已替换条目的空洞；交付前仅清理 mobile，复用依赖与 SDK 缓存。
+            gradle_tasks=(:mobile:clean "${gradle_tasks[@]}")
+            break
+            ;;
+    esac
+done
 gradle_command=(env LANG=C.UTF-8 LC_ALL=C.UTF-8 flock --nonblock --conflict-exit-code 75 /workspace/build/android-build.lock
     ./gradlew "${gradle_tasks[@]}" --console=plain)
 # --rm 处理正常退出；退出钩子覆盖失败和终端中断，仅删除本次 CID 对应的容器。
