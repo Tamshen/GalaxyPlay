@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_desktop_title">Desktop floating menu</string>
+    <string name="l7_desktop_title">Vehicle desktop floating menu</string>
     <string name="l7_desktop_hint">Keep a floating shortcut when leaving the app. Select Display in its menu to return quickly.</string>
     <string name="l7_desktop_expand">Expand desktop menu</string>
     <string name="l7_desktop_permission">Enable desktop overlay</string>

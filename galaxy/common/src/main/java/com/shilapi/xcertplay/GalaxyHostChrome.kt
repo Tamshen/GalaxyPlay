@@ -11,7 +11,7 @@ internal class GalaxyHostChrome(private val activity: ComponentActivity) {
         L7ConnectionPanel(context, wireless, onReturn = home, onCancel = cancel, onRecovery = recovery)
 
     fun navigation(releaseTouches: () -> Unit, settings: (String) -> Unit) =
-        L7ProjectionNavigation(context, releaseTouches) { destination ->
+        L7ProjectionNavigation(context, releaseTouches, projection = true, returnHome = { settings("home") }) { destination ->
             when (destination) {
                 "home" -> Unit
                 "connection" -> GalaxyConnectionMenu.select(activity) { settings("settings-connection") }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_desktop_title">桌面悬浮菜单</string>
+    <string name="l7_desktop_title">车机桌面悬浮菜单</string>
     <string name="l7_desktop_hint">离开应用后保留浮动入口，点击菜单的「画面」快速返回。</string>
     <string name="l7_desktop_expand">展开桌面菜单</string>
     <string name="l7_desktop_permission">开启桌面悬浮权限</string>
