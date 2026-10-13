@@ -5,15 +5,10 @@
     <string name="l7_source_diplay_description">CarPlay 接收核心 · GPL-3.0</string>
     <string name="l7_source_diplay_url" translatable="false">https://github.com/shihabal3amri/DiPlay</string>
     <string name="l7_source_diplay_details">DiPlay 是 GalaxyPlay 的直接上游，提供 CarPlay 协议、连接、认证与媒体接收核心。GalaxyPlay 以官方发布核心为基线，银河 L6／L7 的界面、配置与车机适配由本项目维护。当前核心版本见本窗口标题。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；保留原作者署名及各文件许可声明。完整许可见“第三方许可”。</string>
-    <string name="l7_source_geely_name" translatable="false">DiPlay · carlito12345</string>
-    <string name="l7_source_geely_url" translatable="false">https://github.com/carlito12345/DiPlay</string>
-    <string name="l7_source_geely_description">早期配置参考</string>
-    <string name="l7_source_geely_details">carlito12345 的 DiPlay 吉利二改 v0.2.11 曾作为 GalaxyPlay 的早期配置参考。具体包括音频焦点优先级与降音恢复、厂商 CarPlay 音频用途及麦克风输入源读取，以及热点设置入口与无线网络设置回退。\n\n后续 GalaxyPlay 按银河 L6／L7 的需求持续调整和维护自己的方案；当前车型模板、界面、媒体／导航接入、蓝牙互斥与方控实现由本项目维护。这里保留早期参考来源与致谢。\n\n项目地址：\n%1$s\n\n项目根许可：GPL-3.0；各源码文件的原署名与许可声明继续保留。完整许可见“第三方许可”。</string>
     <string name="l7_licenses_title">第三方许可</string>
     <string name="l7_licenses_hint">查看依赖声明与许可原文</string>
     <string name="l7_licenses_load_failed">许可文件暂时无法读取，请重新打开。</string>
     <string name="l7_source_version_diplay" translatable="false">—</string>
     <string name="l7_source_open_project">打开项目链接</string>
     <string name="l7_source_browser_unavailable">未找到可用浏览器，可在项目说明中选择并复制链接。</string>
-    <string name="l7_source_geely_version" translatable="false">0.2.11</string>
 </resources>
