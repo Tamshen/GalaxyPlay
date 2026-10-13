@@ -734,6 +734,19 @@
      fun diagnosticSnapshot(): String =
          "bonjourAdded=${addedCount.get()} bonjourResolved=${resolvedCount.get()} " +
              "bonjourAddressMismatch=${addressMismatchCount.get()} connectProbes=${probeCount.get()} " +
+@@ -513,9 +513,11 @@
+     }
+ 
+     private fun applyLocalScope(address: InetAddress): InetAddress {
++        if (address !is Inet6Address || !address.isLinkLocalAddress) return address
+         val scope = advertisedAddresses.filterIsInstance<Inet6Address>()
+             .firstOrNull { it.scopeId != 0 }?.scopeId ?: return address
+-        if (address !is Inet6Address || address.scopeId != 0) return address
++        // scope 是本机接口索引；不能保留系统 NSD／旧解析结果上另一接口的索引。
++        if (address.scopeId == scope) return address
+         return try {
+             Inet6Address.getByAddress(null, address.address, scope)
+         } catch (_: Exception) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/CarPlayVpnService.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/CarPlayVpnService.kt
 @@ -56,6 +56,7 @@
@@ -1121,7 +1134,15 @@
  import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
  import java.io.IOException
  import java.net.Inet4Address
-@@ -135,10 +133,9 @@
+@@ -42,6 +40,7 @@
+     context: Context,
+     private val diagnostic: (String) -> Unit = {},
+     private val preferredChannel: Int = WifiP2pChannels.AUTO,
++    private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
+ ) : WirelessHotspotManager {
+     init {
+         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
+@@ -135,10 +134,9 @@
              val preferred = remembered?.takeIf {
                  preferredChannel == WifiP2pChannels.AUTO && it.stationMHz == stationFrequency
              }
@@ -1133,7 +1154,7 @@
                  preferredChannel != WifiP2pChannels.AUTO -> "Wi-Fi P2P remembered skipped=manual_channel"
                  preferred != null -> {
                      val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request).first() == preferred.request)
-@@ -182,8 +179,6 @@
+@@ -182,8 +180,6 @@
                  stationFrequency = stationFrequency,
                  preferred = preferred?.request,
                  preferredChannel = preferredChannel,
@@ -1142,7 +1163,7 @@
                  beforeRetry = {
                      ensureStartActive(attempt)
                      // Do not cancel discovery, toggle Wi-Fi, or remove a newly observed group.
-@@ -204,11 +199,7 @@
+@@ -204,11 +200,7 @@
                              val builder = WifiP2pConfig.Builder()
                                  .setNetworkName(credentials.ssid)
                                  .setPassphrase(credentials.passphrase)
@@ -1155,7 +1176,7 @@
                              builder.build()
                          }
                      }
-@@ -266,14 +257,7 @@
+@@ -266,14 +258,7 @@
                      "actualMHz=unavailable matched=unverified")
              } else {
                  diagnostic("Wi-Fi P2P channel requestedMHz=${creation.frequencyMHz ?: "auto"} actualMHz=${group.frequencyMHz} matched=${creation.frequencyMHz?.let { it == group.frequencyMHz } ?: "system_selected"}")
@@ -1171,7 +1192,7 @@
                      throw P2pChannelUnavailableException(preferredChannel,
                          "The car selected channel ${group.channel} instead.")
                  }
-@@ -334,7 +318,7 @@
+@@ -334,7 +319,7 @@
          }
          synchronized(legacyChannelLock) {
              if (activeChannel != null) releaseLegacyChannelRestriction(activeChannel)
@@ -1180,7 +1201,58 @@
          }
          activeThread?.quitSafely()
      }
-@@ -736,7 +720,7 @@
+@@ -552,6 +537,7 @@
+                 continue
+             }
+ 
++            val hostAddresses = interfaceHostAddresses(interfaceName, hostAddress)
+             return WirelessHotspotInfo(
+                 ssid = networkName,
+                 passphrase = passphrase,
+@@ -561,7 +547,8 @@
+                 bssid = interfaceHardwareAddress(interfaceName)
+                     ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
+                 interfaceName = interfaceName,
+-                hostAddress = hostAddress,
++                hostAddress = hostAddresses.first(),
++                hostAddresses = hostAddresses,
+                 bandLabel = band,
+                 backend = WirelessHotspotBackend.WIFI_P2P,
+             )
+@@ -618,6 +605,7 @@
+ 
+             val requestedChannel = creation.frequencyMHz
+                 ?.let(WifiP2pLegacyChannels::operatingChannelFor) ?: UNKNOWN_CHANNEL
++            val hostAddresses = interfaceHostAddresses(interfaceName, hostAddress)
+             return WirelessHotspotInfo(
+                 ssid = networkName,
+                 passphrase = passphrase,
+@@ -627,7 +615,8 @@
+                 bssid = interfaceHardwareAddress(interfaceName)
+                     ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
+                 interfaceName = interfaceName,
+-                hostAddress = hostAddress,
++                hostAddress = hostAddresses.first(),
++                hostAddresses = hostAddresses,
+                 bandLabel = if (requestedChannel == UNKNOWN_CHANNEL) "Auto"
+                     else WifiP2pLegacyChannels.bandLabelFor(requestedChannel),
+                 backend = WirelessHotspotBackend.WIFI_P2P,
+@@ -692,6 +681,14 @@
+         throw IOException("Interrupted while waiting for Wi-Fi P2P", interrupted)
+     }
+ 
++    private fun interfaceHostAddresses(interfaceName: String, primary: InetAddress): List<InetAddress> {
++        val selected = networkInterface(interfaceName)
++        val addresses = p2pHostAddresses(primary,
++            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0)
++        diagnostic("Wi-Fi P2P listener families=${addresses.joinToString(",") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
++        return addresses
++    }
++
+     private fun interfaceAddress(interfaceName: String): InetAddress? {
+         val networkInterface = networkInterface(interfaceName) ?: return null
+         val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
+@@ -736,7 +733,7 @@
          val fiveGhzSupported = runCatching { wifi?.is5GHzBandSupported }.getOrNull()
          val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
          val locationEnabled = runCatching {
@@ -1189,7 +1261,16 @@
          }.getOrNull()
          val required = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES
              else Manifest.permission.ACCESS_FINE_LOCATION
-@@ -843,7 +827,7 @@
+@@ -771,7 +768,7 @@
+             ?.joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
+ 
+     private fun networkInterface(interfaceName: String): NetworkInterface? = try {
+-        NetworkInterface.getByName(interfaceName)
++        interfaceLookup(interfaceName)
+     } catch (_: SocketException) {
+         null
+     }
+@@ -843,7 +840,7 @@
          }
          synchronized(legacyChannelLock) {
              if (failedChannel != null) releaseLegacyChannelRestriction(failedChannel)

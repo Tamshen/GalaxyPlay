@@ -639,6 +639,27 @@
      }
  
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
+@@ -463,10 +409,17 @@
+ 
+         fun makeGroup(config: WifiP2pConfig?) = WifiP2pGroup().apply {
+             shadowOf(this).setIsGroupOwner(true)
+-            shadowOf(this).setNetworkName(config?.networkName ?: "DIRECT-system-test")
+-            shadowOf(this).setPassphrase(if (missingCredentials) null else config?.passphrase ?: "test-generated-key")
++            // Android 10 暴露字段、没有对应 getter；产品不读取配置 getter，替身也应兼容。
++            val name = config?.let { if (android.os.Build.VERSION.SDK_INT < 30)
++                ReflectionHelpers.getField<String>(it, "networkName") else it.networkName }
++            val key = config?.let { if (android.os.Build.VERSION.SDK_INT < 30)
++                ReflectionHelpers.getField<String>(it, "passphrase") else it.passphrase }
++            val band = config?.let { if (android.os.Build.VERSION.SDK_INT < 30)
++                ReflectionHelpers.getField<Int>(it, "groupOwnerBand") else it.groupOwnerBand }
++            shadowOf(this).setNetworkName(name ?: "DIRECT-system-test")
++            shadowOf(this).setPassphrase(if (missingCredentials) null else key ?: "test-generated-key")
+             shadowOf(this).setInterface("p2p-test-missing")
+-            ReflectionHelpers.setField(this, "mFrequency", reportedFrequency ?: config?.groupOwnerBand ?: 2437)
++            ReflectionHelpers.setField(this, "mFrequency", reportedFrequency ?: band ?: 2437)
+         }
+     }
+ }
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 @@ -32,8 +32,9 @@

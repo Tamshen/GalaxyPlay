@@ -40,6 +40,7 @@ class WifiP2pGroupManager(
     context: Context,
     private val diagnostic: (String) -> Unit = {},
     private val preferredChannel: Int = WifiP2pChannels.AUTO,
+    private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
 ) : WirelessHotspotManager {
     init {
         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -536,6 +537,7 @@ class WifiP2pGroupManager(
                 continue
             }
 
+            val hostAddresses = interfaceHostAddresses(interfaceName, hostAddress)
             return WirelessHotspotInfo(
                 ssid = networkName,
                 passphrase = passphrase,
@@ -545,7 +547,8 @@ class WifiP2pGroupManager(
                 bssid = interfaceHardwareAddress(interfaceName)
                     ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
                 interfaceName = interfaceName,
-                hostAddress = hostAddress,
+                hostAddress = hostAddresses.first(),
+                hostAddresses = hostAddresses,
                 bandLabel = band,
                 backend = WirelessHotspotBackend.WIFI_P2P,
             )
@@ -602,6 +605,7 @@ class WifiP2pGroupManager(
 
             val requestedChannel = creation.frequencyMHz
                 ?.let(WifiP2pLegacyChannels::operatingChannelFor) ?: UNKNOWN_CHANNEL
+            val hostAddresses = interfaceHostAddresses(interfaceName, hostAddress)
             return WirelessHotspotInfo(
                 ssid = networkName,
                 passphrase = passphrase,
@@ -611,7 +615,8 @@ class WifiP2pGroupManager(
                 bssid = interfaceHardwareAddress(interfaceName)
                     ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
                 interfaceName = interfaceName,
-                hostAddress = hostAddress,
+                hostAddress = hostAddresses.first(),
+                hostAddresses = hostAddresses,
                 bandLabel = if (requestedChannel == UNKNOWN_CHANNEL) "Auto"
                     else WifiP2pLegacyChannels.bandLabelFor(requestedChannel),
                 backend = WirelessHotspotBackend.WIFI_P2P,
@@ -674,6 +679,14 @@ class WifiP2pGroupManager(
     } catch (interrupted: InterruptedException) {
         Thread.currentThread().interrupt()
         throw IOException("Interrupted while waiting for Wi-Fi P2P", interrupted)
+    }
+
+    private fun interfaceHostAddresses(interfaceName: String, primary: InetAddress): List<InetAddress> {
+        val selected = networkInterface(interfaceName)
+        val addresses = p2pHostAddresses(primary,
+            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0)
+        diagnostic("Wi-Fi P2P listener families=${addresses.joinToString(",") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
+        return addresses
     }
 
     private fun interfaceAddress(interfaceName: String): InetAddress? {
@@ -755,7 +768,7 @@ class WifiP2pGroupManager(
             ?.joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private fun networkInterface(interfaceName: String): NetworkInterface? = try {
-        NetworkInterface.getByName(interfaceName)
+        interfaceLookup(interfaceName)
     } catch (_: SocketException) {
         null
     }
