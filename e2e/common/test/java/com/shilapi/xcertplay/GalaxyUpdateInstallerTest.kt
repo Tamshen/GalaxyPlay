@@ -12,6 +12,7 @@ import androidx.core.app.ActivityOptionsCompat
 import com.shilapi.xcertplay.host.R
 import java.io.File
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -23,6 +24,44 @@ import org.robolectric.shadows.ShadowAlertDialog
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30])
 class GalaxyUpdateInstallerTest {
+    @Before fun resetProviderCache() {
+        // Robolectric 为各用例创建不同缓存目录，FileProvider 静态解析缓存需跟随夹具重置。
+        org.robolectric.util.ReflectionHelpers.getStaticField<MutableMap<String, Any>>(
+            androidx.core.content.FileProvider::class.java, "sCache").clear()
+    }
+    @Test fun installerProtectsPackageUntilResultAndRejectsDuplicateLaunch() {
+        val host = Robolectric.buildActivity(ComponentActivity::class.java).create()
+        val activity = host.get()
+        shadowOf(activity.packageManager).setCanRequestPackageInstalls(true)
+        val root = File(activity.cacheDir, "app-updates").apply { mkdirs() }
+        val file = File(root, "download-install.apk").apply { writeText("fixture"); setLastModified(1) }
+        var launches = 0
+        var requestCode = 0
+        var status = 0
+        val registry = object : ActivityResultRegistry() {
+            override fun <I, O> onLaunch(code: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
+                contract.createIntent(activity, input)
+                requestCode = code; launches++
+            }
+        }
+        val installer = GalaxyUpdateInstaller(activity, { status = it }, { false }, registry)
+        host.start().resume()
+        try {
+            installer.install(file)
+            GalaxyUpdateFiles.cleanup(root)
+            assertTrue(file.exists())
+            installer.install(file)
+            assertEquals(R.string.update_installer_busy, status)
+            assertEquals(1, launches)
+            registry.dispatchResult(requestCode, Activity.RESULT_CANCELED, null)
+            assertEquals(R.string.update_installer_returned, status)
+            GalaxyUpdateFiles.cleanup(root)
+            assertFalse(file.exists())
+        } finally {
+            GalaxyUpdateFiles.finishInstall()
+            host.pause().stop().destroy()
+        }
+    }
     @Test fun activeCarPlayBlocksInstallerAndPermissionRequests() {
         val host = Robolectric.buildActivity(ComponentActivity::class.java).create()
         val activity = host.get()

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="update_installer_busy">安装页面已经打开，请完成或关闭安装页面后再试。</string>
     <string name="update_check">检查更新</string>
     <string name="update_check_hint">查看最新版本，下载并安装更新</string>
     <string name="update_checking">正在检查更新…</string>
@@ -13,7 +14,7 @@
     <string name="update_download_progress">已下载 %1$d%%</string>
     <string name="update_verifying">正在校验安装包…</string>
     <string name="update_ready">版本 %1$s 已下载并校验</string>
-    <string name="update_ready_hint">点击安装，按系统提示确认更新。应用设置会保留。</string>
+    <string name="update_ready_hint">点击安装，按系统提示确认更新。应用设置会保留。安装包位于应用私有缓存，可在 24 小时内重新打开应用继续安装；过期包在应用恢复或下次下载时自动清理。</string>
     <string name="update_install">安装更新</string>
     <string name="update_stop">停止</string>
     <string name="update_close_hint">关闭将停止本次检查或下载，之后可重新检查更新。</string>

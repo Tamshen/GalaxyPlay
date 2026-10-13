@@ -52,10 +52,10 @@ internal class GalaxyUpdateTransfer(private val endpoint: URI = GalaxyUpdateMani
                  progress: (Long) -> Unit): File = network(request) {
         updateRequire(directory.isDirectory || directory.mkdirs(), GalaxyUpdateFailure.STORAGE)
         updateRequire(directory.usableSpace >= release.size + 4 * 1024 * 1024, GalaxyUpdateFailure.STORAGE)
-        directory.listFiles()?.filter { it.isFile && (it.extension == "apk" || it.extension == "partial") &&
-            System.currentTimeMillis() - it.lastModified() > 24 * 60 * 60 * 1000L }?.forEach { it.delete() }
+        GalaxyUpdateFiles.cleanup(directory)
         val pending = File.createTempFile("download-", ".partial", directory)
         val target = File(directory, pending.nameWithoutExtension + ".apk")
+        val protected = GalaxyUpdateFiles.protect(pending, target)
         var delivered = false
         try {
             val whole = MessageDigest.getInstance("SHA-256")
@@ -96,6 +96,7 @@ internal class GalaxyUpdateTransfer(private val endpoint: URI = GalaxyUpdateMani
         } finally {
             pending.delete()
             if (!delivered) target.delete()
+            protected.close()
         }
     }
 
