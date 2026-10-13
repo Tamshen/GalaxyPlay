@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_wireless_waiting_network">热点已就绪，正在等待 iPhone 建立 CarPlay 连接…</string>
+    <string name="galaxy_wireless_step">（%1$d/5）%2$s</string>
+    <string name="galaxy_wireless_authenticating">蓝牙已连接，正在认证 iPhone…</string>
+    <string name="galaxy_wireless_refresh_network">尚未收到 iPhone 的无线连接，正在再次请求连接…</string>
+    <string name="galaxy_wireless_negotiating">iPhone 已建立网络连接，正在确认 CarPlay 会话…</string>
+    <string name="galaxy_wireless_preparing_video">CarPlay 会话已建立，正在等待投屏画面…</string>
+    <string name="galaxy_wireless_retry_delay">%1$s\n%2$d 秒后准备第 %3$d 次连接</string>
+    <string name="galaxy_wireless_releasing">正在清理上一轮连接，准备重新连接…</string>
+    <string name="galaxy_wireless_network_timeout">未收到 iPhone 的无线连接。请在连接设置核对热点名称和密码。</string>
+    <string name="galaxy_wireless_protocol_timeout">iPhone 已建立网络连接，但 CarPlay 会话确认超时。</string>
     <string name="l7_hotspot_use_saved">使用已保存配置连接</string>
     <string name="l7_hotspot_read">重新读取热点配置</string>
     <string name="l7_hotspot_reading">正在读取 Android 原生热点的名称和密码…</string>

@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import com.shilapi.xcertplay.network.WirelessStartupFailure
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
 import org.junit.After
@@ -54,6 +55,23 @@ class WirelessStartupRecoveryTest {
         report(status = CarPlayStatus.Failed("Bluetooth socket closed"))
         assertEquals(1, budget().retries)
         assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
+    }
+
+    @Test fun waitingPageShowsNetworkRefreshAndFailureStepWithNextAttempt() {
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
+        // common 库默认未启用产品 UI；与 mobile 的资源覆盖保持一致。
+        ReflectionHelpers.setField(activity, "l7DebugLogs\$delegate", lazy { true })
+        val stage = TextView(activity)
+        ReflectionHelpers.setField(activity, "stageStatusView", stage)
+        report(status = CarPlayStatus.WaitingForWirelessNetwork(1))
+        assertTrue(stage.text.toString().contains("4/5"))
+        assertTrue(stage.text.toString().contains("Waiting for the iPhone"))
+        report(status = CarPlayStatus.WaitingForWirelessNetwork(2))
+        assertTrue(stage.text.toString().contains("Requesting it again"))
+        report()
+        assertTrue(stage.text.toString().contains("4/5"))
+        assertTrue(stage.text.toString().contains("attempt 2"))
+        assertTrue(stage.text.toString().contains("2 seconds"))
     }
 
     @Test fun exhaustedBudgetStopsAutomaticRecoveryAndExposesRetry() {

@@ -59,6 +59,34 @@ class FirstTcpWatchdogTest {
         assertEquals(0, failures)
     }
 
+    @Test fun refreshGateClosesOnRealTcpSessionSuccessOrTermination() {
+        for (end in 0..2) {
+            val watch = watchdog()
+            assertFalse(watch.waitingForFirstTcp())
+            watch.startSessionSent(0)
+            assertTrue(watch.waitingForFirstTcp())
+            assertFalse(watch.accepted(event(internal = true)))
+            assertTrue(watch.waitingForFirstTcp())
+            when (end) {
+                0 -> watch.accepted(event())
+                1 -> watch.sessionEstablished()
+                2 -> watch.terminate()
+            }
+            assertFalse(watch.waitingForFirstTcp())
+        }
+    }
+
+    @Test fun protocolStageWorksForEarlyTcpAndCannotReturnAfterSessionSuccess() {
+        val watch = watchdog()
+        assertFalse(watch.waitingForProtocol())
+        watch.accepted(event())
+        assertTrue(watch.waitingForProtocol())
+        assertFalse(watch.waitingForFirstTcp())
+        watch.sessionEstablished()
+        watch.accepted(event())
+        assertFalse(watch.waitingForProtocol())
+    }
+
     @Test fun repeatedStartDoesNotExtendDeadline() {
         val watch = watchdog()
         watch.startSessionSent(0)

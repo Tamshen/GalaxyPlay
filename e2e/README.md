@@ -14,6 +14,10 @@
 
 原厂媒体接入回归包括 `GalaxyOemMediaContractTest`（精确公开重载、本应用 MediaSession、拒绝占位入口）、`GalaxyOemPlaybackSnapshotTest`（图标／immutable 返回入口、能力字段与失效对象）、`L7MediaCenterSessionTest`（来源接受、异常重试、健康服务多次恢复、旧控制／焦点隔离），并由 `GalaxyProfilesTest` 验证旧音频保留、明确应用的新焦点与会话冻结。Android VM 测试源集中的 `com.ecarx.eas.sdk` 为自写公开签名替身，禁止进入正式 APK，也不作为原厂 SDK 或实车成功证据。Docker 构建 `:common:assembleDebugAndroidTest`，在独占 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，再执行 `adb -s emulator-5556 shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，成功标记为 `SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK`。配置设备脚本增加 L7 模板焦点实际落盘断言，单次点击后等待界面完成转换，失败截图保留且恢复原设置。
 
+## 原生热点连接恢复
+
+`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 覆盖原生热点首个 TCP 尚未到达时的五秒单次同链路恢复、相同 StartSession、不额外发送 Wi-Fi 配置、原总期限不延长、TCP／取消／过期代次／撤回停止、显式重复请求消耗预算与接口变化阻止旧请求。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 覆盖五步中英文、认证不报网络成功、TCP／协议超时区别、失败步骤和等待页的下一轮次数／秒数不被旧提示转换覆盖；common 测试需显式启用 mobile 的产品 UI 配置。以上为软件回归，不建立真实手机链路。
+
 ## 在线更新验收
 
 `GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、长说明滚动／横竖屏大字号与最大 480 dpi 界面尺寸固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
