@@ -19,6 +19,7 @@ internal class L7MediaArtwork(context: Context,
     private val publish: (Uri?) -> Unit) : Closeable {
     private val app = context.applicationContext
     private val directory = File(app.cacheDir, "l7-media-artwork/${UUID.randomUUID()}")
+    private val storageLease = GalaxyTemporaryFiles.protect(directory)
     private val cache = LinkedHashMap<Int, File>()
     private var selected: Int? = null
     private var closed = false
@@ -112,6 +113,7 @@ internal class L7MediaArtwork(context: Context,
         cache.values.forEach(::remove)
         cache.clear()
         directory.delete()
+        storageLease.close()
         event("close")
     }
 

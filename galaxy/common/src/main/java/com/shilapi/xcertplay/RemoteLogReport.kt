@@ -18,9 +18,13 @@ internal class RemoteLogBatch(
     private val metadata: RemoteLogMetadata,
     val index: Int,
     val total: Int,
-    val entries: List<RemoteLogEntry>,
+    entries: List<RemoteLogEntry>,
+    private val loadEntries: (() -> List<RemoteLogEntry>)? = null,
+    private val storedCount: Int? = null,
 ) {
-    val lineCount get() = entries.size
+    private val initialEntries = entries
+    val entries get() = loadEntries?.invoke() ?: initialEntries
+    val lineCount get() = storedCount ?: entries.size
     val body: ByteArray get() = JSONArray(entries.map { metadata.event(it, index, total) })
         .toString().toByteArray(Charsets.UTF_8).also { check(it.size <= RemoteLogReport.MAX_BODY) }
 }
@@ -37,7 +41,7 @@ internal data class RemoteLogMetadata(val id: String, val collected: String, val
         } }
 }
 
-/** 每次点击冻结一份有界快照；设备只由 URL 区分，正文不包含硬件编号。 */
+/** 共用批次元数据；完整上传用磁盘快照，查看器保留近期窗口。设备只由 URL 区分。 */
 internal data class RemoteLogReport(
     val id: String,
     val batches: List<RemoteLogBatch>,
@@ -45,8 +49,11 @@ internal data class RemoteLogReport(
     val shortenedSources: Int,
     val duplicateCopies: Int = 0,
     val memoryEvicted: Long = 0,
-) {
-    val lineCount get() = batches.sumOf { it.lineCount }
+    private val storage: java.io.Closeable? = null,
+    private val storedLineCount: Int? = null,
+) : java.io.Closeable {
+    val lineCount get() = storedLineCount ?: batches.sumOf { it.lineCount }
+    override fun close() { storage?.close() }
 
     companion object {
         const val MAX_BODY = 256 * 1024
@@ -57,6 +64,7 @@ internal data class RemoteLogReport(
         private val configurationReference = Regex("(?:^| )config_ref=(cfg_[g-v]{64})(?: |$)")
         internal fun redact(line: String): String? = DiagnosticRedactor.redact(line)
 
+        // 查看器使用近期窗口；完整上传必须调用 RemoteLogArchive，不能经过候选裁剪。
         fun collect(context: Context, checkpoint: () -> Unit = {}): RemoteLogReport {
             checkpoint()
             val drained = AsyncDiagnosticLog.awaitIdle(500)
