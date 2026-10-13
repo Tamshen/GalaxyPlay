@@ -1045,6 +1045,10 @@ private class AudioRenderer(
     private var playbackStarted = false
     private var prebufferBytes = 0
     private var startThresholdBytes = 0
+    private var trackCapacityBytes = 0
+    private val musicJitter = MusicJitterRecovery()
+    private val codecInputWait = AudioCodecInputWait()
+    private val audioOutputInfo = MediaCodec.BufferInfo()
     private var fadeApplied = false
     private var droppedPacketsLogged = false
     private var firstAacPayloadLogged = false
@@ -1108,7 +1112,11 @@ private class AudioRenderer(
             packetsReceived.incrementAndGet()
             val now = System.nanoTime()
             val previous = lastArrivalNs.getAndSet(now)
-            if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
+            if (previous != 0L) {
+                val gap = (now - previous) / 1_000_000L
+                maxArrivalGapMs.accumulateAndGet(gap, ::maxOf)
+                musicJitter.observe(gap)
+            }
         }
         if (!started || !queue.offer(AudioPacket(rtp, sample, System.nanoTime()))) {
             if (started) packetsDropped.incrementAndGet()
@@ -1312,6 +1320,7 @@ private class AudioRenderer(
             false, format.sampleRate, format.channels, useBus = !AudioOutputPolicy.isLegacy(streamOverride))
         diagnosticStage = "track-capacity"
         val capacityBytes = built.bufferSizeInFrames * frameBytes
+        trackCapacityBytes = capacityBytes
         startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
             if (wirelessRealtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
         report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
@@ -1536,7 +1545,10 @@ private class AudioRenderer(
     private fun feedCodec(payload: ByteArray, presentationTimeUs: Long) {
         val codec = codec ?: run { decoderUnavailablePackets++; return }
         diagnosticStage = "decoder-input"
-        val index = codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
+        val index = if (wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA)
+            codecInputWait.await({ running }, { codec.dequeueInputBuffer(0) }, { drainCodec(codec) })
+        else codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
+        if (!running) return
         if (index < 0) {
             inputDropped++
             if (inputDropped == 1) {
@@ -1570,7 +1582,7 @@ private class AudioRenderer(
 
     private fun drainCodec(codec: MediaCodec) {
         diagnosticStage = "decoder-output"
-        val info = MediaCodec.BufferInfo()
+        val info = audioOutputInfo
         while (running) {
             diagnosticStage = "decoder-output"
             val index = codec.dequeueOutputBuffer(info, 0)
@@ -1684,8 +1696,18 @@ private class AudioRenderer(
 
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
+        val wirelessMusic = wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA
+        if (wirelessMusic) {
+            val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
+            if (threshold > startThresholdBytes) {
+                startThresholdBytes = threshold
+                report("Audio: jitter recovery startMs=${threshold * 1000L / bytesPerSecond} " +
+                    "observedGapMs=${musicJitter.gapMillis} capacityMs=${trackCapacityBytes * 1000L / bytesPerSecond}")
+            }
+        }
         if (bufferProgress.shouldRebuffer(!wirelessRealtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition, startThresholdBytes / 2L)) {
+                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition,
+                startThresholdBytes / 2L, recoverOnQueuedBurst = wirelessMusic)) {
             // An underrun left the track below the recovery waterline. Retain PCM while paused,
             // then use the configured start threshold again when music resumes.
             track.pause()
@@ -1733,7 +1755,8 @@ private class AudioRenderer(
             "estimatedQueuedFrames=${queuedFrames ?: -1} writeErrors=$writeErrorsThisWindow " +
             "lastWriteError=${lastWriteErrorCode ?: "none"} zeroWrites=$zeroWritesThisWindow " +
             "partialWrites=$partialWritesThisWindow " +
-            "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
+            "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount " +
+            "inputRetriesTotal=${codecInputWait.retries} inputTimeoutsTotal=${codecInputWait.timeouts} ended=$force"
         Log.i(STATS_TAG, line)
         report(line)
         if (mappedChannel == AudioChannel.MEDIA) {
