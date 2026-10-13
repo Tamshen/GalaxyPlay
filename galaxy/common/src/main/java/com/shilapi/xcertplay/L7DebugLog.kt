@@ -57,16 +57,26 @@ internal object L7DebugLog {
     fun record(message: String) = record(message, persistent)
     fun recordConfiguration(message: String, configuration: GalaxyConfigurationEvidence?) = record(message, persistent, configuration)
 
-    fun record(message: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence? = target?.configuration ?: currentConfiguration) {
-        val safe = DiagnosticRedactor.redact(message) ?: return
-        runCatching { performance.poll() }.getOrNull()?.let { writeRedacted(it, target, configuration) }
-        writeRedacted(safe, target, configuration)
+    fun recordSession(message: String, session: SessionLogFile?) {
+        val now = System.currentTimeMillis()
+        val event = DiagnosticLogIdentity.next()
+        val configuration = session?.configuration ?: currentConfiguration
+        AsyncDiagnosticLog.append(session, message, now, configuration, event)
+        record(message, persistent, configuration, event, now)
     }
 
-    private fun writeRedacted(safe: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence?) {
+    fun record(message: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence? = target?.configuration ?: currentConfiguration,
+               event: String? = null, nowMillis: Long = System.currentTimeMillis()) {
+        val safe = DiagnosticRedactor.redact(message) ?: return
+        runCatching { performance.poll() }.getOrNull()?.let { writeRedacted(it, target, configuration) }
+        writeRedacted(safe, target, configuration, event ?: DiagnosticLogIdentity.next(), nowMillis)
+    }
+
+    private fun writeRedacted(safe: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence?,
+                              event: String = DiagnosticLogIdentity.next(), now: Long = System.currentTimeMillis()) {
         buffer.appendRedacted((configuration?.let { "config_ref=${it.id} " } ?: "") +
-            "${timestamp.get()!!.format(Date())}  $safe")
-        AsyncDiagnosticLog.append(target, safe, configuration = configuration)
+            "${timestamp.get()!!.format(Date(now))}  ${DiagnosticLogIdentity.prefix(event, now)}$safe")
+        AsyncDiagnosticLog.append(target, safe, nowMillis = now, configuration = configuration, eventId = event)
     }
 }
 

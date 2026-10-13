@@ -3369,8 +3369,8 @@ class CarPlayHostActivity : ComponentActivity() {
                     !message.startsWith(CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX)) return
                 val safe = DiagnosticRedactor.redact(message) ?: return
                 // 文件目标随监听器固定，旧控制器的关闭诊断仍落在所属会话；写盘不占用主线程。
-                AsyncDiagnosticLog.append(diagnosticLog, safe)
-                if (l7DebugLogs) L7DebugLog.record(safe)
+                if (l7DebugLogs) L7DebugLog.recordSession(safe, diagnosticLog)
+                else AsyncDiagnosticLog.append(diagnosticLog, safe)
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
                         return@runOnUiThread

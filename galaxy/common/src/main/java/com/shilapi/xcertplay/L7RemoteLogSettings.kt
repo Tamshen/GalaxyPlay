@@ -68,7 +68,11 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 status.completedBatches, status.totalBatches, status.uploadedLines, status.totalLines) else ""
             val limit = if (status.omittedLines > 0 || status.shortenedSources > 0) "\n" +
                 context.getString(R.string.l7_log_snapshot_limit, status.omittedLines, status.shortenedSources) else ""
-            return message + progress + limit
+            val copies = if (status.duplicateCopies > 0) "\n" +
+                context.getString(R.string.l7_log_duplicate_copies, status.duplicateCopies) else ""
+            val memory = if (status.memoryEvicted > 0) "\n" +
+                context.getString(R.string.l7_log_memory_evicted, status.memoryEvicted) else ""
+            return message + progress + limit + copies + memory
         }
     }
 
