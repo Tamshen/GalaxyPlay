@@ -52,9 +52,9 @@ bash scripts/build-galaxyplay-host.sh --check
 | 项目 | 版本 | 用途 | 许可 |
 | --- | --- | --- | --- |
 | [DiPlay](https://github.com/shihabal3amri/DiPlay) | 0.2.15 | 接收核心，保留 L7 专用适配 | [GPL-3.0](docs/第三方许可.md#diplay) |
-| [DiPlay · carlito12345](https://github.com/carlito12345/DiPlay) | 参考 0.2.11 | 吉利二改；音频配置与热点跳转来源，蓝牙与方控适配参考 | [来源与许可](docs/第三方许可.md#diplay-geely-reference) |
+| [DiPlay · carlito12345](https://github.com/carlito12345/DiPlay) | 参考 0.2.11 | 早期配置参考：音频焦点、厂商音频用途／输入源与热点设置跳转 | [来源与许可](docs/第三方许可.md#diplay-geely-reference) |
 
-感谢 carlito12345 开源分享车机适配实现；参考项目版本不代表 L7 核心升级或全部功能已合入。应用「关于」提供项目地址与参考说明；其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，也可在「关于 → 第三方许可」离线查看。
+感谢 carlito12345 提供早期配置参考。GalaxyPlay 以官方 DiPlay 为核心基线，后续银河 L6／L7 的配置、界面及车机接入方案由本项目持续调整和维护。应用「关于」提供项目地址与参考说明；其他依赖和资源的声明、署名与许可见[第三方许可](docs/第三方许可.md)，也可在「关于 → 第三方许可」离线查看。
 
 <!-- 首次使用协议开始：正文同步自 galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md，仅调整 Markdown 排版。 -->
 

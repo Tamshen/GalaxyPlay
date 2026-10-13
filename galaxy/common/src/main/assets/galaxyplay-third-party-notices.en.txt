@@ -8,21 +8,23 @@ DiPlay — GPL-3.0. Receiver protocol, connection and recovery code.
 https://github.com/shihabal3amri/DiPlay
 Original xcertplay source attribution and file licenses remain in the receiver sources.
 
-Head-unit adaptation reference
+Early configuration reference
 
-DiPlay — carlito12345 Geely fork. Thanks to carlito12345 for sharing the open-source head-unit adaptations.
+DiPlay — carlito12345 Geely fork. Thanks to carlito12345 for providing an early configuration reference.
 https://github.com/carlito12345/DiPlay
-Purpose: source comparison and adaptation reference for Bluetooth media handoff, steering-wheel input and audio compatibility.
-Reviewed reference: 0.2.11, commit 0109cf7f6948ae1823099ca29170e83df3cd6cce. This is a reference baseline, not the L7 receiver core version.
-Relationship: migration preparation and attribution; not a separate SDK, module or Gradle dependency. This notice does not mean that all fork features have been integrated or verified on L7. Any subsequent selected patches must record their source and retain individual file notices.
-Root license: GPL-3.0, with the same license text bundled in the application. Individual source copyrights and license notices remain applicable.
-https://github.com/carlito12345/DiPlay/blob/0109cf7f6948ae1823099ca29170e83df3cd6cce/LICENSE
+Early reference baseline: v0.2.11, commit 9944dab959d41c633f8f6928d720f04e180c6881. The current receiver core uses the official DiPlay baseline specified in the product version configuration.
+Specific early references: audio focus priority and ducking recovery; factory CarPlay audio usages, microphone input sources and standard-usage fallback; the hotspot settings entry and its wireless-settings fallback.
+Subsequent maintenance: GalaxyPlay has adjusted and maintained its own configuration and integration solutions for Galaxy L6 and L7. Current vehicle templates, interface, media and navigation registration, Bluetooth media exclusion and steering-wheel handling are maintained in this project. The fork is not included as a separate SDK, module or Gradle dependency.
+Traceability: local implementation commits 9a0b31a (audio reference) and 061e9e6 (settings navigation). Current maintenance points are AudioFocusCoordinator, L7FactoryAudioProfile and L7HotspotSettings.openSettings.
+Root license: GPL-3.0. Original source attribution and individual file license notices are retained, and the original license text is bundled in the application.
+https://github.com/carlito12345/DiPlay/blob/9944dab959d41c633f8f6928d720f04e180c6881/LICENSE
 
 Runtime components
 
 Concentus 1.0.0 — BSD-3-Clause. Pure Java Opus encoder and decoder, published as com.plasmoverse:concentus:1.0.0. Software fallback for wireless audio and microphone streams when system Opus codecs cannot start; audio routing is unchanged. The original META-INF/LICENSE from the artifact is bundled as licenses/Concentus-LICENSE.txt.
 https://github.com/lostromb/concentus
 https://github.com/plasmoapp/concentus
+Integration comparison: the software Opus fallback was compared with a later Boyue implementation. The codec algorithms come from Concentus; GalaxyPlay maintains capability detection, per-stream fallback and resource release.
 
 AndroidX — Apache-2.0. Android support components including Core, Activity, Lifecycle and Car App. Copyright notices remain with the respective Android Open Source Project sources.
 https://github.com/androidx/androidx
