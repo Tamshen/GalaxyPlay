@@ -14,8 +14,13 @@ internal class DebugLogBuffer(private val capacity: Int = 1000) {
 
     @Synchronized fun append(line: String) {
         val safe = DiagnosticRedactor.redact(line) ?: return
+        appendRedacted(safe)
+    }
+
+    /** 仅接受调用方已脱敏的正文与非敏感时间／配置前缀，避免重复执行正则。 */
+    @Synchronized internal fun appendRedacted(line: String) {
         if (lines.size == capacity) { lines.removeFirst(); evicted++ }
-        lines.addLast(safe)
+        lines.addLast(line)
         revision++
     }
 
@@ -31,6 +36,8 @@ internal class DebugLogBuffer(private val capacity: Int = 1000) {
 
 internal object L7DebugLog {
     val buffer = DebugLogBuffer()
+    private val timestamp = ThreadLocal.withInitial { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
+    private val performance = GalaxyProcessPerformance()
     @Volatile private var persistent: SessionLogFile? = null
     @Volatile private var currentConfiguration: GalaxyConfigurationEvidence? = null
     @Synchronized fun initialize(context: android.content.Context) {
@@ -52,8 +59,13 @@ internal object L7DebugLog {
 
     fun record(message: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence? = target?.configuration ?: currentConfiguration) {
         val safe = DiagnosticRedactor.redact(message) ?: return
-        buffer.append((configuration?.let { "config_ref=${it.id} " } ?: "") +
-            "${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())}  $safe")
+        runCatching { performance.poll() }.getOrNull()?.let { writeRedacted(it, target, configuration) }
+        writeRedacted(safe, target, configuration)
+    }
+
+    private fun writeRedacted(safe: String, target: SessionLogFile?, configuration: GalaxyConfigurationEvidence?) {
+        buffer.appendRedacted((configuration?.let { "config_ref=${it.id} " } ?: "") +
+            "${timestamp.get()!!.format(Date())}  $safe")
         AsyncDiagnosticLog.append(target, safe, configuration = configuration)
     }
 }

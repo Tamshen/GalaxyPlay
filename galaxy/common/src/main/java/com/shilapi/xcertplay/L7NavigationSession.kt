@@ -16,7 +16,8 @@ internal class L7NavigationSession(
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val sequence = java.util.concurrent.atomic.AtomicLong()
-    private val operations = com.shilapi.xcertplay.diagnostics.DiagnosticOperation({ event(it) })
+    private val operations = com.shilapi.xcertplay.diagnostics.SampledDiagnosticOperation(
+        { event(it) }, setOf("serviceReady"))
     private fun event(body: String) {
         runCatching { log("Navigation: generation=$generation event=${sequence.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body") }
     }
@@ -125,7 +126,7 @@ internal class L7NavigationSession(
         closed = true
         port.invalidate()
         latest = CarPlayNavigationSnapshot()
-        enqueue { if (started) stop(); call("unregister") { port.close() } }
+        enqueue { operations.flush(); if (started) stop(); call("unregister") { port.close() } }
     }
     private fun enqueue(action: () -> Unit) {
         try { worker.execute(action) }

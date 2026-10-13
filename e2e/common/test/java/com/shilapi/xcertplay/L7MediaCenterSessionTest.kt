@@ -288,6 +288,15 @@ class L7MediaCenterSessionTest {
         assertTrue(port.calls.contains("progress:20"))
         assertFalse(logs.any { "private-title" in it })
     }
+    @Test fun frequentProgressDoesNotFloodLogsOrSteeringStateAndStillPublishesEveryLatestValue() {
+        connect(); session.update(playing()); worker.drain()
+        logs.clear()
+        repeat(1000) { session.update(playing((it + 1).toLong())); worker.drain() }
+        assertEquals(1000, port.calls.count { it.startsWith("progress:") && it != "progress:0" })
+        assertTrue(logs.size <= 2)
+        session.close(); worker.drain()
+        assertTrue(logs.any { "stage=updateProgress phase=SUMMARY calls=1001" in it })
+    }
     @Test fun stateFailureDoesNotSuppressIndependentProgressAndDoesNotLeakExceptionMessage() {
         connect(); port.failState = true; session.update(playing(1200)); worker.drain()
         assertTrue(port.calls.contains("progress:1200"))
