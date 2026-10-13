@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_storage_title">存储与内存占用</string>
+    <string name="galaxy_storage_total">应用数据占用</string>
+    <string name="galaxy_storage_logs">日志占用（上限 5 MB）</string>
+    <string name="galaxy_storage_cache">缓存占用</string>
+    <string name="galaxy_storage_other">配置与其他数据</string>
+    <string name="galaxy_storage_memory">当前运行内存</string>
+    <string name="galaxy_storage_loading">正在统计…</string>
+    <string name="galaxy_storage_unavailable">暂时无法统计</string>
+    <string name="galaxy_storage_policy">日志总量超过 5 MB 时自动清理较旧记录，保留最近上下文。启动及运行期间自动清理闲置临时文件，上传、下载与安装中的文件受保护。数据含日志、缓存、配置及报告；运行内存单独统计。</string>
+</resources>

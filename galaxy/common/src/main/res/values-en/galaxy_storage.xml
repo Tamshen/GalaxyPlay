@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="galaxy_storage_title">Storage and memory usage</string>
+    <string name="galaxy_storage_total">App data usage</string>
+    <string name="galaxy_storage_logs">Logs (5 MB limit)</string>
+    <string name="galaxy_storage_cache">Cache usage</string>
+    <string name="galaxy_storage_other">Settings and other data</string>
+    <string name="galaxy_storage_memory">Current memory usage</string>
+    <string name="galaxy_storage_loading">Measuring…</string>
+    <string name="galaxy_storage_unavailable">Currently unavailable</string>
+    <string name="galaxy_storage_policy">When logs exceed 5 MB, older records are removed while recent context is retained. Unused temporary files are cleaned at startup and during use. Active uploads, downloads and installers are protected. App data includes logs, cache, settings and reports; process memory is measured separately.</string>
+</resources>
