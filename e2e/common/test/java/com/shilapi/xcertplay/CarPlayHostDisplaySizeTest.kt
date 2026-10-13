@@ -115,6 +115,49 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(73, AirPlayPersistence.loadDisplayScalePercent(activity))
     }
 
+    @Test fun newConnectionWaitsForSystemBarsInsteadOfFreezingThePreviousFullPanelSize() {
+        allowStartup()
+        setField("projectionWindow", GalaxyProjectionWindow(android.widget.FrameLayout(activity)) {})
+        invoke("maybeStartCarPlay")
+        assertTrue(controllerConstruction.constructed().isEmpty())
+        assertNull(getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+    }
+
+    @Test fun galaxyProtocolUsesTheRemainingAspectRatioWithEitherOrBothSystemBarsVisible() {
+        val resources = org.mockito.Mockito.spy(activity.resources)
+        org.mockito.Mockito.`when`(resources.getBoolean(R.bool.config_l7_product_ui)).thenReturn(true)
+        activity = org.mockito.Mockito.spy(activity)
+        org.mockito.Mockito.doReturn(resources).`when`(activity).resources
+        allowStartup()
+        AirPlayPersistence.saveDisplayScalePercent(activity, 100)
+        AirPlayPersistence.saveUiScalePercent(activity, 100)
+        activity.javaClass.getDeclaredMethod("loadPersistedSettings").apply { isAccessible = true }.invoke(activity)
+        val method = activity.javaClass.getDeclaredMethod("createAirPlayConfig", sizeClass).apply { isAccessible = true }
+        for (height in listOf(1920, 1872, 1744, 1696)) {
+            val config = method.invoke(activity, size(1440, height)) as AirPlayConfig
+            assertEquals(1440, config.main.widthPixels)
+            assertEquals(height, config.main.heightPixels)
+            val viewport = VideoViewport.fit(1440, height, config.main.widthPixels, config.main.heightPixels)
+            assertEquals(0.0, viewport.left, 0.001)
+            assertEquals(0.0, viewport.top, 0.001)
+            assertEquals(height.toDouble(), viewport.height, 0.001)
+            assertEquals(1440.0 / height, config.main.widthPhysicalMm!!.toDouble() / config.main.heightPhysicalMm!!, 0.01)
+        }
+    }
+
+    @Test fun settledInsetsCannotStartBeforeTheMeasuredViewportIsCommitted() {
+        allowStartup()
+        val window = GalaxyProjectionWindow(android.widget.FrameLayout(activity)) {}
+        window.javaClass.getDeclaredField("ready").apply { isAccessible = true }.setBoolean(window, true)
+        setField("projectionWindow", window)
+        setField("videoView", TextureView(activity).apply { layout(0, 0, 1440, 1696) })
+        setField("activeDisplaySize", size(1440, 1920))
+        invoke("maybeStartCarPlay")
+        assertTrue(controllerConstruction.constructed().isEmpty())
+        assertNull(getField("sessionDisplay"))
+    }
+
     @Test fun surroundViewOpenAndCloseKeepsTheNegotiatedCanvas() {
         val display = startSession()
         applySize(1920, 942)
