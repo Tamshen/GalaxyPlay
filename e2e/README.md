@@ -18,9 +18,13 @@
 
 `WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 覆盖原生热点首个 TCP 尚未到达时的五秒单次同链路恢复、相同 StartSession、不额外发送 Wi-Fi 配置、原总期限不延长、TCP／取消／过期代次／撤回停止、显式重复请求消耗预算与接口变化阻止旧请求。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 覆盖五步中英文、认证不报网络成功、TCP／协议超时区别、失败步骤和等待页的下一轮次数／秒数不被旧提示转换覆盖；common 测试需显式启用 mobile 的产品 UI 配置。以上为软件回归，不建立真实手机链路。
 
+`P2pCredentialsTest`、`WifiP2pGroupManagerTest` 覆盖明确请求的密码与系统回读一致、外层引号兼容、默认组缺凭据拒绝、真实单播 AP 提示、发送前配置变化拒绝；日志仅保留匹配结果。`ConnectionCancellationTest` 在 Android 10／11 验证应用首页先于旧宿主关闭、重复取消幂等、延迟释放不再跳转、旧宿主不停止新会话。`RemoteLogEvidenceRetentionTest` 覆盖同事件跨来源合并、真实重复故障保留、事件时间排序、媒体压力下阶段／错误证据与 1 MiB JSON 预算、会话关闭后释放证据仍落盘。
+
+`../tools/scripts/python-frida16.sh e2e/device/connection_cancel_smoke.py` 仅允许有本地 Frida 转发的 AVD，阻止真实控制器启动，点击实际取消按钮，核对应用首页恢复与宿主销毁、连续前台采样始终属于本应用、合成两秒延迟释放后无迟到导航，并覆盖控制器尚未创建的取消；结束恢复偏好与协议。生命周期／合成会话验证不替代实车窗口与资源释放结果，截图与观测记录留在 `build/previews/133-cancellation/`。
+
 ## 在线更新验收
 
-`GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、长说明滚动／横竖屏大字号与最大 480 dpi 界面尺寸固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
+`GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、无记录时过期孤立包清理、活动下载及系统安装器文件保护／返回解锁、拒绝越界符号链接清理、重复安装请求拒绝、长说明滚动／横竖屏大字号与最大 480 dpi 界面尺寸固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
 
 `python3 e2e/device/app_update_smoke.py --adb ../tools/scripts/adb.sh` 仅允许 AVD，读取正式 HTTPS 商店，检查结果和关闭；需要在商店已有更高版本、模拟器安装含更新功能的旧版验收包时，显式加 `--install-update --from-code 旧代码 --to-code 新代码`，验证下载、APK 身份校验、安装授权取消／返回、系统覆盖安装、旧进程结束后启动和更新后版本复查。安装模式会更换模拟器应用版本，安装来源 AppOp 在结束时恢复；不清除配置、连接手机或上传日志。截图与结果保留于忽略目录 `build/previews/app-update/`。
 
