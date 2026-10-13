@@ -324,6 +324,7 @@ class CarPlayHostActivity : ComponentActivity() {
     // Keep one surface per layer alive, including while its map card is hidden.
     private val clusterLayers = mutableMapOf<Boolean, ClusterMapPresentation>()
     private var activeDisplaySize: DisplaySize? = null
+    private var projectionWindow: GalaxyProjectionWindow? = null
     private var pendingDisplaySize: DisplaySize? = null
     private var sessionDisplay: CarPlaySessionDisplay? = null
     private val displayTrace = GalaxyDisplayTrace(::appendLog)
@@ -707,9 +708,9 @@ class CarPlayHostActivity : ComponentActivity() {
             clusterMonitor = null
         }
         ensureClusterPresentation()
-        maybeStartCarPlay()
         applyFullscreenMode()
         refreshDisplaySizeAfterLayout()
+        maybeStartCarPlay()
     }
 
     // Experimental: the CarPlay instrument-cluster stream on the BYD cluster projection display.
@@ -928,6 +929,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun buildContentView(): View {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        if (l7DebugLogs) projectionWindow = GalaxyProjectionWindow(root,
+            report = ::appendLog, settled = ::refreshDisplaySizeAfterLayout)
         val video = TextureView(this).apply {
             // 主画面没有 alpha，避免全屏透明合成；黑边由根容器承接。
             isOpaque = true
@@ -3454,7 +3457,14 @@ class CarPlayHostActivity : ComponentActivity() {
         if (profile == null) { setConnectionStage(getString(R.string.profile_load_failed)); return }
         configurationContext = GalaxyConfigurationContext(super.getApplicationContext(), profile, runtimeOnly = true)
         sessionLog?.configuration = GalaxyConfigurationEvidence.from(this, profile)
+        val previousBars = hideTopBar to hideBottomBar
         loadPersistedSettings()
+        // 偏好可能在等待权限期间改变；先应用栏位布局，不能用旧视口建立新连接。
+        if (l7DebugLogs && previousBars != (hideTopBar to hideBottomBar)) {
+            applyFullscreenMode()
+            refreshDisplaySizeAfterLayout()
+            return
+        }
         val controllerGeneration = restartGeneration
         L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "BEGIN")
         val config = createRuntimeConfig()
@@ -3670,6 +3680,10 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (controller == null && adoptBackgroundSession()) return
         val size = activeDisplaySize ?: run { recordWiredWait("DISPLAY"); return }
+        // Insets 已就绪仍需等去抖尺寸提交，避免权限回调抢在新视口更新前启动。
+        val windowReady = projectionWindow?.let {
+            it.ready && videoView?.width == size.width && videoView?.height == size.height
+        } ?: true
         val transportReady = if (wirelessEnabled) wirelessPermissionsReady else vpnReady
         val locationReady = !locationReportingEnabled || locationPermissionAvailable
         if (
@@ -3679,6 +3693,7 @@ class CarPlayHostActivity : ComponentActivity() {
             shuttingDown.get() ||
             menuOpen ||
             handshakeResetInProgress ||
+            !windowReady ||
             pendingDisplaySize != null ||
             controller != null
         ) {
@@ -3686,6 +3701,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 !transportReady -> "VPN"
                 !locationReady -> "LOCATION"
                 !microphonePermissionResolved -> "MICROPHONE"
+                !windowReady -> "SYSTEM_BARS_LAYOUT"
                 pendingDisplaySize != null -> "DISPLAY_SETTLE"
                 controller != null -> "EXISTING_CONTROLLER"
                 else -> "LIFECYCLE"
@@ -4198,7 +4214,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun applyFullscreenMode() {
         val hideTop = hideTopBar
         val hideBottom = hideBottomBar
-        WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
+        // 产品布局自行处理系统栏与车机裁窗的交集，视频和触控使用同一剩余区域。
+        WindowCompat.setDecorFitsSystemWindows(window, !l7DebugLogs && !(hideTop && hideBottom))
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         if (hideTop) {
             controller.hide(WindowInsetsCompat.Type.statusBars())
@@ -4212,6 +4229,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        projectionWindow?.configure(hideTop, hideBottom)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
