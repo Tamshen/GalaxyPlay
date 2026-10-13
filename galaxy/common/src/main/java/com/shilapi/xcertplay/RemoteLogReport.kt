@@ -43,6 +43,8 @@ internal data class RemoteLogReport(
     val batches: List<RemoteLogBatch>,
     val omittedLines: Int,
     val shortenedSources: Int,
+    val duplicateCopies: Int = 0,
+    val memoryEvicted: Long = 0,
 ) {
     val lineCount get() = batches.sumOf { it.lineCount }
 
@@ -89,7 +91,7 @@ internal data class RemoteLogReport(
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
             return build(lines, version, context.getString(R.string.l7_core_source_info),
                 "snapshot writerDrained=$drained memoryEvicted=${buffer.evicted}",
-                runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull(), checkpoint) { shortened }
+                runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull(), checkpoint, buffer.evicted) { shortened }
         }
 
         private fun tail(file: File, limit: Long, onShortened: () -> Unit): String = RandomAccessFile(file, "r").use {
@@ -112,11 +114,11 @@ internal data class RemoteLogReport(
         private fun build(lines: Sequence<Pair<String, String>>, version: String, core: String,
                           snapshot: String? = null, saved: GalaxyConfigurationEvidence? = null,
                           checkpoint: () -> Unit = {},
+                          memoryEvicted: Long = 0,
                           shortened: () -> Int): RemoteLogReport {
             val metadata = RemoteLogMetadata(UUID.randomUUID().toString(), Instant.now().toString(), version.take(80), core.take(120))
-            val retained = ArrayDeque<Pair<RemoteLogEntry, Int>>()
+            val retained = RemoteLogWindow<RemoteLogEntry>(MAX_LINES, MAX_REPORT_BODY - SUMMARY_RESERVE, deduplicate = false)
             val configurations = linkedMapOf<String, GalaxyConfigurationEvidence>()
-            var retainedBytes = 0
             val raw = RemoteLogSnapshot()
             for ((source, line) in lines) {
                 checkpoint()
@@ -127,11 +129,12 @@ internal data class RemoteLogReport(
                 runCatching { GalaxyConfigurationEvidence.read(header) }
                     .onSuccess { configurations[it.id] = it }
             }
-            val prepared = raw.lines.size
+            val candidates = raw.lines
+            val prepared = candidates.size
             var omitted = raw.omitted; var excluded = 0; var masked = 0; var truncated = 0; var count = raw.count
-            while (raw.lines.isNotEmpty()) {
+            while (candidates.isNotEmpty()) {
                 checkpoint()
-                val (index, source, line) = raw.lines.removeFirst()
+                val (index, source, line) = candidates.removeFirst()
                 val safe = redact(line)
                 if (safe == null) { excluded++; continue }
                 if (safe != line || "[redacted]" in safe) masked++
@@ -139,18 +142,12 @@ internal data class RemoteLogReport(
                 val reference = configurationReference.find(safe)?.groupValues?.get(1)
                 val entry = RemoteLogEntry(index, source, safe, reference)
                 val size = metadata.event(entry, MAX_LINES + 1, MAX_LINES + 1).toString().toByteArray(Charsets.UTF_8).size + 1
-                while (retained.isNotEmpty() && (retained.size == MAX_LINES || retainedBytes + size > MAX_REPORT_BODY - SUMMARY_RESERVE)) {
-                    retainedBytes -= retained.removeFirst().second
-                    omitted++
-                }
-                // 不按文本去重：相同报错的重复次数和先后顺序也是诊断证据。
-                retained += entry to size
-                retainedBytes += size
+                omitted += retained.add(index, source, safe, entry, size)
             }
             // 无实际内容时不为了摘要发请求，也不能记录为上传成功。
-            if (retained.isEmpty()) return RemoteLogReport(metadata.id, emptyList(), omitted, shortened())
+            if (retained.size == 0) return RemoteLogReport(metadata.id, emptyList(), omitted, shortened(), raw.duplicateCopies, memoryEvicted)
             fun headers(): List<RemoteLogEntry> {
-                val referenced = retained.mapNotNull { it.first.configurationId }.distinct()
+                val referenced = retained.ordered().mapNotNull { it.value.configurationId }.distinct()
                 val historical = referenced.mapNotNull { configurations[it] }.mapIndexed { index, evidence ->
                     RemoteLogEntry(count + index, "configuration", "configuration_snapshot", evidence.id, evidence, "at_event")
                 }
@@ -158,7 +155,7 @@ internal data class RemoteLogReport(
                     RemoteLogEntry(count + historical.size, "configuration", "saved_configuration_at_upload", evidence.id, evidence, "saved_at_upload")
                 })
             }
-            val references = retained.mapNotNull { it.first.configurationId }.groupingBy { it }.eachCount().toMutableMap()
+            val references = retained.ordered().mapNotNull { it.value.configurationId }.groupingBy { it }.eachCount().toMutableMap()
             val costs = mutableMapOf<String, Int>()
             // 当前保存副本与历史同 ID 时仍是两个角色，单独计量；裁剪过程不反复序列化配置。
             val savedCost = saved?.let { evidence -> metadata.event(RemoteLogEntry(count + 64, "configuration",
@@ -171,11 +168,11 @@ internal data class RemoteLogReport(
                     MAX_LINES + 1).toString().toByteArray().size + 33
             }
             var extraBytes = savedCost + references.keys.sumOf { costs[it] ?: 0 }
-            while (retained.isNotEmpty() && retainedBytes + extraBytes > MAX_REPORT_BODY - SUMMARY_RESERVE) {
+            while (retained.size > 0 && retained.cost + extraBytes > MAX_REPORT_BODY - SUMMARY_RESERVE) {
                 checkpoint()
-                val removed = retained.removeFirst()
-                retainedBytes -= removed.second; omitted++
-                removed.first.configurationId?.let { id ->
+                val removed = retained.removeOne()
+                omitted++
+                removed.value.configurationId?.let { id ->
                     val remaining = references.getValue(id) - 1
                     if (remaining == 0) { references.remove(id); extraBytes -= costs[id] ?: 0 }
                     else references[id] = remaining
@@ -187,13 +184,15 @@ internal data class RemoteLogReport(
             val notes = snapshot?.let { listOf(RemoteLogEntry(count++, "collection", it)) }.orEmpty()
             val summary = RemoteLogEntry(count, "collection", "upload_summary retained=${retained.size} " +
                 "scannedLines=${raw.count} preparedLines=$prepared " +
-                "omittedLines=$omitted excludedPayloadLines=$excluded redactedLines=$masked truncatedLines=$truncated " +
+                "omittedLines=$omitted duplicateCopies=${raw.duplicateCopies} memoryEvicted=$memoryEvicted " +
+                "excludedPayloadLines=$excluded redactedLines=$masked truncatedLines=$truncated " +
                 "shortenedSources=${shortened()} missingConfigurations=$missing currentConfigurationAvailable=${saved != null}")
-            val sizes = retained.associate { it.first.index to it.second - 1 }
-            val groups = split(headers + retained.map { it.first } + notes + summary, metadata, sizes, checkpoint)
+            val ordered = retained.ordered()
+            val sizes = ordered.associate { it.value.index to it.cost - 1 }
+            val groups = split(headers + ordered.map { it.value } + notes + summary, metadata, sizes, checkpoint)
             return RemoteLogReport(metadata.id, groups.mapIndexed { index, entries ->
                 RemoteLogBatch(metadata, index + 1, groups.size, entries)
-            }, omitted, shortened())
+            }, omitted, shortened(), raw.duplicateCopies, memoryEvicted)
         }
 
         private fun split(entries: Iterable<RemoteLogEntry>, metadata: RemoteLogMetadata,

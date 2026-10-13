@@ -32,7 +32,9 @@
     <string name="l7_log_token_error">请填写 Basic 空格加 Base64 编码的用户名:写入凭据</string>
     <string name="l7_log_partial">OpenObserve 未全部写入，重试可能产生重复记录</string>
     <string name="l7_log_batch_progress">已确认 %1$d/%2$d 批 · %3$d/%4$d 条</string>
-    <string name="l7_log_snapshot_limit">快照达到保留上限：省略 %1$d 条较早日志，截取 %2$d 份文件；详情见上传摘要。</string>
+    <string name="l7_log_snapshot_limit">上传副本容量受限：%1$d 条日志未纳入本次上传，%2$d 份文件仅读取尾部。未删除本地日志；详情见整理摘要。</string>
+    <string name="l7_log_duplicate_copies">已合并同一事件的 %1$d 份重复副本；独立发生的重复故障仍保留。</string>
+    <string name="l7_log_memory_evicted">内存窗口已替换 %1$d 条记录；上传同时读取落盘文件，此数不等于上传省略数。</string>
     <string name="l7_log_search">搜索日志（不区分大小写）</string>
     <string name="l7_log_match_count">匹配 %1$d / %2$d 条 · 长按单行可复制</string>
     <string name="l7_log_copy_matches">复制筛选结果</string>

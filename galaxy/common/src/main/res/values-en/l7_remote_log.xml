@@ -30,7 +30,9 @@
     <string name="l7_log_token_error">Enter Basic followed by a space and Base64-encoded username:ingestion-credential</string>
     <string name="l7_log_partial">OpenObserve did not accept every record. Retrying may create duplicates.</string>
     <string name="l7_log_batch_progress">Confirmed %1$d/%2$d batches · %3$d/%4$d records</string>
-    <string name="l7_log_snapshot_limit">Snapshot limit reached: %1$d older records omitted, %2$d files shortened. See the upload summary.</string>
+    <string name="l7_log_snapshot_limit">Upload copy limit: %1$d records were excluded, and only the tails of %2$d files were read. Local logs were kept. See the preparation summary.</string>
+    <string name="l7_log_duplicate_copies">Merged %1$d copies of the same events. Separate occurrences of repeated failures are kept.</string>
+    <string name="l7_log_memory_evicted">The memory window replaced %1$d records. Uploads also read saved files; this is separate from the upload exclusion count.</string>
     <string name="l7_log_search">Search logs (case-insensitive)</string>
     <string name="l7_log_match_count">Matched %1$d / %2$d records · Hold a line to copy</string>
     <string name="l7_log_copy_matches">Copy matches</string>

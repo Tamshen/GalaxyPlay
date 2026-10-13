@@ -15,6 +15,7 @@ internal object RemoteLogUpload {
         val omittedLines: Int = 0, val shortenedSources: Int = 0,
         val finishedAt: Long = 0,
         val streamDeleting: Boolean = false,
+        val duplicateCopies: Int = 0, val memoryEvicted: Long = 0,
     )
     private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport, var next: Int = 0)
     @Volatile var status = Status()
@@ -91,6 +92,7 @@ internal object RemoteLogUpload {
     private fun Pending.state(phase: Phase, code: Int = 0) = Status(
         phase, report.id, code, next, report.batches.size,
         report.batches.take(next).sumOf { it.lineCount }, report.lineCount, report.omittedLines, report.shortenedSources,
+        duplicateCopies = report.duplicateCopies, memoryEvicted = report.memoryEvicted,
     )
     private fun allowed(context: Context) = L7Agreement.accepted(context) && !L7AppExit.exiting
 

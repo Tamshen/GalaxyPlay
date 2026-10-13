@@ -17,12 +17,13 @@ internal object AsyncDiagnosticLog {
     }
 
     fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis(),
-        configuration: GalaxyConfigurationEvidence? = target?.configuration) {
+        configuration: GalaxyConfigurationEvidence? = target?.configuration,
+        eventId: String = DiagnosticLogIdentity.next()) {
         if (target == null) return
         val captured = generation
         val safe = DiagnosticRedactor.redact(message) ?: return
         val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
-        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe", captured, configuration)) }
+        runCatching { writer.enqueue(Entry(target, "$timestamp  ${DiagnosticLogIdentity.prefix(eventId, nowMillis)}$safe", captured, configuration)) }
     }
 
     /** 由后台维护任务调用，当前会话仍可从新代次继续记录。 */
