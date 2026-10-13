@@ -98,7 +98,7 @@ object AirPlayPersistence {
 
     const val DEFAULT_MANUFACTURER = "DiPlay"
     const val DEFAULT_MODEL = "DiPlay"
-    const val DEFAULT_OEM_LABEL = "BYD"
+    const val DEFAULT_OEM_LABEL = GalaxyCarPlayAppearance.DEFAULT_LABEL
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
 
     fun loadAmbientDelaySeconds(context: Context): Int =
@@ -436,16 +436,10 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadOemLabel(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
-            // iOS hides the car icon without a label.
-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
+    fun loadOemLabel(context: Context): String = GalaxyCarPlayAppearance.label(context)
 
     fun saveOemLabel(context: Context, oemLabel: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_OEM_LABEL, oemLabel)
-            .apply()
+        GalaxyCarPlayAppearance.saveLabel(context, oemLabel)
     }
 
     fun loadAmbientLightThreshold(context: Context): AmbientLightThreshold = AmbientLightThreshold.fromStored(
@@ -833,14 +827,11 @@ object AirPlayPersistence {
         File(context.filesDir, CUSTOM_ICON_FILE).takeIf { it.isFile }
 
     fun saveCustomAirPlayIcon(context: Context, encodedImage: ByteArray) {
-        require(encodedImage.isNotEmpty()) { "AirPlay icon data must not be empty" }
-        File(context.filesDir, CUSTOM_ICON_FILE).outputStream().use { output ->
-            output.write(encodedImage)
-        }
+        GalaxyCarPlayAppearance.saveIcon(context, encodedImage)
     }
 
     fun clearCustomAirPlayIcon(context: Context) {
-        File(context.filesDir, CUSTOM_ICON_FILE).delete()
+        GalaxyCarPlayAppearance.resetIcon(context)
     }
 
     fun loadIdentity(context: Context): AirPlayIdentity {

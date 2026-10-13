@@ -22,6 +22,10 @@ internal object GalaxyApplicationPreferences {
         } }
         groups.getValue("diplay")["app_language"] = AppLocale.preference(actual)
         groups.getValue("xcertplay_airplay")["manual_hotspot_security"] = AirPlayPersistence.loadManualHotspotSecurity(actual).name
+        groups.getValue("xcertplay_airplay")["oem_label"] = GalaxyCarPlayAppearance.label(actual)
+        // 仅记录图标来源，不将用户图片或文件路径放进日志附件。
+        groups.getValue("xcertplay_airplay")["galaxy_oem_icon"] =
+            if (GalaxyCarPlayAppearance.customIcon(actual) == null) "DEFAULT" else "CUSTOM"
         return GalaxyConfiguration(groups.filterValues { it.isNotEmpty() }, emptyMap()).json().getJSONObject("preferences")
     }
 

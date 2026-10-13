@@ -125,6 +125,15 @@
      private const val KEY_WIDTH_PHYSICAL_MM = "display_width_physical_mm"
      private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
      private const val KEY_MAX_DETECTED_WIDTH = "display_max_detected_width"
+@@ -110,7 +98,7 @@
+ 
+     const val DEFAULT_MANUFACTURER = "DiPlay"
+     const val DEFAULT_MODEL = "DiPlay"
+-    const val DEFAULT_OEM_LABEL = "BYD"
++    const val DEFAULT_OEM_LABEL = GalaxyCarPlayAppearance.DEFAULT_LABEL
+     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
+ 
+     fun loadAmbientDelaySeconds(context: Context): Int =
 @@ -157,14 +145,14 @@
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getBoolean(KEY_HEVC_ENABLED, false)
@@ -279,10 +288,31 @@
  
      fun saveManualHotspotSsid(context: Context, ssid: String) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-@@ -485,15 +458,6 @@
-             .putInt(KEY_AMBIENT_LUX_THRESHOLD, threshold.lux).apply()
+@@ -463,16 +436,10 @@
+             .apply()
      }
  
+-    fun loadOemLabel(context: Context): String =
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
+-            // iOS hides the car icon without a label.
+-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
++    fun loadOemLabel(context: Context): String = GalaxyCarPlayAppearance.label(context)
+ 
+     fun saveOemLabel(context: Context, oemLabel: String) {
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putString(KEY_OEM_LABEL, oemLabel)
+-            .apply()
++        GalaxyCarPlayAppearance.saveLabel(context, oemLabel)
+     }
+ 
+     fun loadAmbientLightThreshold(context: Context): AmbientLightThreshold = AmbientLightThreshold.fromStored(
+@@ -483,15 +450,6 @@
+     fun saveAmbientLightThreshold(context: Context, threshold: AmbientLightThreshold) {
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+             .putInt(KEY_AMBIENT_LUX_THRESHOLD, threshold.lux).apply()
+-    }
+-
 -    fun loadAppAppearance(context: Context): AppAppearance = AppAppearance.fromKey(
 -        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_APP_APPEARANCE, null),
 -    )
@@ -290,12 +320,10 @@
 -    fun saveAppAppearance(context: Context, appearance: AppAppearance) {
 -        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
 -            .putString(KEY_APP_APPEARANCE, appearance.key).apply()
--    }
--
+     }
+ 
      fun loadCarPlayNightMode(context: Context): CarPlayNightMode = CarPlayNightMode.fromKey(
-         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CARPLAY_NIGHT_MODE, null),
-     )
-@@ -503,24 +467,6 @@
+@@ -503,24 +461,6 @@
              .putString(KEY_CARPLAY_NIGHT_MODE, mode.key).apply()
      }
  
@@ -320,7 +348,7 @@
      fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getInt(KEY_FPS, 30),
-@@ -539,40 +485,9 @@
+@@ -539,40 +479,9 @@
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_MAIN_BUFFERED_AUDIO, enabled).apply()
      }
  
@@ -361,7 +389,7 @@
      }
  
      fun saveFps(context: Context, fps: Int) {
-@@ -628,8 +543,7 @@
+@@ -628,8 +537,7 @@
              .apply()
      }
  
@@ -371,7 +399,7 @@
  
      fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
-@@ -818,36 +732,6 @@
+@@ -818,36 +726,6 @@
      fun saveClusterMarkerVerticalStep(context: Context, step: Int) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
              .putInt(KEY_CLUSTER_MARKER_Y, step.coerceIn(CarPlayClusterDisplay.verticalSteps)).apply()
@@ -408,6 +436,23 @@
      }
  
      // Cluster mapping has its own key; never reuse the main display mapping at the same resolution.
+@@ -949,14 +827,11 @@
+         File(context.filesDir, CUSTOM_ICON_FILE).takeIf { it.isFile }
+ 
+     fun saveCustomAirPlayIcon(context: Context, encodedImage: ByteArray) {
+-        require(encodedImage.isNotEmpty()) { "AirPlay icon data must not be empty" }
+-        File(context.filesDir, CUSTOM_ICON_FILE).outputStream().use { output ->
+-            output.write(encodedImage)
+-        }
++        GalaxyCarPlayAppearance.saveIcon(context, encodedImage)
+     }
+ 
+     fun clearCustomAirPlayIcon(context: Context) {
+-        File(context.filesDir, CUSTOM_ICON_FILE).delete()
++        GalaxyCarPlayAppearance.resetIcon(context)
+     }
+ 
+     fun loadIdentity(context: Context): AirPlayIdentity {
 --- a/common/src/main/java/com/shilapi/xcertplay/AppAppearance.kt
 +++ /dev/null
 @@ -1,107 +0,0 @@

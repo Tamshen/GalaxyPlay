@@ -146,6 +146,13 @@ class GalaxySettingsActivity : ComponentActivity() {
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) exportDiagnostics(uri)
     }
+    private val carPlayIconCrop = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (page == "settings-general") render()
+    }
+    private val carPlayIconPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) carPlayIconCrop.launch(Intent(this, ImageCropActivity::class.java)
+            .setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
 
     private var languagePreferenceAtCreate = AppLocale.SYSTEM
 
@@ -648,7 +655,8 @@ class GalaxySettingsActivity : ComponentActivity() {
                 }.apply { if (setupError != null) setFeedback(getString(R.string.l7_auth_not_ready), error = true) })
                 card.addView(L7Components.actionRow(this, getString(R.string.l7_auth_quick_import), getString(R.string.l7_auth_import_row_hint)) { authenticationDialog().quickImport() })
             }
-            "settings-general" -> GalaxyApplicationSettingsPage.add(this, content) {
+            "settings-general" -> GalaxyApplicationSettingsPage.add(this, content,
+                onChooseIcon = { carPlayIconPicker.launch("image/*") }) {
                 page = "settings-auth"; render()
             }
             "settings-permissions" -> section(content, getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->

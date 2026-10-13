@@ -2935,6 +2935,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun createAirPlayConfig(size: DisplaySize): AirPlayConfig {
+        // 应用设置独立保存；重连构造新会话时读取，当前控制器的已冻结配置不变。
+        if (l7DebugLogs) oemLabel = AirPlayPersistence.loadOemLabel(this)
         val physical = resolvePhysicalSize(size)
         val baseDisplay = AirPlayDisplayConfig(
             widthPixels = size.width,
@@ -3030,6 +3032,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun loadAirPlayIcon(): AirPlayIcon {
+        if (l7DebugLogs) return GalaxyCarPlayAppearance.icon(this)
         val customBytes = try {
             AirPlayPersistence.loadCustomAirPlayIconFile(this)?.readBytes()
         } catch (_: Exception) {
