@@ -36,6 +36,8 @@ internal class GalaxyWirelessConnectionProgress {
                 context.getString(R.string.galaxy_wireless_network_timeout)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT ->
                 context.getString(R.string.galaxy_wireless_protocol_timeout)
+            status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION &&
+                status.message.startsWith("Wi-Fi Direct") -> context.getString(R.string.galaxy_p2p_configuration_changed)
             else -> detail
         }
         return context.getString(R.string.galaxy_wireless_step, step, text)

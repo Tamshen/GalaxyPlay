@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_p2p_configuration_changed">Wi-Fi Direct 的当前配置未确认或已变化。请重新发起连接，应用不会让手机使用旧配置。</string>
     <string name="galaxy_wireless_waiting_network">热点已就绪，正在等待 iPhone 建立 CarPlay 连接…</string>
     <string name="galaxy_wireless_step">（%1$d/5）%2$s</string>
     <string name="galaxy_wireless_authenticating">蓝牙已连接，正在认证 iPhone…</string>

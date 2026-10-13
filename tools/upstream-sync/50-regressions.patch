@@ -571,10 +571,39 @@
          val index = choices.indexOf(channel)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
-@@ -72,48 +72,6 @@
-         return encoded
+@@ -42,6 +42,26 @@
+         shadowOf(wifi.connectionInfo).setSupplicantState(SupplicantState.COMPLETED)
      }
  
++    @Test @Config(sdk = [29, 30]) fun quotedCredentialIsNormalizedAndCurrentGroupIsRevalidated() {
++        radio.quoteCredentials = true
++        val logs = mutableListOf<String>()
++        WifiP2pGroupManager(context, logs::add).use { manager ->
++            val info = background { manager.start(5000) }
++            assertFalse(info.passphrase.startsWith("\""))
++            background { manager.validateReady() }
++            assertTrue(logs.any { it.contains("configuration revalidated") })
++            assertFalse(logs.any { it.contains(info.passphrase) })
++        }
++    }
++
++    @Test @Config(sdk = [29, 30]) fun changedGroupCannotPublishOldCredentials() {
++        WifiP2pGroupManager(context).use { manager ->
++            background { manager.start(5000) }
++            radio.group = radio.makeGroup(null)
++            assertTrue(failure { manager.validateReady() } is com.shilapi.xcertplay.network.WirelessStartupException)
++        }
++    }
++
+     @Test fun disconnectedStationCannotPinNewGroupToStaleTwoGhzChannel() {
+         val info = context.getSystemService(WifiManager::class.java).connectionInfo
+         shadowOf(info).setFrequency(2462)
+@@ -70,48 +90,6 @@
+         val encoded = "$kind|$requested|2437|$station|00000000-0000-0000-0000-000000000001"
+         memory.edit().putString("confirmed", encoded).commit()
+         return encoded
+-    }
+-
 -    @Test fun manualChannelOverridesAlignmentWithoutReplacingAutomaticMemory() {
 -        val remembered = seedMemory()
 -        val logs = mutableListOf<String>()
@@ -615,17 +644,13 @@
 -        assertEquals(listOf(5745), radio.requests.map { it?.groupOwnerBand })
 -        assertEquals(1, radio.removals)
 -        assertNull(memory.getString("confirmed", null))
--    }
--
+     }
+ 
      @Test fun hotspotCreationAloneAndLateConfirmationAfterCloseAreNeverLearned() {
-         val manager = WifiP2pGroupManager(context)
-         background { manager.start(5000) }
-@@ -328,18 +286,6 @@
-         assertSame(replacement, radio.group)
-         assertEquals(0, radio.removals)
+@@ -330,18 +308,6 @@
          assertTrue(logs.any { it.contains("cleanup skipped=another_app_owns_group") })
--    }
--
+     }
+ 
 -    @Test fun connectionSnapshotDoesNotInterpretAnEmptyP2pListAsFailedIphoneAssociation() {
 -        val manager = WifiP2pGroupManager(context)
 -        background { manager.start(5000) }
@@ -636,10 +661,20 @@
 -        assertEquals("p2pGroup=absent association=unknown", background { manager.connectionDiagnosticSnapshot() })
 -        background { manager.close() }
 -        assertEquals("p2pGroup=unavailable association=unknown", manager.connectionDiagnosticSnapshot())
-     }
- 
+-    }
+-
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
-@@ -463,10 +409,17 @@
+         val old = WifiP2pGroupManager(context)
+         val previous = background { old.start(5000) }
+@@ -422,6 +388,7 @@
+         var rejectCustom = false
+         var competingGroup = false
+         var missingCredentials = false
++        var quoteCredentials = false
+         var noCreateReply = false
+         var fixed24Only = false
+         var allowed24 = setOf(2412, 2437, 2462)
+@@ -463,10 +430,18 @@
  
          fun makeGroup(config: WifiP2pConfig?) = WifiP2pGroup().apply {
              shadowOf(this).setIsGroupOwner(true)
@@ -653,7 +688,8 @@
 +            val band = config?.let { if (android.os.Build.VERSION.SDK_INT < 30)
 +                ReflectionHelpers.getField<Int>(it, "groupOwnerBand") else it.groupOwnerBand }
 +            shadowOf(this).setNetworkName(name ?: "DIRECT-system-test")
-+            shadowOf(this).setPassphrase(if (missingCredentials) null else key ?: "test-generated-key")
++            val actualKey = key ?: "test-generated-key"
++            shadowOf(this).setPassphrase(if (missingCredentials) null else if (quoteCredentials) "\"$actualKey\"" else actualKey)
              shadowOf(this).setInterface("p2p-test-missing")
 -            ReflectionHelpers.setField(this, "mFrequency", reportedFrequency ?: config?.groupOwnerBand ?: 2437)
 +            ReflectionHelpers.setField(this, "mFrequency", reportedFrequency ?: band ?: 2437)
