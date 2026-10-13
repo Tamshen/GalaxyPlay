@@ -1029,7 +1029,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun createL7Waiting() = galaxyChrome.waiting(wirelessEnabled,
         home = { showDiPlayHome() },
-        cancel = { CarPlayBackgroundSession.stop { runOnUiThread { showDiPlayHome(); finish() } } },
+        cancel = ::cancelConnection,
         recovery = { showDiPlayHome("wireless-recovery") }).also { panel ->
         panel.retryButton.visibility = if (startupRecovery.stopped) View.VISIBLE else View.GONE
         panel.retryButton.setOnClickListener {
@@ -1041,6 +1041,19 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun createL7Navigation() = galaxyChrome.navigation(::releaseVideoTouches, ::showDiPlayHome)
+
+    private fun cancelConnection() {
+        if (isFinishing || shuttingDown.get() ||
+            (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this))) return
+        L7StartupGuard.stopped()
+        // 先建立应用内返回页面，再允许停止回调关闭宿主；完成回调不再把用户拉回前台。
+        showDiPlayHome()
+        if (CarPlayBackgroundSession.isOwner(this)) CarPlayBackgroundSession.stop()
+        else {
+            shutdown(false, "connection cancelled before startup")
+            finish()
+        }
+    }
 
     private fun refreshL7ChromeDensity() {
         if (!l7DebugLogs || l7ChromeDensity == L7UiDensity.value(this)) return
