@@ -27,5 +27,6 @@ internal object GalaxyApplicationSettingsPage {
             GalaxyProfileFieldsView.add(activity, card, R.string.l7_section_app_ui,
                 setOf("carplay_night_mode", "ambient_delay_seconds", "ambient_lux_threshold"))
         }
+        GalaxyStorageSettings.add(activity, parent)
     }
 }

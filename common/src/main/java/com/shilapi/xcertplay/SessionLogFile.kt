@@ -15,6 +15,7 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
             rotate()
             file.writeText("")
             writtenConfiguration = null
+            notifyStorage(true)
             append(header)
         }
     }
@@ -26,7 +27,8 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
             file.parentFile?.mkdirs()
             val header = evidence?.takeIf { writtenConfiguration != it.id || file.length() == 0L }
                 ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
-            if (file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES) {
+            val rotated = file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES
+            if (rotated) {
                 rotate()
                 file.writeText("")
                 writtenConfiguration = null
@@ -36,6 +38,7 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
                 writtenConfiguration = evidence.id
             }
             file.appendBytes(bytes)
+            notifyStorage(rotated)
         }
         Unit
     }
@@ -49,8 +52,10 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
         file.copyTo(File(file.parentFile, archiveNames.first()), overwrite = true)
     }
     override fun close() = synchronized(lock) { closed = true }
+    private fun notifyStorage(rescan: Boolean) { runCatching { storageChanged?.invoke(file, rescan) } }
     companion object {
         internal val storageLock = Any()
+        @Volatile internal var storageChanged: ((File, Boolean) -> Unit)? = null
         const val MAX_BYTES = 512 * 1024L
         private val ARCHIVE_NAMES = listOf("previous.log") + (2..7).map { "previous-$it.log" }
         val REPORT_NAMES = ARCHIVE_NAMES.reversed() + "diplay.log" + listOf("steering-previous-2.log", "steering-previous.log", "steering.log",

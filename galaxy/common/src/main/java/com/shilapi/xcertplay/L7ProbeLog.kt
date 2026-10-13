@@ -86,6 +86,9 @@ internal object L7ProbeLog {
         val latest = File(folder, files.last())
         if (latest.isFile) save(File(folder, files.first()), latest.readBytes().take(MAX_BYTES).toByteArray())
         save(latest, entries.joinToString("\n", postfix = "\n").toByteArray(Charsets.UTF_8))
+        GalaxyLogRetention(folder).prune()
+        // 采集文件由原子保存写入，通知持续日志预算重新核对，避免沿用写入前的大小。
+        runCatching { SessionLogFile.storageChanged?.invoke(latest, true) }
         L7DebugLog.initialize(context)
         lines(report).forEach { L7DebugLog.recordConfiguration(it, evidence) }
     }
