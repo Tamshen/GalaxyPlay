@@ -513,9 +513,11 @@ class CarPlayBonjour(
     }
 
     private fun applyLocalScope(address: InetAddress): InetAddress {
+        if (address !is Inet6Address || !address.isLinkLocalAddress) return address
         val scope = advertisedAddresses.filterIsInstance<Inet6Address>()
             .firstOrNull { it.scopeId != 0 }?.scopeId ?: return address
-        if (address !is Inet6Address || address.scopeId != 0) return address
+        // scope 是本机接口索引；不能保留系统 NSD／旧解析结果上另一接口的索引。
+        if (address.scopeId == scope) return address
         return try {
             Inet6Address.getByAddress(null, address.address, scope)
         } catch (_: Exception) {
