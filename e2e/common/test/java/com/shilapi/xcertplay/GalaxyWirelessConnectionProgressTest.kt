@@ -42,4 +42,13 @@ class GalaxyWirelessConnectionProgressTest {
         assertFalse(authentication.contains("会话已建立"))
         assertTrue(describe(CarPlayStatus.NegotiatingWireless).contains("4/5"))
     }
+
+    @Test fun changedP2pConfigurationHasReadableFailureAtItsCurrentStep() {
+        describe(CarPlayStatus.WaitingForWirelessNetwork(1))
+        val failure = describe(CarPlayStatus.Failed("Wi-Fi Direct configuration changed",
+            startupFailure = WirelessStartupFailure.HOTSPOT_CONFIGURATION))
+        assertTrue(failure.contains("4/5"))
+        assertTrue(failure.contains("配置"))
+        assertFalse(failure.contains("configuration changed"))
+    }
 }

@@ -75,6 +75,7 @@ class WifiP2pGroupManager(
     private var created = false
     private var closed = false
     private var startAttempt: StartAttempt? = null
+    private var readyInfo: WirelessHotspotInfo? = null
     @Volatile private var observedCreatedName: String? = null
     @Volatile private var requestedName: String? = null
 
@@ -266,6 +267,7 @@ class WifiP2pGroupManager(
             synchronized(stateLock) {
                 ensureStartActiveLocked(attempt)
                 created = true
+                readyInfo = group
                 startAttempt = null
                 // Manual experiments must not replace the proven automatic configuration.
                 pendingSuccess = if (!legacyChannels && preferredChannel == WifiP2pChannels.AUTO) {
@@ -280,6 +282,30 @@ class WifiP2pGroupManager(
             cleanupFailedStart(attempt)
             throw failure
         }
+    }
+
+    override fun validateReady() {
+        val (active, expected) = synchronized(stateLock) {
+            if (closed || !created) throw IOException("Wi-Fi Direct is no longer active")
+            requireNotNull(channel) to requireNotNull(readyInfo)
+        }
+        val result = AtomicReference<WifiP2pGroup?>()
+        val latch = CountDownLatch(1)
+        p2pManager.requestGroupInfo(active) { result.set(it); latch.countDown() }
+        if (!latch.await(REQUEST_POLL_NANOS, TimeUnit.NANOSECONDS))
+            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi Direct did not confirm its current group")
+        val group = result.get()
+        synchronized(stateLock) {
+            if (closed || channel !== active || readyInfo !== expected || group == null || !group.isGroupOwner ||
+                group.networkName != expected.ssid || group.getInterface() != expected.interfaceName ||
+                (Build.VERSION.SDK_INT >= 29 && group.frequency != expected.frequencyMHz) ||
+                groupSecurity(group) != expected.security ||
+                P2pCredentials.passphrase(group.passphrase, expected.passphrase) != expected.passphrase)
+                throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
+                    "Wi-Fi Direct configuration changed before publication")
+        }
+        diagnostic("Wi-Fi P2P configuration revalidated group=true interface=true channel=true security=true " +
+            "credentialReadable=${!group!!.passphrase.isNullOrBlank()}")
     }
 
     override fun onCarPlayConfirmed() = synchronized(stateLock) {
@@ -303,6 +329,7 @@ class WifiP2pGroupManager(
                 if (configurationMemory.forget(it)) diagnostic("Wi-Fi P2P remembered cleared=session_unconfirmed")
             }
             pendingSuccess = null
+            readyInfo = null
             attempt = startAttempt
             attempt?.stopped = true
             stateLock.notifyAll()
@@ -506,8 +533,8 @@ class WifiP2pGroupManager(
             if (credentials != null && networkName != null && networkName != credentials.ssid) {
                 throw IOException("Wi-Fi Direct returned an unexpected group")
             }
-            val passphrase = group.passphrase?.takeIf { it.isNotBlank() }
-                ?: credentials?.passphrase
+            val passphrase = if (credentials == null && group.passphrase.isNullOrBlank()) null
+                else P2pCredentials.passphrase(group.passphrase, credentials?.passphrase)
             val interfaceName = group.getInterface()?.takeIf { it.isNotBlank() }
             val frequencyMHz = group.frequency
             val channelNumber = wifiFrequencyMhzToChannel(frequencyMHz)
@@ -538,19 +565,23 @@ class WifiP2pGroupManager(
             }
 
             val hostAddresses = interfaceHostAddresses(interfaceName, hostAddress)
+            val interfaceAddress = interfaceHardwareAddress(interfaceName)
+            diagnostic("Wi-Fi P2P credentials source=${if (group.passphrase.isNullOrBlank()) "requested" else "readback"} " +
+                "matched=${credentials != null && !group.passphrase.isNullOrBlank()} apHint=${P2pCredentials.accessPointHint(interfaceAddress) != null}")
             return WirelessHotspotInfo(
                 ssid = networkName,
                 passphrase = passphrase,
                 security = groupSecurity(group),
                 channel = channelNumber,
                 frequencyMHz = frequencyMHz,
-                bssid = interfaceHardwareAddress(interfaceName)
+                bssid = interfaceAddress
                     ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
                 interfaceName = interfaceName,
                 hostAddress = hostAddresses.first(),
                 hostAddresses = hostAddresses,
                 bandLabel = band,
                 backend = WirelessHotspotBackend.WIFI_P2P,
+                accessPointBssid = P2pCredentials.accessPointHint(interfaceAddress),
             )
         }
     }
@@ -584,7 +615,7 @@ class WifiP2pGroupManager(
             }
 
             val networkName = group.networkName?.takeIf { it.isNotBlank() }
-            val passphrase = group.passphrase?.takeIf { it.isNotBlank() }
+            val passphrase = group.passphrase?.takeIf { it.isNotBlank() }?.let { P2pCredentials.passphrase(it, null) }
             val interfaceName = legacyGroupInterface(group)
             if (networkName == null || passphrase == null || interfaceName == null) {
                 lastReason = "incomplete group details ssid=${networkName != null} " +

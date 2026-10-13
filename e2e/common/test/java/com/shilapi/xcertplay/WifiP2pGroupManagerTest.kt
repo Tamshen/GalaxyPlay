@@ -42,6 +42,26 @@ class WifiP2pGroupManagerTest {
         shadowOf(wifi.connectionInfo).setSupplicantState(SupplicantState.COMPLETED)
     }
 
+    @Test @Config(sdk = [29, 30]) fun quotedCredentialIsNormalizedAndCurrentGroupIsRevalidated() {
+        radio.quoteCredentials = true
+        val logs = mutableListOf<String>()
+        WifiP2pGroupManager(context, logs::add).use { manager ->
+            val info = background { manager.start(5000) }
+            assertFalse(info.passphrase.startsWith("\""))
+            background { manager.validateReady() }
+            assertTrue(logs.any { it.contains("configuration revalidated") })
+            assertFalse(logs.any { it.contains(info.passphrase) })
+        }
+    }
+
+    @Test @Config(sdk = [29, 30]) fun changedGroupCannotPublishOldCredentials() {
+        WifiP2pGroupManager(context).use { manager ->
+            background { manager.start(5000) }
+            radio.group = radio.makeGroup(null)
+            assertTrue(failure { manager.validateReady() } is com.shilapi.xcertplay.network.WirelessStartupException)
+        }
+    }
+
     @Test fun disconnectedStationCannotPinNewGroupToStaleTwoGhzChannel() {
         val info = context.getSystemService(WifiManager::class.java).connectionInfo
         shadowOf(info).setFrequency(2462)
@@ -368,6 +388,7 @@ class WifiP2pGroupManagerTest {
         var rejectCustom = false
         var competingGroup = false
         var missingCredentials = false
+        var quoteCredentials = false
         var noCreateReply = false
         var fixed24Only = false
         var allowed24 = setOf(2412, 2437, 2462)
@@ -417,7 +438,8 @@ class WifiP2pGroupManagerTest {
             val band = config?.let { if (android.os.Build.VERSION.SDK_INT < 30)
                 ReflectionHelpers.getField<Int>(it, "groupOwnerBand") else it.groupOwnerBand }
             shadowOf(this).setNetworkName(name ?: "DIRECT-system-test")
-            shadowOf(this).setPassphrase(if (missingCredentials) null else key ?: "test-generated-key")
+            val actualKey = key ?: "test-generated-key"
+            shadowOf(this).setPassphrase(if (missingCredentials) null else if (quoteCredentials) "\"$actualKey\"" else actualKey)
             shadowOf(this).setInterface("p2p-test-missing")
             ReflectionHelpers.setField(this, "mFrequency", reportedFrequency ?: band ?: 2437)
         }
