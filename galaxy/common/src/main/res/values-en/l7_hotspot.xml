@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_wireless_waiting_network">Hotspot ready. Waiting for the iPhone to connect to CarPlay…</string>
+    <string name="galaxy_wireless_step">(%1$d/5) %2$s</string>
+    <string name="galaxy_wireless_authenticating">Bluetooth connected. Authenticating the iPhone…</string>
+    <string name="galaxy_wireless_refresh_network">No wireless connection from the iPhone yet. Requesting it again…</string>
+    <string name="galaxy_wireless_negotiating">The iPhone is connected over the network. Confirming the CarPlay session…</string>
+    <string name="galaxy_wireless_preparing_video">CarPlay session established. Waiting for video…</string>
+    <string name="galaxy_wireless_retry_delay">%1$s\nPreparing connection attempt %3$d in %2$d seconds</string>
+    <string name="galaxy_wireless_releasing">Releasing the previous connection before reconnecting…</string>
+    <string name="galaxy_wireless_network_timeout">No wireless connection from the iPhone. Check the hotspot name and password in connection settings.</string>
+    <string name="galaxy_wireless_protocol_timeout">The iPhone connected over the network, but CarPlay session confirmation timed out.</string>
     <string name="l7_hotspot_use_saved">Connect with saved details</string>
     <string name="l7_hotspot_read">Read hotspot configuration again</string>
     <string name="l7_hotspot_reading">Reading the Android native hotspot name and password…</string>

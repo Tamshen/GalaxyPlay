@@ -23,6 +23,12 @@ internal class FirstTcpWatchdog(
         private set
     private var cancelTimer: (() -> Unit)? = null
 
+    @Synchronized fun waitingForFirstTcp(): Boolean =
+        !terminated && !success && firstStartNanos != null && firstAcceptNanos == null
+
+    @Synchronized fun waitingForProtocol(): Boolean =
+        !terminated && !success && firstAcceptNanos != null
+
     @Synchronized fun startSessionSent(sentAtNanos: Long) {
         if (terminated || firstStartNanos != null) return
         firstStartNanos = sentAtNanos

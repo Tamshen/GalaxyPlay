@@ -662,7 +662,15 @@
  }
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
-@@ -32,8 +32,9 @@
+@@ -4,6 +4,7 @@
+ import android.os.Looper
+ import android.view.View
+ import android.widget.Button
++import android.widget.TextView
+ import com.shilapi.xcertplay.network.WirelessStartupFailure
+ import com.shilapi.xcertplay.orchestration.CarPlayStatus
+ import org.junit.After
+@@ -32,8 +33,9 @@
          activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
          activity.setTheme(android.R.style.Theme_Material_NoActionBar)
          ReflectionHelpers.setField(CarPlayBackgroundSession, "owner", activity)
@@ -674,7 +682,7 @@
      }
  
      @After fun cleanup() {
-@@ -45,7 +46,7 @@
+@@ -45,7 +47,7 @@
          ReflectionHelpers.callInstanceMethod<(CarPlayStatus) -> Unit>(activity, "createStatusReporter",
              from(Int::class.javaPrimitiveType, generation))(status)
      }
@@ -683,7 +691,31 @@
  
      @Test fun duplicateFailureAndCleanupErrorScheduleOnlyOneRetry() {
          report()
-@@ -62,7 +63,7 @@
+@@ -55,6 +57,23 @@
+         assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
+     }
+ 
++    @Test fun waitingPageShowsNetworkRefreshAndFailureStepWithNextAttempt() {
++        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
++        // common 库默认未启用产品 UI；与 mobile 的资源覆盖保持一致。
++        ReflectionHelpers.setField(activity, "l7DebugLogs\$delegate", lazy { true })
++        val stage = TextView(activity)
++        ReflectionHelpers.setField(activity, "stageStatusView", stage)
++        report(status = CarPlayStatus.WaitingForWirelessNetwork(1))
++        assertTrue(stage.text.toString().contains("4/5"))
++        assertTrue(stage.text.toString().contains("Waiting for the iPhone"))
++        report(status = CarPlayStatus.WaitingForWirelessNetwork(2))
++        assertTrue(stage.text.toString().contains("Requesting it again"))
++        report()
++        assertTrue(stage.text.toString().contains("4/5"))
++        assertTrue(stage.text.toString().contains("attempt 2"))
++        assertTrue(stage.text.toString().contains("2 seconds"))
++    }
++
+     @Test fun exhaustedBudgetStopsAutomaticRecoveryAndExposesRetry() {
+         repeat(6) { generation ->
+             ReflectionHelpers.setField(activity, "restartGeneration", generation)
+@@ -62,7 +81,7 @@
              report(generation)
          }
          assertEquals(5, budget().retries)
@@ -3019,11 +3051,10 @@
          diagnostics.connectionAccepted()
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
-@@ -22,6 +22,35 @@
-     }, { failures++ }, { now * 1_000_000 })
+@@ -23,11 +23,68 @@
      private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
          AirPlayTcpAccepted(owner, internal, now * 1_000_000)
-+
+ 
 +    @Test fun protocolDeadlineStartsOnceAndLateFirstTcpTimerCannotFailIt() {
 +        val watch = FirstTcpWatchdog(identity, { delay, action ->
 +            deadline = now + delay; timer = action
@@ -3052,9 +3083,43 @@
 +        }
 +        assertEquals(0, failures)
 +    }
- 
++
      @Test fun noSuccessfulStartSessionDoesNotArmTimer() {
          watchdog()
+         now = 60_000
+         assertNull(timer)
+         assertEquals(0, failures)
++    }
++
++    @Test fun refreshGateClosesOnRealTcpSessionSuccessOrTermination() {
++        for (end in 0..2) {
++            val watch = watchdog()
++            assertFalse(watch.waitingForFirstTcp())
++            watch.startSessionSent(0)
++            assertTrue(watch.waitingForFirstTcp())
++            assertFalse(watch.accepted(event(internal = true)))
++            assertTrue(watch.waitingForFirstTcp())
++            when (end) {
++                0 -> watch.accepted(event())
++                1 -> watch.sessionEstablished()
++                2 -> watch.terminate()
++            }
++            assertFalse(watch.waitingForFirstTcp())
++        }
++    }
++
++    @Test fun protocolStageWorksForEarlyTcpAndCannotReturnAfterSessionSuccess() {
++        val watch = watchdog()
++        assertFalse(watch.waitingForProtocol())
++        watch.accepted(event())
++        assertTrue(watch.waitingForProtocol())
++        assertFalse(watch.waitingForFirstTcp())
++        watch.sessionEstablished()
++        watch.accepted(event())
++        assertFalse(watch.waitingForProtocol())
+     }
+ 
+     @Test fun repeatedStartDoesNotExtendDeadline() {
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/ManualHotspotConfigTest.kt
 @@ -24,7 +24,7 @@

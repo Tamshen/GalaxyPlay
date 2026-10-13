@@ -34,6 +34,7 @@ class Iap2WirelessControlClient(
         // The caller must prove that the current CarPlay session is usable before keeping it alive.
         keepAliveAfterDeadline: () -> Boolean = { false },
         onProgress: (String) -> Unit = {},
+        startupRecovery: WirelessStartSessionRecovery? = null,
     ): Iap2WirelessControlResult {
         require(identification.wireless != null) {
             "Wireless control requires an Iap2IdentificationConfig with wireless transport"
@@ -73,6 +74,14 @@ class Iap2WirelessControlClient(
         var postTransportWiFiConfigurationsSent = 0
         var transportNotificationSeen = false
         var wirelessCarPlayAvailableSeen = false
+        fun startCarPlay() {
+            beforeStartSession()
+            sendStartSession(endpoint, ::sendControl, onStartSessionSent)
+            startupRecovery?.startSessionSent()
+            stage = later(stage, Iap2WirelessControlStage.CARPLAY_START_SENT)
+            carPlayStartSessionsSent++
+            onProgress("iap2 tx=0x4301 carplay-start-session")
+        }
         val location = Iap2LocationReporter(locationProvider, onProgress)
         val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
         try {
@@ -92,7 +101,12 @@ class Iap2WirelessControlClient(
                 }
                 location.tick(::sendControl)
                 vehicleStatus.tick(::sendControl)
-                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                startupRecovery?.retryIfDue {
+                    onProgress("iap2 startup refresh attempt=1 reason=no-first-tcp")
+                    startCarPlay()
+                }
+                val controlPollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val pollTimeout = startupRecovery?.pollTimeout(controlPollTimeout) ?: controlPollTimeout
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -163,16 +177,13 @@ class Iap2WirelessControlClient(
                     CARPLAY_AVAILABILITY -> {
                         onProgress("iap2 rx=0x4300 carplay-availability")
                         onProgress(carPlayAvailabilityDiagnostic(incoming))
-                        beforeStartSession()
-                        sendStartSession(endpoint, ::sendControl, onStartSessionSent)
-                        stage = later(stage, Iap2WirelessControlStage.CARPLAY_START_SENT)
-                        carPlayStartSessionsSent++
-                        onProgress("iap2 tx=0x4301 carplay-start-session")
+                        startCarPlay()
                     }
 
                     WIRELESS_CARPLAY_UPDATE -> {
                         val available = Iap2WirelessMessages.wirelessCarPlayAvailability(incoming)
                         if (available) wirelessCarPlayAvailableSeen = true
+                        else startupRecovery?.cancel()
                         onProgress("iap2 rx=0x4e0d wireless-carplay-update available=$available")
                     }
 

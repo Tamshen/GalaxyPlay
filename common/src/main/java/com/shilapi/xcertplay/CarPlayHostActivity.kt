@@ -2772,6 +2772,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 hotspotStatus.copy(state = getString(R.string.connecting_bluetooth))
             CarPlayStatus.RunningWireless ->
                 hotspotStatus.copy(state = getString(R.string.running))
+            is CarPlayStatus.WaitingForWirelessNetwork ->
+                hotspotStatus.copy(state = getString(R.string.galaxy_wireless_waiting_network))
             CarPlayStatus.WirelessActive ->
                 hotspotStatus.copy(state = getString(R.string.active))
             CarPlayStatus.AttachingNetwork ->
@@ -3379,8 +3381,11 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (!menuOpen && controllerGeneration == restartGeneration) {
             updateHotspotStatus(status)
-            val description = status.describe()
-            setConnectionStage(description)
+            val detail = status.describe()
+            val formatted = wirelessEnabled && l7DebugLogs
+            val description = if (formatted)
+                wirelessProgress.describe(this, status, detail) else detail
+            setConnectionStageText(description, formatted)
             when (status) {
                 is CarPlayStatus.Failed -> if (status.wifiResetRequired) {
                     wifiRecoveryButton?.visibility = View.VISIBLE
@@ -3720,6 +3725,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private val startupRecovery = GalaxyWirelessRecovery()
+    private val wirelessProgress = GalaxyWirelessConnectionProgress()
 
     private fun reconnectAfterLoss(reason: String, startupFailure: com.shilapi.xcertplay.network.WirelessStartupFailure? = null) {
         if (!CarPlayBackgroundSession.isOwner(this)) return
@@ -3731,7 +3737,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 GalaxyWirelessRecovery.Decision.Ignore -> return
                 GalaxyWirelessRecovery.Decision.Stop -> {
                     (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
-                    setConnectionStage("$reason\n${getString(R.string.wireless_startup_retries_exhausted)}")
+                    setConnectionStageText("$reason\n${getString(R.string.wireless_startup_retries_exhausted)}",
+                        wirelessEnabled && l7DebugLogs)
                     appendLog("Wireless recovery stopped retries=${startupRecovery.retries}")
                     return
                 }
@@ -3745,6 +3752,8 @@ class CarPlayHostActivity : ComponentActivity() {
             (RECONNECT_DELAY_MILLIS * (1L shl reconnectAttempts.coerceAtMost(4))).coerceAtMost(30_000L)
         }
         reconnectAttempts += 1
+        if (wirelessEnabled && l7DebugLogs) setConnectionStageText(getString(
+            R.string.galaxy_wireless_retry_delay, reason, (delayMillis + 999) / 1000, reconnectAttempts + 1), true)
         appendLog("$reason; retrying in ${delayMillis}ms")
         mainHandler.postDelayed(
             {
@@ -3774,7 +3783,8 @@ class CarPlayHostActivity : ComponentActivity() {
         pendingVideoFailure = null
         videoRecoveryPanel?.recovered()
         videoFailureDialog?.dismiss()
-        setConnectionStage(reason)
+        if (wirelessEnabled && l7DebugLogs) setConnectionStageText(wirelessProgress.restarting(this), true)
+        else setConnectionStage(reason)
         Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}")
         val generation = ++restartGeneration
         handshakeResetInProgress = true
@@ -4132,8 +4142,13 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun setConnectionStage(message: String) {
+        setConnectionStageText(message, message == wiredStartupFeedback)
+    }
+
+    private fun setConnectionStageText(message: String, formatted: Boolean) {
         latestStage = message
-        stageStatusView?.text = if (message == wiredStartupFeedback) message else friendlyStage(message)
+        // 已本地化的步骤与恢复详情直接显示，避免被旧英文关键词映射成笼统提示。
+        stageStatusView?.text = if (formatted) message else friendlyStage(message)
         updateDebugOverlays()
     }
 
@@ -4245,6 +4260,10 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.WaitingForPairedIphone -> getString(R.string.waiting_for_paired_iphone)
         CarPlayStatus.ConnectingBluetooth -> getString(R.string.connecting_bluetooth)
         CarPlayStatus.RunningWireless -> getString(R.string.wireless_carplay_control_running)
+        is CarPlayStatus.WaitingForWirelessNetwork -> getString(if (request > 1)
+            R.string.galaxy_wireless_refresh_network else R.string.galaxy_wireless_waiting_network)
+        CarPlayStatus.NegotiatingWireless -> getString(R.string.galaxy_wireless_negotiating)
+        CarPlayStatus.PreparingWirelessVideo -> getString(R.string.galaxy_wireless_preparing_video)
         CarPlayStatus.WirelessActive -> getString(R.string.wireless_carplay_active)
         CarPlayStatus.WirelessActiveFallback -> getString(R.string.wireless_carplay_active)
         CarPlayStatus.DiscoveringIphone -> getString(R.string.discovering_iphone)

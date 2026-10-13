@@ -122,6 +122,9 @@ sealed class CarPlayStatus {
     data object WaitingForPairedIphone : CarPlayStatus()
     data object ConnectingBluetooth : CarPlayStatus()
     data object RunningWireless : CarPlayStatus()
+    data class WaitingForWirelessNetwork(val request: Int) : CarPlayStatus()
+    data object NegotiatingWireless : CarPlayStatus()
+    data object PreparingWirelessVideo : CarPlayStatus()
     data object WirelessActive : CarPlayStatus()
     data object WirelessActiveFallback : CarPlayStatus()
     data object DiscoveringIphone : CarPlayStatus()
@@ -1494,6 +1497,7 @@ class CarPlayController(
                     "location=false vehicleStatus=false",
             )
             startedHotspot?.validateReady()
+            var startRequests = 0
             val result = Iap2WirelessControlClient(
                 session = channel,
                 mfi = Iap2MfiAuthenticationClient(mfi),
@@ -1503,7 +1507,16 @@ class CarPlayController(
                 timeoutMillis = controlLoopTimeoutMillis(),
                 keepAliveAfterDeadline = { keepBluetoothControlAlive(generation) },
                 beforeStartSession = { startedHotspot?.validateReady() },
-                onStartSessionSent = { watchdog.startSessionSent(it.sentAtNanos) },
+                onStartSessionSent = {
+                    watchdog.startSessionSent(it.sentAtNanos)
+                    startRequests++
+                    if (watchdog.waitingForFirstTcp())
+                        onStatus(CarPlayStatus.WaitingForWirelessNetwork(startRequests), generation)
+                },
+                startupRecovery = if (hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT)
+                    com.shilapi.xcertplay.transport.WirelessStartSessionRecovery({
+                        !isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()
+                    }) else null,
                 onIncoming = routeFrameHandler(),
                 onProgress = { message ->
                     diagnostics.controlProgress(message)
@@ -1636,7 +1649,10 @@ class CarPlayController(
 
             override fun onTcpAccepted(event: AirPlayTcpAccepted) {
                 if (isStaleWirelessRun(generation)) return
-                if (watchdog.accepted(event)) wirelessDiagnostics?.connectionAccepted()
+                if (watchdog.accepted(event)) {
+                    wirelessDiagnostics?.connectionAccepted()
+                    if (watchdog.waitingForProtocol()) onStatus(CarPlayStatus.NegotiatingWireless, generation)
+                }
             }
 
             override fun onTransportError(message: String) {
@@ -1652,6 +1668,7 @@ class CarPlayController(
                     it.close()
                 }
                 wirelessConnectionProof.activate(generation, session)
+                onStatus(CarPlayStatus.PreparingWirelessVideo, generation)
                 // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
                 // the Bluetooth bootstrap after the tunneled iAP2 channel is ready.
                 sessionListener.onSessionActive(session)
@@ -2807,6 +2824,11 @@ class CarPlayController(
     private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
         if (closed) return
         mainHandler.post {
+            // 发送与 TCP 接入来自不同线程，迟到的等待提示不能覆盖已接入的阶段。
+            if (status is CarPlayStatus.WaitingForWirelessNetwork && firstTcpWatchdog?.waitingForFirstTcp() != true)
+                return@post
+            if (status == CarPlayStatus.NegotiatingWireless && firstTcpWatchdog?.waitingForProtocol() != true)
+                return@post
             if (!closed && (generation == null || generation == currentStatusGeneration()) && status != lastReportedStatus) {
                 lastReportedStatus = status
                 diagnostics.emit(DiagnosticEvent.Component.CONNECTION, DiagnosticEvent.Kind.STATE,
@@ -2845,6 +2867,12 @@ class CarPlayController(
             "STEP bt/rfcomm: connecting to the iPhone iAP2 RFCOMM service"
         CarPlayStatus.RunningWireless ->
             "STEP iap2/wireless: Bluetooth control loop running"
+        is CarPlayStatus.WaitingForWirelessNetwork ->
+            "STEP wifi/wait: startup request sent count=$request; waiting for the iPhone AirPlay connection"
+        CarPlayStatus.NegotiatingWireless ->
+            "STEP wifi/protocol: phone connected; negotiating the AirPlay session"
+        CarPlayStatus.PreparingWirelessVideo ->
+            "STEP video/wait: AirPlay session established; waiting for rendered video"
         CarPlayStatus.WirelessActive ->
             "STEP handoff/complete: tunnel iAP2 ready; Bluetooth bootstrap released"
         CarPlayStatus.WirelessActiveFallback ->
