@@ -63,7 +63,12 @@ class GalaxyAppUpdateTest {
         shadowOf(activity.packageManager).installPackage(installed)
         GalaxyUpdateCache.clear(activity)
         val queue = Queue(); val source = Source()
-        val update = GalaxyAppUpdate(activity, source, queue) { _, _, token -> token.check() }
+        val update = GalaxyAppUpdate(activity, source, queue) { file, _, token ->
+            token.check()
+            file.setLastModified(1)
+            GalaxyUpdateFiles.cleanup(file.parentFile!!)
+            assertTrue("校验中的更新包必须受保护", file.exists())
+        }
         host.start().resume()
         try { test(update, queue, source, activity) { host.pause().stop() } }
         finally { host.pause().stop().destroy(); GalaxyUpdateCache.clear(activity) }

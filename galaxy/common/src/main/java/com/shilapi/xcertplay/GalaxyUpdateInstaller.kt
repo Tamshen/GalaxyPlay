@@ -22,11 +22,13 @@ internal class GalaxyUpdateInstaller(
         status(if (activity.packageManager.canRequestPackageInstalls()) R.string.update_permission_ready else R.string.update_permission_denied)
     }
     private val installer = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult(), registry) {
+        GalaxyUpdateFiles.finishInstall()
         status(R.string.update_installer_returned)
     }
 
     fun install(file: File) {
         if (occupied()) { status(R.string.update_end_connection); return }
+        var leased = false
         try {
             if (!activity.packageManager.canRequestPackageInstalls()) {
                 L7Dialogs.builder(activity).setTitle(R.string.update_install_permission)
@@ -39,8 +41,13 @@ internal class GalaxyUpdateInstaller(
                     }.show()
                 return
             }
+            if (!GalaxyUpdateFiles.beginInstall(file)) { status(R.string.update_installer_busy); return }
+            leased = true
             installer.launch(intent(activity, file))
-        } catch (_: Exception) { status(R.string.update_installer_unavailable) }
+        } catch (_: Exception) {
+            if (leased) GalaxyUpdateFiles.finishInstall()
+            status(R.string.update_installer_unavailable)
+        }
     }
 
     companion object {

@@ -26,20 +26,28 @@ internal object GalaxyUpdateCache {
     fun load(context: Context): Pending? {
         val root = directory(context)
         val record = File(root, "pending.json")
-        if (!record.exists()) return null
-        return try {
+        var ownedFile: File? = null
+        val pending = if (!record.exists()) null else try {
             updateRequire(record.length() in 1..GalaxyUpdateManifest.MAX_METADATA_SIZE.toLong())
-            updateRequire(System.currentTimeMillis() - record.lastModified() < 24 * 60 * 60 * 1000L)
             val json = JSONObject(record.readText())
             val name = json.getString("file")
             updateRequire(Regex("download-[a-zA-Z0-9-]+\\.apk").matches(name))
             val file = File(root, name)
             updateRequire(file.canonicalFile.parentFile == root.canonicalFile && file.isFile)
+            updateRequire(file.canonicalFile.name == file.name)
+            ownedFile = file
+            updateRequire(System.currentTimeMillis() - record.lastModified() < GalaxyUpdateFiles.RETENTION_MILLIS)
             val release = GalaxyUpdateManifest.parse(json.getJSONObject("release").toString(), GalaxyUpdateManifest.endpoint, context.packageName)
             if (!release.newerThan(context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode)) {
-                clear(context); file.delete(); null
+                clear(context); GalaxyUpdateFiles.delete(root, file); null
             } else { updateRequire(file.length() == release.size); Pending(file, release) }
-        } catch (_: Exception) { clear(context); null }
+        } catch (_: Exception) {
+            clear(context)
+            ownedFile?.let { GalaxyUpdateFiles.delete(root, it) }
+            null
+        }
+        GalaxyUpdateFiles.cleanup(root, pending?.file)
+        return pending
     }
 
     fun clear(context: Context) { File(directory(context), "pending.json").delete() }

@@ -68,12 +68,16 @@ internal class GalaxyAppUpdate(
                         detail = text(R.string.update_download_progress, completed * 100 / latest.size))
                 }
                 if (current(token)) state = state.copy(message = text(R.string.update_verifying))
-                verify(file, latest, token)
-                token.check()
                 val verified = file
+                GalaxyUpdateFiles.protect(verified).use {
+                    verify(verified, latest, token)
+                    token.check()
+                    GalaxyUpdateCache.save(activity.applicationContext, verified, latest)
+                }
                 main.post {
                     if (!current(token)) { verified.delete(); return@post }
-                    ready?.delete(); ready = verified
+                    ready?.takeIf { it != verified }?.let { GalaxyUpdateFiles.delete(it.parentFile!!, it) }
+                    ready = verified
                     state = L7TaskProgress(false, text(R.string.update_ready, latest.version), detail = text(R.string.update_ready_hint),
                         result = true, resultLabel = R.string.update_install, showProgress = false)
                     result = { install(latest, verified) }
@@ -86,8 +90,10 @@ internal class GalaxyAppUpdate(
     private fun install(latest: GalaxyUpdateRelease, file: File) {
         // 安装前重新验证私有缓存和当前已安装版本，授权或返回不自动触发安装。
         run(R.string.update_verifying, { install(latest, file) }) { token ->
-            verify(file, latest, token)
-            GalaxyUpdateCache.save(activity.applicationContext, file, latest)
+            GalaxyUpdateFiles.protect(file).use {
+                verify(file, latest, token)
+                GalaxyUpdateCache.save(activity.applicationContext, file, latest)
+            }
             main.post {
                 if (!current(token)) return@post
                 state = L7TaskProgress(false, text(R.string.update_ready, latest.version), detail = text(R.string.update_ready_hint),
@@ -163,7 +169,7 @@ internal class GalaxyAppUpdate(
     }
     private fun restore(pending: GalaxyUpdateCache.Pending) {
         run(R.string.update_verifying, { restore(pending) }) { token ->
-            verify(pending.file, pending.release, token)
+            GalaxyUpdateFiles.protect(pending.file).use { verify(pending.file, pending.release, token) }
             main.post {
                 if (!current(token)) return@post
                 state = L7TaskProgress(false, text(R.string.update_ready, pending.release.version),

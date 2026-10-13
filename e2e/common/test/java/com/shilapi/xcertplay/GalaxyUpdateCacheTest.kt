@@ -45,8 +45,51 @@ class GalaxyUpdateCacheTest {
         GalaxyUpdateCache.save(context, file, release)
         File(root, "pending.json").setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L)
         assertNull(GalaxyUpdateCache.load(context))
+        assertFalse(file.exists())
         File(root, "pending.json").writeText("{" + "x".repeat(GalaxyUpdateManifest.MAX_METADATA_SIZE))
         assertNull(GalaxyUpdateCache.load(context)); assertFalse(File(root, "pending.json").exists())
+    }
+
+    @Test fun reopeningWithoutRecordCleansExpiredOrphansButKeepsRecentAndUnrelatedFiles() {
+        val old = File(root, "download-old.partial").apply {
+            writeText("partial"); setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L)
+        }
+        val unrelated = File(root, "keep.txt").apply { writeText("keep"); setLastModified(1) }
+        assertNull(GalaxyUpdateCache.load(context))
+        assertFalse(old.exists()); assertTrue(file.exists()); assertTrue(unrelated.exists())
+    }
+
+    @Test fun activeTransferAndValidPendingPackageAreNotDeletedWhenTheirFilesAreOld() {
+        file.setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L)
+        GalaxyUpdateFiles.protect(file).use {
+            assertNull(GalaxyUpdateCache.load(context)); assertTrue(file.exists())
+        }
+        GalaxyUpdateCache.save(context, file, release)
+        GalaxyUpdateFiles.cleanup(root)
+        assertTrue(file.exists()); assertNotNull(GalaxyUpdateCache.load(context))
+        GalaxyUpdateCache.clear(context)
+        assertNull(GalaxyUpdateCache.load(context)); assertFalse(file.exists())
+    }
+
+    @Test fun symlinkCannotCauseOutsideCacheFileToBeDeleted() {
+        val outside = File(context.cacheDir, "outside.apk").apply { writeText("private"); setLastModified(1) }
+        val link = File(root, "download-link.apk")
+        java.nio.file.Files.createSymbolicLink(link.toPath(), outside.toPath())
+        GalaxyUpdateFiles.cleanup(root)
+        assertTrue(outside.exists())
+        assertTrue(java.nio.file.Files.isSymbolicLink(link.toPath()))
+    }
+
+    @Test fun activeSystemInstallerKeepsItsPackageEvenIfPendingRecordExpires() {
+        GalaxyUpdateCache.save(context, file, release)
+        assertTrue(GalaxyUpdateFiles.beginInstall(file))
+        try {
+            assertFalse(GalaxyUpdateFiles.beginInstall(file))
+            File(root, "pending.json").setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L)
+            assertNull(GalaxyUpdateCache.load(context)); assertTrue(file.exists())
+        } finally { GalaxyUpdateFiles.finishInstall() }
+        file.setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L)
+        assertNull(GalaxyUpdateCache.load(context)); assertFalse(file.exists())
     }
     @Test fun missingOrChangedApkIsNotRestored() {
         GalaxyUpdateCache.save(context, file, release); file.writeText("changed")
