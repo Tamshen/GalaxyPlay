@@ -114,7 +114,8 @@ internal object GalaxyConfigurationFields {
             "cluster_map_enabled" to false, "adb_cluster_activity_enabled" to false,
             "wifi_p2p_preferred_channel" to 0, "existing_wifi_ssid" to "", "existing_wifi_passphrase" to "",
             "manufacturer" to AirPlayPersistence.DEFAULT_MANUFACTURER, "model" to AirPlayPersistence.DEFAULT_MODEL,
-            "oem_label" to AirPlayPersistence.DEFAULT_OEM_LABEL, "mfi_i2c_path" to AirPlayPersistence.DEFAULT_MFI_I2C_PATH))
+            "oem_label" to AirPlayPersistence.DEFAULT_OEM_LABEL, GalaxyCarPlayAppearance.CUSTOM_LABEL to false,
+            "mfi_i2c_path" to AirPlayPersistence.DEFAULT_MFI_I2C_PATH))
         // 动态几何和未开启的上游功能保留“未设置”，读取时仍由原有策略计算默认值。
         listOf("main_buffered_audio", "center_map_overlay", "center_map_auto_hide", "cluster_map_scale_percent",
             "cluster_content", "cluster_marker_horizontal_step", "cluster_marker_vertical_step",
