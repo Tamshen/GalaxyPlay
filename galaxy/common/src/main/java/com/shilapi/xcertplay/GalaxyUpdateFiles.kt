@@ -38,7 +38,7 @@ internal object GalaxyUpdateFiles {
         val kept = (pending ?: recorded(root, nowMillis))?.canonicalPath
         root.listFiles()?.forEach { file ->
             if (owned(root, file) && file.canonicalPath != kept &&
-                nowMillis - file.lastModified() >= RETENTION_MILLIS) delete(root, file)
+                nowMillis - file.lastModified() >= 60_000) delete(root, file)
         }
     }
 

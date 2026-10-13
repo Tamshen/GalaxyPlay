@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="l7_log_preparation_failed">Could not prepare the complete logs. Check available storage and retry.</string>
     <string name="l7_log_remote">Remote logs</string>
     <string name="l7_log_server">OpenObserve log server</string>
     <string name="l7_log_server_hint">App settings take priority; the built-in server address is hidden</string>
@@ -13,7 +14,7 @@
     <string name="l7_log_unconfigured">Not configured</string>
     <string name="l7_log_config_first">Enter the OpenObserve ingestion URL and authorization first</string>
     <string name="l7_log_idle">No uploads yet</string>
-    <string name="l7_log_uploading">Preparing and uploading…</string>
+    <string name="l7_log_uploading">Preparing all local logs and uploading in batches…</string>
     <string name="l7_log_success">Uploaded\nLog name %1$s\nReport %2$s</string>
     <string name="l7_log_device">Log name</string>
     <string name="l7_log_device_hint">Uploads go to this device-specific stream. Tap to copy the name and include it when reporting issues.</string>
@@ -32,7 +33,7 @@
     <string name="l7_log_batch_progress">Confirmed %1$d/%2$d batches · %3$d/%4$d records</string>
     <string name="l7_log_snapshot_limit">Upload copy limit: %1$d records were excluded, and only the tails of %2$d files were read. Local logs were kept. See the preparation summary.</string>
     <string name="l7_log_duplicate_copies">Merged %1$d copies of the same events. Separate occurrences of repeated failures are kept.</string>
-    <string name="l7_log_memory_evicted">The memory window replaced %1$d records. Uploads also read saved files; this is separate from the upload exclusion count.</string>
+    <string name="l7_log_memory_evicted">The memory cache rotated %1$d entries; all retained local log files are included in this upload.</string>
     <string name="l7_log_search">Search logs (case-insensitive)</string>
     <string name="l7_log_match_count">Matched %1$d / %2$d records · Hold a line to copy</string>
     <string name="l7_log_copy_matches">Copy matches</string>

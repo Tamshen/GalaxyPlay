@@ -16,8 +16,10 @@ internal object RemoteLogUpload {
         val finishedAt: Long = 0,
         val streamDeleting: Boolean = false,
         val duplicateCopies: Int = 0, val memoryEvicted: Long = 0,
+        val preparationFailed: Boolean = false,
     )
-    private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport, var next: Int = 0)
+    private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport,
+                               var next: Int = 0, var uploadedLines: Int = 0)
     @Volatile var status = Status()
         private set
     @Volatile private var generation = 0L
@@ -33,7 +35,7 @@ internal object RemoteLogUpload {
         if (!saved.valid() || !allowed(app) || L7ProbeRunner.clearing || status.phase == Phase.UPLOADING) return false
         val config = saved.forDevice(RemoteLogDevice.id(app))
         val retained = if (retry) pending?.takeIf { it.config == config } else null
-        if (retained == null) pending = null
+        if (retained == null) { pending?.report?.close(); pending = null }
         val run = ++generation
         val sender = RemoteLogTransport().also { transport = it }
         status = retained?.state(Phase.UPLOADING) ?: Status(Phase.UPLOADING)
@@ -45,7 +47,7 @@ internal object RemoteLogUpload {
         var task = retained
         val code = runCatching {
             check(run == generation)
-            val current = task ?: Pending(config, RemoteLogReport.collect(app) {
+            val current = task ?: Pending(config, RemoteLogArchive.collect(app) {
                 check(run == generation && !L7AppExit.exiting && !L7ProbeRunner.clearing)
             }).also { task = it }
             synchronized(this) {
@@ -64,34 +66,41 @@ internal object RemoteLogUpload {
                     code in 200..299 -> Phase.SUCCESS
                     else -> Phase.FAILED
                 }
-                status = (task?.state(phase, code) ?: Status(phase, code = code)).copy(streamDeleting = sender.streamDeleting)
-                if (phase == Phase.EMPTY) pending = null
+                var finished = (task?.state(phase, code) ?: Status(phase, code = code)).copy(
+                    streamDeleting = sender.streamDeleting, preparationFailed = task == null)
+                if (phase == Phase.EMPTY) { task?.report?.close(); pending = null }
                 if (phase == Phase.SUCCESS) {
-                    status = status.copy(finishedAt = System.currentTimeMillis())
-                    runCatching { RemoteLogHistory.save(app, RemoteLogHistory.Entry(status.finishedAt, status.totalLines)) }
+                    finished = finished.copy(finishedAt = System.currentTimeMillis())
+                    runCatching { RemoteLogHistory.save(app, RemoteLogHistory.Entry(finished.finishedAt, finished.totalLines)) }
+                    task?.report?.close()
                     pending = null
                 }
-            }
+                // 清理结束后再发布完成状态，避免界面已成功而临时快照仍在释放。
+                status = finished
+            } else task?.report?.close()
         }
     }
 
     private fun sendBatches(app: Context, task: Pending, run: Long, sender: RemoteLogTransport): Int {
         while (task.next < task.report.batches.size) {
             synchronized(this) { check(run == generation && allowed(app)) }
-            val code = sender.send(task.config, task.report.batches[task.next])
+            val batch = task.report.batches[task.next]
+            val code = sender.send(task.config, batch)
             if (code !in 200..299) return code
             synchronized(this) {
                 check(run == generation && allowed(app))
                 task.next++
+                task.uploadedLines += batch.lineCount
                 status = task.state(Phase.UPLOADING)
             }
+            if (task.next < task.report.batches.size) Thread.sleep(100)
         }
         return 200
     }
 
     private fun Pending.state(phase: Phase, code: Int = 0) = Status(
         phase, report.id, code, next, report.batches.size,
-        report.batches.take(next).sumOf { it.lineCount }, report.lineCount, report.omittedLines, report.shortenedSources,
+        uploadedLines, report.lineCount, report.omittedLines, report.shortenedSources,
         duplicateCopies = report.duplicateCopies, memoryEvicted = report.memoryEvicted,
     )
     private fun allowed(context: Context) = L7Agreement.accepted(context) && !L7AppExit.exiting
@@ -103,7 +112,7 @@ internal object RemoteLogUpload {
         val old = transport
         transport = null
         if (old != null) Thread({ old.close() }, "l7-log-upload-cancel").apply { isDaemon = true; start() }
-        pending = null
+        pending?.report?.close(); pending = null
         status = status.copy(phase = Phase.CANCELLED)
     }
 }

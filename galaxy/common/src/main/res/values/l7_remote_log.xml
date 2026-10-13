@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="l7_log_preparation_failed">完整日志整理失败，请检查存储空间后重试。</string>
     <string name="l7_log_default_url" translatable="false"></string>
     <string name="l7_log_default_authorization" translatable="false"></string>
     <string name="l7_log_remote">远程日志</string>
@@ -15,7 +16,7 @@
     <string name="l7_log_unconfigured">未配置</string>
     <string name="l7_log_config_first">请先填写 OpenObserve 写入地址和认证信息</string>
     <string name="l7_log_idle">尚未上传</string>
-    <string name="l7_log_uploading">正在整理并上传…</string>
+    <string name="l7_log_uploading">正在整理全部本地日志并分批上传…</string>
     <string name="l7_log_success">上传成功\n日志名称 %1$s\n报告 %2$s</string>
     <string name="l7_log_device">日志名称</string>
     <string name="l7_log_device_hint">上传到本机专属的同名日志流；点击复制，反馈问题时提供此名称</string>
@@ -34,7 +35,7 @@
     <string name="l7_log_batch_progress">已确认 %1$d/%2$d 批 · %3$d/%4$d 条</string>
     <string name="l7_log_snapshot_limit">上传副本容量受限：%1$d 条日志未纳入本次上传，%2$d 份文件仅读取尾部。未删除本地日志；详情见整理摘要。</string>
     <string name="l7_log_duplicate_copies">已合并同一事件的 %1$d 份重复副本；独立发生的重复故障仍保留。</string>
-    <string name="l7_log_memory_evicted">内存窗口已替换 %1$d 条记录；上传同时读取落盘文件，此数不等于上传省略数。</string>
+    <string name="l7_log_memory_evicted">内存缓存已轮转 %1$d 条记录；全部现存日志文件仍纳入本次上传。</string>
     <string name="l7_log_search">搜索日志（不区分大小写）</string>
     <string name="l7_log_match_count">匹配 %1$d / %2$d 条 · 长按单行可复制</string>
     <string name="l7_log_copy_matches">复制筛选结果</string>

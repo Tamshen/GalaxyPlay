@@ -174,6 +174,37 @@ class RemoteLogBatchTest {
         assertEquals((3..status.totalBatches).toList(), received.drop(3).map { it.first })
     }
 
+    @Test fun fullUploadAndRetryDeliverEveryLocalLineBeyondTheOldSnapshotBudget() {
+        File(folder, "previous-7.log").writeText((0 until 6200).joinToString("\n") {
+            "full_upload_index=$it codec=H264 " + "counter ".repeat(12)
+        })
+        val received = CopyOnWriteArrayList<Pair<Int, String>>()
+        val accepted = mutableListOf<Int>()
+        configure { text, data ->
+            val batch = data.getJSONObject(0).getInt("batch_index")
+            received += batch to text
+            if (received.size == 3) 503 else {
+                for (i in 0 until data.length()) {
+                    Regex("full_upload_index=(\\d+)").find(data.getJSONObject(i).getString("message"))
+                        ?.let { accepted += it.groupValues[1].toInt() }
+                }
+                200
+            }
+        }
+        assertTrue(RemoteLogUpload.start(app))
+        await(RemoteLogUpload.Phase.FAILED, 30)
+        assertEquals(2, RemoteLogUpload.status.completedBatches)
+        assertEquals(0, RemoteLogUpload.status.omittedLines)
+        File(folder, "previous-7.log").writeText("different newer session\n")
+        assertTrue(RemoteLogUpload.start(app, retry = true))
+        await(RemoteLogUpload.Phase.SUCCESS, 30)
+        assertEquals(received[2].second, received[3].second)
+        assertEquals((0 until 6200).toList(), accepted)
+        assertTrue(received.sumOf { it.second.toByteArray().size } > 1024 * 1024)
+        assertEquals(RemoteLogUpload.status.totalLines, RemoteLogUpload.status.uploadedLines)
+        assertTrue(File(app.cacheDir, "log-upload-snapshots").listFiles().orEmpty().isEmpty())
+    }
+
     @Test fun cancelPreventsLaterBatchesAndLateSuccessCannotRestoreTheTask() {
         File(folder, "diplay.log").writeText((0..2200).joinToString("\n") { "event=$it HEVC " + "detail ".repeat(15) })
         val entered = CountDownLatch(1)
@@ -209,8 +240,8 @@ class RemoteLogBatchTest {
         L7Agreement.accept(app)
     }
 
-    private fun await(phase: RemoteLogUpload.Phase) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+    private fun await(phase: RemoteLogUpload.Phase, seconds: Long = 10) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds)
         while (RemoteLogUpload.status.phase == RemoteLogUpload.Phase.UPLOADING && System.nanoTime() < deadline) Thread.sleep(20)
         assertEquals(phase, RemoteLogUpload.status.phase)
     }

@@ -1,0 +1,98 @@
+package com.shilapi.xcertplay
+
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [29, 30])
+class RemoteLogArchiveTest {
+    private val app get() = RuntimeEnvironment.getApplication()
+    private val logs get() = File(app.filesDir, "logs")
+    private val snapshots get() = File(app.cacheDir, "log-upload-snapshots")
+    @Before fun setup() { RemoteLogUpload.cancel(); logs.deleteRecursively(); logs.mkdirs(); L7DebugLog.buffer.clear() }
+    @After fun cleanup() { RemoteLogUpload.cancel(); snapshots.deleteRecursively() }
+
+    @Test fun fullHistoryBeyondFiveThousandLinesAndOneMiBKeepsBeginningMiddleAndEnd() {
+        val text = (0 until 6500).joinToString("\n") { "evidence_index=$it codec=H264 " + "counter ".repeat(15) }
+        File(logs, "previous-7.log").writeText(text)
+        File(logs, "diplay.log").writeText("ERROR final connection failed token=private-secret\n")
+        RemoteLogArchive.collect(app).use { report ->
+            assertEquals(0, report.omittedLines)
+            assertEquals(0, report.shortenedSources)
+            assertTrue(report.lineCount > 6500)
+            assertTrue(report.batches.size > 4)
+            assertTrue(report.batches.sumOf { it.body.size } > 1024 * 1024)
+            val actual = mutableListOf<Int>()
+            report.batches.forEach { batch ->
+                assertTrue(batch.body.size <= RemoteLogReport.MAX_BODY)
+                assertTrue(batch.lineCount <= RemoteLogReport.MAX_BATCH_LINES)
+                batch.entries.filter { it.source == "previous-7.log" }.forEach {
+                    actual += Regex("evidence_index=(\\d+)").find(it.message)!!.groupValues[1].toInt()
+                }
+                assertFalse(batch.body.toString(Charsets.UTF_8).contains("private-secret"))
+            }
+            assertEquals((0 until 6500).toList(), actual)
+        }
+        assertTrue(snapshots.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test fun frozenBatchesDoNotChangeWhenSourceRotatesAndDuplicateEventsAreMerged() {
+        val id = DiagnosticLogIdentity.next()
+        val first = DiagnosticLogIdentity.prefix(id, 2000) + "ERROR repeated failure"
+        val earlier = DiagnosticLogIdentity.prefix(DiagnosticLogIdentity.next(), 1000) + "connection begin"
+        File(logs, "diplay.log").writeText(first + "\n" + earlier + "\n")
+        L7DebugLog.buffer.append(first)
+        RemoteLogArchive.collect(app).use { report ->
+            assertEquals(1, report.duplicateCopies)
+            val frozen = report.batches.map { it.body.toList() }
+            File(logs, "diplay.log").writeText("new session\n")
+            assertEquals(frozen, report.batches.map { it.body.toList() })
+            val lines = report.batches.flatMap { it.entries }.filter { it.source == "diplay.log" }
+            assertTrue(lines.first().message.endsWith("connection begin"))
+            assertEquals(1, lines.count { it.message.endsWith("ERROR repeated failure") })
+        }
+    }
+
+    @Test fun completeFileReadIncludesDataPastOldPerSourceLimitAndMalformedLargeLineIsBounded() {
+        File(logs, "debug.log").writeText("start evidence\n" + "x".repeat(600_000) + "\nend evidence\n")
+        RemoteLogArchive.collect(app).use { report ->
+            assertEquals(0, report.shortenedSources)
+            val lines = report.batches.flatMap { it.entries }.filter { it.source == "debug.log" }
+            assertEquals(3, lines.size)
+            assertEquals("start evidence", lines.first().message)
+            assertEquals("end evidence", lines.last().message)
+            assertTrue(lines[1].message.contains("omittedChars=600000"))
+        }
+    }
+
+    @Test fun cancelledPreparationRemovesAllTemporaryInputsAndIndex() {
+        File(logs, "diplay.log").writeText((0..2000).joinToString("\n") { "counter=$it" })
+        val calls = AtomicInteger()
+        val stopped = IllegalStateException("cancelled")
+        val result = runCatching { RemoteLogArchive.collect(app) { if (calls.incrementAndGet() == 40) throw stopped } }
+        assertSame(stopped, result.exceptionOrNull())
+        assertTrue(snapshots.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test fun historicalConfigurationsBeyondOldHeaderLimitStayAttachedToEveryEvent() {
+        val profile = GalaxyProfiles(app).refresh()
+        val evidence = (1..70).map { GalaxyConfigurationEvidence.from(app, profile.copy(revision = it)) }
+        File(logs, "previous-7.log").writeText(evidence.mapIndexed { index, config ->
+            config.header + "\nconfig_ref=${config.id} history_config_event=$index"
+        }.joinToString("\n"))
+        RemoteLogArchive.collect(app).use { report ->
+            val rows = report.batches.flatMap { it.entries }
+            assertEquals(evidence.map { it.id }.toSet(), rows.filter { it.configurationRole == "at_event" }
+                .map { it.configurationId }.toSet())
+            assertEquals(70, rows.count { "history_config_event=" in it.message })
+        }
+    }
+}
