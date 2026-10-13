@@ -7,7 +7,7 @@ import android.widget.Toast
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** 关于页区分接收核心与车机适配参考，完整声明和许可原文支持离线查看。 */
+/** 关于页展示当前接收核心，完整依赖声明和许可原文支持离线查看。 */
 internal object L7OpenSourceSettings {
     fun add(parent: LinearLayout) {
         val context = parent.context
@@ -18,13 +18,6 @@ internal object L7OpenSourceSettings {
                     R.string.l7_source_diplay_url, R.string.l7_source_diplay_details)
             }.apply {
                 setValue(context.getString(R.string.l7_source_version_diplay))
-            })
-            card.addView(L7Components.actionRow(context, context.getString(R.string.l7_source_geely_name),
-                context.getString(R.string.l7_source_geely_description)) {
-                showProject(context, R.string.l7_source_geely_name, R.string.l7_source_geely_version,
-                    R.string.l7_source_geely_url, R.string.l7_source_geely_details)
-            }.apply {
-                setValue(context.getString(R.string.l7_source_geely_version))
             })
             card.addView(L7Components.actionRow(context, context.getString(R.string.l7_licenses_title),
                 context.getString(R.string.l7_licenses_hint)) { showLicenses(context) })
