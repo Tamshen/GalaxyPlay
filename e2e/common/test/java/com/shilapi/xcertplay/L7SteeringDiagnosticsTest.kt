@@ -9,6 +9,19 @@ class L7SteeringDiagnosticsTest {
     private val logs = mutableListOf<String>()
     private val store = L7SteeringTraceStore({ time }, logs::add, 8)
 
+    @Test fun mediaSnapshotUpdatesDoNotCaptureConfigurationOrEvictPhysicalInputEvidence() {
+        var captures = 0
+        val state = L7SteeringTraceStore({ time }, logs::add, 8, logger = { captures++; logs::add })
+        state.begin("window-key", CarPlayMediaButton.PLAY).step("CHANNEL_WRITTEN")
+        val before = state.snapshot()
+        repeat(1000) { state.state("mediaCenter", "operation=$it", trace = false) }
+        val after = state.snapshot()
+        assertEquals(1, captures)
+        assertEquals(before.events, after.events)
+        assertEquals("operation=999", after.states["mediaCenter"])
+        assertEquals(before.revision + 1000, after.revision)
+    }
+
     @Test fun delayedDeliveryRetainsInputIdentityAndMeasuresWaitAndQueueSeparately() {
         var owner: Any? = Any()
         lateinit var waiting: () -> Unit

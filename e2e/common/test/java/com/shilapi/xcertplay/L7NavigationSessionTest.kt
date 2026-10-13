@@ -43,6 +43,21 @@ class L7NavigationSessionTest {
     private fun drain() { while (tasks.isNotEmpty()) tasks.removeFirst().run() }
     private fun route(road: String? = "private-road") = CarPlayNavigationSnapshot(true, road)
 
+    @Test fun frequentReadinessChecksKeepBinderChangesButDoNotFloodLogs() {
+        var checks = 0
+        port.duringConnection = { checks++ }
+        session.update(route()); drain(); logs.clear()
+        repeat(1000) { session.update(route()); drain() }
+        assertEquals(1001, checks)
+        assertTrue(logs.isEmpty())
+        port.available = false; session.update(route()); drain()
+        assertTrue(logs.any { "WAITING_BINDER" in it })
+        port.available = true; session.update(route()); drain()
+        assertEquals(2, port.calls.count { it == "start" })
+        session.close(); drain()
+        assertTrue(logs.any { "stage=serviceReady phase=SUMMARY calls=1003" in it })
+    }
+
     @Test fun bindingGapDoesNotCacheRouteAndRecoveryReplaysStartAndLatestRoad() {
         port.available = false; session.update(route()); drain()
         assertEquals(listOf("init"), port.calls)

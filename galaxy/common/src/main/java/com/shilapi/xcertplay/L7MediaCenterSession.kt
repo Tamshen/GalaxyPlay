@@ -30,7 +30,8 @@ internal class L7MediaCenterSession(
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val events = AtomicLong()
-    private val operations = com.shilapi.xcertplay.diagnostics.DiagnosticOperation({ event("ipc $it") })
+    private val operations = com.shilapi.xcertplay.diagnostics.SampledDiagnosticOperation(
+        { event("ipc $it") }, setOf("updateProgress"))
     private val scheduled = AtomicBoolean()
     @Volatile private var closed = false
     @Volatile private var registered = false
@@ -291,7 +292,7 @@ internal class L7MediaCenterSession(
     }
     private fun safely(stage: String, action: () -> Any?): Boolean = try {
         val result = operations.run(stage, action)
-        event("$stage result=$result")
+        if (stage != "updateProgress" || result == false) event("$stage result=$result")
         result != false
     } catch (error: Exception) { failure(stage, error); false }
       catch (error: LinkageError) { failure(stage, error); false }
@@ -302,7 +303,8 @@ internal class L7MediaCenterSession(
     private fun event(body: String) {
         if (traceSend != null && !closed && current() && !body.startsWith("updateProgress")) {
             L7SteeringDiagnostics.store.state("oemRegistration", "registered=$registered foreignFocus=$foreignFocus ready=$ready")
-            L7SteeringDiagnostics.store.state("mediaCenter", "generation=$generation $body")
+            // 原调用已进入媒体日志；状态面板只更新快照，避免每次 IPC 再创建方控追踪及读取配置。
+            L7SteeringDiagnostics.store.state("mediaCenter", "generation=$generation $body", trace = false)
         }
         runCatching { log("MediaCenter: generation=$generation event=${events.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body") }
     }
@@ -313,6 +315,7 @@ internal class L7MediaCenterSession(
         port.invalidate()
         snapshot = Snapshot(CarPlayNowPlaying(), null)
         try { worker.execute {
+            operations.flush()
             safely("clearSources") { port.sources(intArrayOf()) }
             safely("unregister") { port.unregister() }
             safely("release") { port.close(); "RETURNED" }

@@ -37,10 +37,11 @@ internal class L7SteeringTraceStore(
         begin("session", -1).step(if (active) "CONNECTED" else "DISCONNECTED")
     }
 
-    @Synchronized fun state(name: String, value: String) {
-        if (states[name] == value) return
-        states[name] = safe(value)
-        begin(name, -1).step("STATE", value)
+    @Synchronized fun state(name: String, value: String, trace: Boolean = true) {
+        val sanitized = safe(value)
+        if (states[name] == sanitized) return
+        states[name] = sanitized
+        if (trace) begin(name, -1).step("STATE", value) else revision++
     }
 
     @Synchronized internal fun append(trace: L7SteeringTrace, stage: String, detail: String) {
@@ -55,7 +56,8 @@ internal class L7SteeringTraceStore(
 
     @Synchronized fun snapshot() = Snapshot(revision, connected, generation, events.toList(), states.toMap())
     @Synchronized fun clear() { events.clear(); revision++ }
-    private fun safe(value: String) = value.take(160).replace(Regex("[^A-Za-z0-9_:=., /+-]"), "_")
+    private fun safe(value: String) = value.take(160).replace(SAFE_TEXT, "_")
+    private companion object { val SAFE_TEXT = Regex("[^A-Za-z0-9_:=., /+-]") }
 }
 
 internal class L7SteeringTrace internal constructor(
