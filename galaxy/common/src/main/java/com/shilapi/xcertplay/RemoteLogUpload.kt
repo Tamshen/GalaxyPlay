@@ -5,7 +5,7 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-/** 单个手动任务顺序发送各批；重试跳过已确认批次，保留未确认批次的事件编号。 */
+/** 单个手动任务有界并发发送各批；重试跳过已确认批次，保留未确认批次的事件编号。 */
 internal object RemoteLogUpload {
     enum class Phase { IDLE, UPLOADING, SUCCESS, FAILED, CANCELLED, EMPTY }
     data class Status(
@@ -17,13 +17,15 @@ internal object RemoteLogUpload {
         val streamDeleting: Boolean = false,
         val duplicateCopies: Int = 0, val memoryEvicted: Long = 0,
         val preparationFailed: Boolean = false,
+        val preparing: Boolean = false, val scannedLines: Int = 0,
     )
     private data class Pending(val config: RemoteLogConfig, val report: RemoteLogReport,
-                               var next: Int = 0, var uploadedLines: Int = 0)
+                               val confirmed: BooleanArray = BooleanArray(report.batches.size),
+                               var completed: Int = 0, var uploadedLines: Int = 0)
     @Volatile var status = Status()
         private set
     @Volatile private var generation = 0L
-    private var transport: RemoteLogTransport? = null
+    private var transport: RemoteLogBatchSender? = null
     private var pending: Pending? = null
     // 取消后至多等待一个新任务，旧整理在检查点退出；反复点击不会堆叠整理线程。
     private val worker = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(1),
@@ -37,17 +39,21 @@ internal object RemoteLogUpload {
         val retained = if (retry) pending?.takeIf { it.config == config } else null
         if (retained == null) { pending?.report?.close(); pending = null }
         val run = ++generation
-        val sender = RemoteLogTransport().also { transport = it }
-        status = retained?.state(Phase.UPLOADING) ?: Status(Phase.UPLOADING)
+        val sender = RemoteLogBatchSender().also { transport = it }
+        status = retained?.state(Phase.UPLOADING) ?: Status(Phase.UPLOADING, preparing = true)
         worker.execute { upload(app, config, retained, run, sender) }
         return true
     }
 
-    private fun upload(app: Context, config: RemoteLogConfig, retained: Pending?, run: Long, sender: RemoteLogTransport) {
+    private fun upload(app: Context, config: RemoteLogConfig, retained: Pending?, run: Long, sender: RemoteLogBatchSender) {
         var task = retained
         val code = runCatching {
             check(run == generation)
-            val current = task ?: Pending(config, RemoteLogArchive.collect(app) {
+            val current = task ?: Pending(config, RemoteLogArchive.collect(app, progress = { scanned ->
+                synchronized(this) {
+                    if (run == generation && status.preparing) status = status.copy(scannedLines = scanned)
+                }
+            }) {
                 check(run == generation && !L7AppExit.exiting && !L7ProbeRunner.clearing)
             }).also { task = it }
             synchronized(this) {
@@ -81,25 +87,21 @@ internal object RemoteLogUpload {
         }
     }
 
-    private fun sendBatches(app: Context, task: Pending, run: Long, sender: RemoteLogTransport): Int {
-        while (task.next < task.report.batches.size) {
-            synchronized(this) { check(run == generation && allowed(app)) }
-            val batch = task.report.batches[task.next]
-            val code = sender.send(task.config, batch)
-            if (code !in 200..299) return code
+    private fun sendBatches(app: Context, task: Pending, run: Long, sender: RemoteLogBatchSender): Int =
+        sender.send(task.config, task.report.batches, task.confirmed,
+            checkpoint = { check(run == generation && allowed(app) && !L7ProbeRunner.clearing) }) { index ->
             synchronized(this) {
                 check(run == generation && allowed(app))
-                task.next++
-                task.uploadedLines += batch.lineCount
+                check(!task.confirmed[index])
+                task.confirmed[index] = true
+                task.completed++
+                task.uploadedLines += task.report.batches[index].lineCount
                 status = task.state(Phase.UPLOADING)
             }
-            if (task.next < task.report.batches.size) Thread.sleep(100)
         }
-        return 200
-    }
 
     private fun Pending.state(phase: Phase, code: Int = 0) = Status(
-        phase, report.id, code, next, report.batches.size,
+        phase, report.id, code, completed, report.batches.size,
         uploadedLines, report.lineCount, report.omittedLines, report.shortenedSources,
         duplicateCopies = report.duplicateCopies, memoryEvicted = report.memoryEvicted,
     )
@@ -113,6 +115,6 @@ internal object RemoteLogUpload {
         transport = null
         if (old != null) Thread({ old.close() }, "l7-log-upload-cancel").apply { isDaemon = true; start() }
         pending?.report?.close(); pending = null
-        status = status.copy(phase = Phase.CANCELLED)
+        status = status.copy(phase = Phase.CANCELLED, preparing = false)
     }
 }

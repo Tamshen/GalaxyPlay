@@ -14,7 +14,8 @@
     <string name="l7_log_unconfigured">Not configured</string>
     <string name="l7_log_config_first">Enter the OpenObserve ingestion URL and authorization first</string>
     <string name="l7_log_idle">No uploads yet</string>
-    <string name="l7_log_uploading">Preparing all local logs and uploading in batches…</string>
+    <string name="l7_log_preparing">Preparing all logs; scanned %1$d lines…</string>
+    <string name="l7_log_uploading">Uploading all logs in batches…</string>
     <string name="l7_log_success">Uploaded\nLog name %1$s\nReport %2$s</string>
     <string name="l7_log_device">Log name</string>
     <string name="l7_log_device_hint">Uploads go to this device-specific stream. Tap to copy the name and include it when reporting issues.</string>

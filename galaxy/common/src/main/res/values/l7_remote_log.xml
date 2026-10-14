@@ -16,7 +16,8 @@
     <string name="l7_log_unconfigured">未配置</string>
     <string name="l7_log_config_first">请先填写 OpenObserve 写入地址和认证信息</string>
     <string name="l7_log_idle">尚未上传</string>
-    <string name="l7_log_uploading">正在整理全部本地日志并分批上传…</string>
+    <string name="l7_log_preparing">正在整理全部日志，已扫描 %1$d 条…</string>
+    <string name="l7_log_uploading">正在分批上传全部日志…</string>
     <string name="l7_log_success">上传成功\n日志名称 %1$s\n报告 %2$s</string>
     <string name="l7_log_device">日志名称</string>
     <string name="l7_log_device_hint">上传到本机专属的同名日志流；点击复制，反馈问题时提供此名称</string>

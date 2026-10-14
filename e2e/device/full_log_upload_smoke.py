@@ -21,6 +21,7 @@ package = 'com.ecarx.carplay'
 output = Path('build/previews/full-log-upload')
 output.mkdir(parents=True, exist_ok=True)
 received, accepted = [], []
+received_lock = threading.Lock()
 
 
 def adb(*parts, data=None):
@@ -62,8 +63,10 @@ class Server(BaseHTTPRequestHandler):
         assert len(body) <= 256 * 1024
         rows = json.loads(body)
         assert len(rows) <= 1000
-        received.append((rows[0]['batch_index'], body))
-        code = 503 if len(received) == 3 else 200
+        index = rows[0]['batch_index']
+        with received_lock:
+            received.append((index, body))
+            code = 503 if index == 3 and sum(i == 3 for i, _ in received) == 1 else 200
         if code == 200:
             for row in rows:
                 match = re.search(r'full_avd_line=(\d+)', row['message'])
@@ -119,15 +122,19 @@ try:
     deadline = time.monotonic() + 60
     while 'HTTP 503' not in texts():
         assert time.monotonic() < deadline, '未到失败重试状态'
-    assert len(received) == 3
+    first_attempt = list(received)
+    assert any(i == 3 for i, _ in first_attempt)
     (output / 'failed-batch.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     private('cat > files/logs/previous-7.log', data=b'newer unrelated session\n')
     tap('重试上传')
     deadline = time.monotonic() + 60
     while '上传成功' not in texts():
         assert time.monotonic() < deadline, '未完成完整上传'
-    assert received[2][1] == received[3][1], '重试必须使用原批次正文和事件编号'
-    assert accepted == list(range(6200)), '上下文记录必须全部收到且没有已确认批次重复'
+    failed_bodies = [body for index, body in received if index == 3]
+    assert len(failed_bodies) == 2 and failed_bodies[0] == failed_bodies[1], '重试必须使用原批次正文和事件编号'
+    confirmed = {index for index, _ in first_attempt if index != 3}
+    assert confirmed.isdisjoint(index for index, _ in received[len(first_attempt):]), '不能重发已确认批次'
+    assert sorted(accepted) == list(range(6200)), '上下文记录必须全部收到且没有已确认批次重复'
     assert sum(len(body) for _, body in received) > 1024 * 1024
     assert private('ls -A cache/log-upload-snapshots').strip() == b'', '成功后仍有快照残留'
     (output / 'complete.png').write_bytes(adb('exec-out', 'screencap', '-p'))
