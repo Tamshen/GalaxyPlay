@@ -54,7 +54,8 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         fun statusText(context: Context, status: RemoteLogUpload.Status, logName: String): String {
             val message = when (status.phase) {
                 RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
-                RemoteLogUpload.Phase.UPLOADING -> context.getString(R.string.l7_log_uploading)
+                RemoteLogUpload.Phase.UPLOADING -> if (status.preparing)
+                    context.getString(R.string.l7_log_preparing, status.scannedLines) else context.getString(R.string.l7_log_uploading)
                 RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
                 RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
                 RemoteLogUpload.Phase.EMPTY -> context.getString(R.string.l7_log_empty_hint)

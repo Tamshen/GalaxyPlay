@@ -27,6 +27,15 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class RemoteLogTest {
+    @Test fun preparationShowsScannedLinesWithoutClaimingNetworkUploadProgress() {
+        val preparing = RemoteLogUpload.Status(RemoteLogUpload.Phase.UPLOADING, preparing = true, scannedLines = 7000)
+        val text = L7RemoteLogSettings.statusText(context, preparing, "test-stream")
+        assertTrue(text.contains("7000"))
+        assertEquals(context.getString(com.shilapi.xcertplay.host.R.string.l7_log_preparing, 7000), text)
+        val uploading = preparing.copy(preparing = false, totalBatches = 18, totalLines = 7003)
+        assertTrue(L7RemoteLogSettings.statusText(context, uploading, "test-stream")
+            .startsWith(context.getString(com.shilapi.xcertplay.host.R.string.l7_log_uploading)))
+    }
     private val context get() = RuntimeEnvironment.getApplication()
     private val token = "Basic " + Base64.getEncoder().encodeToString(("test:" + UUID.randomUUID()).toByteArray())
     private var server: HttpServer? = null

@@ -21,12 +21,13 @@ internal class RemoteLogBatch(
     entries: List<RemoteLogEntry>,
     private val loadEntries: (() -> List<RemoteLogEntry>)? = null,
     private val storedCount: Int? = null,
+    private val loadBody: (() -> ByteArray)? = null,
 ) {
     private val initialEntries = entries
     val entries get() = loadEntries?.invoke() ?: initialEntries
     val lineCount get() = storedCount ?: entries.size
-    val body: ByteArray get() = JSONArray(entries.map { metadata.event(it, index, total) })
-        .toString().toByteArray(Charsets.UTF_8).also { check(it.size <= RemoteLogReport.MAX_BODY) }
+    val body: ByteArray get() = (loadBody?.invoke() ?: JSONArray(entries.map { metadata.event(it, index, total) })
+        .toString().toByteArray(Charsets.UTF_8)).also { check(it.size <= RemoteLogReport.MAX_BODY) }
 }
 
 internal data class RemoteLogMetadata(val id: String, val collected: String, val version: String, val core: String) {

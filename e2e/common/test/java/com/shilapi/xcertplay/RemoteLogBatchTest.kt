@@ -7,6 +7,8 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
@@ -25,9 +27,10 @@ import org.robolectric.annotation.Config
 class RemoteLogBatchTest {
     private val app get() = RuntimeEnvironment.getApplication()
     private var server: HttpServer? = null
+    private var serverWorkers: ExecutorService? = null
     private val folder get() = File(app.filesDir, "logs")
     @Before fun before() { RemoteLogUpload.cancel(); folder.deleteRecursively(); folder.mkdirs(); L7DebugLog.buffer.clear() }
-    @After fun after() { RemoteLogUpload.cancel(); server?.stop(0) }
+    @After fun after() { RemoteLogUpload.cancel(); server?.stop(0); serverWorkers?.shutdownNow() }
 
     @Test fun repeatedCancellationDoesNotCreateParallelCollectorsOrSendStaleSnapshots() {
         val received = CopyOnWriteArrayList<String>()
@@ -145,16 +148,17 @@ class RemoteLogBatchTest {
         configure { text, data ->
             val batch = data.getJSONObject(0).getInt("batch_index")
             received += batch to text
-            if (received.size == 2) 503 else 200
+            if (batch == 2 && received.count { it.first == 2 } == 1) 503 else 200
         }
         assertTrue(RemoteLogUpload.start(app))
         await(RemoteLogUpload.Phase.FAILED)
         assertNull(RemoteLogHistory.last(app))
-        assertEquals(listOf(1, 2), received.map { it.first })
-        assertEquals(1, RemoteLogUpload.status.completedBatches)
+        val firstAttempt = received.toList()
+        assertTrue(firstAttempt.any { it.first == 2 })
+        assertEquals(firstAttempt.size - 1, RemoteLogUpload.status.completedBatches)
         val reportId = RemoteLogUpload.status.id
         Thread.sleep(100)
-        assertEquals(2, received.size)
+        assertEquals(firstAttempt.size, received.size)
         // 失败后切换车型与参数，重试仍发送原报告，而不是读取新配置冒充旧测试。
         val repository = GalaxyProfiles(app)
         val draft = GalaxyConfigurationContext(app, repository.draft("current", "Retry next configuration"), true)
@@ -163,15 +167,17 @@ class RemoteLogBatchTest {
         repository.select(saved.id)
         assertTrue(RemoteLogUpload.start(app, retry = true))
         await(RemoteLogUpload.Phase.SUCCESS)
-        assertEquals(listOf(1, 2, 2), received.take(3).map { it.first })
-        assertEquals(received[1].second, received[2].second)
+        assertEquals(firstAttempt.single { it.first == 2 }.second, received.last { it.first == 2 }.second)
         val status = RemoteLogUpload.status
         assertEquals(reportId, status.id)
         assertEquals(status.totalBatches, status.completedBatches)
         assertEquals(status.totalLines, status.uploadedLines)
         assertEquals(RemoteLogHistory.Entry(status.finishedAt, status.totalLines), RemoteLogHistory.last(app))
         assertTrue(status.finishedAt > 0)
-        assertEquals((3..status.totalBatches).toList(), received.drop(3).map { it.first })
+        val alreadyConfirmed = firstAttempt.map { it.first }.filter { it != 2 }.toSet()
+        assertEquals((1..status.totalBatches).filter { it !in alreadyConfirmed }.toSet(),
+            received.drop(firstAttempt.size).map { it.first }.toSet())
+        assertEquals(status.totalBatches + 1, received.size)
     }
 
     @Test fun fullUploadAndRetryDeliverEveryLocalLineBeyondTheOldSnapshotBudget() {
@@ -179,11 +185,11 @@ class RemoteLogBatchTest {
             "full_upload_index=$it codec=H264 " + "counter ".repeat(12)
         })
         val received = CopyOnWriteArrayList<Pair<Int, String>>()
-        val accepted = mutableListOf<Int>()
+        val accepted = CopyOnWriteArrayList<Int>()
         configure { text, data ->
             val batch = data.getJSONObject(0).getInt("batch_index")
             received += batch to text
-            if (received.size == 3) 503 else {
+            if (batch == 3 && received.count { it.first == 3 } == 1) 503 else {
                 for (i in 0 until data.length()) {
                     Regex("full_upload_index=(\\d+)").find(data.getJSONObject(i).getString("message"))
                         ?.let { accepted += it.groupValues[1].toInt() }
@@ -193,13 +199,15 @@ class RemoteLogBatchTest {
         }
         assertTrue(RemoteLogUpload.start(app))
         await(RemoteLogUpload.Phase.FAILED, 30)
-        assertEquals(2, RemoteLogUpload.status.completedBatches)
+        val firstAttempt = received.toList()
+        assertEquals(firstAttempt.size - 1, RemoteLogUpload.status.completedBatches)
         assertEquals(0, RemoteLogUpload.status.omittedLines)
         File(folder, "previous-7.log").writeText("different newer session\n")
         assertTrue(RemoteLogUpload.start(app, retry = true))
         await(RemoteLogUpload.Phase.SUCCESS, 30)
-        assertEquals(received[2].second, received[3].second)
-        assertEquals((0 until 6200).toList(), accepted)
+        assertEquals(firstAttempt.single { it.first == 3 }.second, received.last { it.first == 3 }.second)
+        assertEquals((0 until 6200).toList(), accepted.sorted())
+        assertEquals(RemoteLogUpload.status.totalBatches + 1, received.size)
         assertTrue(received.sumOf { it.second.toByteArray().size } > 1024 * 1024)
         assertEquals(RemoteLogUpload.status.totalLines, RemoteLogUpload.status.uploadedLines)
         assertTrue(File(app.cacheDir, "log-upload-snapshots").listFiles().orEmpty().isEmpty())
@@ -207,7 +215,7 @@ class RemoteLogBatchTest {
 
     @Test fun cancelPreventsLaterBatchesAndLateSuccessCannotRestoreTheTask() {
         File(folder, "diplay.log").writeText((0..2200).joinToString("\n") { "event=$it HEVC " + "detail ".repeat(15) })
-        val entered = CountDownLatch(1)
+        val entered = CountDownLatch(3)
         val finish = CountDownLatch(1)
         val received = CopyOnWriteArrayList<Int>()
         configure { _, data -> received += data.length(); entered.countDown(); finish.await(3, TimeUnit.SECONDS); 200 }
@@ -217,7 +225,7 @@ class RemoteLogBatchTest {
         finish.countDown()
         Thread.sleep(200)
         assertEquals(RemoteLogUpload.Phase.CANCELLED, RemoteLogUpload.status.phase)
-        assertEquals(1, received.size)
+        assertEquals(3, received.size)
     }
 
     private fun records(report: RemoteLogReport) = report.batches.flatMap { batch ->
@@ -227,6 +235,7 @@ class RemoteLogBatchTest {
 
     private fun configure(reply: (String, JSONArray) -> Int) {
         val http = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        http.executor = Executors.newFixedThreadPool(3).also { serverWorkers = it }
         http.createContext("/") { exchange ->
             val text = exchange.requestBody.bufferedReader().readText()
             val data = JSONArray(text)

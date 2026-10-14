@@ -95,4 +95,43 @@ class RemoteLogArchiveTest {
             assertEquals(70, rows.count { "history_config_event=" in it.message })
         }
     }
+
+    @Test fun sameEventWithDifferentRawTextIsRetainedAndNullBindingsCannotReuseThePreviousConfiguration() {
+        val evidence = GalaxyConfigurationEvidence.capture(app)
+        val event = DiagnosticLogIdentity.prefix(DiagnosticLogIdentity.next(), 1000)
+        val first = "config_ref=${evidence.id} " + event + "failure token=first-secret"
+        val different = "config_ref=${evidence.id} " + event + "failure token=other-secret"
+        File(logs, "diplay.log").writeText(evidence.header + "\n$first\n$different\n$first\nplain event\nplain event\n")
+        val progress = mutableListOf<Int>()
+        RemoteLogArchive.collect(app, progress = progress::add).use { report ->
+            assertEquals(1, report.duplicateCopies)
+            val rows = report.batches.flatMap { it.entries }.filter { it.source == "diplay.log" }
+            assertEquals(4, rows.size)
+            assertEquals(2, rows.count { it.configurationId == evidence.id })
+            assertEquals(2, rows.count { it.configurationId == null && it.message == "plain event" })
+            assertTrue(progress.last() >= 6)
+            val body = report.batches.joinToString { it.body.toString(Charsets.UTF_8) }
+            assertFalse(body.contains("first-secret"))
+            assertFalse(body.contains("other-secret"))
+            assertTrue(body.contains("prepareIndexMs="))
+        }
+    }
+
+    @Test fun frozenConfigurationIsStillSanitizedAtSendAndBatchFieldsInsideMessagesRemainUntouched() {
+        val evidence = GalaxyConfigurationEvidence.capture(app)
+        val message = "quoted {\"batch_index\":2147483647,\"batch_count\":2147483647} unicode=中文"
+        File(logs, "diplay.log").writeText(evidence.header + "\nconfig_ref=${evidence.id} $message\n")
+        RemoteLogArchive.collect(app).use { report ->
+            val data = snapshots.listFiles()!!.single().resolve("batches.bin")
+            data.writeText(data.readText().replace("[redacted]", "secret1234"))
+            val rows = org.json.JSONArray(report.batches.first().body.toString(Charsets.UTF_8))
+            for (index in 0 until rows.length()) {
+                val row = rows.getJSONObject(index)
+                assertEquals(1, row.getInt("batch_index"))
+                assertEquals(report.batches.size, row.getInt("batch_count"))
+                row.optJSONObject("configuration_file")?.let { assertFalse(it.toString().contains("secret1234")) }
+                if (row.getString("source") == "diplay.log") assertTrue(row.getString("message").endsWith(message))
+            }
+        }
+    }
 }
