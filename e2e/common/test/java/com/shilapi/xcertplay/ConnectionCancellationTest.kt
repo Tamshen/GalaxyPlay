@@ -66,6 +66,7 @@ class ConnectionCancellationTest {
         assertTrue(host.isFinishing)
         assertTrue(ReflectionHelpers.getField<java.util.concurrent.atomic.AtomicBoolean>(host, "shuttingDown").get())
         assertEquals(1, ReflectionHelpers.getField<Int>(host, "restartGeneration"))
+        assertTrue(ReflectionHelpers.getField<GalaxyWirelessRecovery>(host, "startupRecovery").stopped)
         ReflectionHelpers.callInstanceMethod<Unit>(host, "cancelConnection")
         assertNull(shadowOf(host).nextStartedActivity)
     }

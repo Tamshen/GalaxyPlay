@@ -189,6 +189,10 @@ class CarPlayHostActivity : ComponentActivity() {
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
         wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
         wifiP2pChannelPolicy = GalaxyP2pSettings.load(this).policy,
+        wirelessFirstTcpTimeoutMillis = com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning
+            .firstTcpMillis(wirelessEnabled, wirelessHotspotMode),
+        wirelessStartupRefreshEnabled = com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning
+            .refreshEnabled(wirelessEnabled, wirelessHotspotMode),
         manualHotspotSsid = manualHotspotSsid,
         manualHotspotPassphrase = manualHotspotPassphrase,
         manualHotspotBand = manualHotspotBand,
@@ -3355,7 +3359,8 @@ class CarPlayHostActivity : ComponentActivity() {
             override fun onTransportError(message: String) {
                 runOnUiThread {
                     if (controllerGeneration == restartGeneration) appendLog("CarPlay transport error: $message")
-                    if (menuOpen || controllerGeneration != restartGeneration) {
+                    if (menuOpen || controllerGeneration != restartGeneration ||
+                        startupRecovery.stopped || shuttingDown.get()) {
                         return@runOnUiThread
                     }
                     startupRecovery.disconnected()
@@ -3393,7 +3398,8 @@ class CarPlayHostActivity : ComponentActivity() {
             L7WiredDiagnostics.event(this, wiredAttempt, "TRANSPORT", status.javaClass.simpleName,
                 outcome = if (status is CarPlayStatus.Failed) "FAILED" else null)
         }
-        if (!menuOpen && controllerGeneration == restartGeneration) {
+        if (!menuOpen && controllerGeneration == restartGeneration &&
+            !startupRecovery.stopped && !shuttingDown.get()) {
             updateHotspotStatus(status)
             val detail = status.describe()
             val formatted = wirelessEnabled && l7DebugLogs
@@ -3745,8 +3751,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || startupRecovery.stopped) return
         if (reconnectScheduled) return
-        val startupDelay = startupFailure?.let { failure ->
-            when (val decision = startupRecovery.failed(restartGeneration, failure)) {
+        val startupDelay = if (wirelessEnabled) {
+            when (val decision = startupRecovery.failed(restartGeneration, startupFailure)) {
                 is GalaxyWirelessRecovery.Decision.Retry -> decision.delayMillis
                 GalaxyWirelessRecovery.Decision.Ignore -> return
                 GalaxyWirelessRecovery.Decision.Stop -> {
@@ -3757,7 +3763,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     return
                 }
             }
-        }
+        } else null
         reconnectScheduled = true
         val generation = restartGeneration
         val delayMillis = if (startupDelay != null) startupDelay else if (reason.contains("AirPlay iAP tunnel", ignoreCase = true)) {
@@ -3887,6 +3893,7 @@ class CarPlayHostActivity : ComponentActivity() {
         L7WiredDiagnostics.event(this, wiredAttempt, "STOP", "BEGIN", outcome = "CANCELLED")
         if (terminateProcess) L7StartupGuard.stopped()
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
+        startupRecovery.stop()
         restartGeneration += 1
         pendingVideoFailure = null
         videoRecoveryPanel?.recovered()

@@ -33,6 +33,7 @@ class WirelessStartupRecoveryTest {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         activity.setTheme(android.R.style.Theme_Material_NoActionBar)
         ReflectionHelpers.setField(CarPlayBackgroundSession, "owner", activity)
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
         val panel = L7ConnectionPanel(activity, true, {}, {}, {})
         retry = panel.retryButton
         ReflectionHelpers.setField(activity, "connectionPanel", panel)
@@ -71,7 +72,7 @@ class WirelessStartupRecoveryTest {
         report()
         assertTrue(stage.text.toString().contains("4/5"))
         assertTrue(stage.text.toString().contains("attempt 2"))
-        assertTrue(stage.text.toString().contains("2 seconds"))
+        assertTrue(stage.text.toString().contains("1 s"))
     }
 
     @Test fun exhaustedBudgetStopsAutomaticRecoveryAndExposesRetry() {
@@ -93,6 +94,47 @@ class WirelessStartupRecoveryTest {
         assertEquals(0, budget().retries)
         assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
         assertEquals(View.VISIBLE, retry.visibility)
+    }
+
+    @Test fun repeatedUnclassifiedBluetoothFailureAlsoExhaustsTheBudget() {
+        repeat(6) { generation ->
+            ReflectionHelpers.setField(activity, "restartGeneration", generation)
+            ReflectionHelpers.setField(activity, "reconnectScheduled", false)
+            report(generation, CarPlayStatus.Failed("Bluetooth RFCOMM read failed"))
+        }
+        assertTrue(budget().stopped)
+        assertEquals(5, budget().retries)
+        assertEquals(View.VISIBLE, retry.visibility)
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+    }
+
+    @Test fun wiredFailureKeepsItsExistingRetryPathWithoutUsingWirelessBudget() {
+        ReflectionHelpers.setField(activity, "wirelessEnabled", false)
+        report(status = CarPlayStatus.Failed("USB transport error"))
+        assertEquals(0, budget().retries)
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+    }
+
+    @Test fun lateTransportErrorCannotReplaceExhaustedFeedbackWithGenericReconnectingText() {
+        val stage = TextView(activity)
+        ReflectionHelpers.setField(activity, "stageStatusView", stage)
+        ReflectionHelpers.setField(activity, "l7DebugLogs\$delegate", lazy { true })
+        repeat(6) { generation ->
+            ReflectionHelpers.setField(activity, "restartGeneration", generation)
+            ReflectionHelpers.setField(activity, "reconnectScheduled", false)
+            report(generation)
+        }
+        val stoppedText = stage.text.toString()
+        assertTrue(stoppedText.contains(activity.getString(com.shilapi.xcertplay.host.R.string.wireless_startup_retries_exhausted)))
+        val listener = ReflectionHelpers.callInstanceMethod<com.shilapi.xcertplay.airplay.AirPlaySessionListener>(
+            activity, "createSessionListener", from(Int::class.javaPrimitiveType, 5))
+        listener.onTransportError("AirPlay session ended while closing")
+        listener.onSessionEnded(org.mockito.Mockito.mock(com.shilapi.xcertplay.airplay.AirPlaySession::class.java))
+        report(5, CarPlayStatus.RunningWireless)
+        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(stoppedText, stage.text.toString())
+        assertEquals(View.VISIBLE, retry.visibility)
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
     }
 
     @Test fun staleGenerationUserDisconnectMenuAndDifferentOwnerCannotSchedule() {

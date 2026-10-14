@@ -70,8 +70,11 @@ class CarPlayRuntimeConfig(
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",
     val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,
+    val wirelessFirstTcpTimeoutMillis: Long = com.shilapi.xcertplay.network.WirelessStartupPolicy.FIRST_TCP_MILLIS,
+    val wirelessStartupRefreshEnabled: Boolean = false,
 ) {
     init {
+        require(wirelessFirstTcpTimeoutMillis in 1..60_000) { "Wireless first TCP timeout must be in 1..60000ms" }
         require(iphoneDevices.all { it.vendorId == APPLE_VENDOR_ID }) {
             "iPhone USB identities must use Apple vendor ID 0x${APPLE_VENDOR_ID.toString(16)}"
         }

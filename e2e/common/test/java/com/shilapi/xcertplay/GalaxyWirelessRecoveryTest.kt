@@ -8,6 +8,21 @@ import org.junit.Test
 class GalaxyWirelessRecoveryTest {
     private val failure = WirelessStartupFailure.FIRST_TCP_TIMEOUT
 
+    @Test fun typedAndBluetoothFailuresUseFastBoundedBackoffAndManualStopRejectsLateRetries() {
+        val recovery = GalaxyWirelessRecovery()
+        val delays = (0 until 5).map { generation ->
+            (recovery.failed(generation, if (generation % 2 == 0) failure else null)
+                as GalaxyWirelessRecovery.Decision.Retry).delayMillis
+        }
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 5_000L, 5_000L), delays)
+        assertEquals(GalaxyWirelessRecovery.Decision.Stop, recovery.failed(5, null))
+        recovery.manualRetry()
+        recovery.stop()
+        assertEquals(GalaxyWirelessRecovery.Decision.Ignore, recovery.failed(100, null))
+        recovery.manualRetry()
+        assertEquals(1_000L, (recovery.failed(101, failure) as GalaxyWirelessRecovery.Decision.Retry).delayMillis)
+    }
+
     @Test fun duplicateFailureConsumesOneAttemptAndBudgetIsFinite() {
         val recovery = GalaxyWirelessRecovery()
         repeat(WirelessStartupPolicy.MAX_STARTUP_RETRIES) { generation ->
