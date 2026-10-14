@@ -849,6 +849,39 @@
 -                .removeCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
 -        }
  }
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/HotspotAddressPolicy.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/HotspotAddressPolicy.kt
+@@ -5,6 +5,30 @@
+ import java.net.InetAddress
+ 
+ internal object HotspotAddressPolicy {
++    const val FAMILY_IPV4 = "IPv4"
++    const val FAMILY_IPV6 = "IPv6"
++
++    fun parseFamily(raw: String?): String? = when (raw) {
++        FAMILY_IPV4 -> FAMILY_IPV4
++        FAMILY_IPV6 -> FAMILY_IPV6
++        else -> null
++    }
++
++    /** 根据已验证偏好选择；没有可用 IPv6 时保留原 IPv4 优先行为。 */
++    fun select(addresses: List<InetAddress>, preferredFamily: String?): InetAddress? {
++        if (preferredFamily == FAMILY_IPV6) {
++            addresses.filterIsInstance<Inet6Address>().firstOrNull {
++                it.isLinkLocalAddress && it.scopeId > 0
++            }?.let { return it }
++        }
++        return select(addresses)
++    }
++
++    /** 与上游地址恢复保持相同方向，但拒绝没有本机作用域的链路本地 IPv6。 */
++    fun alternateFamilyCandidate(addresses: List<InetAddress>, published: InetAddress): InetAddress? =
++        if (published is Inet6Address) addresses.filterIsInstance<Inet4Address>().firstOrNull(::usable)
++        else addresses.filterIsInstance<Inet6Address>().firstOrNull { it.isLinkLocalAddress && it.scopeId > 0 }
++
+     fun select(addresses: List<InetAddress>): InetAddress? {
+         var linkLocal: InetAddress? = null
+         for (address in addresses) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/Ipv6NcmBridge.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/Ipv6NcmBridge.kt
 @@ -54,10 +54,13 @@
@@ -1610,7 +1643,15 @@
  import com.shilapi.xcertplay.transport.I2cTransport
  import com.shilapi.xcertplay.transport.I2cTransportException
  import com.shilapi.xcertplay.transport.IphoneCarPlayConfiguration
-@@ -119,6 +122,9 @@
+@@ -91,6 +94,7 @@
+ import java.io.Closeable
+ import java.io.IOException
+ import java.net.InetAddress
++import java.net.NetworkInterface
+ import java.net.Inet6Address
+ import java.util.Locale
+ import java.util.UUID
+@@ -119,6 +123,9 @@
      data object WaitingForPairedIphone : CarPlayStatus()
      data object ConnectingBluetooth : CarPlayStatus()
      data object RunningWireless : CarPlayStatus()
@@ -1620,7 +1661,7 @@
      data object WirelessActive : CarPlayStatus()
      data object WirelessActiveFallback : CarPlayStatus()
      data object DiscoveringIphone : CarPlayStatus()
-@@ -163,12 +169,17 @@
+@@ -163,12 +170,17 @@
      private val clearPairRecord: () -> Unit = {},
      private val locationProvider: Iap2LocationProvider? = null,
      private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
@@ -1639,7 +1680,7 @@
          BydNavigationOutputs.start(context.applicationContext)
          BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
      }
-@@ -177,7 +188,9 @@
+@@ -177,7 +189,9 @@
  
      private val appContext = context.applicationContext
      private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
@@ -1649,7 +1690,7 @@
      private val usbManager: UsbManager? = context.getSystemService(UsbManager::class.java)
      private val bluetoothAdapter =
          appContext.getSystemService(BluetoothManager::class.java)?.adapter
-@@ -190,10 +203,13 @@
+@@ -190,10 +204,13 @@
              } else {
                  IphoneUsbMatcher.appleVendor()
              },
@@ -1663,7 +1704,7 @@
      private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
      private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
      private val mainHandler = Handler(Looper.getMainLooper())
-@@ -202,11 +218,16 @@
+@@ -202,11 +219,16 @@
      private val lifecycleLock = Any()
      @Volatile private var uiListener: AirPlaySessionListener? = listener
      @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
@@ -1680,7 +1721,7 @@
      private var mfiResetLogged = false
  
      @Volatile private var closed = false
-@@ -214,6 +235,8 @@
+@@ -214,6 +236,8 @@
      @Volatile private var ch341Host: Ch341UsbHost? = null
      @Volatile private var mfiSession: MfiSession? = null
      @Volatile private var mux: Iap2UsbMuxHost? = null
@@ -1689,7 +1730,7 @@
      @Volatile private var csm: Iap2Session? = null
      @Volatile private var activeSession: AirPlaySession? = null
      @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
-@@ -227,13 +250,21 @@
+@@ -227,13 +251,21 @@
      private val playbackStatus = com.shilapi.xcertplay.media.CarPlayPlaybackStatus()
  
      /** Told when the iPhone starts or stops playing media; may run on any thread. */
@@ -1714,7 +1755,15 @@
  
      /** Video in car; set before [start] to offer it to the iPhone (with AirPlayConfig.videoInCar). */
      @Volatile var videoListener: CarPlayVideoListener? = null
-@@ -263,13 +294,13 @@
+@@ -249,6 +281,7 @@
+     private val wirelessResourceLock = Any()
+     private val wirelessFailureReported = AtomicBoolean(false)
+     @Volatile private var firstTcpWatchdog: FirstTcpWatchdog? = null
++    @Volatile private var hotspotAddressRecovery: com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery? = null
+     private val startupTimer = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
+         Thread(task, "diplay-first-tcp-timeout").apply { isDaemon = true }
+     }.apply { removeOnCancelPolicy = true }
+@@ -263,13 +296,13 @@
      private val wirelessHandoffRequested = AtomicBoolean(false)
      private val wirelessTunnelReady = AtomicBoolean(false)
      private val wirelessActiveReported = AtomicBoolean(false)
@@ -1729,7 +1778,7 @@
      private var ch341PermissionCloseable: Closeable? = null
      private var vpnLatch = CountDownLatch(1)
      private val teardownComplete = CountDownLatch(1)
-@@ -288,10 +319,14 @@
+@@ -288,10 +321,14 @@
  
      private val sessionListener = object : AirPlaySessionListener {
          override fun onSessionActive(session: AirPlaySession) {
@@ -1745,7 +1794,7 @@
                  com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                  // The gear may have changed since /info.
                  if (videoListener != null) {
-@@ -300,6 +335,9 @@
+@@ -300,6 +337,9 @@
                  }
              }
              activeSession = session
@@ -1755,7 +1804,7 @@
              if (replacement) restoreDashboardContent(session)
              debugLog(
                  "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
-@@ -311,16 +349,17 @@
+@@ -311,16 +351,17 @@
          override fun onSessionEnded(session: AirPlaySession) {
              if (activeSession === session) {
                  activeSession = null
@@ -1780,7 +1829,7 @@
              }
              debugLog("AirPlay session ended peer=${session.host}")
              uiListener?.onSessionEnded(session)
-@@ -417,6 +456,9 @@
+@@ -417,6 +458,9 @@
              if (closed) return
          }
          connectionDiagnostic("start transport=${config.transport}")
@@ -1790,7 +1839,7 @@
          if (!hasRequiredUsbService()) return
          videoListener?.let { listener ->
              videoGate = VideoInCarGate(
-@@ -435,6 +477,7 @@
+@@ -435,6 +479,7 @@
          if (config.transport == CarPlayTransport.WIRED) {
              permissionCloseable = iphoneHost.registerPermissionReceiver(::onIphonePermission)
              attachCloseable = iphoneHost.registerAttachReceiver(::onIphoneAttached)
@@ -1798,7 +1847,7 @@
          }
          startMfi()
      }
-@@ -447,14 +490,21 @@
+@@ -447,14 +492,21 @@
      }
  
      /** Re-runs iPhone discovery/bring-up using the already-open MFi session. */
@@ -1822,7 +1871,7 @@
          }
      }
  
-@@ -469,6 +519,8 @@
+@@ -469,6 +521,8 @@
          }
      }
  
@@ -1831,7 +1880,7 @@
      /** Moves CarPlay on the main screen to its declared view area [index], for example another dock edge. */
      fun showViewArea(index: Int): Boolean {
          if (closed) return false
-@@ -575,13 +627,41 @@
+@@ -575,13 +629,41 @@
          }
      }
  
@@ -1878,7 +1927,7 @@
              false
          }
      }
-@@ -592,6 +672,13 @@
+@@ -592,6 +674,13 @@
              closed = true
              dashboardMapOutputVisible = false
          }
@@ -1892,7 +1941,7 @@
          firstTcpWatchdog?.terminate()
          startupTimer.shutdownNow()
          (hotspot as? ManualHotspotManager)?.close()
-@@ -605,6 +692,7 @@
+@@ -605,6 +694,7 @@
          availabilityPollGeneration.incrementAndGet()
          wirelessGeneration.incrementAndGet()
          permissionPollGeneration += 1
@@ -1900,7 +1949,7 @@
          touchExecutor.shutdownNow()
          tunnelExecutor.shutdownNow()
          val service = vpnService
-@@ -617,19 +705,29 @@
+@@ -617,19 +707,29 @@
                          closeBestEffort("Wi-Fi scan pause") { wifiScanPause?.close() }
                          wifiScanPause = null
                      } else {
@@ -1933,7 +1982,7 @@
                  } finally {
                      executor.shutdownNow()
                      var executorTerminated = false
-@@ -642,6 +740,12 @@
+@@ -642,6 +742,12 @@
                          "teardown end elapsedMs=${elapsedMillis(teardownStarted)} " +
                              "executorTerminated=$executorTerminated",
                      )
@@ -1946,7 +1995,7 @@
                      teardownComplete.countDown()
                  }
              },
-@@ -731,7 +835,7 @@
+@@ -731,7 +837,7 @@
      fun awaitClosed(timeoutMillis: Long): Boolean {
          require(timeoutMillis >= 0) { "timeoutMillis must not be negative" }
          return try {
@@ -1955,7 +2004,7 @@
          } catch (_: InterruptedException) {
              Thread.currentThread().interrupt()
              false
-@@ -740,28 +844,41 @@
+@@ -740,28 +846,41 @@
  
      // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
      private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
@@ -2008,7 +2057,7 @@
          when (config.mfiTarget) {
              MfiTarget.LOCAL -> openLocalMfi(offlineDirectory)
              MfiTarget.USB_CH341 -> {
-@@ -1142,13 +1259,17 @@
+@@ -1142,13 +1261,17 @@
                  },
                  onTimeout = {
                      if (!closed && generation == wirelessGeneration.get()) {
@@ -2028,7 +2077,34 @@
              )
              firstTcpWatchdog = watchdog
              val mfi = mfiSession?.client
-@@ -1215,6 +1336,7 @@
+@@ -1162,7 +1285,25 @@
+             wirelessConnectionProof.begin(generation) {
+                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
+             }
+-            val hostAddress = hotspotInfo.hostAddress
++            val addressMemory = if (hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT)
++                com.shilapi.xcertplay.network.GalaxyHotspotAddressMemory(appContext, hotspotInfo) else null
++            val addressRecovery = addressMemory?.let { memory ->
++                com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery(
++                    hotspotInfo.hostAddresses, memory.preferredFamily(),
++                    sample = {
++                        hotspotInfo.interfaceName?.let { name ->
++                            NetworkInterface.getByName(name)?.inetAddresses?.toList()
++                        }.orEmpty()
++                    },
++                    isCurrent = { !isStaleWirelessRun(generation) },
++                    remember = memory::remember, log = ::debugLog,
++                )
++            }
++            synchronized(wirelessResourceLock) {
++                if (isStaleWirelessRun(generation)) { addressRecovery?.close(); return }
++                hotspotAddressRecovery = addressRecovery
++            }
++            val hostAddress = addressRecovery?.initialAddress ?: hotspotInfo.hostAddress
+                 ?: throw IOException(
+                     "Wireless hotspot did not provide a usable host address",
+                 )
+@@ -1215,6 +1356,7 @@
                  ?: throw IOException("Bluetooth adapter is unavailable")
              if (!adapter.isEnabled) throw IOException("Bluetooth is not enabled")
              val device = selectWirelessBluetoothDevice(adapter)
@@ -2036,7 +2112,17 @@
              val hostBluetoothMac = accessoryBluetoothMac(adapter)
              debugLog(
                  "wireless selected Bluetooth target name=${device.name ?: "unknown"} " +
-@@ -1251,13 +1373,10 @@
+@@ -1241,7 +1383,8 @@
+                         listener = wirelessSessionListener(generation, watchdog),
+                         listenerIdentity = watchdog.listener,
+                         media = media,
+-                        additionalBindAddresses = hotspotInfo.hostAddresses.filter { it != hostAddress },
++                        additionalBindAddresses = (addressRecovery?.publishedAddresses ?: hotspotInfo.hostAddresses)
++                            .filter { it != hostAddress },
+                     )
+                 ) {
+                     CarPlayVpnService.AttachResult.Started -> Unit
+@@ -1251,13 +1394,10 @@
                          throw IOException(result.message)
                  }
              }
@@ -2053,7 +2139,17 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1283,6 +1402,10 @@
+@@ -1272,7 +1412,8 @@
+                 // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
+                 useInterfaceMdns = true,
+                 onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
+-                additionalAddresses = hotspotInfo.hostAddresses.filter { it != hostAddress },
++                additionalAddresses = (addressRecovery?.publishedAddresses ?: hotspotInfo.hostAddresses)
++                    .filter { it != hostAddress },
+             )
+             synchronized(wirelessResourceLock) {
+                 if (isStaleWirelessRun(generation)) return
+@@ -1283,6 +1424,10 @@
              startedBonjour = bonjourClient
              diagnostics.start()
              debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
@@ -2064,7 +2160,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1301,8 +1424,7 @@
+@@ -1301,8 +1446,7 @@
              val bluetoothStarted = System.nanoTime()
              try {
                  connectBluetoothSocket(socket, device.address)
@@ -2074,7 +2170,7 @@
              } catch (error: Throwable) {
                  connectionDiagnostic(
                      "Bluetooth connect failed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
-@@ -1312,7 +1434,6 @@
+@@ -1312,7 +1456,6 @@
                  throw error
              }
              debugLog("wireless RFCOMM connected address=${device.address}")
@@ -2082,7 +2178,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1321,8 +1442,7 @@
+@@ -1321,8 +1464,7 @@
                  try {
                      BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
                  } finally {
@@ -2092,7 +2188,7 @@
                      if (bluetoothSocket === socket) bluetoothSocket = null
                  }
              }
-@@ -1330,7 +1450,7 @@
+@@ -1330,7 +1472,7 @@
                  stream,
                  traceContext = "wireless-rfcomm",
                  onTrace = ::debugLog,
@@ -2101,7 +2197,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) {
-@@ -1343,14 +1463,12 @@
+@@ -1343,14 +1485,12 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
@@ -2119,7 +2215,7 @@
              )
              val endpoint = Iap2WirelessCarPlayEndpoint(
                  ssid = hotspotInfo.ssid,
-@@ -1379,6 +1497,7 @@
+@@ -1379,6 +1519,7 @@
                      "location=false vehicleStatus=false",
              )
              startedHotspot?.validateReady()
@@ -2127,7 +2223,7 @@
              val result = Iap2WirelessControlClient(
                  session = channel,
                  mfi = Iap2MfiAuthenticationClient(mfi),
-@@ -1388,8 +1507,17 @@
+@@ -1388,8 +1529,23 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  keepAliveAfterDeadline = { keepBluetoothControlAlive(generation) },
                  beforeStartSession = { startedHotspot?.validateReady() },
@@ -2143,11 +2239,17 @@
 +                    com.shilapi.xcertplay.transport.WirelessStartSessionRecovery({
 +                        !isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()
 +                    }) else null,
++                startupRefreshEndpoint = addressRecovery?.let { recovery ->
++                    { endpoint ->
++                        val refreshed = recovery.refresh(endpoint)
++                        if (!isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()) refreshed else null
++                    }
++                },
 +                onIncoming = routeFrameHandler(),
                  onProgress = { message ->
                      diagnostics.controlProgress(message)
                      debugLog(message)
-@@ -1458,7 +1586,7 @@
+@@ -1458,7 +1614,7 @@
                  stream,
                  traceContext = "wireless-tunnel",
                  onTrace = ::debugLog,
@@ -2156,7 +2258,7 @@
              )
          } catch (error: Throwable) {
              debugLog("Could not open the tunneled iAP2 link", error)
-@@ -1466,11 +1594,8 @@
+@@ -1466,11 +1622,8 @@
          }
          wirelessTunnelChannel = channel
          val generation = wirelessGeneration.get()
@@ -2170,7 +2272,7 @@
          return try {
              tunnelExecutor.execute {
                  try {
-@@ -1486,7 +1611,7 @@
+@@ -1486,7 +1639,7 @@
                          onReady = {
                              onWirelessTunnelReady(generation)
                          },
@@ -2179,7 +2281,7 @@
                          onProgress = { message -> debugLog("iAP tunnel $message") },
                      )
                      if (closed || generation != wirelessGeneration.get()) return@execute
-@@ -1524,7 +1649,10 @@
+@@ -1524,7 +1677,10 @@
  
              override fun onTcpAccepted(event: AirPlayTcpAccepted) {
                  if (isStaleWirelessRun(generation)) return
@@ -2191,7 +2293,19 @@
              }
  
              override fun onTransportError(message: String) {
-@@ -1540,6 +1668,7 @@
+@@ -1534,12 +1690,18 @@
+             }
+ 
+             override fun onSessionActive(session: AirPlaySession) {
+-                if (isStaleWirelessRun(generation) || !watchdog.sessionEstablished()) return
++                synchronized(wirelessResourceLock) {
++                    if (isStaleWirelessRun(generation) || !watchdog.sessionEstablished()) return
++                    wirelessAirPlayEndpoint?.let { endpoint ->
++                        wirelessAirPlayEndpoint = hotspotAddressRecovery?.forSession(endpoint, session.localAddress) ?: endpoint
++                    }
++                }
+                 wirelessDiagnostics?.let {
+                     it.sessionActive()
                      it.close()
                  }
                  wirelessConnectionProof.activate(generation, session)
@@ -2199,7 +2313,7 @@
                  // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
                  // the Bluetooth bootstrap after the tunneled iAP2 channel is ready.
                  sessionListener.onSessionActive(session)
-@@ -1555,6 +1684,7 @@
+@@ -1555,13 +1717,17 @@
                  if (isStaleWirelessRun(generation) || activeSession !== session) return
                  if (!watchdog.sessionEstablished()) return
                  wirelessConnectionProof.rendered(generation, session)
@@ -2207,7 +2321,18 @@
                  val firstFrame = synchronized(this) {
                      if (reportedFrameSession === session) false else {
                          reportedFrameSession = session
-@@ -1606,6 +1736,7 @@
+                         true
+                     }
+                 }
+-                if (firstFrame) uiListener?.onVideoFrameRendered(session)
++                if (firstFrame) {
++                    hotspotAddressRecovery?.rendered(session.localAddress)
++                    uiListener?.onVideoFrameRendered(session)
++                }
+             }
+ 
+             override fun onDebugLog(message: String) {
+@@ -1606,6 +1772,7 @@
                          wirelessFailureReported.get() || !wirelessTunnelReady.get()) return@Thread
                      debugLog("wireless handoff ready; closing Bluetooth bootstrap transport")
                      closeBluetoothBootstrapTransport()
@@ -2215,7 +2340,7 @@
                      onStatus(CarPlayStatus.WirelessActive, generation)
                  }
              },
-@@ -1657,9 +1788,6 @@
+@@ -1657,9 +1824,6 @@
          if (activeSession != null && wirelessConnectionProof.hasRenderedFrame(generation)) {
              if (!wirelessActiveReported.compareAndSet(false, true)) return@synchronized
              wirelessHandoffFellBack.set(true)
@@ -2225,7 +2350,7 @@
              debugLog("wireless handoff fallback after rendered video; tunnel iAP2 unavailable; " +
                  "preserving AirPlay and keeping the Bluetooth bootstrap for iAP2 control")
              onStatus(CarPlayStatus.WirelessActiveFallback, generation)
-@@ -1683,146 +1811,254 @@
+@@ -1683,146 +1847,254 @@
          if (activeSocket != null) closeBestEffort("wireless Bluetooth socket") { activeSocket.close() }
      }
  
@@ -2564,7 +2689,7 @@
          }
      }
  
-@@ -1842,28 +2078,47 @@
+@@ -1842,28 +2114,47 @@
          )
      }
  
@@ -2622,7 +2747,7 @@
          val configuration = IphoneCarPlayConfiguration.find(device)
              ?: throw IphoneUsbException.Protocol(
                  "iPhone exposes no CarPlay configuration for NCM",
-@@ -1878,16 +2133,31 @@
+@@ -1878,16 +2169,31 @@
          )
          val connection = requireUsbManager().openDevice(device)
              ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
@@ -2659,7 +2784,7 @@
              debugLog("wired USBMUX host opened")
              onStatus(CarPlayStatus.Pairing)
              val pairingClient = LockdownPairingClient(mux)
-@@ -1902,38 +2172,6 @@
+@@ -1902,38 +2208,6 @@
              )
              onStatus(CarPlayStatus.ConnectingControl)
              val carKitClient = LockdownCarKitClient(mux)
@@ -2698,7 +2823,7 @@
              val carkit = try {
                  carKitClient.open(pairRecord, config.label)
              } catch (error: Throwable) {
-@@ -1960,7 +2198,7 @@
+@@ -1960,7 +2234,7 @@
                      var result = ConnectionIoDiagnostics.Result.FAILED
                      try {
                          debugLog("wired link TX begin ${wireSummary(data)}")
@@ -2707,7 +2832,7 @@
                          for (offset in data.indices step 256) {
                              carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
                          }
-@@ -1994,9 +2232,11 @@
+@@ -1994,9 +2268,11 @@
                  tracedCarkit,
                  traceContext = "wired",
                  onTrace = ::debugLog,
@@ -2721,7 +2846,7 @@
              debugLog("wired iAP2 CSM channel opened")
  
              val ncmHostMac = ncm.hostMac ?: config.hostMac
-@@ -2015,7 +2255,7 @@
+@@ -2015,7 +2291,7 @@
                  ?: throw IphoneUsbException.DeviceUnavailable("MFi coprocessor client is unavailable")
              val endpoint = Iap2WiredCarPlayEndpoint(
                  ipv6Addresses = listOf(config.linkLocal),
@@ -2730,7 +2855,7 @@
                  publicKey = identity.publicKeyHex,
                  sourceVersion = airPlayConfig.sourceVersion,
                  deviceIdentifier = ncmHostMac.macString(),
-@@ -2033,7 +2273,7 @@
+@@ -2033,7 +2309,7 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  locationProvider = locationProvider,
                  vehicleStatusProvider = vehicleStatusProvider,
@@ -2739,7 +2864,7 @@
                  onProgress = { message -> debugLog("wired $message") },
              )
              onStatus(
-@@ -2045,10 +2285,11 @@
+@@ -2045,10 +2321,11 @@
              )
          } catch (error: Throwable) {
              debugLog("wired bring-up failed", error)
@@ -2753,7 +2878,7 @@
          }
      }
  
-@@ -2108,13 +2349,8 @@
+@@ -2108,13 +2385,8 @@
          }
          val manager: WirelessHotspotManager = when (hotspotMode) {
              WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
@@ -2769,7 +2894,7 @@
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
                  onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-@@ -2165,6 +2401,7 @@
+@@ -2165,6 +2437,7 @@
      // Kept across reconnects within this controller: resuming between attempts would start a scan.
      private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
          if (closed || !WifiScanPause.eligible(backend)) return@synchronized
@@ -2777,7 +2902,7 @@
          (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
      }
  
-@@ -2253,7 +2490,6 @@
+@@ -2253,7 +2526,6 @@
          }
      }
  
@@ -2785,7 +2910,7 @@
      private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
          try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-@@ -2262,20 +2498,11 @@
+@@ -2262,20 +2534,11 @@
                  connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
                  return
              }
@@ -2808,8 +2933,12 @@
                      "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
              )
          } catch (error: RuntimeException) {
-@@ -2291,6 +2518,8 @@
+@@ -2289,8 +2552,12 @@
+             val owner = firstTcpWatchdog?.listener
+             firstTcpWatchdog?.terminate()
              val diagnostics = wirelessDiagnostics
++            hotspotAddressRecovery?.close()
++            hotspotAddressRecovery = null
              wirelessDiagnostics = null
              diagnostics?.close()
 +            audioConnectionListener?.invoke(false)
@@ -2817,7 +2946,7 @@
              wirelessConnectionProof.clear()
              media.setIapTunnelHandler(null)
              val activeTunnel = wirelessTunnelChannel
-@@ -2301,7 +2530,10 @@
+@@ -2301,7 +2568,10 @@
  
              val activeBonjour = bonjour
              bonjour = null
@@ -2829,7 +2958,7 @@
  
              val activeHotspot = hotspot
              hotspot = null
-@@ -2399,6 +2631,7 @@
+@@ -2399,6 +2669,7 @@
              close()
              completed = true
          } catch (error: Throwable) {
@@ -2837,7 +2966,7 @@
              debugLog("$name teardown failed", error)
          } finally {
              connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
-@@ -2408,8 +2641,6 @@
+@@ -2408,8 +2679,6 @@
      private fun controlLoopTimeoutMillis(): Long = when {
          config.transport == CarPlayTransport.WIRED -> Iap2WiredControlClient.NO_TIMEOUT_MILLIS
          config.locationReportingEnabled -> LOCATION_CONTROL_LOOP_TIMEOUT_MILLIS
@@ -2846,7 +2975,7 @@
          else -> CONTROL_LOOP_TIMEOUT_MILLIS
      }
  
-@@ -2498,7 +2729,7 @@
+@@ -2498,7 +2767,7 @@
      }
  
      private fun closeReceivers() {
@@ -2855,7 +2984,7 @@
              try {
                  it.close()
              } catch (_: Exception) {
-@@ -2507,6 +2738,7 @@
+@@ -2507,6 +2776,7 @@
          }
          permissionCloseable = null
          attachCloseable = null
@@ -2863,7 +2992,7 @@
          ch341PermissionCloseable = null
      }
  
-@@ -2524,6 +2756,9 @@
+@@ -2524,6 +2794,9 @@
          }
      }
  
@@ -2873,7 +3002,7 @@
      private fun requireUsbManager(): UsbManager =
          usbManager ?: throw IOException("USB service is unavailable on this device")
  
-@@ -2536,7 +2771,7 @@
+@@ -2536,7 +2809,7 @@
  
      private fun fail(error: Throwable, generation: Int? = null) {
          synchronized(wirelessResourceLock) {
@@ -2882,7 +3011,7 @@
              val wireless = config.transport == CarPlayTransport.WIRELESS
              if (wireless) {
                  if (!wirelessFailureReported.compareAndSet(false, true)) return
-@@ -2561,11 +2796,11 @@
+@@ -2561,11 +2834,11 @@
  
      private fun connectionDiagnostic(message: String) {
          try {
@@ -2897,7 +3026,7 @@
          }
      }
  
-@@ -2589,9 +2824,23 @@
+@@ -2589,9 +2862,23 @@
      private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
          if (closed) return
          mainHandler.post {
@@ -2922,7 +3051,7 @@
                  uiListener?.onDebugLog(status.debugLogMessage())
                  uiStatusReporter?.invoke(status)
              }
-@@ -2618,6 +2867,12 @@
+@@ -2618,6 +2905,12 @@
              "STEP bt/rfcomm: connecting to the iPhone iAP2 RFCOMM service"
          CarPlayStatus.RunningWireless ->
              "STEP iap2/wireless: Bluetooth control loop running"
@@ -3271,21 +3400,25 @@
              isDaemon = true
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2WirelessControlClient.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2WirelessControlClient.kt
-@@ -34,6 +34,7 @@
+@@ -34,6 +34,8 @@
          // The caller must prove that the current CarPlay session is usable before keeping it alive.
          keepAliveAfterDeadline: () -> Boolean = { false },
          onProgress: (String) -> Unit = {},
 +        startupRecovery: WirelessStartSessionRecovery? = null,
++        startupRefreshEndpoint: ((Iap2WirelessCarPlayEndpoint) -> Iap2WirelessCarPlayEndpoint?)? = null,
      ): Iap2WirelessControlResult {
          require(identification.wireless != null) {
              "Wireless control requires an Iap2IdentificationConfig with wireless transport"
-@@ -73,6 +74,14 @@
+@@ -73,6 +75,17 @@
          var postTransportWiFiConfigurationsSent = 0
          var transportNotificationSeen = false
          var wirelessCarPlayAvailableSeen = false
-+        fun startCarPlay() {
++        var currentEndpoint = endpoint
++        fun startCarPlay(startEndpoint: Iap2WirelessCarPlayEndpoint = currentEndpoint, refresh: Boolean = false) {
 +            beforeStartSession()
-+            sendStartSession(endpoint, ::sendControl, onStartSessionSent)
++            if (refresh && startupRecovery?.canSend() != true) return
++            sendStartSession(startEndpoint, ::sendControl, onStartSessionSent)
++            currentEndpoint = startEndpoint
 +            startupRecovery?.startSessionSent()
 +            stage = later(stage, Iap2WirelessControlStage.CARPLAY_START_SENT)
 +            carPlayStartSessionsSent++
@@ -3294,21 +3427,24 @@
          val location = Iap2LocationReporter(locationProvider, onProgress)
          val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
          try {
-@@ -92,7 +101,12 @@
+@@ -92,7 +105,15 @@
                  }
                  location.tick(::sendControl)
                  vehicleStatus.tick(::sendControl)
 -                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
 +                startupRecovery?.retryIfDue {
++                    val refreshed = if (startupRefreshEndpoint == null) currentEndpoint
++                        else startupRefreshEndpoint(currentEndpoint) ?: return@retryIfDue
++                    if (!startupRecovery.canSend()) return@retryIfDue
 +                    onProgress("iap2 startup refresh attempt=1 reason=no-first-tcp")
-+                    startCarPlay()
++                    startCarPlay(refreshed, refresh = true)
 +                }
 +                val controlPollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
 +                val pollTimeout = startupRecovery?.pollTimeout(controlPollTimeout) ?: controlPollTimeout
                  val incoming = session.recv(pollTimeout)
                  if (incoming == null) {
                      if (session.isClosed) {
-@@ -163,16 +177,13 @@
+@@ -163,16 +184,13 @@
                      CARPLAY_AVAILABILITY -> {
                          onProgress("iap2 rx=0x4300 carplay-availability")
                          onProgress(carPlayAvailabilityDiagnostic(incoming))
@@ -3327,7 +3463,7 @@
                          onProgress("iap2 rx=0x4e0d wireless-carplay-update available=$available")
                      }
  
-@@ -242,7 +253,7 @@
+@@ -242,7 +260,7 @@
          private const val MAX_PRE_TRANSPORT_WIFI_CONFIGURATION_SENDS = 5
          private const val MAX_POST_TRANSPORT_WIFI_CONFIGURATION_SENDS = 2
  
@@ -3336,6 +3472,18 @@
          internal fun carPlayAvailabilityDiagnostic(frame: Iap2Frame): String = try {
              val value = Iap2CarPlayMessages.availability(frame)
              "iap2 availability wired=${value.wired?.available ?: "unknown"} " +
+@@ -310,6 +328,11 @@
+     val ipAddresses: List<String> = ipAddresses.toList()
+     val accessPointBssid: ByteArray? = accessPointBssid?.copyOf()
+ 
++    /** 地址恢复保留热点、认证身份、端口与 AP 提示，不重新派生配对身份。 */
++    fun withIpAddresses(addresses: List<String>): Iap2WirelessCarPlayEndpoint =
++        Iap2WirelessCarPlayEndpoint(ssid, passphrase, channel, security, addresses, airPlayPort,
++            deviceIdentifier, publicKey, sourceVersion, accessPointBssid)
++
+     init {
+         require(accessPointBssid == null || accessPointBssid.size == 6) { "AP address must contain six bytes" }
+         require(ssid.isNotBlank()) { "ssid is required and must not be blank" }
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/IphoneUsbHost.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/IphoneUsbHost.kt
 @@ -13,6 +13,7 @@

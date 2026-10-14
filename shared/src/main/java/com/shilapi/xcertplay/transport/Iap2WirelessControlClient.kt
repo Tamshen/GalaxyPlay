@@ -35,6 +35,7 @@ class Iap2WirelessControlClient(
         keepAliveAfterDeadline: () -> Boolean = { false },
         onProgress: (String) -> Unit = {},
         startupRecovery: WirelessStartSessionRecovery? = null,
+        startupRefreshEndpoint: ((Iap2WirelessCarPlayEndpoint) -> Iap2WirelessCarPlayEndpoint?)? = null,
     ): Iap2WirelessControlResult {
         require(identification.wireless != null) {
             "Wireless control requires an Iap2IdentificationConfig with wireless transport"
@@ -74,9 +75,12 @@ class Iap2WirelessControlClient(
         var postTransportWiFiConfigurationsSent = 0
         var transportNotificationSeen = false
         var wirelessCarPlayAvailableSeen = false
-        fun startCarPlay() {
+        var currentEndpoint = endpoint
+        fun startCarPlay(startEndpoint: Iap2WirelessCarPlayEndpoint = currentEndpoint, refresh: Boolean = false) {
             beforeStartSession()
-            sendStartSession(endpoint, ::sendControl, onStartSessionSent)
+            if (refresh && startupRecovery?.canSend() != true) return
+            sendStartSession(startEndpoint, ::sendControl, onStartSessionSent)
+            currentEndpoint = startEndpoint
             startupRecovery?.startSessionSent()
             stage = later(stage, Iap2WirelessControlStage.CARPLAY_START_SENT)
             carPlayStartSessionsSent++
@@ -102,8 +106,11 @@ class Iap2WirelessControlClient(
                 location.tick(::sendControl)
                 vehicleStatus.tick(::sendControl)
                 startupRecovery?.retryIfDue {
+                    val refreshed = if (startupRefreshEndpoint == null) currentEndpoint
+                        else startupRefreshEndpoint(currentEndpoint) ?: return@retryIfDue
+                    if (!startupRecovery.canSend()) return@retryIfDue
                     onProgress("iap2 startup refresh attempt=1 reason=no-first-tcp")
-                    startCarPlay()
+                    startCarPlay(refreshed, refresh = true)
                 }
                 val controlPollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
                 val pollTimeout = startupRecovery?.pollTimeout(controlPollTimeout) ?: controlPollTimeout
@@ -320,6 +327,11 @@ class Iap2WirelessCarPlayEndpoint(
 ) {
     val ipAddresses: List<String> = ipAddresses.toList()
     val accessPointBssid: ByteArray? = accessPointBssid?.copyOf()
+
+    /** 地址恢复保留热点、认证身份、端口与 AP 提示，不重新派生配对身份。 */
+    fun withIpAddresses(addresses: List<String>): Iap2WirelessCarPlayEndpoint =
+        Iap2WirelessCarPlayEndpoint(ssid, passphrase, channel, security, addresses, airPlayPort,
+            deviceIdentifier, publicKey, sourceVersion, accessPointBssid)
 
     init {
         require(accessPointBssid == null || accessPointBssid.size == 6) { "AP address must contain six bytes" }

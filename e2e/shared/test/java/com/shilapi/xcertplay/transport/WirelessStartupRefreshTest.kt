@@ -17,7 +17,9 @@ class WirelessStartupRefreshTest {
         wireless = Iap2WirelessIdentification("02:11:22:33:44:55", "test-ap"))
 
     private fun runLoop(enabled: Boolean, tcpArrives: Boolean = false, withdrawn: Boolean = false,
-                        validationFails: Boolean = false): List<Iap2Frame> {
+                        validationFails: Boolean = false, invalidateAtRefresh: Boolean = false,
+                        tcpDuringValidation: Boolean = false, availabilityAfterRefresh: Boolean = false,
+                        refreshEndpoint: ((Iap2WirelessCarPlayEndpoint) -> Iap2WirelessCarPlayEndpoint?)? = null): List<Iap2Frame> {
         val session = mock(Iap2Session::class.java)
         val mfi = mock(Iap2MfiAuthenticationClient::class.java)
         val sent = mutableListOf<Iap2Frame>()
@@ -39,6 +41,8 @@ class WirelessStartupRefreshTest {
                     if (withdrawn) Iap2Frame(0x4e0d,
                         Iap2ParameterList.of(Iap2Parameter(0, byteArrayOf(0))).encode()) else null
                 }
+                2 -> if (availabilityAfterRefresh) Iap2Frame(0x4300, byteArrayOf())
+                    else { now += it.getArgument<Long>(0); closed = true; null }
                 else -> { now += it.getArgument<Long>(0); closed = true; null }
             }
         }
@@ -47,8 +51,12 @@ class WirelessStartupRefreshTest {
                 Iap2WirelessControlClient(session, mfi).run(identification, endpoint,
                     startupRecovery = recovery, beforeStartSession = {
                         validations++
+                        if (tcpDuringValidation && validations > 1) waiting = false
                         if (validationFails && validations > 1) throw java.io.IOException("interface changed")
-                    })
+                    }, startupRefreshEndpoint = if (invalidateAtRefresh || refreshEndpoint != null) { value ->
+                        if (invalidateAtRefresh) waiting = false
+                        if (refreshEndpoint == null) value else refreshEndpoint(value)
+                    } else null)
             }
             if (validationFails) assertThrows(java.io.IOException::class.java) { operation() }
             else operation()
@@ -71,5 +79,43 @@ class WirelessStartupRefreshTest {
 
     @Test fun changedHotspotIsRevalidatedBeforeRefreshAndNoStaleRequestIsWritten() {
         assertEquals(1, runLoop(true, validationFails = true).count { it.messageId == 0x4301 })
+    }
+
+    @Test fun dualStackRecoveryWritesTheOtherEndpointOnTheSameAuthenticatedChannel() {
+        val ipv4 = java.net.InetAddress.getByName("192.0.2.1")
+        val ipv6 = java.net.Inet6Address.getByAddress(null,
+            java.net.InetAddress.getByName("fe80::1234").address, 22)
+        val addresses = listOf(ipv4, ipv6)
+        val policy = com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery(
+            addresses, null, { addresses }, { true }, {})
+        val sent = runLoop(true, refreshEndpoint = policy::refresh)
+        val starts = sent.filter { it.messageId == 0x4301 }
+        assertEquals(2, starts.size)
+        assertArrayEquals(Iap2WirelessControlClient.carPlayStartSession(endpoint).encodedFrame(), starts[0].encodedFrame())
+        val alternate = endpoint.withIpAddresses(listOf(ipv6.hostAddress!!.substringBefore('%')))
+        assertArrayEquals(Iap2WirelessControlClient.carPlayStartSession(alternate).encodedFrame(), starts[1].encodedFrame())
+        assertFalse(sent.any { it.messageId == 0x5703 })
+    }
+
+    @Test fun firstTcpDuringCandidateLookupOrValidationRejectsTheRefreshWrite() {
+        for (sent in listOf(runLoop(true, invalidateAtRefresh = true),
+            runLoop(true, tcpDuringValidation = true)))
+            assertEquals(1, sent.count { it.messageId == 0x4301 })
+    }
+
+    @Test fun missingCandidateConsumesTheSingleRefreshBudgetWithoutWriting() {
+        var requests = 0
+        val sent = runLoop(true, refreshEndpoint = { requests++; null })
+        assertEquals(1, requests)
+        assertEquals(1, sent.count { it.messageId == 0x4301 })
+    }
+
+    @Test fun laterPhoneAvailabilityDoesNotRevertTheRecoveredEndpoint() {
+        val sent = runLoop(true, availabilityAfterRefresh = true,
+            refreshEndpoint = { it.withIpAddresses(listOf("fe80::1234")) })
+        val starts = sent.filter { it.messageId == 0x4301 }
+        assertEquals(3, starts.size)
+        assertArrayEquals(starts[1].encodedFrame(), starts[2].encodedFrame())
+        assertFalse(starts[0].encodedFrame().contentEquals(starts[2].encodedFrame()))
     }
 }

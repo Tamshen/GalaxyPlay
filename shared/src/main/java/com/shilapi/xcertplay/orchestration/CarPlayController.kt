@@ -94,6 +94,7 @@ import com.shilapi.xcertplay.transport.NcmUsbBridge
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.Inet6Address
 import java.util.Locale
 import java.util.UUID
@@ -280,6 +281,7 @@ class CarPlayController(
     private val wirelessResourceLock = Any()
     private val wirelessFailureReported = AtomicBoolean(false)
     @Volatile private var firstTcpWatchdog: FirstTcpWatchdog? = null
+    @Volatile private var hotspotAddressRecovery: com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery? = null
     private val startupTimer = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
         Thread(task, "diplay-first-tcp-timeout").apply { isDaemon = true }
     }.apply { removeOnCancelPolicy = true }
@@ -1283,7 +1285,25 @@ class CarPlayController(
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
             }
-            val hostAddress = hotspotInfo.hostAddress
+            val addressMemory = if (hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT)
+                com.shilapi.xcertplay.network.GalaxyHotspotAddressMemory(appContext, hotspotInfo) else null
+            val addressRecovery = addressMemory?.let { memory ->
+                com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery(
+                    hotspotInfo.hostAddresses, memory.preferredFamily(),
+                    sample = {
+                        hotspotInfo.interfaceName?.let { name ->
+                            NetworkInterface.getByName(name)?.inetAddresses?.toList()
+                        }.orEmpty()
+                    },
+                    isCurrent = { !isStaleWirelessRun(generation) },
+                    remember = memory::remember, log = ::debugLog,
+                )
+            }
+            synchronized(wirelessResourceLock) {
+                if (isStaleWirelessRun(generation)) { addressRecovery?.close(); return }
+                hotspotAddressRecovery = addressRecovery
+            }
+            val hostAddress = addressRecovery?.initialAddress ?: hotspotInfo.hostAddress
                 ?: throw IOException(
                     "Wireless hotspot did not provide a usable host address",
                 )
@@ -1363,7 +1383,8 @@ class CarPlayController(
                         listener = wirelessSessionListener(generation, watchdog),
                         listenerIdentity = watchdog.listener,
                         media = media,
-                        additionalBindAddresses = hotspotInfo.hostAddresses.filter { it != hostAddress },
+                        additionalBindAddresses = (addressRecovery?.publishedAddresses ?: hotspotInfo.hostAddresses)
+                            .filter { it != hostAddress },
                     )
                 ) {
                     CarPlayVpnService.AttachResult.Started -> Unit
@@ -1391,7 +1412,8 @@ class CarPlayController(
                 // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
                 useInterfaceMdns = true,
                 onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
-                additionalAddresses = hotspotInfo.hostAddresses.filter { it != hostAddress },
+                additionalAddresses = (addressRecovery?.publishedAddresses ?: hotspotInfo.hostAddresses)
+                    .filter { it != hostAddress },
             )
             synchronized(wirelessResourceLock) {
                 if (isStaleWirelessRun(generation)) return
@@ -1517,6 +1539,12 @@ class CarPlayController(
                     com.shilapi.xcertplay.transport.WirelessStartSessionRecovery({
                         !isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()
                     }) else null,
+                startupRefreshEndpoint = addressRecovery?.let { recovery ->
+                    { endpoint ->
+                        val refreshed = recovery.refresh(endpoint)
+                        if (!isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()) refreshed else null
+                    }
+                },
                 onIncoming = routeFrameHandler(),
                 onProgress = { message ->
                     diagnostics.controlProgress(message)
@@ -1662,7 +1690,12 @@ class CarPlayController(
             }
 
             override fun onSessionActive(session: AirPlaySession) {
-                if (isStaleWirelessRun(generation) || !watchdog.sessionEstablished()) return
+                synchronized(wirelessResourceLock) {
+                    if (isStaleWirelessRun(generation) || !watchdog.sessionEstablished()) return
+                    wirelessAirPlayEndpoint?.let { endpoint ->
+                        wirelessAirPlayEndpoint = hotspotAddressRecovery?.forSession(endpoint, session.localAddress) ?: endpoint
+                    }
+                }
                 wirelessDiagnostics?.let {
                     it.sessionActive()
                     it.close()
@@ -1691,7 +1724,10 @@ class CarPlayController(
                         true
                     }
                 }
-                if (firstFrame) uiListener?.onVideoFrameRendered(session)
+                if (firstFrame) {
+                    hotspotAddressRecovery?.rendered(session.localAddress)
+                    uiListener?.onVideoFrameRendered(session)
+                }
             }
 
             override fun onDebugLog(message: String) {
@@ -2516,6 +2552,8 @@ class CarPlayController(
             val owner = firstTcpWatchdog?.listener
             firstTcpWatchdog?.terminate()
             val diagnostics = wirelessDiagnostics
+            hotspotAddressRecovery?.close()
+            hotspotAddressRecovery = null
             wirelessDiagnostics = null
             diagnostics?.close()
             audioConnectionListener?.invoke(false)
