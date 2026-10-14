@@ -26,6 +26,8 @@
 
 `GalaxyLogRetentionTest` 验证总日志 5 MB、持续写入／轮转、活动文件保留、旧异常大文件尾部及符号链接隔离；`GalaxyStorageUsageTest` 验证数据分类、符号链接不重复计量、上传／封面／下载保护、孤立文件清理及上传临时预算失败不删本地日志。`python3 e2e/device/storage_usage_smoke.py` 仅允许 AVD，备份日志目录后注入超额文件和闲置临时文件，验证启动自动清理、最新活动文件保留、应用设置各项占用与真实进程内存；结束恢复原日志目录，之后仍受新预算管理。`python3 e2e/device/full_log_upload_smoke.py` 仅向本机 HTTP 接口上传 6200 条合成日志，第三批失败后替换源文件，核对原快照续传／正文不变／全部接收／成功清理；结束恢复原日志及上传配置、历史。
 
+`GalaxyP2pRegionTest` 检查大陆车载排除室内频段、自动 149 候选、其他地区保守 2.4 GHz、历史信道与同射频共存、手动越界阻止请求和系统拒绝回退；地区限制不使用不固定频率的系统默认建组。`WifiP2pGroupManagerTest` 在 API 29／30 覆盖实际组回读越界后的释放及非法手动设置不干扰既有组。`GalaxyWirelessSettingsTest` 核对地区确认／取消、原频道保留、候选过滤及地区变化使旧频道窗口失效；`GalaxyConfigurationEvidenceTest` 核对地区枚举保留与敏感值继续脱敏。
+
 ## 在线更新验收
 
 `GalaxyUpdateManifestTest`、`GalaxyUpdateTransferTest`、`GalaxyUpdateApkTest`、`GalaxyAppUpdateTest` 、`GalaxyUpdateInstallerTest`、`GalaxyUpdateCacheTest` 和 `GalaxyUpdateLayoutTest` 覆盖直链／分片、相对地址、版本号、元数据预算、失败／取消、旧弹窗通知隔离、校验和、签名轮换及回退拒绝、系统安装授权、进程重启后重新校验恢复、缓存过期／升级清理、无记录时过期孤立包清理、活动下载及系统安装器文件保护／返回解锁、拒绝越界符号链接清理、重复安装请求拒绝、长说明滚动／横竖屏大字号与最大 480 dpi 界面尺寸固定按钮及仅限私有更新缓存的读取授权；Activity Result 测试使用独立注册表，不启动真实系统页面。
