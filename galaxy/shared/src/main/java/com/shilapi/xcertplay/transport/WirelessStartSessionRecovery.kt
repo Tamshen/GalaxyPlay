@@ -8,6 +8,7 @@ class WirelessStartSessionRecovery(
 ) {
     private var firstStartNanos: Long? = null
     private var consumed = false
+    @Volatile private var cancelled = false
 
     init { require(delayMillis in 1..30_000) }
 
@@ -16,7 +17,10 @@ class WirelessStartSessionRecovery(
         if (firstStartNanos == null) firstStartNanos = nowNanos() else cancel()
     }
 
-    fun cancel() { consumed = true }
+    fun cancel() { consumed = true; cancelled = true }
+
+    // 候选地址查询可能让出执行权；发送前再次检查 TCP、取消与会话代次。
+    fun canSend(): Boolean = !cancelled && !Thread.currentThread().isInterrupted && stillWaiting()
 
     fun pollTimeout(remainingMillis: Long): Long {
         if (!pending()) return remainingMillis
@@ -33,7 +37,7 @@ class WirelessStartSessionRecovery(
 
     private fun pending(): Boolean {
         if (consumed || firstStartNanos == null) return false
-        if (Thread.currentThread().isInterrupted || !stillWaiting()) { cancel(); return false }
+        if (!canSend()) { cancel(); return false }
         return true
     }
 

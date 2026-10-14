@@ -16,7 +16,7 @@
 
 ## 原生热点连接恢复
 
-`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 覆盖原生热点首个 TCP 尚未到达时的五秒单次同链路恢复、相同 StartSession、不额外发送 Wi-Fi 配置、原总期限不延长、TCP／取消／过期代次／撤回停止、显式重复请求消耗预算与接口变化阻止旧请求。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 覆盖五步中英文、认证不报网络成功、TCP／协议超时区别、失败步骤和等待页的下一轮次数／秒数不被旧提示转换覆盖；common 测试需显式启用 mobile 的产品 UI 配置。以上为软件回归，不建立真实手机链路。
+`GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
 
 `P2pCredentialsTest`、`WifiP2pGroupManagerTest` 覆盖明确请求的密码与系统回读一致、外层引号兼容、默认组缺凭据拒绝、真实单播 AP 提示、发送前配置变化拒绝；日志仅保留匹配结果。`ConnectionCancellationTest` 在 Android 10／11 验证应用首页先于旧宿主关闭、重复取消幂等、延迟释放不再跳转、旧宿主不停止新会话。`RemoteLogEvidenceRetentionTest` 覆盖同事件跨来源合并、真实重复故障保留、事件时间排序、媒体压力下阶段／错误证据与 1 MiB JSON 预算、会话关闭后释放证据仍落盘。
 

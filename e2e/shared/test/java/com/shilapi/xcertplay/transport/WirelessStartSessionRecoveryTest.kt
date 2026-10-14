@@ -65,4 +65,14 @@ class WirelessStartSessionRecoveryTest {
         }
         assertFalse(recovery.retryIfDue { fail("third request") })
     }
+
+    @Test fun claimingTheBudgetDoesNotMaskExplicitCancellationBeforeTheWrite() {
+        recovery.startSessionSent(); now = 5_000
+        assertTrue(recovery.retryIfDue {
+            assertTrue(recovery.canSend())
+            recovery.cancel()
+            assertFalse(recovery.canSend())
+        })
+        assertFalse(recovery.retryIfDue { fail("cancelled retry") })
+    }
 }
