@@ -15,15 +15,17 @@ internal class GalaxyWirelessRecovery {
         data object Ignore : Decision
     }
 
-    fun failed(generation: Int, failure: WirelessStartupFailure): Decision {
+    fun failed(generation: Int, failure: WirelessStartupFailure?): Decision {
         if (stopped || generation <= failedGeneration) return Decision.Ignore
         failedGeneration = generation
         val delay = if (failure == WirelessStartupFailure.HOTSPOT_CONFIGURATION) null else budget.nextDelayMillis()
         if (delay == null) { stopped = true; return Decision.Stop }
-        return Decision.Retry(delay)
+        // 无线重试最多五次；蓝牙或会话中断也进入同一预算，避免无分类错误无限重连。
+        return Decision.Retry((delay / 2).coerceAtMost(5_000L))
     }
     fun firstFrame(session: Any, nowMillis: Long) = budget.firstFrame(session, nowMillis)
     fun stable(session: Any, nowMillis: Long) = budget.resetIfStable(session, nowMillis)
     fun disconnected() = budget.disconnected()
+    fun stop() { stopped = true; budget.disconnected() }
     fun manualRetry() { budget.manualRetry(); failedGeneration = -1; stopped = false }
 }

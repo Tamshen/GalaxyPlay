@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.transport
 
-/** 原生热点首次请求无响应时复用蓝牙控制链路；不延长总期限，不新增线程。 */
+/** 首次请求无响应时按宿主授权复用蓝牙控制链路；不延长总期限，不新增线程。 */
 class WirelessStartSessionRecovery(
     private val stillWaiting: () -> Boolean,
     private val delayMillis: Long = 5_000,

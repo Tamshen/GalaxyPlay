@@ -1002,6 +1002,7 @@ class GalaxySettingsActivity : ComponentActivity() {
 
     private fun stopFromHome() {
         fun stop() {
+            L7DebugLog.record("CONNECTION_ACTION action=MANUAL_DISCONNECT active=${CarPlayBackgroundSession.active}")
             disconnectButton?.isEnabled = false
             CarPlayBackgroundSession.stop { runOnUiThread { if (!isDestroyed) refreshStatus() } }
         }

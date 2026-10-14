@@ -65,6 +65,8 @@ e2e/
 
 [L7UiDensityTest](common/test/java/com/shilapi/xcertplay/L7UiDensityTest.kt) 检查默认中档、自定义保存、非法输入保护、窗口 dp 换算与系统/投屏配置隔离。
 
+无线扫描／快速重试使用 `GalaxyWirelessStartupTuningTest`、`FirstTcpWatchdogTest`、`WirelessStartupRefreshTest`、`GalaxyWirelessRecoveryTest`、`WirelessStartupRecoveryTest` 和 `ConnectionCancellationTest`：检查 Direct 的 45 秒首 TCP 窗口、模拟手机 35 秒才接入、同链路五秒单次补发且不重发凭据／延长期限，1／2／4／5／5 秒有限退避、蓝牙未分类错误进入同一预算、停止后的迟到错误不改写失败反馈。`HostConnectionSettingsRefreshTest` 核对连接方式切换后策略进入下一次真实运行配置；有线与其他后端保留原约束。替身计时及 Docker 回环不代表真实手机扫描或连接提速已经通过。
+
 [L7AgreementTest](common/test/java/com/shilapi/xcertplay/L7AgreementTest.kt) 检查默认未同意、正文摘要失配需重签、撤回保留连接配置、完整协议资源、文末等待 4999/5000 毫秒边界、主动勾选、停止期间禁止确认、后台返回重计时及布局/主题刷新保持倒计时。
 
 设置双栏检查：`python3 e2e/device/l7_floating_navigation_smoke.py --adb ../tools/scripts/adb.sh --settings-only --output-dir build/previews/settings-columns`。仅在已同意协议的 AVD 运行，检查右侧正文滚动、左栏及 Header 固定、昼夜选中态、两级返回、首页悬浮菜单恢复和按钮坐标一致；不建立连接，结束留在设置。

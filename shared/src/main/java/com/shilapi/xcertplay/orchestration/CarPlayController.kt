@@ -1271,6 +1271,7 @@ class CarPlayController(
                     }
                 },
                 log = { debugLog("wireless startup generation=$generation listener=${listenerIdentity.id} $it") },
+                timeoutMillis = config.wirelessFirstTcpTimeoutMillis,
                 protocolTimeoutMillis = WirelessStartupPolicy.FIRST_TCP_MILLIS,
             )
             firstTcpWatchdog = watchdog
@@ -1282,6 +1283,10 @@ class CarPlayController(
             }
             pauseWifiScans(hotspotInfo.backend)
             val startedHotspot = hotspot
+            val refreshEnabled = hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT ||
+                (hotspotInfo.backend == WirelessHotspotBackend.WIFI_P2P && config.wirelessStartupRefreshEnabled)
+            debugLog("wireless startup budgets firstTcpMs=${config.wirelessFirstTcpTimeoutMillis} " +
+                "protocolMs=${WirelessStartupPolicy.FIRST_TCP_MILLIS} sameLinkRefresh=$refreshEnabled")
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
             }
@@ -1535,7 +1540,7 @@ class CarPlayController(
                     if (watchdog.waitingForFirstTcp())
                         onStatus(CarPlayStatus.WaitingForWirelessNetwork(startRequests), generation)
                 },
-                startupRecovery = if (hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT)
+                startupRecovery = if (refreshEnabled)
                     com.shilapi.xcertplay.transport.WirelessStartSessionRecovery({
                         !isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp()
                     }) else null,
