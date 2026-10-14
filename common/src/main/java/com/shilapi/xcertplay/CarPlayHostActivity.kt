@@ -188,6 +188,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // USB 有线连接不依赖未填写的无线热点参数。
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
         wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
+        wifiP2pChannelPolicy = GalaxyP2pSettings.load(this).policy,
         manualHotspotSsid = manualHotspotSsid,
         manualHotspotPassphrase = manualHotspotPassphrase,
         manualHotspotBand = manualHotspotBand,

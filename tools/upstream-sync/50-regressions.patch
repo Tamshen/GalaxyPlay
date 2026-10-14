@@ -571,7 +571,7 @@
          val index = choices.indexOf(channel)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
-@@ -42,6 +42,26 @@
+@@ -42,6 +42,50 @@
          shadowOf(wifi.connectionInfo).setSupplicantState(SupplicantState.COMPLETED)
      }
  
@@ -595,10 +595,34 @@
 +        }
 +    }
 +
++    @Test @Config(sdk = [29, 30]) fun mainlandRejectsUnexpectedIndoorGroupAndReleasesIt() {
++        radio.reportedFrequency = 5180
++        WifiP2pGroupManager(context, preferredChannel = 149,
++            channelPolicy = com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA.policy).use { manager ->
++            val error = failure { manager.start(5000) }
++            assertTrue(error is com.shilapi.xcertplay.network.WirelessStartupException)
++            assertTrue(error.message!!.contains("vehicle region"))
++            assertNull(radio.group)
++            assertEquals(1, radio.removals)
++        }
++    }
++
++    @Test @Config(sdk = [29, 30]) fun mainlandManualIndoorChannelDoesNotTouchAnExistingGroup() {
++        radio.group = radio.makeGroup(null)
++        val existing = radio.group
++        WifiP2pGroupManager(context, preferredChannel = 36,
++            channelPolicy = com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA.policy).use { manager ->
++            assertTrue(failure { manager.start(5000) } is com.shilapi.xcertplay.network.WirelessStartupException)
++            assertSame(existing, radio.group)
++            assertTrue(radio.requests.isEmpty())
++            assertEquals(0, radio.removals)
++        }
++    }
++
      @Test fun disconnectedStationCannotPinNewGroupToStaleTwoGhzChannel() {
          val info = context.getSystemService(WifiManager::class.java).connectionInfo
          shadowOf(info).setFrequency(2462)
-@@ -70,48 +90,6 @@
+@@ -70,48 +114,6 @@
          val encoded = "$kind|$requested|2437|$station|00000000-0000-0000-0000-000000000001"
          memory.edit().putString("confirmed", encoded).commit()
          return encoded
@@ -647,7 +671,7 @@
      }
  
      @Test fun hotspotCreationAloneAndLateConfirmationAfterCloseAreNeverLearned() {
-@@ -330,18 +308,6 @@
+@@ -330,18 +332,6 @@
          assertTrue(logs.any { it.contains("cleanup skipped=another_app_owns_group") })
      }
  
@@ -666,7 +690,7 @@
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
          val old = WifiP2pGroupManager(context)
          val previous = background { old.start(5000) }
-@@ -422,6 +388,7 @@
+@@ -422,6 +412,7 @@
          var rejectCustom = false
          var competingGroup = false
          var missingCredentials = false
@@ -674,7 +698,7 @@
          var noCreateReply = false
          var fixed24Only = false
          var allowed24 = setOf(2412, 2437, 2462)
-@@ -463,10 +430,18 @@
+@@ -463,10 +454,18 @@
  
          fun makeGroup(config: WifiP2pConfig?) = WifiP2pGroup().apply {
              shadowOf(this).setIsGroupOwner(true)

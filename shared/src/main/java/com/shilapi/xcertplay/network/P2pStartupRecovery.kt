@@ -25,7 +25,9 @@ internal object P2pStartupRecovery {
 
     /** A band-only request still needs channel selection, which some BYD drivers cannot do. */
     fun plan(stationFrequency: Int?, preferred: P2pCreationRequest? = null,
-             preferredChannel: Int = WifiP2pChannels.AUTO): List<P2pCreationRequest> = buildList {
+             preferredChannel: Int = WifiP2pChannels.AUTO,
+             channelPolicy: P2pChannelPolicy? = null): List<P2pCreationRequest> = channelPolicy?.plan(
+                 stationFrequency, preferred, preferredChannel) ?: buildList {
         WifiP2pChannels.frequencyMhz(preferredChannel)?.let {
             add(P2pCreationRequest(P2pCreationMode.PREFERRED_CHANNEL, it))
             return@buildList
@@ -68,9 +70,10 @@ internal object P2pStartupRecovery {
         beforeRetry: () -> Unit,
         preferred: P2pCreationRequest? = null,
         preferredChannel: Int = WifiP2pChannels.AUTO,
+        channelPolicy: P2pChannelPolicy? = null,
         request: (P2pCreationRequest) -> Unit,
     ): P2pCreationRequest {
-        val modes = plan(stationFrequency, preferred, preferredChannel)
+        val modes = plan(stationFrequency, preferred, preferredChannel, channelPolicy)
         var lastRejection: P2pCreateRejected? = null
         for ((index, mode) in modes.withIndex()) {
             var retriedBusy = false
@@ -79,6 +82,10 @@ internal object P2pStartupRecovery {
                     request(mode)
                     return mode
                 } catch (failure: P2pConfigBuildCompatibilityFailure) {
+                    // 地区限制下不能改用不固定频率的 API，否则系统可能选择室内专用信道。
+                    if (channelPolicy != null) throw WirelessStartupException(
+                        WirelessStartupFailure.HOTSPOT_CONFIGURATION,
+                        "Wi-Fi Direct cannot enforce the selected vehicle region on this framework").apply { initCause(failure) }
                     if (preferredChannel != WifiP2pChannels.AUTO) {
                         throw P2pChannelUnavailableException(preferredChannel, failure.message.orEmpty(), failure)
                     }

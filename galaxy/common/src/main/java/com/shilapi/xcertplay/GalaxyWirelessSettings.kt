@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.network.WifiP2pChannels
+import com.shilapi.xcertplay.network.GalaxyP2pRegion
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** 无线方式独立保存；只由用户确认切换，不启动或关闭任何网络。 */
@@ -25,6 +26,7 @@ internal class GalaxyWirelessSettings(
     private var pickerGeneration = 0
     private lateinit var modeRow: L7SettingRow
     private var channelRow: L7SettingRow? = null
+    private var regionRow: L7SettingRow? = null
     private var wifiRow: L7SettingRow? = null
 
     init {
@@ -43,6 +45,9 @@ internal class GalaxyWirelessSettings(
             wifiRow = L7Components.actionRow(activity, activity.getString(R.string.l7_hotspot_wifi_settings)) {
                 openWifiSettings(activity)
             }.also(card::addView)
+            regionRow = L7Components.valueRow(activity, activity.getString(R.string.galaxy_p2p_region_title), "",
+                ::chooseRegion).apply { setDescription(activity.getString(R.string.galaxy_p2p_region_hint)) }
+                .also(card::addView)
             channelRow = L7Components.valueRow(activity, activity.getString(R.string.wifi_direct_channel_title), "",
                 ::chooseChannel).apply { setDescription(activity.getString(R.string.wifi_direct_channel_description)) }
                 .also(card::addView)
@@ -55,6 +60,12 @@ internal class GalaxyWirelessSettings(
         modeRow.isEnabled = !closed && canEdit()
         channelRow?.setValue(channelLabel(AirPlayPersistence.loadWifiP2pPreferredChannel(activity)))
         channelRow?.isEnabled = !closed && canEdit()
+        val region = GalaxyP2pSettings.load(activity)
+        regionRow?.setValue(regionLabel(region))
+        regionRow?.isEnabled = !closed && canEdit()
+        val channel = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
+        val invalid = channel != WifiP2pChannels.AUTO && !region.policy.allows(channel)
+        channelRow?.setFeedback(if (invalid) activity.getString(R.string.galaxy_p2p_region_channel_invalid) else "", error = invalid)
         val available = supported(activity)
         val enabled = wifiEnabled(activity)
         modeRow.setFeedback(if (available) "" else activity.getString(R.string.this_head_unit_does_not_support_wi_fi_direct))
@@ -89,7 +100,8 @@ internal class GalaxyWirelessSettings(
 
     private fun chooseChannel() {
         if (closed || !canEdit()) return
-        val choices = listOf(WifiP2pChannels.AUTO) + WifiP2pChannels.channels
+        val region = GalaxyP2pSettings.load(activity)
+        val choices = listOf(WifiP2pChannels.AUTO) + region.policy.channels
         val current = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
         var selection = current
         dismiss()
@@ -100,12 +112,38 @@ internal class GalaxyWirelessSettings(
             }.setPositiveButton(R.string.save) { _, _ ->
                 if (canConfirm(generation) && selection != current &&
                     AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
+                    GalaxyP2pSettings.load(activity) == region &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.WIFI_P2P) {
                     AirPlayPersistence.saveWifiP2pPreferredChannel(activity, selection)
                     update()
                 }
             }.setNegativeButton(R.string.cancel, null).show()
     }
+
+    private fun chooseRegion() {
+        if (closed || !canEdit()) return
+        val current = GalaxyP2pSettings.load(activity)
+        var selection = current
+        dismiss()
+        val generation = pickerGeneration
+        val choices = GalaxyP2pRegion.entries
+        dialog = L7Dialogs.builder(activity).setTitle(R.string.galaxy_p2p_region_title).setFixedHeight()
+            .setSingleChoiceItems(choices.map(::regionLabel).toTypedArray(), choices.indexOf(current)) { _, index ->
+                selection = choices[index]
+            }.setPositiveButton(R.string.save) { _, _ ->
+                if (canConfirm(generation) && selection != current && GalaxyP2pSettings.load(activity) == current &&
+                    AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.WIFI_P2P) {
+                    GalaxyP2pSettings.save(activity, selection)
+                    update()
+                }
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+
+    private fun regionLabel(region: GalaxyP2pRegion) = activity.getString(when (region) {
+        GalaxyP2pRegion.MAINLAND_CHINA -> R.string.galaxy_p2p_region_mainland
+        GalaxyP2pRegion.OTHER_CONSERVATIVE -> R.string.galaxy_p2p_region_other
+    })
+
 
     private fun modeLabel(mode: WirelessHotspotMode) = activity.getString(
         if (mode == WirelessHotspotMode.WIFI_P2P) R.string.wifi_direct else R.string.built_in_car_hotspot)
@@ -141,6 +179,7 @@ internal class GalaxyWirelessSettings(
             builder.show()
             return false
         }
+
 
         private fun openWifiSettings(activity: Activity) {
             if (runCatching { activity.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }.isFailure) {
