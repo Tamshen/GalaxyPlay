@@ -70,5 +70,5 @@
     <string name="wifi_direct_phone_hint">Keep Bluetooth and Wi-Fi on your iPhone on, then connect and allow CarPlay when prompted. Native hotspot details are not required.</string>
     <string name="wifi_direct_channel_title">Preferred Wi-Fi Direct channel</string>
     <string name="wifi_direct_channel_choice">Channel %1$d · %2$s</string>
-    <string name="wifi_direct_channel_description">Auto chooses a channel for you. Manual channels depend on what your car supports. Changes apply to the next Wi-Fi Direct connection.</string>
+    <string name="wifi_direct_channel_description">Auto follows the selected vehicle region. Manual channels also require system support. Mainland China prefers upper 5 GHz; other regions use conservative 2.4 GHz. Changes apply to the next connection.</string>
 </resources>

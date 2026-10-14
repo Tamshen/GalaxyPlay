@@ -42,6 +42,8 @@ class GalaxyConfigurationEvidenceTest {
         assertEquals(value, GalaxyConfigurationEvidence.read(value.text))
         assertEquals(value.id, DiagnosticRedactor.redact("config_ref=${value.id}")!!.substringAfter('='))
         assertTrue(value.text.length > DiagnosticRedactor.MAX_LINE)
+        val preferences = JSONObject(value.text).getJSONObject("application_preferences").getJSONObject("xcertplay_airplay")
+        assertEquals("MAINLAND_CHINA", preferences.getJSONObject("galaxy_p2p_region").getString("value"))
     }
     @Test fun editedConfigurationEvidenceMarksCustomAndKeepsOriginalAdaptationAndLegacyHeader() {
         val repository = GalaxyProfiles(app)

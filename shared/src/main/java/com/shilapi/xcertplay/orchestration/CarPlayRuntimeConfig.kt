@@ -69,6 +69,7 @@ class CarPlayRuntimeConfig(
     val wifiScanPauseEnabled: Boolean = false,
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",
+    val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,
 ) {
     init {
         require(iphoneDevices.all { it.vendorId == APPLE_VENDOR_ID }) {

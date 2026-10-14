@@ -62,6 +62,30 @@ class WifiP2pGroupManagerTest {
         }
     }
 
+    @Test @Config(sdk = [29, 30]) fun mainlandRejectsUnexpectedIndoorGroupAndReleasesIt() {
+        radio.reportedFrequency = 5180
+        WifiP2pGroupManager(context, preferredChannel = 149,
+            channelPolicy = com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA.policy).use { manager ->
+            val error = failure { manager.start(5000) }
+            assertTrue(error is com.shilapi.xcertplay.network.WirelessStartupException)
+            assertTrue(error.message!!.contains("vehicle region"))
+            assertNull(radio.group)
+            assertEquals(1, radio.removals)
+        }
+    }
+
+    @Test @Config(sdk = [29, 30]) fun mainlandManualIndoorChannelDoesNotTouchAnExistingGroup() {
+        radio.group = radio.makeGroup(null)
+        val existing = radio.group
+        WifiP2pGroupManager(context, preferredChannel = 36,
+            channelPolicy = com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA.policy).use { manager ->
+            assertTrue(failure { manager.start(5000) } is com.shilapi.xcertplay.network.WirelessStartupException)
+            assertSame(existing, radio.group)
+            assertTrue(radio.requests.isEmpty())
+            assertEquals(0, radio.removals)
+        }
+    }
+
     @Test fun disconnectedStationCannotPinNewGroupToStaleTwoGhzChannel() {
         val info = context.getSystemService(WifiManager::class.java).connectionInfo
         shadowOf(info).setFrequency(2462)

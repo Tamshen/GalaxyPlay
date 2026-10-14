@@ -121,7 +121,7 @@ class GalaxyWirelessSettingsTest {
         choose(confirmed, 1)
         confirmed.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(36, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+        assertEquals(149, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
         assertEquals("synthetic-native", AirPlayPersistence.loadManualHotspotSsid(activity))
     }
 
@@ -147,5 +147,48 @@ class GalaxyWirelessSettingsTest {
         ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(android.provider.Settings.ACTION_WIFI_SETTINGS, shadowOf(activity).nextStartedActivity.action)
+    }
+
+    @Test fun oldIndoorChannelIsPreservedButNotSelectableForMainlandVehicles() {
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        AirPlayPersistence.saveWifiP2pPreferredChannel(activity, 36)
+        settings.addDirect(parent)
+        val row = rows().first { it.titleView.text == activity.getString(R.string.wifi_direct_channel_title) }
+        assertEquals(36, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+        row.performClick()
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        val labels = (0 until dialog.listView.adapter.count).map { dialog.listView.adapter.getItem(it).toString() }
+        assertFalse(labels.any { it.contains("36") || it.contains("48") })
+        assertTrue(labels.any { it.contains("149") })
+        choose(dialog, 0)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+    }
+
+    @Test fun regionChangesOnlyOnConfirmationAndLateChannelPickerCannotSave() {
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        settings.addDirect(parent)
+        val region = rows().first { it.titleView.text == activity.getString(R.string.galaxy_p2p_region_title) }
+        region.performClick()
+        val cancelled = ShadowAlertDialog.getLatestAlertDialog()
+        choose(cancelled, 1)
+        cancelled.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertEquals(com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA, GalaxyP2pSettings.load(activity))
+        region.performClick()
+        val confirmed = ShadowAlertDialog.getLatestAlertDialog()
+        choose(confirmed, 1)
+        confirmed.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(com.shilapi.xcertplay.network.GalaxyP2pRegion.OTHER_CONSERVATIVE, GalaxyP2pSettings.load(activity))
+        val channel = rows().first { it.titleView.text == activity.getString(R.string.wifi_direct_channel_title) }
+        channel.performClick()
+        val picker = ShadowAlertDialog.getLatestAlertDialog()
+        assertFalse((0 until picker.listView.adapter.count).any { picker.listView.adapter.getItem(it).toString().contains("5 GHz") })
+        choose(picker, 1)
+        GalaxyP2pSettings.save(activity, com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA)
+        picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
     }
 }

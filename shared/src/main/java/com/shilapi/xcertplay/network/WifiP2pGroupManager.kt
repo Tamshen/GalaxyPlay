@@ -41,6 +41,7 @@ class WifiP2pGroupManager(
     private val diagnostic: (String) -> Unit = {},
     private val preferredChannel: Int = WifiP2pChannels.AUTO,
     private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
+    private val channelPolicy: P2pChannelPolicy? = null,
 ) : WirelessHotspotManager {
     init {
         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -104,6 +105,9 @@ class WifiP2pGroupManager(
     }
 
     override fun start(timeoutMillis: Long): WirelessHotspotInfo {
+        if (preferredChannel != WifiP2pChannels.AUTO && channelPolicy?.allows(preferredChannel) == false)
+            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
+                "Wi-Fi Direct channel is outside the selected vehicle region")
         val legacyChannels = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
         if (legacyChannels) {
             diagnostic("Wi-Fi P2P legacy channel API sdk=${Build.VERSION.SDK_INT}")
@@ -140,7 +144,8 @@ class WifiP2pGroupManager(
             diagnostic(when {
                 preferredChannel != WifiP2pChannels.AUTO -> "Wi-Fi P2P remembered skipped=manual_channel"
                 preferred != null -> {
-                    val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request).first() == preferred.request)
+                    val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request,
+                        channelPolicy = channelPolicy).first() == preferred.request)
                         "first" else "deferred"
                     "Wi-Fi P2P remembered $position mode=${preferred.request.mode} frequencyMHz=${preferred.request.frequencyMHz ?: "auto"}"
                 }
@@ -181,6 +186,7 @@ class WifiP2pGroupManager(
                 stationFrequency = stationFrequency,
                 preferred = preferred?.request,
                 preferredChannel = preferredChannel,
+                channelPolicy = channelPolicy,
                 beforeRetry = {
                     ensureStartActive(attempt)
                     // Do not cancel discovery, toggle Wi-Fi, or remove a newly observed group.
@@ -295,6 +301,7 @@ class WifiP2pGroupManager(
         if (!latch.await(REQUEST_POLL_NANOS, TimeUnit.NANOSECONDS))
             throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi Direct did not confirm its current group")
         val group = result.get()
+        if (group != null && channelPolicy != null) validateRegionChannel(wifiFrequencyMhzToChannel(group.frequency))
         synchronized(stateLock) {
             if (closed || channel !== active || readyInfo !== expected || group == null || !group.isGroupOwner ||
                 group.networkName != expected.ssid || group.getInterface() != expected.interfaceName ||
@@ -525,6 +532,7 @@ class WifiP2pGroupManager(
                 timeoutNanos = minOf(remainingNanos, REQUEST_POLL_NANOS),
             )
             if (group == null) continue
+            if (group.frequency > 0) validateRegionChannel(wifiFrequencyMhzToChannel(group.frequency))
             if (!group.isGroupOwner) {
                 throw IOException("Wi-Fi P2P device became a group client instead of owner")
             }
@@ -802,6 +810,12 @@ class WifiP2pGroupManager(
         interfaceLookup(interfaceName)
     } catch (_: SocketException) {
         null
+    }
+
+    private fun validateRegionChannel(channel: Int?) {
+        if (channelPolicy != null && (channel == null || !channelPolicy.allows(channel)))
+            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
+                "Wi-Fi Direct actual channel is outside the selected vehicle region")
     }
 
     private fun groupSecurity(group: WifiP2pGroup): Iap2WirelessSecurity {

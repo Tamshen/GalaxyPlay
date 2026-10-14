@@ -1000,6 +1000,55 @@
      }.sortedWith(compareByDescending<Pair<Int, HotspotSelection>> { it.first }.thenBy { it.second.name })
          .firstOrNull()?.second
  }
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/P2pChannelPolicy.kt
+@@ -0,0 +1,46 @@
++package com.shilapi.xcertplay.network
++
++/** 宿主提供车载地区候选；射频是否许可仍由系统决定，不修改国家码。 */
++class P2pChannelPolicy(channels: List<Int>) {
++    val channels: List<Int> = channels.toList()
++
++    init {
++        require(this.channels.isNotEmpty() && this.channels.distinct().size == this.channels.size)
++        require(this.channels.all { it != WifiP2pChannels.AUTO && WifiP2pChannels.isValid(it) })
++    }
++
++    fun allows(channel: Int): Boolean = channel in channels
++
++    internal fun plan(station: Int?, remembered: P2pCreationRequest?, manual: Int): List<P2pCreationRequest> {
++        if (manual != WifiP2pChannels.AUTO) {
++            if (!allows(manual)) throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
++                "Wi-Fi Direct channel is outside the selected vehicle region")
++            return listOf(P2pCreationRequest(P2pCreationMode.PREFERRED_CHANNEL, WifiP2pChannels.frequencyMhz(manual)))
++        }
++        val five = channels.filter { it >= 36 }
++        val two = listOf(6, 1, 11).filter(::allows)
++        val stationChannel = station?.let(::wifiFrequencyMhzToChannel)?.takeIf(::allows)
++        val rememberedChannel = remembered?.frequencyMHz?.let(::wifiFrequencyMhzToChannel)?.takeIf(::allows)
++        val switchingFive = station != null && station in 5150..5895
++        val rememberedSwitches = switchingFive && rememberedChannel != null && rememberedChannel >= 36 &&
++            remembered?.frequencyMHz != station
++        val ordered = buildList {
++            if (rememberedChannel != null && !rememberedSwitches) add(rememberedChannel)
++            if (stationChannel != null) add(stationChannel)
++            // 共享 5 GHz 射频时，先用当前允许信道；跨信道跳频前先尝试 2.4 GHz。
++            if (switchingFive || (stationChannel != null && stationChannel in 1..11)) { addAll(two); addAll(five) }
++            else { addAll(five); addAll(two) }
++            if (rememberedChannel != null && rememberedSwitches) add(rememberedChannel)
++        }.distinct()
++        return ordered.map { channel ->
++            val frequency = WifiP2pChannels.frequencyMhz(channel)
++            val mode = when {
++                channel == stationChannel && channel >= 36 -> P2pCreationMode.ALIGNED_5_GHZ
++                channel == stationChannel -> P2pCreationMode.ALIGNED_2_GHZ
++                channel >= 36 -> P2pCreationMode.FIXED_5_GHZ
++                else -> P2pCreationMode.FIXED_2_GHZ
++            }
++            P2pCreationRequest(mode, frequency)
++        }
++    }
++}
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/P2pStartupRecovery.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/P2pStartupRecovery.kt
 @@ -3,11 +3,7 @@
@@ -1015,13 +1064,13 @@
  
  internal data class P2pCreationRequest(val mode: P2pCreationMode, val frequencyMHz: Int? = null)
  
-@@ -29,14 +25,9 @@
- 
+@@ -30,13 +26,10 @@
      /** A band-only request still needs channel selection, which some BYD drivers cannot do. */
      fun plan(stationFrequency: Int?, preferred: P2pCreationRequest? = null,
--             preferredChannel: Int = WifiP2pChannels.AUTO,
+              preferredChannel: Int = WifiP2pChannels.AUTO,
 -             bandRequests: Boolean = true): List<P2pCreationRequest> = buildList {
-+             preferredChannel: Int = WifiP2pChannels.AUTO): List<P2pCreationRequest> = buildList {
++             channelPolicy: P2pChannelPolicy? = null): List<P2pCreationRequest> = channelPolicy?.plan(
++                 stationFrequency, preferred, preferredChannel) ?: buildList {
          WifiP2pChannels.frequencyMhz(preferredChannel)?.let {
              add(P2pCreationRequest(P2pCreationMode.PREFERRED_CHANNEL, it))
 -            return@buildList
@@ -1031,7 +1080,7 @@
              return@buildList
          }
          val aligned24 = stationFrequency != null && stationFrequency in 2412..2462 &&
-@@ -72,33 +63,14 @@
+@@ -72,33 +65,15 @@
          if (none { it.mode == P2pCreationMode.SYSTEM_DEFAULT }) add(P2pCreationRequest(P2pCreationMode.SYSTEM_DEFAULT))
      }
  
@@ -1059,13 +1108,25 @@
          preferred: P2pCreationRequest? = null,
          preferredChannel: Int = WifiP2pChannels.AUTO,
 -        bandRequests: Boolean = true,
++        channelPolicy: P2pChannelPolicy? = null,
          request: (P2pCreationRequest) -> Unit,
      ): P2pCreationRequest {
 -        val modes = plan(stationFrequency, preferred, preferredChannel, bandRequests)
-+        val modes = plan(stationFrequency, preferred, preferredChannel)
++        val modes = plan(stationFrequency, preferred, preferredChannel, channelPolicy)
          var lastRejection: P2pCreateRejected? = null
          for ((index, mode) in modes.withIndex()) {
              var retriedBusy = false
+@@ -107,6 +82,10 @@
+                     request(mode)
+                     return mode
+                 } catch (failure: P2pConfigBuildCompatibilityFailure) {
++                    // 地区限制下不能改用不固定频率的 API，否则系统可能选择室内专用信道。
++                    if (channelPolicy != null) throw WirelessStartupException(
++                        WirelessStartupFailure.HOTSPOT_CONFIGURATION,
++                        "Wi-Fi Direct cannot enforce the selected vehicle region on this framework").apply { initCause(failure) }
+                     if (preferredChannel != WifiP2pChannels.AUTO) {
+                         throw P2pChannelUnavailableException(preferredChannel, failure.message.orEmpty(), failure)
+                     }
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/WifiP2pChannels.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/WifiP2pChannels.kt
 @@ -1,51 +1,21 @@
@@ -1134,15 +1195,16 @@
  import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
  import java.io.IOException
  import java.net.Inet4Address
-@@ -42,6 +40,7 @@
+@@ -42,6 +40,8 @@
      context: Context,
      private val diagnostic: (String) -> Unit = {},
      private val preferredChannel: Int = WifiP2pChannels.AUTO,
 +    private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
++    private val channelPolicy: P2pChannelPolicy? = null,
  ) : WirelessHotspotManager {
      init {
          require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
-@@ -76,6 +75,7 @@
+@@ -76,6 +76,7 @@
      private var created = false
      private var closed = false
      private var startAttempt: StartAttempt? = null
@@ -1150,7 +1212,17 @@
      @Volatile private var observedCreatedName: String? = null
      @Volatile private var requestedName: String? = null
  
-@@ -135,10 +135,9 @@
+@@ -104,6 +105,9 @@
+     }
+ 
+     override fun start(timeoutMillis: Long): WirelessHotspotInfo {
++        if (preferredChannel != WifiP2pChannels.AUTO && channelPolicy?.allows(preferredChannel) == false)
++            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
++                "Wi-Fi Direct channel is outside the selected vehicle region")
+         val legacyChannels = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+         if (legacyChannels) {
+             diagnostic("Wi-Fi P2P legacy channel API sdk=${Build.VERSION.SDK_INT}")
+@@ -135,13 +139,13 @@
              val preferred = remembered?.takeIf {
                  preferredChannel == WifiP2pChannels.AUTO && it.stationMHz == stationFrequency
              }
@@ -1161,17 +1233,23 @@
 -                WifiP2pChannels.band(preferredChannel) != null -> "Wi-Fi P2P remembered skipped=band_preference"
                  preferredChannel != WifiP2pChannels.AUTO -> "Wi-Fi P2P remembered skipped=manual_channel"
                  preferred != null -> {
-                     val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request).first() == preferred.request)
-@@ -182,8 +181,6 @@
+-                    val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request).first() == preferred.request)
++                    val position = if (P2pStartupRecovery.plan(stationFrequency, preferred.request,
++                        channelPolicy = channelPolicy).first() == preferred.request)
+                         "first" else "deferred"
+                     "Wi-Fi P2P remembered $position mode=${preferred.request.mode} frequencyMHz=${preferred.request.frequencyMHz ?: "auto"}"
+                 }
+@@ -182,8 +186,7 @@
                  stationFrequency = stationFrequency,
                  preferred = preferred?.request,
                  preferredChannel = preferredChannel,
 -                // Band-only requests need the API 29 WifiP2pConfig; the legacy path pins channels.
 -                bandRequests = !legacyChannels,
++                channelPolicy = channelPolicy,
                  beforeRetry = {
                      ensureStartActive(attempt)
                      // Do not cancel discovery, toggle Wi-Fi, or remove a newly observed group.
-@@ -204,11 +201,7 @@
+@@ -204,11 +207,7 @@
                              val builder = WifiP2pConfig.Builder()
                                  .setNetworkName(credentials.ssid)
                                  .setPassphrase(credentials.passphrase)
@@ -1184,7 +1262,7 @@
                              builder.build()
                          }
                      }
-@@ -266,14 +259,7 @@
+@@ -266,14 +265,7 @@
                      "actualMHz=unavailable matched=unverified")
              } else {
                  diagnostic("Wi-Fi P2P channel requestedMHz=${creation.frequencyMHz ?: "auto"} actualMHz=${group.frequencyMHz} matched=${creation.frequencyMHz?.let { it == group.frequencyMHz } ?: "system_selected"}")
@@ -1200,7 +1278,7 @@
                      throw P2pChannelUnavailableException(preferredChannel,
                          "The car selected channel ${group.channel} instead.")
                  }
-@@ -281,6 +267,7 @@
+@@ -281,6 +273,7 @@
              synchronized(stateLock) {
                  ensureStartActiveLocked(attempt)
                  created = true
@@ -1208,7 +1286,7 @@
                  startAttempt = null
                  // Manual experiments must not replace the proven automatic configuration.
                  pendingSuccess = if (!legacyChannels && preferredChannel == WifiP2pChannels.AUTO) {
-@@ -295,6 +282,30 @@
+@@ -295,6 +288,31 @@
              cleanupFailedStart(attempt)
              throw failure
          }
@@ -1225,6 +1303,7 @@
 +        if (!latch.await(REQUEST_POLL_NANOS, TimeUnit.NANOSECONDS))
 +            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_NOT_READY, "Wi-Fi Direct did not confirm its current group")
 +        val group = result.get()
++        if (group != null && channelPolicy != null) validateRegionChannel(wifiFrequencyMhzToChannel(group.frequency))
 +        synchronized(stateLock) {
 +            if (closed || channel !== active || readyInfo !== expected || group == null || !group.isGroupOwner ||
 +                group.networkName != expected.ssid || group.getInterface() != expected.interfaceName ||
@@ -1239,7 +1318,7 @@
      }
  
      override fun onCarPlayConfirmed() = synchronized(stateLock) {
-@@ -318,6 +329,7 @@
+@@ -318,6 +336,7 @@
                  if (configurationMemory.forget(it)) diagnostic("Wi-Fi P2P remembered cleared=session_unconfirmed")
              }
              pendingSuccess = null
@@ -1247,7 +1326,7 @@
              attempt = startAttempt
              attempt?.stopped = true
              stateLock.notifyAll()
-@@ -334,7 +346,7 @@
+@@ -334,7 +353,7 @@
          }
          synchronized(legacyChannelLock) {
              if (activeChannel != null) releaseLegacyChannelRestriction(activeChannel)
@@ -1256,7 +1335,15 @@
          }
          activeThread?.quitSafely()
      }
-@@ -521,8 +533,8 @@
+@@ -513,6 +532,7 @@
+                 timeoutNanos = minOf(remainingNanos, REQUEST_POLL_NANOS),
+             )
+             if (group == null) continue
++            if (group.frequency > 0) validateRegionChannel(wifiFrequencyMhzToChannel(group.frequency))
+             if (!group.isGroupOwner) {
+                 throw IOException("Wi-Fi P2P device became a group client instead of owner")
+             }
+@@ -521,8 +541,8 @@
              if (credentials != null && networkName != null && networkName != credentials.ssid) {
                  throw IOException("Wi-Fi Direct returned an unexpected group")
              }
@@ -1267,7 +1354,7 @@
              val interfaceName = group.getInterface()?.takeIf { it.isNotBlank() }
              val frequencyMHz = group.frequency
              val channelNumber = wifiFrequencyMhzToChannel(frequencyMHz)
-@@ -552,18 +564,24 @@
+@@ -552,18 +572,24 @@
                  continue
              }
  
@@ -1294,7 +1381,7 @@
              )
          }
      }
-@@ -597,7 +615,7 @@
+@@ -597,7 +623,7 @@
              }
  
              val networkName = group.networkName?.takeIf { it.isNotBlank() }
@@ -1303,7 +1390,7 @@
              val interfaceName = legacyGroupInterface(group)
              if (networkName == null || passphrase == null || interfaceName == null) {
                  lastReason = "incomplete group details ssid=${networkName != null} " +
-@@ -618,6 +636,7 @@
+@@ -618,6 +644,7 @@
  
              val requestedChannel = creation.frequencyMHz
                  ?.let(WifiP2pLegacyChannels::operatingChannelFor) ?: UNKNOWN_CHANNEL
@@ -1311,7 +1398,7 @@
              return WirelessHotspotInfo(
                  ssid = networkName,
                  passphrase = passphrase,
-@@ -627,7 +646,8 @@
+@@ -627,7 +654,8 @@
                  bssid = interfaceHardwareAddress(interfaceName)
                      ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
                  interfaceName = interfaceName,
@@ -1321,7 +1408,7 @@
                  bandLabel = if (requestedChannel == UNKNOWN_CHANNEL) "Auto"
                      else WifiP2pLegacyChannels.bandLabelFor(requestedChannel),
                  backend = WirelessHotspotBackend.WIFI_P2P,
-@@ -692,6 +712,14 @@
+@@ -692,6 +720,14 @@
          throw IOException("Interrupted while waiting for Wi-Fi P2P", interrupted)
      }
  
@@ -1336,7 +1423,7 @@
      private fun interfaceAddress(interfaceName: String): InetAddress? {
          val networkInterface = networkInterface(interfaceName) ?: return null
          val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
-@@ -736,7 +764,7 @@
+@@ -736,7 +772,7 @@
          val fiveGhzSupported = runCatching { wifi?.is5GHzBandSupported }.getOrNull()
          val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
          val locationEnabled = runCatching {
@@ -1345,7 +1432,7 @@
          }.getOrNull()
          val required = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES
              else Manifest.permission.ACCESS_FINE_LOCATION
-@@ -771,7 +799,7 @@
+@@ -771,9 +807,15 @@
              ?.joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
  
      private fun networkInterface(interfaceName: String): NetworkInterface? = try {
@@ -1353,8 +1440,16 @@
 +        interfaceLookup(interfaceName)
      } catch (_: SocketException) {
          null
++    }
++
++    private fun validateRegionChannel(channel: Int?) {
++        if (channelPolicy != null && (channel == null || !channelPolicy.allows(channel)))
++            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
++                "Wi-Fi Direct actual channel is outside the selected vehicle region")
      }
-@@ -843,7 +871,7 @@
+ 
+     private fun groupSecurity(group: WifiP2pGroup): Iap2WirelessSecurity {
+@@ -843,7 +885,7 @@
          }
          synchronized(legacyChannelLock) {
              if (failedChannel != null) releaseLegacyChannelRestriction(failedChannel)
@@ -2658,16 +2753,18 @@
          }
      }
  
-@@ -2109,12 +2350,7 @@
+@@ -2108,13 +2349,8 @@
+         }
          val manager: WirelessHotspotManager = when (hotspotMode) {
              WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
-                 preferredChannel = config.wifiP2pPreferredChannel)
+-                preferredChannel = config.wifiP2pPreferredChannel)
 -            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 -                LocalOnlyHotspotManager(appContext, ::debugLog)
 -            } else {
 -                throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
 -                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
 -            }
++                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy)
 +            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
@@ -2840,14 +2937,17 @@
          CarPlayStatus.WirelessActiveFallback ->
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
-@@ -66,6 +66,7 @@
+@@ -66,8 +66,10 @@
      val wirelessBluetoothDeviceAddress: String? = null,
      val locationReportingEnabled: Boolean = false,
      val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
 +    val wifiScanPauseEnabled: Boolean = false,
      val existingWifiSsid: String = "",
      val existingWifiPassphrase: String = "",
++    val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,
  ) {
+     init {
+         require(iphoneDevices.all { it.vendorId == APPLE_VENDOR_ID }) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/ConnectionIoDiagnostics.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/ConnectionIoDiagnostics.kt
 @@ -1,6 +1,6 @@
