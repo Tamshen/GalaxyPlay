@@ -117,7 +117,7 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 ## 热点与蓝牙会话回归
 
-`L7HotspotProbeTest` 覆盖独立读取、API 29 门槛、拒绝／服务缺失／隐藏接口、空配置／掩码／有效配置以及 JSON 脱敏；`L7ProbeRunnerTest` 另验证单项热点复查不上传、不覆盖凭据。`NativeHotspotConfigurationTest` 用 API 30 系统替身覆盖 setter 返回、不可回读、回读不一致、异常类型脱敏和已开热点不重配；`CarHotspotTetheringTest` 区分已有热点、启动请求、回调与实际状态确认。现有热点任务和无线门禁回归继续覆盖读取失败保留配置、拒绝／取消和设置恢复。
+`L7HotspotProbeTest` 覆盖独立读取、API 29 门槛、拒绝／服务缺失／隐藏接口、空配置／掩码／有效配置以及 JSON 脱敏；`L7ProbeRunnerTest` 另验证单项热点复查不上传、不覆盖凭据。`NativeHotspotConfigurationTest` 用 API 30 系统替身覆盖 setter 返回、不可回读、回读不一致、异常类型脱敏和已开热点不重配；`NativeHotspotReadTest` 用 API 29／30 验证旧读取接口优先、异常／无效值向新版回退、引号及安全类型、密码掩码拒绝、方法结果脱敏与日志故障隔离。`CarHotspotTetheringTest` 区分已有热点、启动请求、回调与实际状态确认。热点任务与无线门禁回归另覆盖首次空凭据在开启后读取成功时继续、后读更新实际凭据、后读失败保留原值、启动失败不读及取消拒绝迟到结果。
 
 `L7BluetoothMediaGuardTest` 追加当前会话启用、等待中关闭、快速切换预算、旧确认超时、暂停与已关闭／失败保护器的回归。测试只模拟目标 A2DP，不证明 L7 蓝牙交接或厂商热点授权可用。
 

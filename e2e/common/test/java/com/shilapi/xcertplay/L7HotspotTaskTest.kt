@@ -31,9 +31,15 @@ class L7HotspotTaskTest {
         var grant = true
         var writes = 0
         var starts = 0
+        var reads = 0
+        var afterStart: NativeHotspotRead? = null
         var blocker: (() -> Unit)? = null
         var startResult = CarHotspotTethering.Result.READY
-        override fun read(): NativeHotspotRead { blocker?.invoke(); return result }
+        override fun read(): NativeHotspotRead {
+            reads++
+            blocker?.invoke()
+            return if (starts > 0) afterStart ?: result else result
+        }
         override fun apply(credentials: NativeHotspotCredentials): NativeHotspotProblem? { writes++; return writeProblem }
         override fun enabled() = on
         override fun permitted() = grant
@@ -89,6 +95,57 @@ class L7HotspotTaskTest {
         task.start(); await()
         assertEquals(0, access.writes); assertEquals(1, access.starts)
         assertEquals(R.string.l7_hotspot_ready, task.status.message)
+    }
+
+    @Test fun firstConnectionCanSaveCredentialsThatAppearOnlyAfterHotspotStarts() {
+        context.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
+        access.afterStart = NativeHotspotRead(fresh)
+        task.start(); await()
+        assertEquals(2, access.reads)
+        assertEquals(fresh.ssid, AirPlayPersistence.loadManualHotspotSsid(context))
+        assertEquals(fresh.password, AirPlayPersistence.loadManualHotspotPassphrase(context))
+        assertEquals(fresh.security, AirPlayPersistence.loadManualHotspotSecurity(context))
+        assertEquals(R.string.l7_hotspot_ready, task.status.message)
+        assertEquals(0, access.writes)
+    }
+
+    @Test fun postStartReadUsesActualDetailsAndFailedReadKeepsSavedDetails() {
+        access.result = NativeHotspotRead(old)
+        access.afterStart = NativeHotspotRead(fresh)
+        task.start(); await()
+        assertEquals(fresh.password, AirPlayPersistence.loadManualHotspotPassphrase(context))
+        access.result = NativeHotspotRead(problem = NativeHotspotProblem.PERMISSION)
+        access.afterStart = access.result
+        task.start(); await()
+        assertEquals(fresh.password, AirPlayPersistence.loadManualHotspotPassphrase(context))
+        assertEquals(R.string.l7_hotspot_ready, task.status.message)
+    }
+
+    @Test fun failedStartupDoesNotReadOrSavePostStartCredentials() {
+        access.afterStart = NativeHotspotRead(fresh)
+        access.startResult = CarHotspotTethering.Result.TIMED_OUT
+        task.start(); await()
+        assertEquals(1, access.reads)
+        assertEquals(old.password, AirPlayPersistence.loadManualHotspotPassphrase(context))
+        assertEquals(R.string.l7_hotspot_timeout, task.status.message)
+    }
+
+    @Test fun cancellingWhilePostStartReadIsBlockedCannotSaveItsLateResult() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        access.afterStart = NativeHotspotRead(fresh)
+        access.blocker = {
+            if (access.reads == 2) {
+                entered.countDown()
+                while (release.count > 0) try { release.await(100, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { }
+            }
+        }
+        task.start()
+        assertTrue(entered.await(2, TimeUnit.SECONDS))
+        task.cancel(); release.countDown()
+        Thread.sleep(50)
+        assertEquals(old.password, AirPlayPersistence.loadManualHotspotPassphrase(context))
+        assertEquals(R.string.l7_hotspot_cancelled, task.status.message)
     }
 
     @Test fun missingGrantCannotWriteOrStart() {

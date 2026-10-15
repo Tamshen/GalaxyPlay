@@ -49,35 +49,53 @@ class NativeHotspotConfiguration(context: Context, private val log: (String) -> 
 
     fun read(): NativeHotspotRead {
         wifi ?: return NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED)
-        var modernError: NativeHotspotProblem? = null
-        if (Build.VERSION.SDK_INT >= 30) try {
-            val config = wifi.javaClass.getMethod("getSoftApConfiguration").invoke(wifi) as SoftApConfiguration
-            val security = when (config.securityType) {
-                SoftApConfiguration.SECURITY_TYPE_OPEN -> ManualHotspotSecurity.OPEN
-                SoftApConfiguration.SECURITY_TYPE_WPA2_PSK -> ManualHotspotSecurity.WPA2
-                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION -> ManualHotspotSecurity.WPA3_TRANSITION
-                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE -> ManualHotspotSecurity.WPA3
-                else -> return NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED)
-            }
-            return checked(NativeHotspotCredentials(config.ssid.orEmpty(), config.passphrase.orEmpty(), security))
-        } catch (error: Exception) { modernError = problem(error) }
-        return try {
-            val config = wifi.javaClass.getMethod("getWifiApConfiguration").invoke(wifi) as? WifiConfiguration
-                ?: return NativeHotspotRead(problem = modernError ?: NativeHotspotProblem.INVALID)
-            val key = config.allowedKeyManagement
-            val security = when {
-                key.get(WifiConfiguration.KeyMgmt.SAE) && key.get(WifiConfiguration.KeyMgmt.WPA2_PSK) -> ManualHotspotSecurity.WPA3_TRANSITION
-                key.get(WifiConfiguration.KeyMgmt.SAE) -> ManualHotspotSecurity.WPA3
-                key.get(WifiConfiguration.KeyMgmt.WPA2_PSK) || key.get(WifiConfiguration.KeyMgmt.WPA_PSK) -> ManualHotspotSecurity.WPA2
-                key.get(WifiConfiguration.KeyMgmt.NONE) -> ManualHotspotSecurity.OPEN
-                else -> return NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED)
-            }
-            checked(NativeHotspotCredentials(config.SSID.orEmpty().removeSurrounding("\""),
-                config.preSharedKey.orEmpty().removeSurrounding("\""), security))
-        } catch (error: Exception) {
-            NativeHotspotRead(problem = if (modernError == NativeHotspotProblem.PERMISSION) modernError else problem(error))
-        }
+        val legacy = readMethod("getWifiApConfiguration", ::legacyCredentials)
+        if (legacy.credentials != null || Build.VERSION.SDK_INT < 30) return legacy
+        val modern = readMethod("getSoftApConfiguration", ::modernCredentials)
+        if (modern.credentials != null) return modern
+        return NativeHotspotRead(problem = if (legacy.problem == NativeHotspotProblem.PERMISSION ||
+            modern.problem == NativeHotspotProblem.PERMISSION) NativeHotspotProblem.PERMISSION else modern.problem)
     }
+
+    private fun readMethod(method: String, decode: (Any?) -> NativeHotspotRead): NativeHotspotRead = try {
+        val result = decode(wifi!!.javaClass.getMethod(method).invoke(wifi))
+        diagnostic("hotspot read method=$method readable=${result.credentials != null} result=${result.problem ?: "READY"}")
+        result
+    } catch (error: Exception) {
+        val cause = if (error is InvocationTargetException) error.targetException else error
+        val failure = problem(error)
+        diagnostic("hotspot read method=$method readable=false result=$failure exceptionType=${cause.javaClass.simpleName}")
+        NativeHotspotRead(problem = failure)
+    }
+
+    private fun legacyCredentials(value: Any?): NativeHotspotRead {
+        val config = value as? WifiConfiguration ?: return NativeHotspotRead(problem = NativeHotspotProblem.INVALID)
+        val key = config.allowedKeyManagement
+        val security = when {
+            key.get(WifiConfiguration.KeyMgmt.SAE) && key.get(WifiConfiguration.KeyMgmt.WPA2_PSK) -> ManualHotspotSecurity.WPA3_TRANSITION
+            key.get(WifiConfiguration.KeyMgmt.SAE) -> ManualHotspotSecurity.WPA3
+            key.get(WifiConfiguration.KeyMgmt.WPA2_PSK) || key.get(WifiConfiguration.KeyMgmt.WPA_PSK) -> ManualHotspotSecurity.WPA2
+            key.get(WifiConfiguration.KeyMgmt.NONE) -> ManualHotspotSecurity.OPEN
+            else -> return NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED)
+        }
+        return checked(NativeHotspotCredentials(config.SSID.orEmpty().removeSurrounding("\""),
+            config.preSharedKey.orEmpty().removeSurrounding("\""), security))
+    }
+
+    @android.annotation.TargetApi(30)
+    private fun modernCredentials(value: Any?): NativeHotspotRead {
+        val config = value as? SoftApConfiguration ?: return NativeHotspotRead(problem = NativeHotspotProblem.INVALID)
+        val security = when (config.securityType) {
+            SoftApConfiguration.SECURITY_TYPE_OPEN -> ManualHotspotSecurity.OPEN
+            SoftApConfiguration.SECURITY_TYPE_WPA2_PSK -> ManualHotspotSecurity.WPA2
+            SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION -> ManualHotspotSecurity.WPA3_TRANSITION
+            SoftApConfiguration.SECURITY_TYPE_WPA3_SAE -> ManualHotspotSecurity.WPA3
+            else -> return NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED)
+        }
+        return checked(NativeHotspotCredentials(config.ssid.orEmpty(), config.passphrase.orEmpty(), security))
+    }
+
+    private fun diagnostic(message: String) { runCatching { log(message) } }
 
     /** 仅在热点关闭时替换配置；不为了改名而关闭已连接的设备。 */
     fun apply(credentials: NativeHotspotCredentials): NativeHotspotProblem? {
@@ -118,7 +136,8 @@ class NativeHotspotConfiguration(context: Context, private val log: (String) -> 
         }
     }
 
-    private fun checked(value: NativeHotspotCredentials) = if (value.valid()) NativeHotspotRead(value)
+    private fun checked(value: NativeHotspotCredentials) = if (value.valid() &&
+        (value.password.isEmpty() || !value.password.all { it in "*.•●" })) NativeHotspotRead(value)
         else NativeHotspotRead(problem = NativeHotspotProblem.INVALID)
 
     private fun problem(error: Exception): NativeHotspotProblem = when (
