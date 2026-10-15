@@ -5,7 +5,7 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 
-/** 原生热点只在本轮已监听、仍有效的地址之间恢复，不更换热点或接收端身份。 */
+/** 无线网络只在本轮已监听、仍有效的地址之间恢复，不更换网络或接收端身份。 */
 internal class GalaxyHotspotAddressRecovery(
     addresses: List<InetAddress>,
     preferredFamily: String?,
