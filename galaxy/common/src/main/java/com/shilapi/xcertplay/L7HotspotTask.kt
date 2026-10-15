@@ -58,7 +58,7 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
 
     fun start(proposed: NativeHotspotCredentials? = null) = begin(R.string.l7_hotspot_starting) { token ->
         // 无线连接也先读取；即使缺少开启权限，已读到的名称与密码仍可用于手动路径。
-        if (proposed == null) access.read().credentials?.let { save(token, it) }
+        if (proposed == null) readForStart(token, "READ_BEFORE_START")
         if (cancelled(token)) return@begin
         if (proposed != null && access.enabled() == true) {
             finish(token, null, R.string.l7_hotspot_already_on, true); return@begin
@@ -84,6 +84,8 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
         }
         if (cancelled(token)) return@begin
         val result = access.start { cancelled(token) }
+        // 部分固件只在热点开启后暴露实际凭据；读取失败仍保留原手动配置。
+        if (result == CarHotspotTethering.Result.READY) readForStart(token, "READ_AFTER_START")
         finish(token, null, when (result) {
             CarHotspotTethering.Result.READY -> if (AirPlayPersistence.loadManualHotspotSsid(app).isNotBlank())
                 R.string.l7_hotspot_ready else R.string.l7_hotspot_ready_no_details
@@ -93,6 +95,16 @@ internal class L7HotspotTask(context: Context, private val access: Access = Syst
             CarHotspotTethering.Result.CANCELLED -> R.string.l7_hotspot_cancelled
             else -> R.string.l7_hotspot_failed
         }, if (result == CarHotspotTethering.Result.READY) true else runCatching { access.enabled() }.getOrNull())
+    }
+
+    private fun readForStart(token: Int, phase: String) {
+        if (cancelled(token)) return
+        val result = runCatching { access.read() }.getOrElse {
+            NativeHotspotRead(problem = NativeHotspotProblem.FAILED)
+        }
+        result.credentials?.let { save(token, it) }
+        runCatching { L7DebugLog.record("HotspotTask: run=$token phase=$phase " +
+            "readable=${result.credentials?.valid() == true} result=${result.problem ?: "READY"}") }
     }
 
     @Synchronized private fun begin(message: Int, action: (Int) -> Unit): Boolean {
