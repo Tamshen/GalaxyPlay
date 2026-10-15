@@ -67,6 +67,7 @@ class CarPlayRuntimeConfig(
     val locationReportingEnabled: Boolean = false,
     val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
     val wifiScanPauseEnabled: Boolean = false,
+    val wifiHighPerformanceEnabled: Boolean = false,
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",
     val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,

@@ -18,6 +18,8 @@ data class AudioFormat(
     val payloadType: Int,
     val audioType: String = "media",
     val bufferHint: AudioBufferHint? = null,
+    /** RTP 时基独立于解码采样率；Opus 16/24 kHz 流仍以 48 kHz 解码。 */
+    val rtpClockRate: Int = sampleRate,
 )
 
 /**
@@ -94,6 +96,7 @@ class AudioStream(
     }
 
     private fun runData(socket: DatagramSocket, listener: Listener) {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic)
         val buffer = ByteArray(DATAGRAM_BYTES)
         try {
@@ -242,7 +245,13 @@ object AudioStreamCodec {
         val isOpus = (bits and OPUS_MONO) != 0L
         val pcm = PCM_FORMAT[bits]
         return when {
-            isOpus -> AudioFormat(AudioCodecKind.OPUS, 48_000, 1, payloadType, audioType)
+            isOpus -> AudioFormat(AudioCodecKind.OPUS, 48_000, 1, payloadType, audioType,
+                // 下行反馈按协商时基计数，上行麦克风继续沿现有车型兼容策略。
+                rtpClockRate = when {
+                    bits and 0x40000000L != 0L -> 48_000
+                    bits and 0x20000000L != 0L -> 24_000
+                    else -> 16_000
+                })
             isAacLc -> AudioFormat(
                 AudioCodecKind.AAC_LC,
                 if ((bits and AAC_LC_48K_STEREO) != 0L) 48_000 else 44_100,

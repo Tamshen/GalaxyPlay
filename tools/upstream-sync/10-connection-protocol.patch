@@ -88,15 +88,17 @@
      fun sendTelephony(index: Int) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/AudioStream.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/AudioStream.kt
-@@ -17,6 +17,7 @@
+@@ -17,6 +17,9 @@
      val channels: Int,
      val payloadType: Int,
      val audioType: String = "media",
 +    val bufferHint: AudioBufferHint? = null,
++    /** RTP 时基独立于解码采样率；Opus 16/24 kHz 流仍以 48 kHz 解码。 */
++    val rtpClockRate: Int = sampleRate,
  )
  
  /**
-@@ -52,35 +53,44 @@
+@@ -52,38 +55,48 @@
      private var controlThread: Thread? = null
      private var started = false
  
@@ -165,7 +167,11 @@
      }
  
      private fun runData(socket: DatagramSocket, listener: Listener) {
-@@ -95,6 +105,8 @@
++        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
+         val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic)
+         val buffer = ByteArray(DATAGRAM_BYTES)
+         try {
+@@ -95,6 +108,8 @@
                  } catch (_: Exception) {
                      if (closed.get()) return else continue
                  }
@@ -174,7 +180,7 @@
                  stats.received(
                      size = packet.length,
                      sequence = if (packet.length >= RTP_HEADER_LEN) {
-@@ -144,6 +156,7 @@
+@@ -144,6 +159,7 @@
                      stats.processed()
                      continue
                  }
@@ -182,7 +188,7 @@
                  val rtp = wire.copyOf(RTP_HEADER_LEN) + payload
                  val decryptedNumber = decryptedPackets.incrementAndGet()
                  if (decryptedNumber <= FIRST_PACKET_LOG_COUNT) {
-@@ -168,25 +181,35 @@
+@@ -168,25 +184,35 @@
                  listener.onRtp(rtp, sample)
                  stats.processed()
              }
@@ -229,7 +235,7 @@
      }
  
      private fun readU32Be(source: ByteArray, offset: Int): Int =
-@@ -199,6 +222,7 @@
+@@ -199,6 +225,7 @@
          joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
  
      private companion object {
@@ -237,6 +243,21 @@
          const val TAG = "xcertplay-usb"
          const val DATAGRAM_BYTES = 4_096
          const val AUDIO_RECEIVE_BUFFER_BYTES = 512 * 1024
+@@ -218,7 +245,13 @@
+         val isOpus = (bits and OPUS_MONO) != 0L
+         val pcm = PCM_FORMAT[bits]
+         return when {
+-            isOpus -> AudioFormat(AudioCodecKind.OPUS, 48_000, 1, payloadType, audioType)
++            isOpus -> AudioFormat(AudioCodecKind.OPUS, 48_000, 1, payloadType, audioType,
++                // 下行反馈按协商时基计数，上行麦克风继续沿现有车型兼容策略。
++                rtpClockRate = when {
++                    bits and 0x40000000L != 0L -> 48_000
++                    bits and 0x20000000L != 0L -> 24_000
++                    else -> 16_000
++                })
+             isAacLc -> AudioFormat(
+                 AudioCodecKind.AAC_LC,
+                 if ((bits and AAC_LC_48K_STEREO) != 0L) 48_000 else 44_100,
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/BufferedAudioStream.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/BufferedAudioStream.kt
 @@ -32,6 +32,8 @@
@@ -248,7 +269,21 @@
      private val closed = AtomicBoolean(false)
      private val started = AtomicBoolean(false)
      private var cleanupStarted = false // guarded by lock; permits reentrant close without recursion
-@@ -155,7 +157,7 @@
+@@ -68,6 +70,7 @@
+     }
+ 
+     private fun receive() {
++        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
+         var accepted: Socket? = null
+         try {
+             val socket = acceptPeer() ?: return
+@@ -150,12 +153,13 @@
+ 
+     /** Hands frames to the sink while playing, keeping about [LEAD_MILLIS] of audio ahead of real time. */
+     private fun feed() {
++        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
+         try {
+             while (!closed.get()) {
                  synchronized(lock) {
                      if (closed.get()) return
                      retireFedLocked()
@@ -344,6 +379,24 @@
          } catch (error: Exception) {
              Log.w(TAG, "buffered audio listener failed", error)
              return null
+@@ -434,7 +429,7 @@
+         val streams = active.map { meta ->
+             val entry = linkedMapOf<String, Any?>(
+                 "type" to meta.type,
+-                "sampleRate" to meta.format.sampleRate,
++                "sampleRate" to meta.format.rtpClockRate,
+             )
+             val firstSample = meta.firstSample
+             val originNs = meta.originNs
+@@ -445,7 +440,7 @@
+                     (nowNs - originNs) / 1e9 - meta.playoutLatencyMs / 1000.0,
+                 )
+                 val firstUnsigned = firstSample.toLong() and 0xffff_ffffL
+-                val sampleTime = (firstUnsigned + Math.round(elapsedSec * meta.format.sampleRate)) and
++                val sampleTime = (firstUnsigned + Math.round(elapsedSec * meta.format.rtpClockRate)) and
+                     0xffff_ffffL
+                 entry["streamConnectionID"] = unsignedPlistInteger(meta.connectionId ?: 0L)
+                 entry["timestamp"] = session.syncedNtp()
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlay.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlay.kt
 @@ -10,15 +10,21 @@
@@ -453,7 +506,14 @@
              run(accepted)
          } catch (error: Exception) {
              if (!closed.get()) listener.onClosed(error)
-@@ -74,10 +88,10 @@
+@@ -68,16 +82,17 @@
+     }
+ 
+     private fun run(sock: Socket) {
++        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }
+         var failure: Throwable? = null
+         val stats = StreamReceiveStats("video", onDiagnostic)
+         try {
              val input = sock.getInputStream()
              while (!closed.get()) {
                  stats.reading()
@@ -466,7 +526,7 @@
                  val arrivalNanos = System.nanoTime()
                  stats.received(HEADER_LEN + bodySize)
                  onMessage(header, body, stats, arrivalNanos)
-@@ -87,7 +101,7 @@
+@@ -87,7 +102,7 @@
              failure = error
          } finally {
              stats.flush(ended = true)
@@ -475,7 +535,7 @@
              safeClose(sock)
              if (!closed.get()) listener.onClosed(failure)
          }
-@@ -97,23 +111,22 @@
+@@ -97,23 +112,22 @@
          when (header[OPCODE_OFFSET].toInt() and 0xff) {
              OP_VIDEO_FRAME -> {
                  val payload = if (body.size >= ScreenCodec.TAG_SIZE) {
@@ -507,7 +567,7 @@
              }
              OP_VIDEO_CONFIG -> {
                  val (codec, codecData) = ScreenCodec.detectConfig(body)
-@@ -146,16 +159,8 @@
+@@ -146,16 +160,8 @@
      }
  }
  
@@ -1555,6 +1615,439 @@
          }
          failedThread?.quitSafely()
      }
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/WifiScanPause.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/WifiScanPause.kt
+@@ -3,27 +3,29 @@
+ import android.content.Context
+ import android.os.Build
+ import android.util.Log
++import com.shilapi.xcertplay.adb.LocalAdb
+ import com.shilapi.xcertplay.hud.BydAdbShell
+-import com.shilapi.xcertplay.hud.BydParcel
+-import java.lang.reflect.Field
+ import java.util.concurrent.Executors
+ import java.util.concurrent.ScheduledExecutorService
+ import java.util.concurrent.ScheduledFuture
+ import java.util.concurrent.TimeUnit
+ 
+ /**
+- * Pauses the head unit's automatic Wi-Fi network search while wireless CarPlay runs.
++ * Pauses the head unit's automatic Wi-Fi network search while a Wi-Fi Direct CarPlay session runs.
+  *
+- * BYD DiLink 3 (Android 10) scans every Wi-Fi band every 10 s whenever the car's own Wi-Fi client is
+- * not connected to a network. Each scan takes the single radio off the CarPlay channel for 3-6 s, so
+- * the stream stutters unless the car happens to be joined to a hotspot. Through the approved local
+- * adb shell, `IWifiManager.enableWifiConnectivityManager(false)` stops those scans (shell holds
+- * CONNECTIVITY_INTERNAL). One process-wide worker owns controller leases and restores scans only
+- * after the last lease ends. A durable marker precedes every disable; failed restores retry and
+- * recover when the app next opens. Nothing happens without adb approval. Same LAN is excluded.
++ * Wi-Fi Direct needs the car's Wi-Fi client switched on. While that client is not joined to a
++ * network, BYD firmware searches every band every 10 s (seen on DiLink 3, 4 and 5). The single radio
++ * leaves the CarPlay channel for each search, and the iPhone's audio packets sent meanwhile are lost,
++ * so music and voice stutter on a 10 s rhythm. The built-in car hotspot runs with the client off and
++ * is not affected, and Same LAN needs the search, so only Wi-Fi Direct sessions pause it.
+  *
+- * The binder transaction number differs between firmware builds, so it is read from the framework
+- * itself instead of being hard-coded; when it cannot be read, scans are left alone.
++ * Android offers apps no way to do this. Through the approved local adb shell, [WifiScanPauseMain]
++ * runs as the shell user and turns off the framework's automatic joining, which stops these scans:
++ * `enableWifiConnectivityManager` on Android 7.1-10 and `allowAutojoinGlobal` on Android 11+. One
++ * process-wide worker owns controller leases and restores the search only after the last lease
++ * ends. A durable marker precedes every disable; failed restores retry and recover when the app
++ * next opens, and the framework resets the setting itself when the car restarts. Nothing happens
++ * without adb approval, and this never asks for it.
+  */
+ internal class WifiScanPause(
+     context: Context,
+@@ -51,34 +53,38 @@
+ 
+     internal companion object {
+         internal const val TAG = "DiPlayWifiScan"
++        internal const val HEADER = "DIPLAY_WIFI_SCAN_V1"
++
++        /** app_process start-up on a slow head unit plus the helper's own deadline. */
++        internal const val HELPER_TIMEOUT_MS = 15_000
+ 
+         fun eligible(backend: WirelessHotspotBackend, sdk: Int = Build.VERSION.SDK_INT): Boolean =
+-            sdk == Build.VERSION_CODES.Q && backend != WirelessHotspotBackend.EXISTING_WIFI
++            backend == WirelessHotspotBackend.WIFI_P2P && sdk >= Build.VERSION_CODES.N_MR1
+ 
+         fun restoreIfNeeded(context: Context) = ProcessWifiScanPause.recover(context.applicationContext)
+ 
+-        fun command(code: Int, enabled: Boolean): String {
+-            require(code > 0)
+-            return "service call wifi $code i32 ${if (enabled) 1 else 0}"
++        fun command(apk: String, enabled: Boolean): String {
++            val quoted = "'" + apk.replace("'", "'\"'\"'") + "'"
++            val action = if (enabled) WifiScanPauseMain.RESTORE else WifiScanPauseMain.PAUSE
++            return "CLASSPATH=$quoted app_process /system/bin ${WifiScanPauseMain::class.java.name} $action"
+         }
+ 
+-        /** `void` replies carry only a zero exception word. */
+-        fun accepted(output: String?): Boolean = BydParcel.words(output).firstOrNull() == 0L
++        /** Reads the helper's protocol line; other output, such as runtime warnings, is ignored. */
++        fun parse(output: String?): WifiScanSwitchResult {
++            val prefix = "$HEADER|"
++            val line = output?.lineSequence()?.map(String::trim)?.lastOrNull { it.startsWith(prefix) }
++                ?: return WifiScanSwitchResult.UNKNOWN
++            return WifiScanSwitchResult.entries.firstOrNull { it.name == line.removePrefix(prefix) }
++                ?: WifiScanSwitchResult.UNKNOWN
++        }
+ 
+-        /**
+-         * Android 10 blocks direct reflection on this hidden constant but still allows the lookup when
+-         * it goes through Class.getDeclaredField itself; later releases close that path, so only Q is
+-         * attempted, which is what DiLink 3 runs.
+-         */
+-        fun enableConnectivityManagerTransaction(): Int? {
+-            if (Build.VERSION.SDK_INT != Build.VERSION_CODES.Q) return null
+-            return runCatching {
+-                val stub = Class.forName("android.net.wifi.IWifiManager\$Stub")
+-                val lookup = Class::class.java.getDeclaredMethod("getDeclaredField", String::class.java)
+-                val field = lookup.invoke(stub, "TRANSACTION_enableWifiConnectivityManager") as Field
+-                field.isAccessible = true
+-                field.getInt(null)
+-            }.getOrNull()?.takeIf { it > 0 }
++        /** Why the helper did not answer, from what the adb connection reported. */
++        fun unanswered(access: LocalAdb.Access?): WifiScanSwitchResult = when (access) {
++            LocalAdb.Access.NOT_APPROVED -> WifiScanSwitchResult.ADB_NOT_APPROVED
++            LocalAdb.Access.UNREACHABLE -> WifiScanSwitchResult.ADB_OFF
++            LocalAdb.Access.UNSUPPORTED -> WifiScanSwitchResult.ADB_PAIRING_ONLY
++            // Connected, so the helper may have run before the link failed.
++            LocalAdb.Access.READY, null -> WifiScanSwitchResult.UNKNOWN
+         }
+     }
+ }
+@@ -100,7 +106,10 @@
+     private var retry: ScheduledFuture<*>? = null
+ 
+     override fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {
+-        enqueue(app) { state -> log("Wi-Fi connectivity scans paused=${state.acquire(owner, current)}") }
++        enqueue(app) { state ->
++            val outcome = state.acquire(owner, current)
++            log("Wi-Fi connectivity scans paused=${outcome.paused} reason=${outcome.reason} api=${Build.VERSION.SDK_INT}")
++        }
+     }
+ 
+     override fun release(app: Context, owner: Any, log: (String) -> Unit) {
+@@ -139,10 +148,14 @@
+             edit.commit()
+         }
+         return WifiScanPauseSession(
+-            transactionCode = WifiScanPause::enableConnectivityManagerTransaction,
+-            setEnabled = { code, enabled -> WifiScanPause.accepted(adb.run(app, WifiScanPause.command(code, enabled))) },
++            setEnabled = { enabled -> switch(app, enabled) },
+             loadJournal = { journal.pending },
+             saveJournal = journal::save,
+         ).also { session = it }
+     }
++
++    private fun switch(app: Context, enabled: Boolean): WifiScanSwitchResult {
++        val output = adb.run(app, WifiScanPause.command(app.packageCodePath, enabled), WifiScanPause.HELPER_TIMEOUT_MS)
++        return if (output == null) WifiScanPause.unanswered(adb.lastAccess) else WifiScanPause.parse(output)
++    }
+ }
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/WifiScanPauseMain.kt
+@@ -0,0 +1,150 @@
++package com.shilapi.xcertplay.network
++
++import android.os.Binder
++import android.os.Bundle
++import android.os.IBinder
++import android.os.Parcel
++import android.os.Process
++import java.lang.reflect.InvocationTargetException
++import java.lang.reflect.Method
++import java.lang.reflect.Proxy
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicReference
++import kotlin.system.exitProcess
++
++/**
++ * Shell-UID entry point that [WifiScanPause] starts through the head unit's adb with app_process.
++ * Hidden framework calls are allowed there, and the shell holds the permission they check
++ * (CONNECTIVITY_INTERNAL on Android 7.1-10, NETWORK_SETTINGS on 11+). Prints only the protocol line.
++ */
++object WifiScanPauseMain {
++    internal const val PAUSE = "pause"
++    internal const val RESTORE = "restore"
++    private const val DEADLINE_MS = 12_000L
++    private const val ROOT_UID = 0
++    private const val SHELL_UID = 2000
++
++    @JvmStatic fun main(args: Array<String>) {
++        // A stuck Binder call must not leave a privileged helper running.
++        Thread({ Thread.sleep(DEADLINE_MS); exitProcess(2) }, "wifi-scan-helper-deadline")
++            .apply { isDaemon = true; start() }
++        val result = try { execute(args) } catch (_: Throwable) { WifiScanSwitchResult.UNKNOWN }
++        println("${WifiScanPause.HEADER}|${result.name}")
++        exitProcess(0)
++    }
++
++    private fun execute(args: Array<String>): WifiScanSwitchResult {
++        val uid = Process.myUid()
++        require(uid == SHELL_UID || uid == ROOT_UID)
++        require(args.size == 1 && args[0] in setOf(PAUSE, RESTORE))
++        val wifi = runCatching { connect() }.getOrNull() ?: return WifiScanSwitchResult.UNSUPPORTED
++        return WifiAutojoinSwitch(wifi).set(enabled = args[0] == RESTORE)
++    }
++
++    private fun connect(): Any? {
++        val service = Class.forName("android.os.ServiceManager")
++            .getMethod("getService", String::class.java).invoke(null, "wifi") as? IBinder ?: return null
++        return Class.forName("android.net.wifi.IWifiManager\$Stub")
++            .getMethod("asInterface", IBinder::class.java).invoke(null, service)
++    }
++}
++
++/**
++ * Switches the framework's automatic joining, and with it the periodic connectivity scans, through
++ * the IWifiManager binder proxy. Methods are found by name and shape because BYD firmware renumbers
++ * binder transactions: `enableWifiConnectivityManager(boolean)` on Android 7.1-10,
++ * `allowAutojoinGlobal(boolean)` on 11-13 and `allowAutojoinGlobal(boolean, String, Bundle)` on 14+.
++ * Android 13+ also reports the current setting, so one that someone else turned off is left alone
++ * and every change is read back.
++ */
++internal class WifiAutojoinSwitch(
++    private val wifi: Any,
++    listenerType: Class<*>? = runCatching { Class.forName(LISTENER) }.getOrNull(),
++    private val queryTimeoutMillis: Long = 5_000,
++) {
++    private val methods = wifi.javaClass.methods
++    private val setter: Method? = methods.firstOrNull(::isAutojoinSetter)
++        ?: methods.firstOrNull { it.name == "enableWifiConnectivityManager" && it.parameterTypes.contentEquals(arrayOf(BOOLEAN)) }
++    private val query: Method? = listenerType?.let { type ->
++        methods.firstOrNull { it.name == "queryAutojoinGlobal" && it.parameterTypes.contentEquals(arrayOf(type)) }
++    }
++
++    /** The framework method this firmware offers, or null when there is none. */
++    val method: String? get() = setter?.name
++
++    fun set(enabled: Boolean): WifiScanSwitchResult {
++        val target = setter ?: return WifiScanSwitchResult.UNSUPPORTED
++        try {
++            // A refused query refuses the change too; any other query failure only skips the check.
++            val before = try { read() } catch (denied: SecurityException) { throw denied } catch (_: Exception) { null }
++            if (!enabled && before == false) return WifiScanSwitchResult.ALREADY_OFF
++            call(target, *arguments(target, enabled))
++        } catch (_: SecurityException) {
++            // Every release checks the caller before it changes anything.
++            return WifiScanSwitchResult.DENIED
++        }
++        // A clean void reply; Android 13+ also confirms the new state.
++        val after = runCatching { read() }.getOrNull()
++        return if (after == null || after == enabled) WifiScanSwitchResult.DONE else WifiScanSwitchResult.UNKNOWN
++    }
++
++    /** Android 13+: the current setting; null when this release cannot report it in time. */
++    internal fun read(): Boolean? {
++        val method = query ?: return null
++        val type = method.parameterTypes[0]
++        val answer = AtomicReference<Boolean>()
++        val done = CountDownLatch(1)
++        val callback = object : Binder() {
++            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
++                if (code != FIRST_CALL_TRANSACTION) return super.onTransact(code, data, reply, flags)
++                data.enforceInterface(type.name)
++                answer.set(data.readInt() != 0)
++                done.countDown()
++                return true
++            }
++        }.apply { attachInterface(null, type.name) }
++        val listener = Proxy.newProxyInstance(type.classLoader ?: javaClass.classLoader, arrayOf(type)) { proxy, called, args ->
++            when (called.name) {
++                "asBinder" -> callback
++                "hashCode" -> System.identityHashCode(proxy)
++                "equals" -> proxy === args?.firstOrNull()
++                "toString" -> "DiPlayAutojoinListener"
++                else -> null
++            }
++        }
++        call(method, listener)
++        return if (done.await(queryTimeoutMillis, TimeUnit.MILLISECONDS)) answer.get() else null
++    }
++
++    private fun call(method: Method, vararg args: Any) {
++        try {
++            // Binder 代理类可能不是公开类；shell 已持有权限，仍需明确允许反射访问其公开方法。
++            method.isAccessible = true
++            method.invoke(wifi, *args)
++        } catch (failure: InvocationTargetException) {
++            throw failure.targetException
++        }
++    }
++
++    private fun arguments(method: Method, enabled: Boolean): Array<Any> =
++        Array(method.parameterTypes.size) { index ->
++            when (method.parameterTypes[index]) {
++                BOOLEAN -> enabled
++                String::class.java -> SHELL_PACKAGE
++                else -> Bundle()
++            }
++        }
++
++    private fun isAutojoinSetter(method: Method): Boolean {
++        val types = method.parameterTypes
++        return method.name == "allowAutojoinGlobal" && types.firstOrNull() == BOOLEAN &&
++            types.drop(1).all { it == String::class.java || it == Bundle::class.java }
++    }
++
++    private companion object {
++        const val LISTENER = "android.net.wifi.IBooleanListener"
++        const val SHELL_PACKAGE = "com.android.shell"
++        val BOOLEAN: Class<*> = java.lang.Boolean.TYPE
++    }
++}
+--- a/shared/src/main/java/com/shilapi/xcertplay/network/WifiScanPauseSession.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/WifiScanPauseSession.kt
+@@ -1,4 +1,22 @@
+ package com.shilapi.xcertplay.network
++
++/** What one attempt to switch the framework's automatic network search reported. */
++internal enum class WifiScanSwitchResult(val reason: String, val changedNothing: Boolean) {
++    DONE("done", false),
++
++    /** Pause only: automatic joining was already off, so it is someone else's to restore. */
++    ALREADY_OFF("already-off", true),
++    ADB_OFF("adb-off", true),
++    ADB_NOT_APPROVED("adb-not-approved", true),
++    ADB_PAIRING_ONLY("adb-pairing-only", true),
++    UNSUPPORTED("unsupported-firmware", true),
++
++    /** The framework refused the caller before changing anything. */
++    DENIED("denied", true),
++
++    /** No usable reply: the change may or may not have happened. */
++    UNKNOWN("no-reply", false),
++}
+ 
+ /** SharedPreferences updates its memory cache even when commit fails; retain only durable state. */
+ internal class WifiScanPauseJournal(initialPending: Boolean, private val commit: (Boolean) -> Boolean) {
+@@ -12,31 +30,41 @@
+ 
+ /** Process-wide state used only by one serial worker; no restore can race a newer pause. */
+ internal class WifiScanPauseSession(
+-    private val transactionCode: () -> Int?,
+-    private val setEnabled: (Int, Boolean) -> Boolean,
++    private val setEnabled: (Boolean) -> WifiScanSwitchResult,
+     private val loadJournal: () -> Boolean,
+     private val saveJournal: (Boolean) -> Boolean,
+ ) {
++    /** [reason] is a [WifiScanSwitchResult.reason], or why no switch was attempted. */
++    class Outcome(val paused: Boolean, val reason: String)
++
+     private val owners = mutableSetOf<Any>()
+     private var pauseConfirmed = false
+ 
+-    fun acquire(owner: Any, current: () -> Boolean): Boolean {
+-        if (!current()) return false
++    fun acquire(owner: Any, current: () -> Boolean): Outcome {
++        if (!current()) return Outcome(false, CANCELLED)
+         owners.add(owner)
+-        if (pauseConfirmed) return true
++        if (pauseConfirmed) return Outcome(true, WifiScanSwitchResult.DONE.reason)
++        var reply: WifiScanSwitchResult? = null
+         var acquired = false
+         try {
+-            val code = transactionCode() ?: return false
+-            if (!loadJournal() && !saveJournal(true)) return false
++            val earlierPause = loadJournal()
++            if (!earlierPause && !saveJournal(true)) return Outcome(false, JOURNAL_FAILED)
+             // Persist before the write: a lost shell reply or process death may follow a real mutation.
+-            pauseConfirmed = setEnabled(code, false)
++            val result = setEnabled(false).also { reply = it }
++            // A pause left by an earlier process is still ours; its marker restores it later.
++            pauseConfirmed = result == WifiScanSwitchResult.DONE ||
++                (result == WifiScanSwitchResult.ALREADY_OFF && earlierPause)
+             acquired = pauseConfirmed && current()
++            // Nothing was switched and no older pause awaits restore: drop the marker instead of
++            // retrying a restore every 30 s for a pause that never happened.
++            if (!pauseConfirmed && result.changedNothing && !earlierPause) saveJournal(false)
+         } finally {
+             if (!acquired) owners.remove(owner)
+         }
+-        if (acquired) return true
++        if (acquired) return Outcome(true, WifiScanSwitchResult.DONE.reason)
++        val reason = if (pauseConfirmed) CANCELLED else reply?.reason ?: WifiScanSwitchResult.UNKNOWN.reason
+         recover()
+-        return false
++        return Outcome(false, reason)
+     }
+ 
+     fun release(owner: Any): Boolean {
+@@ -48,11 +76,14 @@
+         if (owners.isNotEmpty()) return true
+         pauseConfirmed = false
+         if (!loadJournal()) return true
+-        // Always resolve the current framework method; never replay an old firmware's binder number.
+-        val code = transactionCode() ?: return false
+-        if (!setEnabled(code, true)) return false
++        if (setEnabled(true) != WifiScanSwitchResult.DONE) return false
+         return saveJournal(false)
+     }
+ 
+     fun recoveryPending(): Boolean = owners.isEmpty() && loadJournal()
++
++    private companion object {
++        const val CANCELLED = "cancelled"
++        const val JOURNAL_FAILED = "journal-failed"
++    }
+ }
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/network/WirelessPerformanceLock.kt
+@@ -0,0 +1,50 @@
++package com.shilapi.xcertplay.network
++
++import android.content.Context
++import android.net.wifi.WifiManager
++import android.os.Build
++import java.io.Closeable
++
++/** 沿用 xcertplay 无线性能锁；控制器关闭后拒绝迟到的会话回调重新持锁。 */
++internal class WirelessPerformanceLock(
++    context: Context,
++    private val log: (String) -> Unit,
++) : Closeable {
++    private val app = context.applicationContext
++    private var highPerformance: WifiManager.WifiLock? = null
++    private var lowLatency: WifiManager.WifiLock? = null
++    private var closed = false
++
++    @Synchronized fun acquire() {
++        if (closed) return
++        val manager = app.getSystemService(WifiManager::class.java) ?: return
++        if (highPerformance == null) highPerformance = acquire(manager,
++            WifiManager.WIFI_MODE_FULL_HIGH_PERF, "GalaxyPlay:high-performance")
++        if (Build.VERSION.SDK_INT >= 29 && lowLatency == null) lowLatency = acquire(manager,
++            WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "GalaxyPlay:low-latency")
++    }
++
++    private fun acquire(manager: WifiManager, mode: Int, tag: String): WifiManager.WifiLock? = try {
++        manager.createWifiLock(mode, tag).apply {
++            setReferenceCounted(false)
++            acquire()
++        }.also { trace("Wireless Wi-Fi lock acquired mode=$mode") }
++    } catch (error: RuntimeException) {
++        trace("Wireless Wi-Fi lock unavailable mode=$mode exceptionType=${error.javaClass.simpleName}")
++        null
++    }
++
++    /** 会话结束可释放后再次使用；最终关闭则永久拒绝重新获取。 */
++    @Synchronized fun release() {
++        listOfNotNull(lowLatency, highPerformance).forEach { lock ->
++            runCatching { if (lock.isHeld) lock.release() }.onFailure {
++                trace("Wireless Wi-Fi lock release failed exceptionType=${it.javaClass.simpleName}")
++            }
++        }
++        lowLatency = null
++        highPerformance = null
++    }
++
++    @Synchronized override fun close() { closed = true; release() }
++    private fun trace(message: String) { runCatching { log(message) } }
++}
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/WirelessReceiveDiagnostics.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/WirelessReceiveDiagnostics.kt
 @@ -4,9 +4,9 @@
@@ -1689,7 +2182,15 @@
  import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
  import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
  import com.shilapi.xcertplay.airplay.AirPlayConfig
-@@ -65,6 +68,8 @@
+@@ -50,6 +53,7 @@
+ import com.shilapi.xcertplay.network.WifiScanPause
+ import com.shilapi.xcertplay.network.WirelessHotspotInfo
+ import com.shilapi.xcertplay.network.WirelessHotspotBackend
++import com.shilapi.xcertplay.network.WirelessPerformanceLock
+ import com.shilapi.xcertplay.network.WirelessHotspotManager
+ import com.shilapi.xcertplay.network.WirelessInterfaceDiagnostics
+ import com.shilapi.xcertplay.network.WirelessReceiveDiagnostics
+@@ -65,6 +69,8 @@
  import com.shilapi.xcertplay.transport.Ch341UsbSession
  import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
  import com.shilapi.xcertplay.transport.Iap2LocationProvider
@@ -1698,7 +2199,7 @@
  import com.shilapi.xcertplay.transport.Iap2UsbMuxHost
  import com.shilapi.xcertplay.transport.Iap2UsbSession
  import com.shilapi.xcertplay.transport.Iap2WiredCarPlayEndpoint
-@@ -74,8 +79,6 @@
+@@ -74,8 +80,6 @@
  import com.shilapi.xcertplay.transport.Iap2WirelessControlClient
  import com.shilapi.xcertplay.transport.Iap2WirelessControlTerminal
  import com.shilapi.xcertplay.transport.Iap2WirelessIdentification
@@ -1707,7 +2208,7 @@
  import com.shilapi.xcertplay.transport.I2cTransport
  import com.shilapi.xcertplay.transport.I2cTransportException
  import com.shilapi.xcertplay.transport.IphoneCarPlayConfiguration
-@@ -119,6 +122,9 @@
+@@ -119,6 +123,9 @@
      data object WaitingForPairedIphone : CarPlayStatus()
      data object ConnectingBluetooth : CarPlayStatus()
      data object RunningWireless : CarPlayStatus()
@@ -1717,7 +2218,7 @@
      data object WirelessActive : CarPlayStatus()
      data object WirelessActiveFallback : CarPlayStatus()
      data object DiscoveringIphone : CarPlayStatus()
-@@ -163,12 +169,17 @@
+@@ -163,7 +170,12 @@
      private val clearPairRecord: () -> Unit = {},
      private val locationProvider: Iap2LocationProvider? = null,
      private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
@@ -1730,13 +2231,7 @@
      init {
          require(!config.locationReportingEnabled || locationProvider != null) {
              "A location provider is required when location reporting is enabled"
-         }
--        WifiScanPause.restoreIfNeeded(context.applicationContext)
-+        if (config.wifiScanPauseEnabled) WifiScanPause.restoreIfNeeded(context.applicationContext)
-         BydNavigationOutputs.start(context.applicationContext)
-         BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
-     }
-@@ -177,7 +188,9 @@
+@@ -177,7 +189,9 @@
  
      private val appContext = context.applicationContext
      private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
@@ -1746,7 +2241,7 @@
      private val usbManager: UsbManager? = context.getSystemService(UsbManager::class.java)
      private val bluetoothAdapter =
          appContext.getSystemService(BluetoothManager::class.java)?.adapter
-@@ -190,10 +203,13 @@
+@@ -190,23 +204,33 @@
              } else {
                  IphoneUsbMatcher.appleVendor()
              },
@@ -1760,8 +2255,11 @@
      private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
      private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
      private val mainHandler = Handler(Looper.getMainLooper())
-@@ -202,11 +218,16 @@
+     private val hostId = UUID.randomUUID().toString().uppercase(Locale.US)
+     private val systemBuid = UUID.randomUUID().toString().uppercase(Locale.US)
      private val lifecycleLock = Any()
++    private val performanceLockLifecycle = Any()
++    private val wirelessPerformanceLock = WirelessPerformanceLock(appContext, ::debugLog)
      @Volatile private var uiListener: AirPlaySessionListener? = listener
      @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
 +    private val iphonePermission = IphoneUsbPermissionGate()
@@ -1777,7 +2275,7 @@
      private var mfiResetLogged = false
  
      @Volatile private var closed = false
-@@ -214,6 +235,8 @@
+@@ -214,6 +238,8 @@
      @Volatile private var ch341Host: Ch341UsbHost? = null
      @Volatile private var mfiSession: MfiSession? = null
      @Volatile private var mux: Iap2UsbMuxHost? = null
@@ -1786,7 +2284,7 @@
      @Volatile private var csm: Iap2Session? = null
      @Volatile private var activeSession: AirPlaySession? = null
      @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
-@@ -227,13 +250,21 @@
+@@ -227,13 +253,21 @@
      private val playbackStatus = com.shilapi.xcertplay.media.CarPlayPlaybackStatus()
  
      /** Told when the iPhone starts or stops playing media; may run on any thread. */
@@ -1811,7 +2309,7 @@
  
      /** Video in car; set before [start] to offer it to the iPhone (with AirPlayConfig.videoInCar). */
      @Volatile var videoListener: CarPlayVideoListener? = null
-@@ -249,6 +280,7 @@
+@@ -249,6 +283,7 @@
      private val wirelessResourceLock = Any()
      private val wirelessFailureReported = AtomicBoolean(false)
      @Volatile private var firstTcpWatchdog: FirstTcpWatchdog? = null
@@ -1819,7 +2317,7 @@
      private val startupTimer = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
          Thread(task, "diplay-first-tcp-timeout").apply { isDaemon = true }
      }.apply { removeOnCancelPolicy = true }
-@@ -263,13 +295,13 @@
+@@ -263,13 +298,13 @@
      private val wirelessHandoffRequested = AtomicBoolean(false)
      private val wirelessTunnelReady = AtomicBoolean(false)
      private val wirelessActiveReported = AtomicBoolean(false)
@@ -1834,14 +2332,22 @@
      private var ch341PermissionCloseable: Closeable? = null
      private var vpnLatch = CountDownLatch(1)
      private val teardownComplete = CountDownLatch(1)
-@@ -288,10 +320,14 @@
+@@ -288,10 +323,21 @@
  
      private val sessionListener = object : AirPlaySessionListener {
          override fun onSessionActive(session: AirPlaySession) {
-+            if (closed) return
-             val replacement = activeSession !== session
+-            val replacement = activeSession !== session
++            val previous = synchronized(performanceLockLifecycle) {
++                if (closed) return
++                val previous = activeSession
++                activeSession = session
++                if (config.transport == CarPlayTransport.WIRELESS && config.wifiHighPerformanceEnabled)
++                    wirelessPerformanceLock.acquire()
++                previous
++            }
++            val replacement = previous !== session
              if (replacement) {
-+                if (activeSession != null) {
++                if (previous != null) {
 +                    sessionStateListener?.invoke(false)
 +                    navigationInput.clear()
 +                }
@@ -1850,20 +2356,31 @@
                  com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                  // The gear may have changed since /info.
                  if (videoListener != null) {
-@@ -300,6 +336,9 @@
+@@ -299,7 +345,9 @@
+                     debugLog("video in car session allowed=${VideoInCar.allowed} delivery=$delivery")
                  }
              }
-             activeSession = session
+-            activeSession = session
 +            sessionStateListener?.invoke(true)
 +            // A2DP 与 RFCOMM 控制属于不同 profile；媒体互斥不依赖可选 iAP2 隧道交接。
 +            audioConnectionListener?.invoke(true)
              if (replacement) restoreDashboardContent(session)
              debugLog(
                  "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
-@@ -311,16 +350,17 @@
+@@ -309,18 +357,25 @@
+         }
+ 
          override fun onSessionEnded(session: AirPlaySession) {
-             if (activeSession === session) {
-                 activeSession = null
+-            if (activeSession === session) {
+-                activeSession = null
++            val ended = synchronized(performanceLockLifecycle) {
++                if (activeSession !== session) false else {
++                    activeSession = null
++                    wirelessPerformanceLock.release()
++                    true
++                }
++            }
++            if (ended) {
 +                navigationInput.clear()
 +                sessionStateListener?.invoke(false)
 +                audioConnectionListener?.invoke(false)
@@ -1885,7 +2402,7 @@
              }
              debugLog("AirPlay session ended peer=${session.host}")
              uiListener?.onSessionEnded(session)
-@@ -417,6 +457,9 @@
+@@ -417,6 +472,9 @@
              if (closed) return
          }
          connectionDiagnostic("start transport=${config.transport}")
@@ -1895,7 +2412,7 @@
          if (!hasRequiredUsbService()) return
          videoListener?.let { listener ->
              videoGate = VideoInCarGate(
-@@ -435,6 +478,7 @@
+@@ -435,6 +493,7 @@
          if (config.transport == CarPlayTransport.WIRED) {
              permissionCloseable = iphoneHost.registerPermissionReceiver(::onIphonePermission)
              attachCloseable = iphoneHost.registerAttachReceiver(::onIphoneAttached)
@@ -1903,7 +2420,7 @@
          }
          startMfi()
      }
-@@ -447,14 +491,21 @@
+@@ -447,14 +506,21 @@
      }
  
      /** Re-runs iPhone discovery/bring-up using the already-open MFi session. */
@@ -1927,7 +2444,7 @@
          }
      }
  
-@@ -469,6 +520,8 @@
+@@ -469,6 +535,8 @@
          }
      }
  
@@ -1936,7 +2453,7 @@
      /** Moves CarPlay on the main screen to its declared view area [index], for example another dock edge. */
      fun showViewArea(index: Int): Boolean {
          if (closed) return false
-@@ -575,13 +628,41 @@
+@@ -575,13 +643,41 @@
          }
      }
  
@@ -1983,10 +2500,11 @@
              false
          }
      }
-@@ -592,6 +673,13 @@
+@@ -592,6 +688,14 @@
              closed = true
              dashboardMapOutputVisible = false
          }
++        synchronized(performanceLockLifecycle) { wirelessPerformanceLock.close() }
 +        diagnostics.stopRequested()
 +        sessionStateListener?.invoke(false)
 +        sessionStateListener = null
@@ -1997,7 +2515,7 @@
          firstTcpWatchdog?.terminate()
          startupTimer.shutdownNow()
          (hotspot as? ManualHotspotManager)?.close()
-@@ -605,6 +693,7 @@
+@@ -605,6 +709,7 @@
          availabilityPollGeneration.incrementAndGet()
          wirelessGeneration.incrementAndGet()
          permissionPollGeneration += 1
@@ -2005,7 +2523,7 @@
          touchExecutor.shutdownNow()
          tunnelExecutor.shutdownNow()
          val service = vpnService
-@@ -617,19 +706,29 @@
+@@ -617,19 +722,29 @@
                          closeBestEffort("Wi-Fi scan pause") { wifiScanPause?.close() }
                          wifiScanPause = null
                      } else {
@@ -2038,7 +2556,7 @@
                  } finally {
                      executor.shutdownNow()
                      var executorTerminated = false
-@@ -642,6 +741,12 @@
+@@ -642,6 +757,12 @@
                          "teardown end elapsedMs=${elapsedMillis(teardownStarted)} " +
                              "executorTerminated=$executorTerminated",
                      )
@@ -2051,7 +2569,7 @@
                      teardownComplete.countDown()
                  }
              },
-@@ -731,7 +836,7 @@
+@@ -731,7 +852,7 @@
      fun awaitClosed(timeoutMillis: Long): Boolean {
          require(timeoutMillis >= 0) { "timeoutMillis must not be negative" }
          return try {
@@ -2060,7 +2578,7 @@
          } catch (_: InterruptedException) {
              Thread.currentThread().interrupt()
              false
-@@ -740,28 +845,41 @@
+@@ -740,28 +861,41 @@
  
      // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
      private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
@@ -2113,7 +2631,7 @@
          when (config.mfiTarget) {
              MfiTarget.LOCAL -> openLocalMfi(offlineDirectory)
              MfiTarget.USB_CH341 -> {
-@@ -1142,13 +1260,18 @@
+@@ -1142,13 +1276,18 @@
                  },
                  onTimeout = {
                      if (!closed && generation == wirelessGeneration.get()) {
@@ -2134,7 +2652,7 @@
              )
              firstTcpWatchdog = watchdog
              val mfi = mfiSession?.client
-@@ -1159,10 +1282,22 @@
+@@ -1159,10 +1298,22 @@
              }
              pauseWifiScans(hotspotInfo.backend)
              val startedHotspot = hotspot
@@ -2158,7 +2676,7 @@
                  ?: throw IOException(
                      "Wireless hotspot did not provide a usable host address",
                  )
-@@ -1215,6 +1350,7 @@
+@@ -1215,6 +1366,7 @@
                  ?: throw IOException("Bluetooth adapter is unavailable")
              if (!adapter.isEnabled) throw IOException("Bluetooth is not enabled")
              val device = selectWirelessBluetoothDevice(adapter)
@@ -2166,7 +2684,7 @@
              val hostBluetoothMac = accessoryBluetoothMac(adapter)
              debugLog(
                  "wireless selected Bluetooth target name=${device.name ?: "unknown"} " +
-@@ -1241,7 +1377,8 @@
+@@ -1241,7 +1393,8 @@
                          listener = wirelessSessionListener(generation, watchdog),
                          listenerIdentity = watchdog.listener,
                          media = media,
@@ -2176,7 +2694,7 @@
                      )
                  ) {
                      CarPlayVpnService.AttachResult.Started -> Unit
-@@ -1251,13 +1388,10 @@
+@@ -1251,13 +1404,10 @@
                          throw IOException(result.message)
                  }
              }
@@ -2193,7 +2711,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1272,7 +1406,8 @@
+@@ -1272,7 +1422,8 @@
                  // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
                  useInterfaceMdns = true,
                  onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
@@ -2203,7 +2721,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) return
-@@ -1283,6 +1418,10 @@
+@@ -1283,6 +1434,10 @@
              startedBonjour = bonjourClient
              diagnostics.start()
              debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
@@ -2214,7 +2732,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1301,8 +1440,7 @@
+@@ -1301,8 +1456,7 @@
              val bluetoothStarted = System.nanoTime()
              try {
                  connectBluetoothSocket(socket, device.address)
@@ -2224,7 +2742,7 @@
              } catch (error: Throwable) {
                  connectionDiagnostic(
                      "Bluetooth connect failed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
-@@ -1312,7 +1450,6 @@
+@@ -1312,7 +1466,6 @@
                  throw error
              }
              debugLog("wireless RFCOMM connected address=${device.address}")
@@ -2232,7 +2750,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1321,8 +1458,7 @@
+@@ -1321,8 +1474,7 @@
                  try {
                      BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
                  } finally {
@@ -2242,7 +2760,7 @@
                      if (bluetoothSocket === socket) bluetoothSocket = null
                  }
              }
-@@ -1330,7 +1466,7 @@
+@@ -1330,7 +1482,7 @@
                  stream,
                  traceContext = "wireless-rfcomm",
                  onTrace = ::debugLog,
@@ -2251,7 +2769,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) {
-@@ -1343,14 +1479,12 @@
+@@ -1343,14 +1495,12 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
@@ -2269,7 +2787,7 @@
              )
              val endpoint = Iap2WirelessCarPlayEndpoint(
                  ssid = hotspotInfo.ssid,
-@@ -1379,6 +1513,7 @@
+@@ -1379,6 +1529,7 @@
                      "location=false vehicleStatus=false",
              )
              startedHotspot?.validateReady()
@@ -2277,7 +2795,7 @@
              val result = Iap2WirelessControlClient(
                  session = channel,
                  mfi = Iap2MfiAuthenticationClient(mfi),
-@@ -1388,8 +1523,23 @@
+@@ -1388,8 +1539,23 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  keepAliveAfterDeadline = { keepBluetoothControlAlive(generation) },
                  beforeStartSession = { startedHotspot?.validateReady() },
@@ -2303,7 +2821,7 @@
                  onProgress = { message ->
                      diagnostics.controlProgress(message)
                      debugLog(message)
-@@ -1458,7 +1608,7 @@
+@@ -1458,7 +1624,7 @@
                  stream,
                  traceContext = "wireless-tunnel",
                  onTrace = ::debugLog,
@@ -2312,7 +2830,7 @@
              )
          } catch (error: Throwable) {
              debugLog("Could not open the tunneled iAP2 link", error)
-@@ -1466,11 +1616,8 @@
+@@ -1466,11 +1632,8 @@
          }
          wirelessTunnelChannel = channel
          val generation = wirelessGeneration.get()
@@ -2326,7 +2844,7 @@
          return try {
              tunnelExecutor.execute {
                  try {
-@@ -1486,7 +1633,7 @@
+@@ -1486,7 +1649,7 @@
                          onReady = {
                              onWirelessTunnelReady(generation)
                          },
@@ -2335,7 +2853,7 @@
                          onProgress = { message -> debugLog("iAP tunnel $message") },
                      )
                      if (closed || generation != wirelessGeneration.get()) return@execute
-@@ -1524,7 +1671,10 @@
+@@ -1524,7 +1687,10 @@
  
              override fun onTcpAccepted(event: AirPlayTcpAccepted) {
                  if (isStaleWirelessRun(generation)) return
@@ -2347,7 +2865,7 @@
              }
  
              override fun onTransportError(message: String) {
-@@ -1534,12 +1684,18 @@
+@@ -1534,12 +1700,18 @@
              }
  
              override fun onSessionActive(session: AirPlaySession) {
@@ -2367,7 +2885,7 @@
                  // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
                  // the Bluetooth bootstrap after the tunneled iAP2 channel is ready.
                  sessionListener.onSessionActive(session)
-@@ -1555,13 +1711,17 @@
+@@ -1555,13 +1727,17 @@
                  if (isStaleWirelessRun(generation) || activeSession !== session) return
                  if (!watchdog.sessionEstablished()) return
                  wirelessConnectionProof.rendered(generation, session)
@@ -2386,7 +2904,7 @@
              }
  
              override fun onDebugLog(message: String) {
-@@ -1606,6 +1766,7 @@
+@@ -1606,6 +1782,7 @@
                          wirelessFailureReported.get() || !wirelessTunnelReady.get()) return@Thread
                      debugLog("wireless handoff ready; closing Bluetooth bootstrap transport")
                      closeBluetoothBootstrapTransport()
@@ -2394,7 +2912,7 @@
                      onStatus(CarPlayStatus.WirelessActive, generation)
                  }
              },
-@@ -1657,9 +1818,6 @@
+@@ -1657,9 +1834,6 @@
          if (activeSession != null && wirelessConnectionProof.hasRenderedFrame(generation)) {
              if (!wirelessActiveReported.compareAndSet(false, true)) return@synchronized
              wirelessHandoffFellBack.set(true)
@@ -2404,7 +2922,7 @@
              debugLog("wireless handoff fallback after rendered video; tunnel iAP2 unavailable; " +
                  "preserving AirPlay and keeping the Bluetooth bootstrap for iAP2 control")
              onStatus(CarPlayStatus.WirelessActiveFallback, generation)
-@@ -1683,146 +1841,254 @@
+@@ -1683,146 +1857,254 @@
          if (activeSocket != null) closeBestEffort("wireless Bluetooth socket") { activeSocket.close() }
      }
  
@@ -2743,7 +3261,7 @@
          }
      }
  
-@@ -1842,28 +2108,47 @@
+@@ -1842,28 +2124,47 @@
          )
      }
  
@@ -2801,7 +3319,7 @@
          val configuration = IphoneCarPlayConfiguration.find(device)
              ?: throw IphoneUsbException.Protocol(
                  "iPhone exposes no CarPlay configuration for NCM",
-@@ -1878,16 +2163,31 @@
+@@ -1878,16 +2179,31 @@
          )
          val connection = requireUsbManager().openDevice(device)
              ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
@@ -2838,7 +3356,7 @@
              debugLog("wired USBMUX host opened")
              onStatus(CarPlayStatus.Pairing)
              val pairingClient = LockdownPairingClient(mux)
-@@ -1902,38 +2202,6 @@
+@@ -1902,38 +2218,6 @@
              )
              onStatus(CarPlayStatus.ConnectingControl)
              val carKitClient = LockdownCarKitClient(mux)
@@ -2877,7 +3395,7 @@
              val carkit = try {
                  carKitClient.open(pairRecord, config.label)
              } catch (error: Throwable) {
-@@ -1960,7 +2228,7 @@
+@@ -1960,7 +2244,7 @@
                      var result = ConnectionIoDiagnostics.Result.FAILED
                      try {
                          debugLog("wired link TX begin ${wireSummary(data)}")
@@ -2886,7 +3404,7 @@
                          for (offset in data.indices step 256) {
                              carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
                          }
-@@ -1994,9 +2262,11 @@
+@@ -1994,9 +2278,11 @@
                  tracedCarkit,
                  traceContext = "wired",
                  onTrace = ::debugLog,
@@ -2900,7 +3418,7 @@
              debugLog("wired iAP2 CSM channel opened")
  
              val ncmHostMac = ncm.hostMac ?: config.hostMac
-@@ -2015,7 +2285,7 @@
+@@ -2015,7 +2301,7 @@
                  ?: throw IphoneUsbException.DeviceUnavailable("MFi coprocessor client is unavailable")
              val endpoint = Iap2WiredCarPlayEndpoint(
                  ipv6Addresses = listOf(config.linkLocal),
@@ -2909,7 +3427,7 @@
                  publicKey = identity.publicKeyHex,
                  sourceVersion = airPlayConfig.sourceVersion,
                  deviceIdentifier = ncmHostMac.macString(),
-@@ -2033,7 +2303,7 @@
+@@ -2033,7 +2319,7 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  locationProvider = locationProvider,
                  vehicleStatusProvider = vehicleStatusProvider,
@@ -2918,7 +3436,7 @@
                  onProgress = { message -> debugLog("wired $message") },
              )
              onStatus(
-@@ -2045,10 +2315,11 @@
+@@ -2045,10 +2331,11 @@
              )
          } catch (error: Throwable) {
              debugLog("wired bring-up failed", error)
@@ -2932,7 +3450,7 @@
          }
      }
  
-@@ -2108,13 +2379,8 @@
+@@ -2108,13 +2395,8 @@
          }
          val manager: WirelessHotspotManager = when (hotspotMode) {
              WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
@@ -2948,7 +3466,7 @@
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
                  onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-@@ -2165,6 +2431,7 @@
+@@ -2165,6 +2447,7 @@
      // Kept across reconnects within this controller: resuming between attempts would start a scan.
      private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
          if (closed || !WifiScanPause.eligible(backend)) return@synchronized
@@ -2956,7 +3474,7 @@
          (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
      }
  
-@@ -2253,7 +2520,6 @@
+@@ -2253,7 +2536,6 @@
          }
      }
  
@@ -2964,7 +3482,7 @@
      private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
          try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-@@ -2262,20 +2528,11 @@
+@@ -2262,20 +2544,11 @@
                  connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
                  return
              }
@@ -2987,7 +3505,7 @@
                      "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
              )
          } catch (error: RuntimeException) {
-@@ -2289,8 +2546,12 @@
+@@ -2289,8 +2562,12 @@
              val owner = firstTcpWatchdog?.listener
              firstTcpWatchdog?.terminate()
              val diagnostics = wirelessDiagnostics
@@ -3000,7 +3518,7 @@
              wirelessConnectionProof.clear()
              media.setIapTunnelHandler(null)
              val activeTunnel = wirelessTunnelChannel
-@@ -2301,7 +2562,10 @@
+@@ -2301,7 +2578,10 @@
  
              val activeBonjour = bonjour
              bonjour = null
@@ -3012,7 +3530,7 @@
  
              val activeHotspot = hotspot
              hotspot = null
-@@ -2399,6 +2663,7 @@
+@@ -2399,6 +2679,7 @@
              close()
              completed = true
          } catch (error: Throwable) {
@@ -3020,7 +3538,7 @@
              debugLog("$name teardown failed", error)
          } finally {
              connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
-@@ -2408,8 +2673,6 @@
+@@ -2408,8 +2689,6 @@
      private fun controlLoopTimeoutMillis(): Long = when {
          config.transport == CarPlayTransport.WIRED -> Iap2WiredControlClient.NO_TIMEOUT_MILLIS
          config.locationReportingEnabled -> LOCATION_CONTROL_LOOP_TIMEOUT_MILLIS
@@ -3029,7 +3547,7 @@
          else -> CONTROL_LOOP_TIMEOUT_MILLIS
      }
  
-@@ -2498,7 +2761,7 @@
+@@ -2498,7 +2777,7 @@
      }
  
      private fun closeReceivers() {
@@ -3038,7 +3556,7 @@
              try {
                  it.close()
              } catch (_: Exception) {
-@@ -2507,6 +2770,7 @@
+@@ -2507,6 +2786,7 @@
          }
          permissionCloseable = null
          attachCloseable = null
@@ -3046,7 +3564,7 @@
          ch341PermissionCloseable = null
      }
  
-@@ -2524,6 +2788,9 @@
+@@ -2524,6 +2804,9 @@
          }
      }
  
@@ -3056,7 +3574,7 @@
      private fun requireUsbManager(): UsbManager =
          usbManager ?: throw IOException("USB service is unavailable on this device")
  
-@@ -2536,7 +2803,7 @@
+@@ -2536,7 +2819,7 @@
  
      private fun fail(error: Throwable, generation: Int? = null) {
          synchronized(wirelessResourceLock) {
@@ -3065,7 +3583,7 @@
              val wireless = config.transport == CarPlayTransport.WIRELESS
              if (wireless) {
                  if (!wirelessFailureReported.compareAndSet(false, true)) return
-@@ -2561,11 +2828,11 @@
+@@ -2561,11 +2844,11 @@
  
      private fun connectionDiagnostic(message: String) {
          try {
@@ -3080,7 +3598,7 @@
          }
      }
  
-@@ -2589,9 +2856,23 @@
+@@ -2589,9 +2872,23 @@
      private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
          if (closed) return
          mainHandler.post {
@@ -3105,7 +3623,7 @@
                  uiListener?.onDebugLog(status.debugLogMessage())
                  uiStatusReporter?.invoke(status)
              }
-@@ -2618,6 +2899,12 @@
+@@ -2618,6 +2915,12 @@
              "STEP bt/rfcomm: connecting to the iPhone iAP2 RFCOMM service"
          CarPlayStatus.RunningWireless ->
              "STEP iap2/wireless: Bluetooth control loop running"
@@ -3120,11 +3638,12 @@
          CarPlayStatus.WirelessActiveFallback ->
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
-@@ -66,10 +66,15 @@
+@@ -66,10 +66,16 @@
      val wirelessBluetoothDeviceAddress: String? = null,
      val locationReportingEnabled: Boolean = false,
      val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
 +    val wifiScanPauseEnabled: Boolean = false,
++    val wifiHighPerformanceEnabled: Boolean = false,
      val existingWifiSsid: String = "",
      val existingWifiPassphrase: String = "",
 +    val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,

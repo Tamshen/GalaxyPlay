@@ -70,6 +70,7 @@ internal class BufferedAudioStream(
     }
 
     private fun receive() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         var accepted: Socket? = null
         try {
             val socket = acceptPeer() ?: return
@@ -152,6 +153,7 @@ internal class BufferedAudioStream(
 
     /** Hands frames to the sink while playing, keeping about [LEAD_MILLIS] of audio ahead of real time. */
     private fun feed() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         try {
             while (!closed.get()) {
                 synchronized(lock) {

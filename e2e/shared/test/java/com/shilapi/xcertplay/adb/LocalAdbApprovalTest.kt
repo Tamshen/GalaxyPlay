@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.adb
 
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.security.KeyPairGenerator
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -62,7 +63,7 @@ class LocalAdbApprovalTest {
 
     // 模拟车机保存密钥，却不向首次授权的连接发送 CNXN。
     private class ApprovalServer(private val fragmentReply: Boolean = false) : AutoCloseable {
-        private val server = ServerSocket(0)
+        private val server = ServerSocket(0).apply { soTimeout = 100 }
         val port = server.localPort
         @Volatile var approved = false
         @Volatile private var closed = false
@@ -75,7 +76,8 @@ class LocalAdbApprovalTest {
         private val workers = CopyOnWriteArrayList<Thread>()
         private val acceptor = thread(isDaemon = true) {
             while (!closed) {
-                val socket = runCatching { server.accept() }.getOrNull() ?: break
+                val socket = try { server.accept() } catch (_: SocketTimeoutException) { continue }
+                    catch (_: java.io.IOException) { break }
                 sockets += socket
                 workers += thread(isDaemon = true) {
                     runCatching { socket.use(::serve) }.onFailure {
@@ -128,10 +130,11 @@ class LocalAdbApprovalTest {
 
         override fun close() {
             closed = true
-            server.close()
-            sockets.forEach { it.close() }
+            // 先让 accept 与已完成的客户端读循环退出，避免跨架构 JDK 关闭阻塞 socket 的原生信号错误。
             acceptor.join(1_000)
+            server.close()
             workers.forEach { it.join(1_000) }
+            sockets.forEach { it.close() }
         }
     }
 }

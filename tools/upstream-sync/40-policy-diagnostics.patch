@@ -7639,6 +7639,16 @@
          <service android:name="com.shilapi.xcertplay.shared.MyCarAppService" tools:node="remove" />
          <meta-data android:name="androidx.car.app.minCarApiLevel" tools:node="remove" />
      </application>
+--- a/shared/src/main/AndroidManifest.xml
++++ b/shared/src/main/AndroidManifest.xml
+@@ -6,6 +6,7 @@
+     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
++    <uses-permission android:name="android.permission.WAKE_LOCK" />
+     <uses-permission
+         android:name="android.permission.NEARBY_WIFI_DEVICES"
+         android:usesPermissionFlags="neverForLocation" />
 --- a/shared/src/main/java/com/shilapi/xcertplay/adb/AdbKeys.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/adb/AdbKeys.kt
 @@ -1,7 +1,6 @@
@@ -7854,6 +7864,39 @@
 -    } else {
 -        isProviderEnabled(LocationManager.GPS_PROVIDER) || isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 -    }
+--- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydAdbShell.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/hud/BydAdbShell.kt
+@@ -15,12 +15,20 @@
+     private var retryAtMillis = 0L
+     private var unavailableLogged = false
+ 
++    /** 最近一次接入状态；不弹出新的 ADB 授权请求。 */
++    @Volatile var lastAccess: LocalAdb.Access? = null
++        private set
++
+     @Synchronized
+-    fun run(context: Context, command: String): String? {
++    fun run(context: Context, command: String): String? = run(context, command, null)
++
++    @Synchronized
++    fun run(context: Context, command: String, readTimeoutMillis: Int?): String? {
+         val now = SystemClock.elapsedRealtime()
+         if (now < retryAtMillis) return null
+         val client = adb ?: LocalAdb(AdbKeys.load(context)).also { adb = it }
+         val access = client.connect(mayAsk = false)
++        lastAccess = access
+         if (access != LocalAdb.Access.READY) {
+             retryAtMillis = now + RETRY_MILLIS
+             if (!unavailableLogged) {
+@@ -30,7 +38,7 @@
+             return null
+         }
+         unavailableLogged = false
+-        return client.shell(command)
++        return if (readTimeoutMillis == null) client.shell(command) else client.shell(command, readTimeoutMillis)
+     }
+ 
+     @Synchronized
 --- a/shared/src/main/java/com/shilapi/xcertplay/hud/BydBootStartRepair.kt
 +++ /dev/null
 @@ -1,50 +0,0 @@

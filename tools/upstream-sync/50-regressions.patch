@@ -851,6 +851,49 @@
      }
  
      @Test fun staleGenerationUserDisconnectMenuAndDifferentOwnerCannotSchedule() {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/adb/LocalAdbApprovalTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/adb/LocalAdbApprovalTest.kt
+@@ -2,6 +2,7 @@
+ 
+ import java.net.ServerSocket
+ import java.net.Socket
++import java.net.SocketTimeoutException
+ import java.security.KeyPairGenerator
+ import java.util.concurrent.CompletableFuture
+ import java.util.concurrent.CopyOnWriteArrayList
+@@ -62,7 +63,7 @@
+ 
+     // 模拟车机保存密钥，却不向首次授权的连接发送 CNXN。
+     private class ApprovalServer(private val fragmentReply: Boolean = false) : AutoCloseable {
+-        private val server = ServerSocket(0)
++        private val server = ServerSocket(0).apply { soTimeout = 100 }
+         val port = server.localPort
+         @Volatile var approved = false
+         @Volatile private var closed = false
+@@ -75,7 +76,8 @@
+         private val workers = CopyOnWriteArrayList<Thread>()
+         private val acceptor = thread(isDaemon = true) {
+             while (!closed) {
+-                val socket = runCatching { server.accept() }.getOrNull() ?: break
++                val socket = try { server.accept() } catch (_: SocketTimeoutException) { continue }
++                    catch (_: java.io.IOException) { break }
+                 sockets += socket
+                 workers += thread(isDaemon = true) {
+                     runCatching { socket.use(::serve) }.onFailure {
+@@ -128,10 +130,11 @@
+ 
+         override fun close() {
+             closed = true
++            // 先让 accept 与已完成的客户端读循环退出，避免跨架构 JDK 关闭阻塞 socket 的原生信号错误。
++            acceptor.join(1_000)
+             server.close()
++            workers.forEach { it.join(1_000) }
+             sockets.forEach { it.close() }
+-            acceptor.join(1_000)
+-            workers.forEach { it.join(1_000) }
+         }
+     }
+ }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayCryptoAndroidCompatibilityTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/airplay/AirPlayCryptoAndroidCompatibilityTest.kt
 @@ -10,7 +10,7 @@
@@ -3259,6 +3302,434 @@
      private fun reportedBuilderFailure(returnDescriptor: String = "Ljava/lang/String;") = NoSuchMethodError(
          "No virtual method getNetworkName()$returnDescriptor in class Landroid/net/wifi/p2p/WifiP2pConfig;",
      ).apply {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseJournalTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseJournalTest.kt
+@@ -26,20 +26,19 @@
+         val journal = storage.journal()
+         var enabled = true
+         val session = WifiScanPauseSession(
+-            transactionCode = { 62 },
+-            setEnabled = { _, value -> enabled = value; true },
++            setEnabled = { value -> enabled = value; WifiScanSwitchResult.DONE },
+             loadJournal = { journal.pending },
+             saveJournal = journal::save,
+         )
+-        assertFalse(session.acquire(Any()) { true })
++        assertFalse(session.acquire(Any()) { true }.paused)
+         assertTrue(storage.memory)
+         assertFalse(storage.disk)
+         assertFalse(journal.pending)
+-        assertFalse(session.acquire(Any()) { true })
++        assertFalse(session.acquire(Any()) { true }.paused)
+         assertTrue(enabled)
+         storage.writable = true
+         val owner = Any()
+-        assertTrue(session.acquire(owner) { true })
++        assertTrue(session.acquire(owner) { true }.paused)
+         assertTrue(storage.disk)
+         assertFalse(enabled)
+         assertTrue(session.release(owner))
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseSessionTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseSessionTest.kt
+@@ -12,22 +12,29 @@
+     private class Fixture {
+         var journal = false
+         var enabled = true
+-        var code: Int? = 62
+         var writesAllowed = true
+         var clearAllowed = true
+         var restoreAvailable = true
+-        val commands = mutableListOf<Pair<Int, Boolean>>()
+-
+-        fun write(code: Int, value: Boolean): Boolean {
++        val commands = mutableListOf<Boolean>()
++
++        fun write(value: Boolean): WifiScanSwitchResult {
+             assertTrue("Recovery must be durable before any firmware write", journal)
+-            commands.add(code to value)
+-            if (value && !restoreAvailable) return false
++            commands.add(value)
++            if (value && !restoreAvailable) return WifiScanSwitchResult.ADB_OFF
+             enabled = value
+-            return true
+-        }
+-
+-        fun session(write: (Int, Boolean) -> Boolean = ::write) = WifiScanPauseSession(
+-            transactionCode = { code },
++            return WifiScanSwitchResult.DONE
++        }
++
++        /** A reply that reports without touching the firmware. */
++        fun refuse(result: WifiScanSwitchResult): (Boolean) -> WifiScanSwitchResult = { value ->
++            if (value) write(true) else {
++                assertTrue("Recovery must be durable before any firmware write", journal)
++                commands.add(false)
++                result
++            }
++        }
++
++        fun session(write: (Boolean) -> WifiScanSwitchResult = ::write) = WifiScanPauseSession(
+             setEnabled = write,
+             loadJournal = { journal },
+             saveJournal = { pending ->
+@@ -46,10 +53,10 @@
+         val session = fixture.session()
+         val first = Any()
+         val second = Any()
+-        assertTrue(session.acquire(first) { true })
+-        assertTrue(session.acquire(first) { true })
+-        assertTrue(session.acquire(second) { true })
+-        assertEquals(listOf(62 to false), fixture.commands)
++        assertTrue(session.acquire(first) { true }.paused)
++        assertTrue(session.acquire(first) { true }.paused)
++        assertTrue(session.acquire(second) { true }.paused)
++        assertEquals(listOf(false), fixture.commands)
+         assertTrue(session.release(first))
+         assertFalse(fixture.enabled)
+         assertTrue(fixture.journal)
+@@ -57,7 +64,7 @@
+         assertTrue(session.release(second))
+         assertTrue(fixture.enabled)
+         assertFalse(fixture.journal)
+-        assertEquals(listOf(62 to false, 62 to true), fixture.commands)
++        assertEquals(listOf(false, true), fixture.commands)
+     }
+ 
+     @Test
+@@ -65,7 +72,7 @@
+         val fixture = Fixture()
+         val session = fixture.session()
+         val owner = Any()
+-        assertTrue(session.acquire(owner) { true })
++        assertTrue(session.acquire(owner) { true }.paused)
+         fixture.restoreAvailable = false
+         assertFalse(session.release(owner))
+         assertFalse(fixture.enabled)
+@@ -74,26 +81,27 @@
+         assertTrue(session.recover())
+         assertTrue(fixture.enabled)
+         assertFalse(fixture.journal)
+-        assertEquals(listOf(62 to false, 62 to true, 62 to true), fixture.commands)
+-    }
+-
+-    @Test
+-    fun nextProcessRestoresDurableMarkerUsingItsCurrentFrameworkCode() {
+-        val fixture = Fixture()
+-        assertTrue(fixture.session().acquire(Any()) { true })
+-        fixture.code = 73
++        assertEquals(listOf(false, true, true), fixture.commands)
++    }
++
++    @Test
++    fun nextProcessRestoresDurableMarker() {
++        val fixture = Fixture()
++        assertTrue(fixture.session().acquire(Any()) { true }.paused)
+         val nextProcess = fixture.session()
+         assertTrue(nextProcess.recoveryPending())
+         assertTrue(nextProcess.recover())
+         assertTrue(fixture.enabled)
+         assertFalse(fixture.journal)
+-        assertEquals(listOf(62 to false, 73 to true), fixture.commands)
++        assertEquals(listOf(false, true), fixture.commands)
+     }
+ 
+     @Test
+     fun failedJournalWriteNeverDisablesFirmware() {
+         val fixture = Fixture().apply { writesAllowed = false }
+-        assertFalse(fixture.session().acquire(Any()) { true })
++        val outcome = fixture.session().acquire(Any()) { true }
++        assertFalse(outcome.paused)
++        assertEquals("journal-failed", outcome.reason)
+         assertTrue(fixture.enabled)
+         assertFalse(fixture.journal)
+         assertTrue(fixture.commands.isEmpty())
+@@ -104,7 +112,7 @@
+         val fixture = Fixture()
+         val session = fixture.session()
+         val owner = Any()
+-        assertTrue(session.acquire(owner) { true })
++        assertTrue(session.acquire(owner) { true }.paused)
+         fixture.clearAllowed = false
+         assertFalse(session.release(owner))
+         assertTrue(fixture.enabled)
+@@ -115,55 +123,107 @@
+     }
+ 
+     @Test
+-    fun unknownFrameworkNeverWritesOrDiscardsRecovery() {
+-        val fixture = Fixture().apply { code = null }
+-        val session = fixture.session()
+-        assertFalse(session.acquire(Any()) { true })
+-        assertTrue(session.recover())
+-        fixture.journal = true
+-        assertFalse(session.recover())
++    fun missingAdbChangesNothingAndLeavesNoRestoreToRetry() {
++        for (result in listOf(
++            WifiScanSwitchResult.ADB_OFF,
++            WifiScanSwitchResult.ADB_NOT_APPROVED,
++            WifiScanSwitchResult.ADB_PAIRING_ONLY,
++            WifiScanSwitchResult.UNSUPPORTED,
++            WifiScanSwitchResult.DENIED,
++        )) {
++            val fixture = Fixture()
++            val session = fixture.session(fixture.refuse(result))
++            val outcome = session.acquire(Any()) { true }
++            assertFalse(outcome.paused)
++            assertEquals(result.reason, outcome.reason)
++            assertTrue(fixture.enabled)
++            assertFalse(fixture.journal)
++            assertFalse(session.recoveryPending())
++            assertEquals(listOf(false), fixture.commands)
++        }
++    }
++
++    @Test
++    fun refusedPauseNeverDiscardsAnEarlierProcessRestore() {
++        val fixture = Fixture().apply { journal = true; enabled = false; restoreAvailable = false }
++        val session = fixture.session(fixture.refuse(WifiScanSwitchResult.ADB_OFF))
++        assertFalse(session.acquire(Any()) { true }.paused)
++        assertTrue(fixture.journal)
+         assertTrue(session.recoveryPending())
+-        assertTrue(fixture.commands.isEmpty())
++        fixture.restoreAvailable = true
++        assertTrue(session.recover())
++        assertTrue(fixture.enabled)
++        assertFalse(fixture.journal)
++    }
++
++    @Test
++    fun searchSomeoneElseTurnedOffIsLeftOff() {
++        val fixture = Fixture().apply { enabled = false }
++        val session = fixture.session(fixture.refuse(WifiScanSwitchResult.ALREADY_OFF))
++        val owner = Any()
++        val outcome = session.acquire(owner) { true }
++        assertFalse(outcome.paused)
++        assertEquals("already-off", outcome.reason)
++        assertFalse(fixture.journal)
++        assertTrue(session.release(owner))
++        assertFalse(fixture.enabled)
++        assertEquals(listOf(false), fixture.commands)
++    }
++
++    @Test
++    fun earlierProcessPauseStillCountsAndIsRestoredLater() {
++        val fixture = Fixture().apply { journal = true; enabled = false }
++        val session = fixture.session(fixture.refuse(WifiScanSwitchResult.ALREADY_OFF))
++        val owner = Any()
++        assertTrue(session.acquire(owner) { true }.paused)
++        assertTrue(fixture.journal)
++        assertTrue(session.release(owner))
++        assertTrue(fixture.enabled)
++        assertFalse(fixture.journal)
+     }
+ 
+     @Test
+     fun uncertainDisableReplyStillRestoresPossiblyMutatedSystem() {
+         val fixture = Fixture()
+-        val session = fixture.session { code, value ->
+-            fixture.write(code, value)
+-            value // The disable happened, but its reply was lost.
+-        }
+-        assertFalse(session.acquire(Any()) { true })
+-        assertTrue(fixture.enabled)
+-        assertFalse(fixture.journal)
+-        assertEquals(listOf(62 to false, 62 to true), fixture.commands)
++        val session = fixture.session { value ->
++            fixture.write(value)
++            if (value) WifiScanSwitchResult.DONE else WifiScanSwitchResult.UNKNOWN // Reply lost after the change.
++        }
++        val outcome = session.acquire(Any()) { true }
++        assertFalse(outcome.paused)
++        assertEquals("no-reply", outcome.reason)
++        assertTrue(fixture.enabled)
++        assertFalse(fixture.journal)
++        assertEquals(listOf(false, true), fixture.commands)
+     }
+ 
+     @Test
+     fun cancellationBeforeOrDuringAcquireCannotLeaveScansSuppressed() {
+         val fixture = Fixture()
+         var current = false
+-        val session = fixture.session { code, value ->
+-            fixture.write(code, value)
++        val session = fixture.session { value ->
++            fixture.write(value)
+             current = false
+-            true
+-        }
+-        assertFalse(session.acquire(Any()) { current })
++            WifiScanSwitchResult.DONE
++        }
++        assertEquals("cancelled", session.acquire(Any()) { current }.reason)
+         assertTrue(fixture.commands.isEmpty())
+         current = true
+-        assertFalse(session.acquire(Any()) { current })
+-        assertTrue(fixture.enabled)
+-        assertFalse(fixture.journal)
+-        assertEquals(listOf(62 to false, 62 to true), fixture.commands)
++        val outcome = session.acquire(Any()) { current }
++        assertFalse(outcome.paused)
++        assertEquals("cancelled", outcome.reason)
++        assertTrue(fixture.enabled)
++        assertFalse(fixture.journal)
++        assertEquals(listOf(false, true), fixture.commands)
+     }
+ 
+     @Test
+     fun thrownDisableStillLeavesRecoveryWithoutAStaleOwner() {
+         val fixture = Fixture()
+-        val session = fixture.session { code, value ->
+-            fixture.write(code, value)
++        val session = fixture.session { value ->
++            fixture.write(value)
+             if (!value) error("reply failed after mutation")
+-            true
++            WifiScanSwitchResult.DONE
+         }
+         try {
+             session.acquire(Any()) { true }
+@@ -182,16 +242,16 @@
+         val session = fixture.session()
+         val old = Any()
+         val current = Any()
+-        assertTrue(session.acquire(old) { true })
++        assertTrue(session.acquire(old) { true }.paused)
+         fixture.restoreAvailable = false
+         assertFalse(session.release(old))
+-        assertTrue(session.acquire(current) { true })
++        assertTrue(session.acquire(current) { true }.paused)
+         fixture.restoreAvailable = true
+         assertTrue(session.recover()) // A scheduled old retry runs after the replacement acquired.
+         assertTrue(session.release(old))
+         assertFalse(fixture.enabled)
+         assertTrue(fixture.journal)
+-        assertEquals(listOf(62 to false, 62 to true, 62 to false), fixture.commands)
++        assertEquals(listOf(false, true, false), fixture.commands)
+         assertTrue(session.release(current))
+         assertTrue(fixture.enabled)
+         assertFalse(fixture.journal)
+@@ -203,20 +263,20 @@
+         val restoreStarted = CountDownLatch(1)
+         val allowRestore = CountDownLatch(1)
+         val worker = Executors.newSingleThreadExecutor()
+-        val session = fixture.session { code, value ->
++        val session = fixture.session { value ->
+             if (value) {
+                 restoreStarted.countDown()
+                 assertTrue(allowRestore.await(5, TimeUnit.SECONDS))
+             }
+-            fixture.write(code, value)
++            fixture.write(value)
+         }
+         val old = Any()
+         val replacement = Any()
+         try {
+-            assertTrue(worker.submit<Boolean> { session.acquire(old) { true } }.get(5, TimeUnit.SECONDS))
++            assertTrue(worker.submit<Boolean> { session.acquire(old) { true }.paused }.get(5, TimeUnit.SECONDS))
+             val oldRestore = worker.submit<Boolean> { session.release(old) }
+             assertTrue(restoreStarted.await(5, TimeUnit.SECONDS))
+-            val replacementPause = worker.submit<Boolean> { session.acquire(replacement) { true } }
++            val replacementPause = worker.submit<Boolean> { session.acquire(replacement) { true }.paused }
+             assertFalse(replacementPause.isDone)
+             allowRestore.countDown()
+             assertTrue(oldRestore.get(5, TimeUnit.SECONDS))
+@@ -224,7 +284,7 @@
+             assertFalse(fixture.enabled)
+             assertTrue(worker.submit<Boolean> { session.recover() }.get(5, TimeUnit.SECONDS))
+             assertFalse(fixture.enabled)
+-            assertEquals(listOf(62 to false, 62 to true, 62 to false), fixture.commands)
++            assertEquals(listOf(false, true, false), fixture.commands)
+             assertTrue(worker.submit<Boolean> { session.release(replacement) }.get(5, TimeUnit.SECONDS))
+             assertTrue(fixture.enabled)
+         } finally {
+--- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseTest.kt
++++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WifiScanPauseTest.kt
+@@ -1,9 +1,8 @@
+ package com.shilapi.xcertplay.network
+ 
+ import android.content.Context
++import com.shilapi.xcertplay.adb.LocalAdb
+ import org.junit.Assert.assertEquals
+-import org.junit.Assert.assertFalse
+-import org.junit.Assert.assertNull
+ import org.junit.Assert.assertTrue
+ import org.junit.Test
+ import org.junit.runner.RunWith
+@@ -15,7 +14,6 @@
+ @Config(sdk = [29], manifest = Config.NONE)
+ class WifiScanPauseTest {
+     private val context get() = RuntimeEnvironment.getApplication()
+-    private val ok = "Result: Parcel(00000000    '....')"
+ 
+     @Test
+     fun controllerCloseInvalidatesQueuedPausesAndReleasesItsOwnLeaseOnce() {
+@@ -45,34 +43,48 @@
+     }
+ 
+     @Test
+-    fun onlyAndroid10HotspotBackendsAreEligibleSoSameLanKeepsStationScanning() {
++    fun onlyWifiDirectPausesTheSearchOnEverySupportedRelease() {
+         for (backend in WirelessHotspotBackend.entries) {
+-            assertEquals(backend != WirelessHotspotBackend.EXISTING_WIFI, WifiScanPause.eligible(backend, 29))
+-            assertFalse(WifiScanPause.eligible(backend, 28))
+-            assertFalse(WifiScanPause.eligible(backend, 30))
++            for (sdk in 24..36) {
++                assertEquals("$backend on API $sdk",
++                    backend == WirelessHotspotBackend.WIFI_P2P && sdk >= 25, WifiScanPause.eligible(backend, sdk))
++            }
+         }
+     }
+ 
+     @Test
+-    fun acceptsOnlyAVoidReplyWithoutException() {
+-        assertTrue(WifiScanPause.accepted(ok))
+-        assertFalse(WifiScanPause.accepted("Result: Parcel(ffffffec 00000000 '........')"))
+-        assertFalse(WifiScanPause.accepted("service: Service wifi does not exist"))
+-        assertFalse(WifiScanPause.accepted(null))
++    fun startsTheHelperFromTheInstalledApkAsTheShellUser() {
++        assertEquals(
++            "CLASSPATH='/data/app/~~a/com.shihab.diplay-b/base.apk' app_process /system/bin " +
++                "com.shilapi.xcertplay.network.WifiScanPauseMain pause",
++            WifiScanPause.command("/data/app/~~a/com.shihab.diplay-b/base.apk", enabled = false),
++        )
++        assertEquals(
++            "CLASSPATH='/data/it'\"'\"'s/base.apk' app_process /system/bin " +
++                "com.shilapi.xcertplay.network.WifiScanPauseMain restore",
++            WifiScanPause.command("/data/it's/base.apk", enabled = true),
++        )
+     }
+ 
+     @Test
+-    fun readsTheTransactionCodeFromTheFramework() {
+-        val expected = Class.forName("android.net.wifi.IWifiManager\$Stub")
+-            .getDeclaredField("TRANSACTION_enableWifiConnectivityManager")
+-            .apply { isAccessible = true }
+-            .getInt(null)
+-        assertEquals(expected, WifiScanPause.enableConnectivityManagerTransaction())
++    fun readsOnlyTheHelperProtocolLine() {
++        for (result in WifiScanSwitchResult.entries) {
++            assertEquals(result, WifiScanPause.parse("WARNING: linker noise\nDIPLAY_WIFI_SCAN_V1|${result.name}\n"))
++        }
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.parse(null))
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.parse(""))
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.parse("Error: Could not find class"))
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.parse("DIPLAY_WIFI_SCAN_V1|PAUSED_MAYBE"))
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.parse("Result: Parcel(00000000    '....')"))
+     }
+ 
+     @Test
+-    @Config(sdk = [30])
+-    fun skipsReleasesAfterAndroid10() {
+-        assertNull(WifiScanPause.enableConnectivityManagerTransaction())
++    fun aMissingReplyReportsWhatAdbSaid() {
++        assertEquals(WifiScanSwitchResult.ADB_NOT_APPROVED, WifiScanPause.unanswered(LocalAdb.Access.NOT_APPROVED))
++        assertEquals(WifiScanSwitchResult.ADB_OFF, WifiScanPause.unanswered(LocalAdb.Access.UNREACHABLE))
++        assertEquals(WifiScanSwitchResult.ADB_PAIRING_ONLY, WifiScanPause.unanswered(LocalAdb.Access.UNSUPPORTED))
++        // A connected shell may have run the helper before the link dropped.
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.unanswered(LocalAdb.Access.READY))
++        assertEquals(WifiScanSwitchResult.UNKNOWN, WifiScanPause.unanswered(null))
+     }
+ }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/network/WirelessStartupDiagnosticsTest.kt
 @@ -34,7 +34,7 @@

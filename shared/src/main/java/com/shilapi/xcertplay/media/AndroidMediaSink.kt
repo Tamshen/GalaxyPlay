@@ -510,6 +510,7 @@ private class VideoDecoder(
     }
 
     private fun run() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }
         try {
             while (running) {
                 // 有输入待输出时快排空；静态画面降低轮询，控制/输入入队会立即唤醒。
@@ -1038,6 +1039,10 @@ private class AudioRenderer(
     private var trackAttributes: AudioAttributes? = null
     private var mappedChannel: AudioChannel? = null
     private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
+    // 只清理音乐长期积压的未解码包；短暂无线突发、电话和导航保持原流程。
+    private val mediaLagGuard = if (format.audioType == "media") MediaPacketLagGuard(format.rtpClockRate) else null
+    @Volatile private var newestRtpSample = 0
+    private var lagRecoveryReports = 0
     @Volatile private var running = true
     @Volatile private var started = false
     private var codec: MediaCodec? = null
@@ -1081,6 +1086,7 @@ private class AudioRenderer(
     private var bytesPerSecond = 0
     private val bufferProgress = AudioBufferProgress(if (format.channels >= 2) 4 else 2)
     private var underrunsAtPlaybackStart = 0
+    private var clockTrim: MediaClockTrim? = null
     private var lastPcmWriteNs = 0L
     private var rebufferCount = 0
     private var diagnosticStage = "starting"
@@ -1137,6 +1143,15 @@ private class AudioRenderer(
                 maxArrivalGapMs.accumulateAndGet(gap, ::maxOf)
                 musicJitter.observe(gap)
             }
+            newestRtpSample = sample
+            val removed = mediaLagGuard?.recover(queue, sample, AudioPacket::sample, now) ?: 0
+            if (removed > 0) {
+                packetsDropped.addAndGet(removed)
+                if (lagRecoveryReports++ < 4) runCatching {
+                    report("Audio: stale media packet backlog recovered audioType=${format.audioType} " +
+                        "packetsDiscarded=$removed remaining=${queue.size}")
+                }
+            }
         }
         if (!started || !queue.offer(AudioPacket(rtp, sample, System.nanoTime()))) {
             if (started) packetsDropped.incrementAndGet()
@@ -1155,6 +1170,7 @@ private class AudioRenderer(
     }
 
     private fun run() {
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         try {
             runCatching { report("Audio: starting api=${Build.VERSION.SDK_INT} " +
                 "audioType=${format.audioType} codec=${format.codec} rate=${format.sampleRate} channels=${format.channels} " +
@@ -1343,6 +1359,9 @@ private class AudioRenderer(
         trackCapacityBytes = capacityBytes
         startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
             if (wirelessRealtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
+        // 不调整通话回声时基；独立的语音实时播放策略也不叠加音乐调速。
+        clockTrim = if (!wirelessRealtime && mappedChannel == AudioChannel.MEDIA)
+            MediaClockTrim(format.sampleRate, startThresholdBytes.toLong() / frameBytes) else null
         report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
             "rate=${format.sampleRate} channels=${format.channels} " +
             "route=$routeLabel " +
@@ -1697,6 +1716,7 @@ private class AudioRenderer(
             writtenFramesThisWindow += framesWritten
             bufferProgress.written(count)
             lastPcmWriteNs = System.nanoTime()
+            if (playbackStarted) trimClock(track)
             if (!playbackStarted) {
                 prebufferBytes += count
                 if (prebufferBytes >= startThresholdBytes) {
@@ -1714,6 +1734,20 @@ private class AudioRenderer(
         playbackStarted = true
     }
 
+    private fun trimClock(track: AudioTrack) {
+        val trim = clockTrim ?: return
+        val compressedRtpFrames = mediaLagGuard?.pendingFrames(queue, newestRtpSample, AudioPacket::sample) ?: 0L
+        val compressedPcmFrames = compressedRtpFrames * format.sampleRate / format.rtpClockRate.coerceAtLeast(1)
+        val now = System.nanoTime()
+        trim.sample(bufferProgress.queuedBytes(track.playbackHeadPosition) / frameBytes, now, compressedPcmFrames)
+        val rate = trim.rateDue(now) ?: return
+        val result = runCatching { track.setPlaybackRate(rate) }.getOrDefault(AudioTrack.ERROR)
+        if (result != AudioTrack.SUCCESS) {
+            clockTrim = null
+            runCatching { report("Audio: clock trim off audioType=${format.audioType} rate=$rate result=$result") }
+        }
+    }
+
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
         val wirelessMusic = wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA
@@ -1721,6 +1755,8 @@ private class AudioRenderer(
             val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
             if (threshold > startThresholdBytes) {
                 startThresholdBytes = threshold
+                // 恢复水位变化后重新定目标，不把旧水位差持续学成时钟偏移。
+                clockTrim = MediaClockTrim(format.sampleRate, threshold.toLong() / frameBytes)
                 report("Audio: jitter recovery startMs=${threshold * 1000L / bytesPerSecond} " +
                     "observedGapMs=${musicJitter.gapMillis} capacityMs=${trackCapacityBytes * 1000L / bytesPerSecond}")
             }
@@ -1776,7 +1812,8 @@ private class AudioRenderer(
             "lastWriteError=${lastWriteErrorCode ?: "none"} zeroWrites=$zeroWritesThisWindow " +
             "partialWrites=$partialWritesThisWindow " +
             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount " +
-            "inputRetriesTotal=${codecInputWait.retries} inputTimeoutsTotal=${codecInputWait.timeouts} ended=$force"
+            "inputRetriesTotal=${codecInputWait.retries} inputTimeoutsTotal=${codecInputWait.timeouts} " +
+            "playbackRate=${clockTrim?.rate ?: -1} ended=$force"
         Log.i(STATS_TAG, line)
         report(line)
         if (mappedChannel == AudioChannel.MEDIA) {

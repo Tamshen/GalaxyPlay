@@ -53,6 +53,7 @@ import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import com.shilapi.xcertplay.network.WifiScanPause
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
+import com.shilapi.xcertplay.network.WirelessPerformanceLock
 import com.shilapi.xcertplay.network.WirelessHotspotManager
 import com.shilapi.xcertplay.network.WirelessInterfaceDiagnostics
 import com.shilapi.xcertplay.network.WirelessReceiveDiagnostics
@@ -179,7 +180,7 @@ class CarPlayController(
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
         }
-        if (config.wifiScanPauseEnabled) WifiScanPause.restoreIfNeeded(context.applicationContext)
+        WifiScanPause.restoreIfNeeded(context.applicationContext)
         BydNavigationOutputs.start(context.applicationContext)
         BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
     }
@@ -216,6 +217,8 @@ class CarPlayController(
     private val hostId = UUID.randomUUID().toString().uppercase(Locale.US)
     private val systemBuid = UUID.randomUUID().toString().uppercase(Locale.US)
     private val lifecycleLock = Any()
+    private val performanceLockLifecycle = Any()
+    private val wirelessPerformanceLock = WirelessPerformanceLock(appContext, ::debugLog)
     @Volatile private var uiListener: AirPlaySessionListener? = listener
     @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
     private val iphonePermission = IphoneUsbPermissionGate()
@@ -320,10 +323,17 @@ class CarPlayController(
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
-            if (closed) return
-            val replacement = activeSession !== session
+            val previous = synchronized(performanceLockLifecycle) {
+                if (closed) return
+                val previous = activeSession
+                activeSession = session
+                if (config.transport == CarPlayTransport.WIRELESS && config.wifiHighPerformanceEnabled)
+                    wirelessPerformanceLock.acquire()
+                previous
+            }
+            val replacement = previous !== session
             if (replacement) {
-                if (activeSession != null) {
+                if (previous != null) {
                     sessionStateListener?.invoke(false)
                     navigationInput.clear()
                 }
@@ -335,7 +345,6 @@ class CarPlayController(
                     debugLog("video in car session allowed=${VideoInCar.allowed} delivery=$delivery")
                 }
             }
-            activeSession = session
             sessionStateListener?.invoke(true)
             // A2DP 与 RFCOMM 控制属于不同 profile；媒体互斥不依赖可选 iAP2 隧道交接。
             audioConnectionListener?.invoke(true)
@@ -348,8 +357,14 @@ class CarPlayController(
         }
 
         override fun onSessionEnded(session: AirPlaySession) {
-            if (activeSession === session) {
-                activeSession = null
+            val ended = synchronized(performanceLockLifecycle) {
+                if (activeSession !== session) false else {
+                    activeSession = null
+                    wirelessPerformanceLock.release()
+                    true
+                }
+            }
+            if (ended) {
                 navigationInput.clear()
                 sessionStateListener?.invoke(false)
                 audioConnectionListener?.invoke(false)
@@ -673,6 +688,7 @@ class CarPlayController(
             closed = true
             dashboardMapOutputVisible = false
         }
+        synchronized(performanceLockLifecycle) { wirelessPerformanceLock.close() }
         diagnostics.stopRequested()
         sessionStateListener?.invoke(false)
         sessionStateListener = null
