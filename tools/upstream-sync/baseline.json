@@ -1483,7 +1483,7 @@
     "shared/src/main/java/com/shilapi/xcertplay/network/WirelessReceiveDiagnostics.kt": "301518ccfed5c231db5779508d46147e1e54c858cf6c896ba51b4dcb52f33848",
     "shared/src/main/java/com/shilapi/xcertplay/network/WirelessStartupDiagnostics.kt": "ec5d7b861be70f99bda22eae6a7d6eda9bb8b144c0304ee7011c694c38b129d3",
     "shared/src/main/java/com/shilapi/xcertplay/network/WirelessStartupPolicy.kt": "0a8353bdaf84d1ddd84f33a53d323acfc4dc2959dcf1355b2afca811f9dff9e9",
-    "shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayController.kt": "9460f974a193b37be0932df278e78f029eea80fa80e6acb3b2f96cc40beb4dd3",
+    "shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayController.kt": "1aad8f2dc7cc0758872e20b9c663961087e577562189458d87f29bdabe36b927",
     "shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt": "5c597fe0247b851bb022bf83d35677a464a1355de2746c50c3f5dcf3bf493e91",
     "shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayVideoListener.kt": "ca5ae99e6d542acec2f4843b46aa45c5d3be68b80a52aedde13afaf414531d6e",
     "shared/src/main/java/com/shilapi/xcertplay/orchestration/ConnectionIoDiagnostics.kt": "367afce4f6eab79eebb37873bda036eff07e6d2ce1ae3265a038540a6706083f",

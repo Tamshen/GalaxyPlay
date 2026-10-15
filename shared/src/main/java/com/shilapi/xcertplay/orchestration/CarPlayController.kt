@@ -94,7 +94,6 @@ import com.shilapi.xcertplay.transport.NcmUsbBridge
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
-import java.net.NetworkInterface
 import java.net.Inet6Address
 import java.util.Locale
 import java.util.UUID
@@ -1290,20 +1289,10 @@ class CarPlayController(
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
             }
-            val addressMemory = if (hotspotInfo.backend == WirelessHotspotBackend.MANUAL_HOTSPOT)
-                com.shilapi.xcertplay.network.GalaxyHotspotAddressMemory(appContext, hotspotInfo) else null
-            val addressRecovery = addressMemory?.let { memory ->
-                com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery(
-                    hotspotInfo.hostAddresses, memory.preferredFamily(),
-                    sample = {
-                        hotspotInfo.interfaceName?.let { name ->
-                            NetworkInterface.getByName(name)?.inetAddresses?.toList()
-                        }.orEmpty()
-                    },
-                    isCurrent = { !isStaleWirelessRun(generation) },
-                    remember = memory::remember, log = ::debugLog,
-                )
-            }
+            val addressRecovery = com.shilapi.xcertplay.network.GalaxyWirelessAddressRecovery.create(
+                appContext, hotspotInfo, config.wirelessStartupRefreshEnabled,
+                isCurrent = { !isStaleWirelessRun(generation) }, log = ::debugLog,
+            )
             synchronized(wirelessResourceLock) {
                 if (isStaleWirelessRun(generation)) { addressRecovery?.close(); return }
                 hotspotAddressRecovery = addressRecovery

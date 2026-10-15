@@ -81,13 +81,16 @@ class WirelessStartupRefreshTest {
         assertEquals(1, runLoop(true, validationFails = true).count { it.messageId == 0x4301 })
     }
 
-    @Test fun dualStackRecoveryWritesTheOtherEndpointOnTheSameAuthenticatedChannel() {
+    @Test fun directRecoveryWritesBoundIpv6OnTheSameAuthenticatedChannel() {
         val ipv4 = java.net.InetAddress.getByName("192.0.2.1")
         val ipv6 = java.net.Inet6Address.getByAddress(null,
             java.net.InetAddress.getByName("fe80::1234").address, 22)
         val addresses = listOf(ipv4, ipv6)
-        val policy = com.shilapi.xcertplay.network.GalaxyHotspotAddressRecovery(
-            addresses, null, { addresses }, { true }, {})
+        val info = com.shilapi.xcertplay.network.WirelessHotspotInfo(
+            endpoint.ssid, endpoint.passphrase, endpoint.security, 149, 5745, null, "p2p0",
+            ipv4, "5 GHz", com.shilapi.xcertplay.network.WirelessHotspotBackend.WIFI_P2P, addresses)
+        val policy = com.shilapi.xcertplay.network.GalaxyWirelessAddressRecovery.create(
+            mock(android.content.Context::class.java), info, true, { true }, { addresses })!!
         val sent = runLoop(true, refreshEndpoint = policy::refresh)
         val starts = sent.filter { it.messageId == 0x4301 }
         assertEquals(2, starts.size)

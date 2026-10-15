@@ -19,7 +19,7 @@
 
 ## 原生热点连接恢复
 
-`GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
+`GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`GalaxyWirelessAddressRecoveryTest` 覆盖产品策略启用后的 Direct 地址恢复、保持原生热点偏好隔离、单栈／晚到地址／取消／关闭及其他后端边界。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、Direct 产品策略实际补发 IPv6、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
 
 `P2pCredentialsTest`、`WifiP2pGroupManagerTest` 覆盖明确请求的密码与系统回读一致、外层引号兼容、默认组缺凭据拒绝、真实单播 AP 提示、发送前配置变化拒绝；日志仅保留匹配结果。`ConnectionCancellationTest` 在 Android 10／11 验证应用首页先于旧宿主关闭、重复取消幂等、延迟释放不再跳转、旧宿主不停止新会话。`RemoteLogEvidenceRetentionTest` 覆盖同事件跨来源合并、真实重复故障保留、事件时间排序、媒体压力下阶段／错误证据与 1 MiB JSON 预算、会话关闭后释放证据仍落盘。
 
