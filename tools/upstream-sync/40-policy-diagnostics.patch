@@ -3211,12 +3211,13 @@
              card.addView(button(getString(R.string.picture_adjustments), false) {
                  startActivity(Intent(this, CarPlayHostActivity::class.java)
                      .putExtra("picture_controls", true).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-@@ -1572,45 +589,34 @@
+@@ -1572,45 +589,35 @@
                  { AirPlayPersistence.loadDisplayScalePercent(this) }, reconnects = true,
                  save = { AirPlayPersistence.saveDisplayScalePercent(this, it) },
              )
 +            val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-+            choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
++            choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms),
++                getString(R.string.s_1000_ms_most_stable), getString(R.string.audio_buffer_phone)),
 +                bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
 +                AirPlayPersistence.saveMediaBufferMillis(this, bufferPresets[it])
 +            }
@@ -3272,7 +3273,7 @@
              }
              if (CarPlayRotation.enabled(this)) {
                  val pictures = CarPlayRotation.Picture.entries
-@@ -1619,76 +625,58 @@
+@@ -1619,76 +626,58 @@
                      getString(R.string.carplay_rotation_sharper),
                  ), pictures.indexOf(CarPlayRotation.picture(this)), reconnects = false) {
                      CarPlayRotation.setPicture(this, pictures[it])
@@ -3384,7 +3385,7 @@
              }
              val adbCluster = AdbClusterRouter.enabled(this)
              if (adbCluster) {
-@@ -1702,7 +690,7 @@
+@@ -1702,7 +691,7 @@
                      holds.indexOf(BydOutputSettings.oemClusterHold(this))) { index ->
                      BydOutputSettings.setOemClusterHold(this, holds[index])
                      ClusterActivityOutput.stopForSettings()
@@ -3393,7 +3394,7 @@
                  }
              }
              val clusterDisplay = ClusterMapPresentation.findDisplay(this)
-@@ -1710,12 +698,13 @@
+@@ -1710,12 +699,13 @@
              val diLink4 = adbCluster || (clusterDisplay != null && clusterSize != null &&
                  DiLink4ClusterDisplay.matches(clusterDisplay.name, clusterSize.x, clusterSize.y))
              val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
@@ -3408,7 +3409,7 @@
              }
              if (clusterMapEnabled) {
                  toggle(card, getString(R.string.center_map_card),
-@@ -1758,24 +747,24 @@
+@@ -1758,24 +748,24 @@
                              getString(R.string.show_the_side_map_only_when_its_card_is_open_and_switch_to), automatic) {
                              DiLink51ClusterLayout.saveAutomatic(this, it)
                              render()
@@ -3437,7 +3438,7 @@
                          }
                      } else {
                          if (diLink4) clusterSafeAreaControls(card)
-@@ -1800,14 +789,14 @@
+@@ -1800,14 +790,14 @@
                                  val controller = CarPlayBackgroundSession.snapshot()?.controller
                                  if (customCard || CarPlayClusterDisplay.usesCustomTurnCard(next) ||
                                      DiLink51ClusterLayout.supported() || controller == null) {
@@ -3454,7 +3455,7 @@
                                          }
                                      }
                                  }
-@@ -1868,53 +857,8 @@
+@@ -1868,53 +858,8 @@
                                  AirPlayPersistence.saveClusterMarkerHorizontalStep(this, 0)
                                  AirPlayPersistence.saveClusterMarkerVerticalStep(this, 0)
                                  render()
@@ -3509,7 +3510,7 @@
                          }
                          if (!diLink4) {
                              toggle(card, getString(R.string.dashboard_map_only_in_small_and_full_navi),
-@@ -1924,12 +868,12 @@
+@@ -1924,12 +869,12 @@
                                  if (it) checkAdbState(mayAsk = true)
                              }
                          }
@@ -3524,7 +3525,7 @@
              toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
                  getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
                  com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) { com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it) }
-@@ -1939,171 +883,28 @@
+@@ -1939,171 +884,28 @@
              }
              clusterSongSwitch(card)
          }
@@ -3701,7 +3702,7 @@
  
      // An opted-in connection prepares the hotspot in the controller instead of stopping at this reminder.
      private fun carHotspotOff(): Boolean =
-@@ -2115,15 +916,6 @@
+@@ -2115,15 +917,6 @@
          if (AirPlayPersistence.loadWirelessHotspotMode(this) != WirelessHotspotMode.MANUAL) return
          if (!CarHotspotSetup.isBydHeadUnit(this)) {
              Log.i("DiPlay-Hotspot", "settings hidden: BYD head unit not detected")
@@ -3717,7 +3718,7 @@
              return
          }
          val controls = column().apply { visibility = View.GONE }
-@@ -2176,7 +968,7 @@
+@@ -2176,7 +969,7 @@
              if (!allReady) {
                  card.addView(button(getString(R.string.btn_auto_apply_permissions), false) { autoApplyPermissions() }, matchButton(8, 54))
              } else {
@@ -3726,7 +3727,7 @@
                      setPadding(0, dp(6), 0, dp(4))
                  })
              }
-@@ -2276,7 +1068,7 @@
+@@ -2276,7 +1069,7 @@
      })
  
      private fun carHotspotOffDialog() {
@@ -3735,7 +3736,7 @@
              .setMessage(getString(R.string.msg_car_hotspot_connect, AirPlayPersistence.loadManualHotspotSsid(this)))
              .setPositiveButton(getString(R.string.open_car_settings)) { _, _ -> openCarWifiSettings() }
              .setNeutralButton(getString(R.string.connect)) { _, _ -> connect(true) }
-@@ -2286,30 +1078,6 @@
+@@ -2286,30 +1079,6 @@
      // BYD maps the AOSP tether action to its own hotspot screen; other firmware falls back to Wi-Fi settings.
      // BYD shows that screen as a dialog and closes it unless its own settings or the car home screen is on top,
      // so the home screen goes first.
@@ -3766,7 +3767,7 @@
      private fun openCarWifiSettings() {
          val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
          val target = packageManager.resolveActivity(hotspot, 0)?.activityInfo?.packageName
-@@ -2330,201 +1098,6 @@
+@@ -2330,201 +1099,6 @@
              runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
          }
          openSystem(wifi)
@@ -3968,7 +3969,7 @@
      }
  
      private fun connectionSetup(content: LinearLayout) {
-@@ -2617,9 +1190,6 @@
+@@ -2617,9 +1191,6 @@
  
      private fun wifiDirectChannelLabel(channel: Int): String = if (channel == WifiP2pChannels.AUTO) {
          getString(R.string.auto)
@@ -3978,7 +3979,7 @@
      } else {
          getString(R.string.wifi_direct_channel_choice, channel,
              getString(if (channel < 36) R.string.s_2_4_ghz else R.string.s_5_ghz))
-@@ -2631,10 +1201,10 @@
+@@ -2631,10 +1202,10 @@
          }
          val control = button(summary(AirPlayPersistence.loadWifiP2pPreferredChannel(this)), false) {}
          control.setOnClickListener {
@@ -3991,7 +3992,7 @@
                  .setSingleChoiceItems(choices.map(::wifiDirectChannelLabel).toTypedArray(),
                      choices.indexOf(current)) { _, which -> selection = choices[which] }
                  .setPositiveButton(R.string.save) { _, _ ->
-@@ -2649,10 +1219,7 @@
+@@ -2649,10 +1220,7 @@
          }
          parent.addView(control, matchButton(12, 60))
          parent.addView(label(getString(R.string.wifi_direct_channel_description), 15, MUTED).apply {
@@ -4003,7 +4004,7 @@
          })
      }
  
-@@ -2700,7 +1267,7 @@
+@@ -2700,7 +1268,7 @@
          val channels = AirPlayPersistence.AUDIO_CHANNELS
          val labels = channels.map(Int::toString).toTypedArray()
          var selection = current.coerceIn(channels.first, channels.last)
@@ -4012,7 +4013,7 @@
              .setSingleChoiceItems(labels, selection) { _, which ->
                  selection = which
                  preview.play(which, navigation)
-@@ -2744,15 +1311,14 @@
+@@ -2744,15 +1312,14 @@
      }
  
      private fun askHotspotCredentials(existingWifi: Boolean = false, done: (String, String) -> Unit) {
@@ -4030,7 +4031,7 @@
              hint = getString(if (existingWifi) R.string.existing_wifi_password else R.string.hotspot_password)
              setText(if (existingWifi) AirPlayPersistence.loadExistingWifiPassphrase(this@DiPlayActivity) else storedPassword())
              setSingleLine()
-@@ -2773,7 +1339,7 @@
+@@ -2773,7 +1340,7 @@
              if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
          }
          fields.addView(ssid); fields.addView(password)
@@ -4039,7 +4040,7 @@
              text = getString(R.string.show_password)
              setOnCheckedChangeListener { _, checked ->
                  password.transformationMethod = if (checked) null else android.text.method.PasswordTransformationMethod.getInstance()
-@@ -2783,8 +1349,8 @@
+@@ -2783,8 +1350,8 @@
          val error = label("", 14, WARNING)
          error.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
          fields.addView(error)
@@ -4050,7 +4051,7 @@
              .setPositiveButton(getString(R.string.save_details), null).setNegativeButton(getString(R.string.cancel)) { _, _ -> hideKeyboard() }
              .setNeutralButton(getString(R.string.hide_keyboard), null).create()
          dialog.setOnShowListener {
-@@ -2808,7 +1374,7 @@
+@@ -2808,7 +1375,7 @@
          else -> "$positive ${step * CarPlayClusterDisplay.MARKER_STEP_PERCENT} %"
      }
  
@@ -4059,7 +4060,7 @@
      private fun overlaySliderRow(title: String, values: List<Int>, current: Int, describe: (Int) -> String): OverlaySliderRow =
          OverlaySliderRow(this, title, values, current, describe)
  
-@@ -2832,8 +1398,7 @@
+@@ -2832,8 +1399,7 @@
              slider = SeekBar(context).apply {
                  max = steps.lastIndex
                  progress = steps.indexOf(current).coerceIn(steps.indices)
@@ -4069,7 +4070,7 @@
                  setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                      override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                          val value = steps[progress.coerceIn(steps.indices)]
-@@ -2877,8 +1442,8 @@
+@@ -2877,8 +1443,8 @@
          body.addView(label(getString(R.string.s_3_tap_check_and_enable_below_this_enables_the_cluster_ma), 16, TEXT))
          val status = label(if (DiLink51ClusterMonitor.hasAccess(this)) getString(R.string.permission_enabled_ready) else getString(R.string.permission_not_enabled), 16, TEXT)
          body.addView(status)
@@ -4080,7 +4081,7 @@
              .setNegativeButton(getString(R.string.close), null)
              .setPositiveButton(getString(R.string.check_and_enable), null).create()
          dialog.setOnShowListener {
-@@ -2889,7 +1454,7 @@
+@@ -2889,7 +1455,7 @@
                      dialog.dismiss()
                      render()
                      toast(getString(R.string.automatic_map_enabled_open_the_cluster_map_card_or_select))
@@ -4089,7 +4090,7 @@
                  } else {
                      status.text = getString(R.string.still_waiting_for_usage_access_check_that_the_command_ran)
                  }
-@@ -2903,7 +1468,7 @@
+@@ -2903,7 +1469,7 @@
              toast(getString(R.string.usb_auto_confirm_status_on))
              return
          }
@@ -4098,7 +4099,7 @@
              .setTitle(getString(R.string.usb_auto_confirm_title))
              .setMessage(getString(R.string.usb_auto_confirm_dialog_msg))
              .setPositiveButton(getString(R.string.btn_auto_apply_permissions)) { _, _ ->
-@@ -2936,7 +1501,7 @@
+@@ -2936,7 +1502,7 @@
          if (usbPermissionOperation != null || isFinishing || isDestroyed) return
          val operation = usbPermissionOperationFactory(applicationContext)
          usbPermissionOperation = operation
@@ -4107,7 +4108,7 @@
              .setTitle(R.string.auto_grant_title)
              .setMessage(R.string.auto_grant_msg)
              .setNegativeButton(R.string.cancel) { _, _ -> cancelUsbPermissionSetup() }
-@@ -2958,7 +1523,7 @@
+@@ -2958,7 +1524,7 @@
                  progress.dismiss()
                  render()
                  if (result.complete) {
@@ -4116,7 +4117,7 @@
                          .setTitle(R.string.auto_grant_success_title)
                          .setMessage(R.string.auto_grant_success_msg)
                          .setPositiveButton(R.string.close, null)
-@@ -3003,7 +1568,7 @@
+@@ -3003,7 +1569,7 @@
              typeface = Typeface.MONOSPACE
              setTextIsSelectable(true)
              setPadding(dp(8), dp(8), dp(8), dp(8))
@@ -4125,7 +4126,7 @@
          })
          body.addView(button(getString(R.string.copy_command), false) {
              getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(
-@@ -3012,52 +1577,51 @@
+@@ -3012,52 +1578,51 @@
              toast(getString(R.string.copied_to_the_car_clipboard_run_the_command_on_your_comput))
          }, matchButton(8, 50))
  
@@ -4208,7 +4209,7 @@
          if (zoom) {
              val behaviours = WheelZoomSettings.Behaviour.entries
              choice(card, getString(R.string.wheel_zoom_behaviour),
-@@ -3084,144 +1648,22 @@
+@@ -3084,144 +1649,22 @@
                  WheelZoomSettings.Role.ZOOM_OUT, WheelZoomSettings.Role.NEXT -> R.string.wheel_key_role_next
                  WheelZoomSettings.Role.JOYSTICK -> R.string.wheel_key_role_joystick
                  WheelZoomSettings.Role.SELECT -> R.string.wheel_key_role_select
@@ -4366,7 +4367,7 @@
      }
  
      /** The 0.2.9 Dashboard song setting, shown once: in the BYD navigation card, or under Advanced vehicle data. */
-@@ -3240,28 +1682,16 @@
+@@ -3240,28 +1683,16 @@
          }
          toggle(card, getString(R.string.carplay_call_controls_experimental),
              getString(R.string.carplay_call_controls_experimental_description),
@@ -4403,7 +4404,7 @@
      }
  
      private fun advancedVehicleData(card: LinearLayout) {
-@@ -3947,13 +2377,13 @@
+@@ -3947,13 +2378,13 @@
                  AirPlayPersistence.loadClusterMarkerVerticalStep(this))
          card.addView(label(getString(R.string.safe_area_mapping_summary,
              rect.width, rect.height, rect.left, rect.top, 1920, 720), 14, MUTED))
@@ -4419,7 +4420,7 @@
          }, matchButton(10, 56))
          card.addView(label(getString(R.string.cluster_safe_area_hint), 14, MUTED))
      }
-@@ -3966,17 +2396,17 @@
+@@ -3966,17 +2397,17 @@
                  AirPlayPersistence.loadClusterMarkerHorizontalStep(this),
                  AirPlayPersistence.loadClusterMarkerVerticalStep(this))
          val editor = SafeAreaEditorView(this).apply {
@@ -4442,7 +4443,7 @@
          panel.addView(label(getString(R.string.cluster_safe_area_live_hint), 14, MUTED))
          panel.addView(ClusterSafeAreaPreviewFrame(this, editor), LinearLayout.LayoutParams(-1, 0, 1f))
          val actions = row()
-@@ -3987,7 +2417,7 @@
+@@ -3987,7 +2418,7 @@
              editor.currentRectForSource()?.let { AirPlayPersistence.saveClusterSafeAreaRect(this, it) }
              dialog.dismiss()
              render()
@@ -4451,7 +4452,7 @@
          }, LinearLayout.LayoutParams(0, dp(56), 1f))
          panel.addView(actions)
          dialog.setContentView(panel, ViewGroup.LayoutParams(-1, -1))
-@@ -4004,32 +2434,8 @@
+@@ -4004,32 +2435,8 @@
          ClusterActivityOutput.beginSafeAreaPreview(previewOwner, initial, this)
      }
  
@@ -4485,7 +4486,7 @@
      }
  
      private fun onLocationReportingChanged(enabled: Boolean) {
-@@ -4063,7 +2469,7 @@
+@@ -4063,7 +2470,7 @@
      }
  
      private fun textInput(title: String, current: String, secret: Boolean, save: (String) -> Unit) {
@@ -4494,7 +4495,7 @@
              setText(current)
              setSingleLine()
              inputType = if (secret) {
-@@ -4072,7 +2478,7 @@
+@@ -4072,7 +2479,7 @@
                  android.text.InputType.TYPE_CLASS_TEXT
              }
          }
@@ -4503,7 +4504,7 @@
              .setPositiveButton(getString(R.string.save)) { _, _ -> save(input.text.toString().let { if (secret) it else it.trim() }) }
              .setNegativeButton(getString(R.string.cancel), null).show()
      }
-@@ -4093,14 +2499,14 @@
+@@ -4093,14 +2500,14 @@
          val control = button(summary(), false) {}
          control.setOnClickListener {
              val fields = column().apply { setPadding(dp(24), dp(8), dp(24), dp(8)) }
@@ -4520,7 +4521,7 @@
                  .setPositiveButton(getString(if (reconnects && CarPlayBackgroundSession.hasSession()) R.string.apply_and_reconnect else R.string.save), null)
                  .setNegativeButton(getString(R.string.cancel), null)
                  .setNeutralButton(getString(R.string.resolution_reset_defaults), null).create()
-@@ -4171,14 +2577,14 @@
+@@ -4171,14 +2578,14 @@
          val control = button(summary(), false) {}
          control.setOnClickListener {
              val fields = column().apply { setPadding(dp(24), dp(8), dp(24), dp(8)) }
@@ -4537,7 +4538,7 @@
                  .setPositiveButton(getString(if (reconnects && CarPlayBackgroundSession.hasSession()) R.string.apply_and_reconnect else R.string.save), null)
                  .setNegativeButton(getString(R.string.cancel), null)
                  .setNeutralButton(getString(R.string.ambient_light_reset_defaults), null).create()
-@@ -4220,14 +2626,14 @@
+@@ -4220,14 +2627,14 @@
          control.setOnClickListener {
              val fields = column().apply { setPadding(dp(24), dp(8), dp(24), dp(8)) }
              fields.addView(label(getString(R.string.ambient_light_threshold_value), 16, MUTED))
@@ -4554,7 +4555,7 @@
                  .setTitle(title)
                  .setView(fields)
                  .setPositiveButton(getString(R.string.save), null)
-@@ -4299,7 +2705,7 @@
+@@ -4299,7 +2706,7 @@
              if (CarPlayDock.movesLive(from, to) && areas != null && target != null) {
                  if (session.controller.showViewArea(target)) areas.use(target)
              } else {
@@ -4563,7 +4564,7 @@
              }
          }
          card.addView(label(getString(R.string.carplay_dock_hint), 14, MUTED).apply { setPadding(0, 0, 0, dp(18)) })
-@@ -4321,11 +2727,7 @@
+@@ -4321,11 +2728,7 @@
          preview.addView(text, LinearLayout.LayoutParams(0, -2, 1f))
          parent.addView(preview)
          parent.addView(button(getString(R.string.choose_image), false) {
@@ -4576,7 +4577,7 @@
          }, matchButton(16, 60))
          if (custom != null) parent.addView(button(getString(R.string.default_icon), false) {
              AirPlayPersistence.clearCustomAirPlayIcon(this)
-@@ -4344,7 +2746,6 @@
+@@ -4344,7 +2747,6 @@
      }
  
      private fun carButtonSaved() {
@@ -4584,7 +4585,7 @@
          if (CarPlayBackgroundSession.hasSession()) toast(getString(R.string.car_button_saved_next_connection))
      }
  
-@@ -4353,7 +2754,6 @@
+@@ -4353,7 +2755,6 @@
          val card = carButtonCard ?: return
          card.removeViews(1, card.childCount - 1)
          carButtonControls(card)
@@ -4592,7 +4593,7 @@
      }
  
      private fun carPlaySizeControl(parent: LinearLayout) {
-@@ -4365,32 +2765,6 @@
+@@ -4365,32 +2766,6 @@
          parent.addView(label(getString(R.string.changes_the_size_of_carplay_icons_and_text_applying_a_size), 14, MUTED).apply {
              setPadding(0, 0, 0, dp(18))
          })
@@ -4625,7 +4626,7 @@
      }
  
      private fun connect(wireless: Boolean) {
-@@ -4432,19 +2806,19 @@
+@@ -4432,19 +2807,19 @@
          }
          val adapter = getSystemService(BluetoothManager::class.java)?.adapter
          if (adapter == null || !adapter.isEnabled) {
@@ -4648,7 +4649,7 @@
              .setItems(devices.map { device ->
                  val name = device.name ?: getString(R.string.paired_device)
                  if (devices.count { it.name == device.name } > 1) "$name · ${device.address.takeLast(5)}" else name
-@@ -4459,7 +2833,7 @@
+@@ -4459,7 +2834,7 @@
      }
  
      private fun wirelessHelp() {
@@ -4657,7 +4658,7 @@
              .setMessage(getString(R.string.pair_your_iphone_with_the_car_s_bluetooth_keep_wi_fi_on_an))
              .setPositiveButton(getString(R.string.got_it), null)
              .setNeutralButton(getString(R.string.reset_carplay_wi_fi)) { _, _ ->
-@@ -4474,7 +2848,7 @@
+@@ -4474,7 +2849,7 @@
      }
  
      private fun confirmWirelessReset() {
@@ -4666,7 +4667,7 @@
              .setMessage(getString(R.string.this_ends_the_existing_wi_fi_direct_connection_including_o))
              .setPositiveButton(getString(R.string.reset_and_connect)) { _, _ ->
                  CarPlayBackgroundSession.stop { runOnUiThread { resetWirelessGroup() } }
-@@ -4487,16 +2861,16 @@
+@@ -4487,16 +2862,16 @@
          val channel = manager.initialize(this, mainLooper, null)
          try {
              manager.requestGroupInfo(channel) { group ->
@@ -4686,7 +4687,7 @@
                                      }
                                      else -> handler.postDelayed({ waitUntilRemoved() }, 200)
                                  }
-@@ -4504,11 +2878,11 @@
+@@ -4504,11 +2879,11 @@
                          }
                          waitUntilRemoved()
                      }
@@ -4700,7 +4701,7 @@
          }
      }
  
-@@ -4528,8 +2902,6 @@
+@@ -4528,8 +2903,6 @@
              lastRunning = running
          }
          connectButton?.isEnabled = setupError == null
@@ -4709,7 +4710,7 @@
      }
      private fun authorizeClusterRouting() {
          val app = applicationContext
-@@ -4577,7 +2949,6 @@
+@@ -4577,7 +2950,6 @@
                      appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
                      appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
                      appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
@@ -4717,7 +4718,7 @@
                      appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
                      appendLine()
                      appendLine("--- Current cluster display diagnostics (even when disabled) ---")
-@@ -4649,7 +3020,7 @@
+@@ -4649,7 +3021,7 @@
                  exportButton?.apply { isEnabled = true; text = getString(R.string.save_diagnostic_report) }
                  if (result.isSuccess) {
                      val (savedReport, report) = result.getOrThrow()
@@ -4726,7 +4727,7 @@
                          .setMessage(when {
                              savedReport.savedInApp -> getString(R.string.diagnostic_report_saved_in_app)
                              savedReport.savedPath != null -> getString(R.string.diagnostic_report_saved_to_path, savedReport.savedPath)
-@@ -4668,7 +3039,7 @@
+@@ -4668,7 +3040,7 @@
                              }.onFailure { showDiagnosticReport(report) }
                          }.show()
                  } else {
@@ -4735,7 +4736,7 @@
                          .setMessage(getString(R.string.check_that_storage_is_available_or_choose_another_save_loc))
                          .setPositiveButton(getString(R.string.choose_location)) { _, _ -> chooseReportDestination() }
                          .setNegativeButton(getString(R.string.close), null).show()
-@@ -4684,12 +3055,12 @@
+@@ -4684,12 +3056,12 @@
              typeface = Typeface.MONOSPACE
              setTextIsSelectable(true)
          })
@@ -4751,7 +4752,7 @@
              openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
          }.setNegativeButton(getString(R.string.later), null).show()
      }
-@@ -4735,9 +3106,9 @@
+@@ -4735,9 +3107,9 @@
      private fun paintChannel(index: Int, selected: Boolean) {
          val target = channelButtons.getOrNull(index) ?: return
          target.isSelected = selected
@@ -4763,7 +4764,7 @@
              rounded(if (selected) ACCENT else SURFACE, if (selected) ACCENT else BORDER),
              null
          )
-@@ -4781,8 +3152,7 @@
+@@ -4781,8 +3153,7 @@
      }
      private fun version() = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0-beta.1"
      private fun languageSettings(content: LinearLayout) {
@@ -4773,7 +4774,7 @@
              card.addView(label(getString(R.string.language_hint), 14, MUTED))
              val current = AppLocale.preference(this)
              val languageButton = button("${getString(R.string.language_app_language)} · ${AppLocale.displayName(this, current)}", false) { }
-@@ -4792,7 +3162,6 @@
+@@ -4792,7 +3163,6 @@
      }
  
      private fun section(parent: LinearLayout, title: String, icon: Int? = null, build: (LinearLayout) -> Unit) {
@@ -4781,7 +4782,7 @@
          val card = card()
          val heading = row().apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, 0, dp(16)) }
          if (icon != null) heading.addView(ImageView(this).apply {
-@@ -4802,64 +3171,15 @@
+@@ -4802,64 +3172,15 @@
          heading.addView(label(title, 22, TEXT, true), LinearLayout.LayoutParams(0, -2, 1f))
          card.addView(heading)
          build(card)
@@ -4847,7 +4848,7 @@
              contentDescription = title,
              enabled = enabled,
              onChanged = save,
-@@ -4874,7 +3194,7 @@
+@@ -4874,7 +3195,7 @@
          val button = button("$title · ${options[selection]}", false) {}.apply { isEnabled = enabled }
          button.setOnClickListener {
              var pendingSelection = selection
@@ -4856,7 +4857,7 @@
                  .setSingleChoiceItems(options.toTypedArray(), selection) { _, index -> pendingSelection = index }
                  .setPositiveButton(getString(if (announcesReconnect && CarPlayBackgroundSession.hasSession()) R.string.apply_and_reconnect else R.string.save)) { _, _ ->
                      if (pendingSelection != selection) {
-@@ -4892,326 +3212,35 @@
+@@ -4892,326 +3213,35 @@
      private fun card() = column().apply { background = rounded(SURFACE, BORDER); setPadding(dp(24), dp(24), dp(24), dp(24)) }
      private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }
      private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }

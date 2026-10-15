@@ -88,7 +88,15 @@
      fun sendTelephony(index: Int) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/AudioStream.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/AudioStream.kt
-@@ -52,35 +52,44 @@
+@@ -17,6 +17,7 @@
+     val channels: Int,
+     val payloadType: Int,
+     val audioType: String = "media",
++    val bufferHint: AudioBufferHint? = null,
+ )
+ 
+ /**
+@@ -52,35 +53,44 @@
      private var controlThread: Thread? = null
      private var started = false
  
@@ -157,7 +165,7 @@
      }
  
      private fun runData(socket: DatagramSocket, listener: Listener) {
-@@ -95,6 +104,8 @@
+@@ -95,6 +105,8 @@
                  } catch (_: Exception) {
                      if (closed.get()) return else continue
                  }
@@ -166,7 +174,7 @@
                  stats.received(
                      size = packet.length,
                      sequence = if (packet.length >= RTP_HEADER_LEN) {
-@@ -144,6 +155,7 @@
+@@ -144,6 +156,7 @@
                      stats.processed()
                      continue
                  }
@@ -174,7 +182,7 @@
                  val rtp = wire.copyOf(RTP_HEADER_LEN) + payload
                  val decryptedNumber = decryptedPackets.incrementAndGet()
                  if (decryptedNumber <= FIRST_PACKET_LOG_COUNT) {
-@@ -168,25 +180,35 @@
+@@ -168,25 +181,35 @@
                  listener.onRtp(rtp, sample)
                  stats.processed()
              }
@@ -221,7 +229,7 @@
      }
  
      private fun readU32Be(source: ByteArray, offset: Int): Int =
-@@ -199,6 +221,7 @@
+@@ -199,6 +222,7 @@
          joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
  
      private companion object {
@@ -229,6 +237,26 @@
          const val TAG = "xcertplay-usb"
          const val DATAGRAM_BYTES = 4_096
          const val AUDIO_RECEIVE_BUFFER_BYTES = 512 * 1024
+--- a/shared/src/main/java/com/shilapi/xcertplay/airplay/BufferedAudioStream.kt
++++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/BufferedAudioStream.kt
+@@ -32,6 +32,8 @@
+     internal class Frame(val sequence: Int, val timestamp: Long, val rtp: ByteArray)
+ 
+     private val id = AudioStreamId(format.payloadType, format.audioType)
++    // 手机目标可能大于原有一秒提前量；预送量须覆盖目标，避免播放端等待尚未送入的数据。
++    private val feedLeadMillis = maxOf(LEAD_MILLIS, (format.bufferHint?.maximumMillis ?: 0) + 200L)
+     private val closed = AtomicBoolean(false)
+     private val started = AtomicBoolean(false)
+     private var cleanupStarted = false // guarded by lock; permits reentrant close without recursion
+@@ -155,7 +157,7 @@
+                 synchronized(lock) {
+                     if (closed.get()) return
+                     retireFedLocked()
+-                    if (rate == 0 || queue.isEmpty() || leadMillisLocked() >= LEAD_MILLIS) {
++                    if (rate == 0 || queue.isEmpty() || leadMillisLocked() >= feedLeadMillis) {
+                         lock.wait(FEED_POLL_MILLIS)
+                     } else {
+                         queue.pollFirst()?.also { frame ->
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/CarPlayMediaEngine.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/CarPlayMediaEngine.kt
 @@ -20,7 +20,6 @@
@@ -280,6 +308,42 @@
                  }
              },
          )
+@@ -179,9 +173,10 @@
+                 "formatBits=0x${java.lang.Long.toHexString((stream["audioFormat"] as? Number)?.toLong() ?: 0L)} " +
+                 "micPort=${(stream["dataPort"] as? Number)?.toInt() ?: 0}",
+         )
++        val negotiatedFormat = format.withBufferHint(stream)
+         val connectionId = stream["streamConnectionID"]
+         val latencyMs = (stream["audioLatencyMs"] as? Number)?.toInt() ?: 0
+-        val meta = AudioMeta(type, format, connectionId, latencyMs)
++        val meta = AudioMeta(type, negotiatedFormat, connectionId, latencyMs)
+         val microphone = microphoneConfig(session, type, stream, format)
+         if (microphone != null) pendingMicrophone[streamKey] = microphone
+ 
+@@ -193,12 +188,12 @@
+                 override fun onStarted(firstSample: Int) {
+                     meta.firstSample = firstSample
+                     meta.originNs = System.nanoTime()
+-                    sink.onAudioStarted(streamId, format, firstSample)
++                    sink.onAudioStarted(streamId, negotiatedFormat, firstSample)
+                     microphone?.let { sink.onMicrophoneStarted(streamId, it) }
+                 }
+ 
+                 override fun onRtp(rtp: ByteArray, sample: Int) =
+-                    sink.onAudioRtp(streamId, format, rtp, sample)
++                    sink.onAudioRtp(streamId, negotiatedFormat, rtp, sample)
+ 
+                 override fun onPacket(
+                     wire: ByteArray,
+@@ -241,7 +236,7 @@
+         }
+         val peer = session.remoteAddress ?: return null
+         val buffered = try {
+-            BufferedAudioStream(key, format, sink, session::logDebug, expectedPeer = peer)
++            BufferedAudioStream(key, format.withBufferHint(stream), sink, session::logDebug, expectedPeer = peer)
+         } catch (error: Exception) {
+             Log.w(TAG, "buffered audio listener failed", error)
+             return null
 --- a/shared/src/main/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlay.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/airplay/ClusterTurnCardOverlay.kt
 @@ -10,15 +10,21 @@

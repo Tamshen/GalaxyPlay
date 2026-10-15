@@ -173,9 +173,10 @@ class CarPlayMediaEngine(
                 "formatBits=0x${java.lang.Long.toHexString((stream["audioFormat"] as? Number)?.toLong() ?: 0L)} " +
                 "micPort=${(stream["dataPort"] as? Number)?.toInt() ?: 0}",
         )
+        val negotiatedFormat = format.withBufferHint(stream)
         val connectionId = stream["streamConnectionID"]
         val latencyMs = (stream["audioLatencyMs"] as? Number)?.toInt() ?: 0
-        val meta = AudioMeta(type, format, connectionId, latencyMs)
+        val meta = AudioMeta(type, negotiatedFormat, connectionId, latencyMs)
         val microphone = microphoneConfig(session, type, stream, format)
         if (microphone != null) pendingMicrophone[streamKey] = microphone
 
@@ -187,12 +188,12 @@ class CarPlayMediaEngine(
                 override fun onStarted(firstSample: Int) {
                     meta.firstSample = firstSample
                     meta.originNs = System.nanoTime()
-                    sink.onAudioStarted(streamId, format, firstSample)
+                    sink.onAudioStarted(streamId, negotiatedFormat, firstSample)
                     microphone?.let { sink.onMicrophoneStarted(streamId, it) }
                 }
 
                 override fun onRtp(rtp: ByteArray, sample: Int) =
-                    sink.onAudioRtp(streamId, format, rtp, sample)
+                    sink.onAudioRtp(streamId, negotiatedFormat, rtp, sample)
 
                 override fun onPacket(
                     wire: ByteArray,
@@ -235,7 +236,7 @@ class CarPlayMediaEngine(
         }
         val peer = session.remoteAddress ?: return null
         val buffered = try {
-            BufferedAudioStream(key, format, sink, session::logDebug, expectedPeer = peer)
+            BufferedAudioStream(key, format.withBufferHint(stream), sink, session::logDebug, expectedPeer = peer)
         } catch (error: Exception) {
             Log.w(TAG, "buffered audio listener failed", error)
             return null

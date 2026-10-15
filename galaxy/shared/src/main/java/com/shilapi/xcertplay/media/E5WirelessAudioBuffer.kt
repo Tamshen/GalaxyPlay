@@ -19,7 +19,9 @@ internal object E5WirelessAudioBuffer {
 }
 
 /** 用 RTP 样本时钟吸收无线包突发，不为每个到达包重新累计等待。只由音频 worker 使用。 */
-internal class WirelessAudioPlayoutClock(private val sampleRate: Int) {
+internal class WirelessAudioPlayoutClock(private val sampleRate: Int,
+    val targetMillis: Int = E5WirelessAudioBuffer.JITTER_MILLIS) {
+    init { require(targetMillis in 1..com.shilapi.xcertplay.airplay.AudioBufferHint.MAX_MILLIS) }
     private var originSample: Long? = null
     private var originNs = 0L
 
@@ -31,13 +33,14 @@ internal class WirelessAudioPlayoutClock(private val sampleRate: Int) {
         // 时间戳倒退或跨越不连续会话时重新建立时钟，不能等待一个无界的远期时间。
         if (delta >= 0x8000_0000L) return reset(unsigned, receivedNs)
         val due = originNs + delta * 1_000_000_000L / sampleRate
-        if (due - receivedNs > MAX_FUTURE_NS) return reset(unsigned, receivedNs)
+        val futureLimit = MAX_FUTURE_NS + (targetMillis - E5WirelessAudioBuffer.JITTER_MILLIS).coerceAtLeast(0) * 1_000_000L
+        if (due - receivedNs > futureLimit) return reset(unsigned, receivedNs)
         return due
     }
 
     private fun reset(sample: Long, receivedNs: Long): Long {
         originSample = sample
-        originNs = receivedNs + E5WirelessAudioBuffer.JITTER_MILLIS * 1_000_000L
+        originNs = receivedNs + targetMillis * 1_000_000L
         return originNs
     }
 

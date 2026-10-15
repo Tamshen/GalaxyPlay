@@ -23,6 +23,7 @@ interface AudioRouteProvider : Closeable {
 interface MediaPlatformAdaptation {
     val profile: PlatformAudioProfile? get() = null
     val template: AudioRoutingTemplate? get() = null
+    val buffers: AudioBufferSettings? get() = null
     fun audioRoutes(context: Context?, report: (String) -> Unit): AudioRouteProvider? = null
 
     companion object { val NONE = object : MediaPlatformAdaptation {} }
@@ -34,6 +35,7 @@ class GalaxyMediaPolicy(
     private val preferBus: Boolean,
     override val template: AudioRoutingTemplate? = null,
     private val navigationDevice: NavigationOutputDevice? = null,
+    override val buffers: AudioBufferSettings? = null,
 ) : MediaPlatformAdaptation {
     override val profile: PlatformAudioProfile? = if (factoryProfile) L7FactoryAudioProfile.load() else null
     override fun audioRoutes(context: Context?, report: (String) -> Unit): AudioRouteProvider? =

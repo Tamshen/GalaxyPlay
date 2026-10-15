@@ -3231,7 +3231,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 ?: AirPlayPersistence.loadAssistantAudioChannel(this),
             context = this,
             platformAdaptation = com.shilapi.xcertplay.media.GalaxyMediaPolicy(
-                l7DebugLogs, audioTemplate?.preferBus ?: AirPlayPersistence.loadL7AudioBusEnabled(this), audioTemplate, GalaxyNavigationOutput.load(this)),
+                l7DebugLogs, audioTemplate?.preferBus ?: AirPlayPersistence.loadL7AudioBusEnabled(this), audioTemplate, GalaxyNavigationOutput.load(this),
+                buffers = if (l7DebugLogs) GalaxyAudioBufferSettings.load(this) else null),
             wirelessAudio = wirelessEnabled,
             callProcessingEnabled = AirPlayPersistence.loadCallProcessingEnabled(this),
             onVideoFailure = { codec, reason -> onVideoFailure(controllerGeneration, codec, reason) },

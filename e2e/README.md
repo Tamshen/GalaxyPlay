@@ -14,6 +14,9 @@
 
 原厂媒体接入回归包括 `GalaxyOemMediaContractTest`（精确公开重载、本应用 MediaSession、拒绝占位入口）、`GalaxyOemPlaybackSnapshotTest`（图标／immutable 返回入口、能力字段与失效对象）、`L7MediaCenterSessionTest`（来源接受、异常重试、健康服务多次恢复、旧控制／焦点隔离），并由 `GalaxyProfilesTest` 验证旧音频保留、明确应用的新焦点与会话冻结。Android VM 测试源集中的 `com.ecarx.eas.sdk` 为自写公开签名替身，禁止进入正式 APK，也不作为原厂 SDK 或实车成功证据。Docker 构建 `:common:assembleDebugAndroidTest`，在独占 AVD 安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`，再执行 `adb -s emulator-5556 shell am instrument -w com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation`，成功标记为 `SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK`。配置设备脚本增加 L7 模板焦点实际落盘断言，单次点击后等待界面完成转换，失败截图保留且恢复原设置。
 
+
+`AudioBufferSettingsTest`、`AudioBufferSelectionRendererTest`、`GalaxyAudioBufferSettingsTest` 与 `CarPlayAudioStreamIsolationTest`／`BufferedAudioSessionTest`／`BufferedAudioStreamTest` 覆盖分用途缓冲、协商值校验、实际播放计划与传输元数据、TCP 预送容量、取消和保存、连接快照；这是软件回归，实车声音延迟与听感单独验收。
+
 ## 原生热点连接恢复
 
 `GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。

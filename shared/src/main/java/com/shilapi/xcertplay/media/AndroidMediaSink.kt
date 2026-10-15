@@ -76,6 +76,7 @@ class AndroidMediaSink(
     private val appContext = context?.applicationContext
     private val factoryAudio = platformAdaptation.profile
     private val audioRoutingTemplate = platformAdaptation.template
+    private val audioBufferSettings = platformAdaptation.buffers
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
         audioFocusEnabled,
@@ -406,7 +407,7 @@ class AndroidMediaSink(
             communicationResources::started,
             communicationResources::released,
             phoneChannel = audioRoutingTemplate?.choice(AudioOutputRole.PHONE) ?: 0,
-        ).also { audioRenderers[id] = it }
+        ).also { it.configureBuffering(audioBufferSettings); audioRenderers[id] = it }
     }
 }
 
@@ -1026,8 +1027,10 @@ private class AudioRenderer(
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
 
-    private val e5Realtime = E5WirelessAudioBuffer.applies(wirelessAudio, format)
-    private val playoutClock = if (e5Realtime) WirelessAudioPlayoutClock(format.sampleRate) else null
+    private var e5Realtime = E5WirelessAudioBuffer.applies(wirelessAudio, format)
+    private var playoutClock = if (e5Realtime) WirelessAudioPlayoutClock(format.sampleRate) else null
+    private var streamBuffer: StreamAudioBuffer? = null
+    private var dynamicMusicBuffer = true
     private var pendingPacket: AudioPacket? = null
     private var pendingDueNs = 0L
 
@@ -1086,6 +1089,23 @@ private class AudioRenderer(
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
     private var callTicket: CallAudioTimeline.Ticket? = null
     private val resumeRequested = AtomicBoolean(false)
+
+    fun configureBuffering(settings: AudioBufferSettings?) {
+        check(!started)
+        val selected = settings ?: if (mediaBufferMillis == MediaAudioBuffer.FOLLOW_PHONE)
+            AudioBufferSettings(mediaMillis = mediaBufferMillis) else return
+        val channel = mappedSelection().channel
+        streamBuffer = StreamAudioBuffer.resolve(selected, channel, format, wirelessAudio)
+        dynamicMusicBuffer = false
+        val buffer = streamBuffer
+        if (buffer != null) {
+            e5Realtime = channel != AudioChannel.MEDIA
+            playoutClock = if (e5Realtime) WirelessAudioPlayoutClock(format.sampleRate, buffer.targetMillis) else null
+        }
+        report("Audio: buffer channel=$channel mode=${if (buffer == null) "default" else if (buffer.followsPhone) "phone" else "manual"} " +
+            "targetMs=${buffer?.targetMillis ?: playoutClock?.targetMillis ?: 0} source=${buffer?.source ?: "existing_policy"} " +
+            "phoneMinMs=${format.bufferHint?.minimumMillis ?: 0} phoneMaxMs=${format.bufferHint?.maximumMillis ?: 0}")
+    }
 
     fun resumeAfterCommunication() { if (running) resumeRequested.set(true) }
 
@@ -1276,7 +1296,7 @@ private class AudioRenderer(
         trackAttributes = attributes
         val plan = if (e5Realtime) E5WirelessAudioBuffer.plan(format.sampleRate, format.channels, minBuffer)
             else MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
-                format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
+                format.sampleRate, format.channels, minBuffer, mediaBufferMillis, streamBuffer?.targetMillis)
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
         var routeLabel: String
@@ -1327,7 +1347,7 @@ private class AudioRenderer(
             "rate=${format.sampleRate} channels=${format.channels} " +
             "route=$routeLabel " +
             "bufferMs=${capacityBytes * 1000L / bytesPerSecond} startMs=${startThresholdBytes * 1000L / bytesPerSecond} " +
-            "wireless=$wirelessAudio jitterTargetMs=${if (e5Realtime) E5WirelessAudioBuffer.JITTER_MILLIS else 0} " +
+            "wireless=$wirelessAudio jitterTargetMs=${playoutClock?.targetMillis ?: 0} " +
             "trackState=${built.state} usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType}")
         Log.i(
             TAG,
@@ -1697,7 +1717,7 @@ private class AudioRenderer(
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
         val wirelessMusic = wirelessAudio && !e5Realtime && mappedChannel == AudioChannel.MEDIA
-        if (wirelessMusic) {
+        if (wirelessMusic && dynamicMusicBuffer) {
             val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
             if (threshold > startThresholdBytes) {
                 startThresholdBytes = threshold

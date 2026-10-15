@@ -32,6 +32,8 @@ internal class BufferedAudioStream(
     internal class Frame(val sequence: Int, val timestamp: Long, val rtp: ByteArray)
 
     private val id = AudioStreamId(format.payloadType, format.audioType)
+    // 手机目标可能大于原有一秒提前量；预送量须覆盖目标，避免播放端等待尚未送入的数据。
+    private val feedLeadMillis = maxOf(LEAD_MILLIS, (format.bufferHint?.maximumMillis ?: 0) + 200L)
     private val closed = AtomicBoolean(false)
     private val started = AtomicBoolean(false)
     private var cleanupStarted = false // guarded by lock; permits reentrant close without recursion
@@ -155,7 +157,7 @@ internal class BufferedAudioStream(
                 synchronized(lock) {
                     if (closed.get()) return
                     retireFedLocked()
-                    if (rate == 0 || queue.isEmpty() || leadMillisLocked() >= LEAD_MILLIS) {
+                    if (rate == 0 || queue.isEmpty() || leadMillisLocked() >= feedLeadMillis) {
                         lock.wait(FEED_POLL_MILLIS)
                     } else {
                         queue.pollFirst()?.also { frame ->
