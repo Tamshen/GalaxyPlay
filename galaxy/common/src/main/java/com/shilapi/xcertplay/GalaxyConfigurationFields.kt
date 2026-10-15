@@ -82,7 +82,8 @@ internal object GalaxyConfigurationFields {
         "hevc_enabled", "hevc_software_decoder", "hide_top_bar", "hide_bottom_bar", "right_hand_drive",
         "safe_area_draw_outside", "adapt_pip_resolution", "display_width_physical_mm", "display_physical_size_basis",
         "galaxy_video_decoder_l7", "galaxy_video_decoder_l6", "galaxy_video_decoder_custom",
-        "media_buffer_ms", "main_buffered_audio", "advanced_audio_channel_mapping", "audio_focus_enabled",
+        "media_buffer_ms", GalaxyAudioBufferSettings.PHONE, GalaxyAudioBufferSettings.ASSISTANT,
+        GalaxyAudioBufferSettings.NAVIGATION, "main_buffered_audio", "advanced_audio_channel_mapping", "audio_focus_enabled",
         "l7_audio_bus_enabled", "l7_call_processing_enabled", "bluetooth_media_exclusive",
         "media_audio_channel", "navigation_audio_channel", "navigation_stream_type", "assistant_audio_channel",
         "galaxy_navigation_output_L7", "galaxy_navigation_output_L6", "galaxy_navigation_output_CUSTOM",
@@ -117,6 +118,7 @@ internal object GalaxyConfigurationFields {
             "manufacturer" to AirPlayPersistence.DEFAULT_MANUFACTURER, "model" to AirPlayPersistence.DEFAULT_MODEL,
             "oem_label" to AirPlayPersistence.DEFAULT_OEM_LABEL, GalaxyCarPlayAppearance.CUSTOM_LABEL to false,
             "mfi_i2c_path" to AirPlayPersistence.DEFAULT_MFI_I2C_PATH))
+        groups.getValue(MAIN).putAll(GalaxyAudioBufferSettings.defaults)
         // 动态几何和未开启的上游功能保留“未设置”，读取时仍由原有策略计算默认值。
         listOf("main_buffered_audio", "center_map_overlay", "center_map_auto_hide", "cluster_map_scale_percent",
             "cluster_content", "cluster_marker_horizontal_step", "cluster_marker_vertical_step",

@@ -26,6 +26,27 @@ class BufferedAudioStreamTest {
     private val key = ByteArray(32) { (it + 1).toByte() }
     private val format = AudioFormat(AudioCodecKind.AAC_LC, 48_000, 2, BufferedAudioStream.STREAM_TYPE, "media")
 
+    @Test fun negotiatedTwoSecondTargetCanFillWhileThePlaybackClockIsStopped() {
+        val sink = RecordingSink()
+        val hint = AudioBufferHint.parse(mapOf("audioLatencyMs" to 2000), 48_000)
+        val stream = BufferedAudioStream(key, format.copy(bufferHint = hint), sink, nanoTime = { 0L })
+        try {
+            stream.start()
+            Socket(InetAddress.getLoopbackAddress(), stream.port).use { socket ->
+                val out = DataOutputStream(socket.getOutputStream())
+                repeat(100) { i ->
+                    val packet = seal(i, i * 1024L, byteArrayOf(0x21))
+                    out.writeShort(packet.size + 2); out.write(packet)
+                }
+                out.flush()
+                stream.setRate(0L, 1, BigInteger.ZERO)
+                waitFor { sink.rtp.size == 100 }
+                assertEquals(0, sink.rtp.first())
+                assertEquals(99 * 1024, sink.rtp.last())
+            }
+        } finally { stream.close() }
+    }
+
     @Test
     fun theOfferIsMadeOnlyWhenEnabled() {
         val off = AirPlayInfoPlist.build(config)

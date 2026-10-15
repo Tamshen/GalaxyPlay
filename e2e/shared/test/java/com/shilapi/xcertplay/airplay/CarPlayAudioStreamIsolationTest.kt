@@ -12,6 +12,34 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class CarPlayAudioStreamIsolationTest {
+    @Test fun udpSetupCarriesEachStreamsNegotiatedBufferToTheSink() {
+        val received = java.util.concurrent.ConcurrentHashMap<String, AudioFormat>()
+        val started = java.util.concurrent.ConcurrentHashMap<String, AudioFormat>()
+        val done = java.util.concurrent.CountDownLatch(2)
+        val engine = CarPlayMediaEngine(object : MediaSink {
+            override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) { started[id.audioType] = format }
+            override fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) {
+                received[id.audioType] = format; done.countDown()
+            }
+        })
+        val session = session()
+        try {
+            for ((purpose, latency) in mapOf("media" to 300, "default" to 80)) {
+                val response = engine.onAudio(session, 100, setup(purpose) + ("audioLatencyMs" to latency))!!
+                val key = AirPlayCrypto.hkdfSha512(session.sharedSecret!!, "DataStream-Salt42".toByteArray(),
+                    "DataStream-Output-Encryption-Key".toByteArray(), 32)
+                val header = byteArrayOf(0x80.toByte(), 0x60, 0, 1, 0, 0, 4, 0, 0, 0, 0, 0)
+                val packet = header + AirPlayCrypto.chachaSeal(key, ByteArray(12), byteArrayOf(1, 2), header.copyOfRange(4, 12)) + ByteArray(8)
+                java.net.DatagramSocket().use { socket -> socket.send(java.net.DatagramPacket(packet, packet.size,
+                    java.net.InetAddress.getLoopbackAddress(), response["dataPort"] as Int)) }
+            }
+            assertTrue(done.await(3, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(300, received.getValue("media").bufferHint!!.minimumMillis)
+            assertEquals(80, received.getValue("default").bufferHint!!.minimumMillis)
+            assertEquals(received, started)
+        } finally { engine.onSessionClosed(session); session.close() }
+    }
+
     @Test fun guidanceSetupAndMediaReplacementKeepTheOtherAudioStreamAlive() {
         val session = session()
         val engine = CarPlayMediaEngine(object : MediaSink {})

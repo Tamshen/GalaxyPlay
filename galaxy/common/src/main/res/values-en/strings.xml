@@ -108,4 +108,16 @@
     <string name="l7_report_current_sample">Current sample</string>
     <string name="galaxy_wireless_retry">Retry connection</string>
     <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
+    <string name="audio_buffer_title">Playback buffering by purpose</string>
+    <string name="audio_buffer_hint">Set separate playback buffers for calls, Siri and navigation. Larger buffers absorb more network jitter but delay the sound; the default policy is recommended for calls and Siri. Follow iPhone uses the buffer target negotiated for this connection, or a default if no valid target is provided. Saved changes apply on the next connection.</string>
+    <string name="audio_buffer_existing">Default policy</string>
+    <string name="audio_buffer_phone">Follow iPhone negotiation</string>
+    <string name="audio_buffer_phone_title">Call buffer</string>
+    <string name="audio_buffer_assistant_title">Siri buffer</string>
+    <string name="audio_buffer_navigation_title">Navigation buffer</string>
+    <string name="audio_buffer_32">32 ms</string>
+    <string name="audio_buffer_80">80 ms</string>
+    <string name="audio_buffer_160">160 ms</string>
+    <string name="audio_buffer_300">300 ms</string>
+    <string name="audio_buffer_500">500 ms</string>
 </resources>

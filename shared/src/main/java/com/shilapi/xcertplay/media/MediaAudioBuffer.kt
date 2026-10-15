@@ -7,7 +7,8 @@ package com.shilapi.xcertplay.media
  */
 object MediaAudioBuffer {
     const val DEFAULT_MILLIS = 300
-    val presets = listOf(DEFAULT_MILLIS, 500, 1000)
+    const val FOLLOW_PHONE = 0
+    val presets = listOf(DEFAULT_MILLIS, 500, 1000, FOLLOW_PHONE)
 
     private const val HEADROOM_MILLIS = 200 // room above the start level so bursts after a gap fit
     private const val MIN_TRACK_BUFFER_BYTES = 16 * 1024
@@ -18,15 +19,18 @@ object MediaAudioBuffer {
     data class Plan(val trackBufferBytes: Int, val startBytes: Int)
 
     /** AudioTrack capacity and the amount to queue before play() for one output stream. */
-    fun plan(isMedia: Boolean, sampleRate: Int, channels: Int, minBufferBytes: Int, mediaMillis: Int): Plan {
+    fun plan(isMedia: Boolean, sampleRate: Int, channels: Int, minBufferBytes: Int, mediaMillis: Int,
+             resolvedMillis: Int? = null): Plan {
         val lowLatency = Plan(
             trackBufferBytes = maxOf(minBufferBytes * 4, MIN_TRACK_BUFFER_BYTES),
             startBytes = maxOf(minBufferBytes, MIN_START_BUFFER_BYTES),
         )
         if (!isMedia) return lowLatency
         val bytesPerSecond = sampleRate.toLong() * channels.coerceIn(1, 2) * 2
-        val start = (bytesPerSecond * sanitize(mediaMillis) / 1000).toInt()
-        val capacity = (bytesPerSecond * (sanitize(mediaMillis) + HEADROOM_MILLIS) / 1000).toInt()
+        val target = resolvedMillis ?: sanitize(mediaMillis).takeIf { it != FOLLOW_PHONE } ?: DEFAULT_MILLIS
+        require(target in 1..com.shilapi.xcertplay.airplay.AudioBufferHint.MAX_MILLIS)
+        val start = (bytesPerSecond * target / 1000).toInt()
+        val capacity = (bytesPerSecond * (target + HEADROOM_MILLIS) / 1000).toInt()
         return Plan(
             trackBufferBytes = maxOf(capacity, lowLatency.trackBufferBytes),
             startBytes = maxOf(start, lowLatency.startBytes),

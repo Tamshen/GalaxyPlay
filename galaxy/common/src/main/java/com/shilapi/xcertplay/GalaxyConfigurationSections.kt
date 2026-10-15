@@ -15,7 +15,8 @@ internal object GalaxyConfigurationSections {
                 quickChoice(context, card, "display_fps", R.string.config_smoothness,
                     listOf(30, 60), listOf(R.string.config_smoothness_standard, R.string.config_smoothness_high))
                 quickChoice(context, card, "media_buffer_ms", R.string.config_music_stability,
-                    listOf(300, 500, 1000), listOf(R.string.config_music_fast, R.string.config_music_stable, R.string.config_music_safest))
+                    listOf(300, 500, 1000, 0), listOf(R.string.config_music_fast, R.string.config_music_stable,
+                        R.string.config_music_safest, R.string.audio_buffer_phone))
                 card.addView(L7Components.switchRow(context, text(R.string.config_bluetooth_music),
                     text(R.string.config_bluetooth_hint), AirPlayPersistence.loadBluetoothMediaExclusive(context)) {
                     AirPlayPersistence.saveBluetoothMediaExclusive(context, it)

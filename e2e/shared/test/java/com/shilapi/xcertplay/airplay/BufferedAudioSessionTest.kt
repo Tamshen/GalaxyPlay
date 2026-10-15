@@ -21,6 +21,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class BufferedAudioSessionTest {
+    @Test fun bufferedSetupDeliversNegotiatedSamplesWithoutChangingOtherStreams() {
+        val received = CopyOnWriteArrayList<AudioFormat>()
+        val engine = CarPlayMediaEngine(object : MediaSink {
+            override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) { received += format }
+            override fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) { received += format }
+        })
+        val session = session(media = engine)
+        try {
+            val response = engine.onBufferedAudio(session, validSetup() + mapOf("latencyMin" to 48_000, "latencyMax" to 96_000))!!
+            Socket("127.0.0.1", response["dataPort"] as Int).use { socket ->
+                sendFrame(socket, 0, 1024)
+                engine.onBufferedAudioControl(session, "SETRATE", mapOf("rate" to 1, "rtpTime" to 1024))
+                waitFor { received.size >= 2 }
+                assertTrue(received.all { it.bufferHint?.minimumMillis == 1000 && it.bufferHint?.maximumMillis == 2000 })
+            }
+        } finally { engine.onSessionClosed(session); session.close() }
+    }
+
     @Test
     fun disabledOutputDeclinesType103BeforeCallingTheMediaHandler() {
         var setups = 0

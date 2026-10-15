@@ -456,4 +456,16 @@
     <string name="video_play">播放</string>
     <string name="video_pause">暂停</string>
     <string name="video_cannot_play">此视频无法在车机屏幕上播放。受保护的视频（例如 Apple TV+）需要获得授权的接收器。</string>
+    <string name="audio_buffer_title">分用途播放缓冲</string>
+    <string name="audio_buffer_hint">分别设置电话、Siri 和导航的播放缓冲。缓冲越大，越能吸收网络抖动，但声音会更晚播放；通话和 Siri 建议保留默认策略。跟随手机协商使用本次连接的缓冲目标，手机未提供有效值时使用默认值。保存后下次连接生效。</string>
+    <string name="audio_buffer_existing">默认策略</string>
+    <string name="audio_buffer_phone">跟随手机协商</string>
+    <string name="audio_buffer_phone_title">电话缓冲</string>
+    <string name="audio_buffer_assistant_title">Siri 缓冲</string>
+    <string name="audio_buffer_navigation_title">导航缓冲</string>
+    <string name="audio_buffer_32">32 ms</string>
+    <string name="audio_buffer_80">80 ms</string>
+    <string name="audio_buffer_160">160 ms</string>
+    <string name="audio_buffer_300">300 ms</string>
+    <string name="audio_buffer_500">500 ms</string>
 </resources>

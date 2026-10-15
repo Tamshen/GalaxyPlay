@@ -31,12 +31,6 @@ internal object L7AudioSettings {
         }
         L7SettingsSection.add(parent, text(R.string.galaxy_navigation_device)) { GalaxyNavigationOutput.add(context, it) }
         L7SettingsSection.add(parent, text(R.string.l7_section_audio_playback), footer = applyHint) { card ->
-            val presets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            if (context !is GalaxyConfigurationContext) L7Components.choice(card, text(R.string.music_buffer), listOf(text(R.string.s_300_ms_default),
-                text(R.string.s_500_ms), text(R.string.s_1000_ms_most_stable)),
-                presets.indexOf(AirPlayPersistence.loadMediaBufferMillis(context))) {
-                AirPlayPersistence.saveMediaBufferMillis(context, presets[it])
-            }
             card.addView(L7Components.switchRow(context, text(R.string.contrib_audio_home_toggle_audio_focus),
                 text(R.string.contrib_audio_home_toggle_audio_focus_desc), AirPlayPersistence.loadAudioFocusEnabled(context)) {
                 AirPlayPersistence.saveAudioFocusEnabled(context, it)
@@ -45,8 +39,8 @@ internal object L7AudioSettings {
                 text(R.string.l7_call_processing_note), AirPlayPersistence.loadCallProcessingEnabled(context)) {
                 AirPlayPersistence.saveCallProcessingEnabled(context, it)
             })
-
         }
+        GalaxyAudioBufferSettings.add(context, parent, includeMusic = context !is GalaxyConfigurationContext)
         L7SettingsSection.add(parent, text(R.string.l7_section_bluetooth_audio)) { L7BluetoothAudioSettings.add(context, it, showExclusive = context !is GalaxyConfigurationContext) }
     }
 
