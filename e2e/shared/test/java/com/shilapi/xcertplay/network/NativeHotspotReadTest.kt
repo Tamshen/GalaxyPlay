@@ -18,7 +18,9 @@ import org.robolectric.annotation.Implements
 @Config(sdk = [29, 30], manifest = Config.NONE, shadows = [NativeHotspotReadShadow::class])
 class NativeHotspotReadTest {
     private val logs = mutableListOf<String>()
-    private fun access() = NativeHotspotConfiguration(RuntimeEnvironment.getApplication(), logs::add)
+    private fun access() = NativeHotspotConfiguration(RuntimeEnvironment.getApplication(), logs::add).apply {
+        shellRead = { _, _ -> NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED) }
+    }
     private fun legacy(password: String = "PrivatePassword9") = WifiConfiguration().apply {
         SSID = "\"PrivateNetwork\""
         preSharedKey = "\"$password\""

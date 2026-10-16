@@ -243,7 +243,7 @@ Docker、缓存、签名和源码验证包的规则统一见构建说明。迁�
 
 CI 继续执行 shared/common 的相同任务并上传原报告路径。以 XML 的 tests/failures/errors/skipped 及实际任务执行状态核对结果；不能仅看构建成功，因为无测试源也可能返回 NO-SOURCE。
 
-目前没有 androidTest 自动化用例。四个模块均将设备测试映射到 `e2e/<模块>/androidTest/`，mobile/automotive 的普通测试也预留 `e2e/<模块>/test/`；需要实际新增文件时再创建目录。设备用例引入时同时配置 runner、依赖与设备连接环境，不能把空目录或预留映射计为设备测试通过。automotive 是保留的上游模块，不纳入 L7 产品验收。
+common 已有 Android VM 的 SDK 契约与无线性能设备用例，入口为 `SdkSubclassInstrumentation`；`-e suite wireless-performance` 执行实际无线锁、shell 读取／扫描租约、双栈监听替换与音频管线验证。其他模块保留 `e2e/<模块>/androidTest/` 映射，不能把空目录或预留入口计为设备测试通过。automotive 是保留的上游模块，不纳入 L7 产品验收。
 
 AVD 可验证界面、授权与生命周期；真实 iPhone、USB 模块、远程认证服务、音频路由与实车长时项目按开发说明的验证章节逐项执行。
 
@@ -372,3 +372,7 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 分步调试回归：`L7DebugGuideTest` 在 API 29／30 核对显式启动、未完成步骤阻止通过、缺失记录、后台迟到窗口拒绝、重绘／Bundle 进度恢复与人工现象前置操作；`DiagnosticOperationTest` 核对阻塞前锚点、耗时、原结果／异常保持、私有返回值不入日志及诊断失败隔离。`CommunicationResourcesTest` 覆盖上下行真实释放后才恢复及失败／成功前后锚点。AVD 使用 `python3 e2e/device/debug_guide_smoke.py` 验证六类入口的中英文昼夜、模态步骤、控件定位、缺失与返回进度，恢复原偏好／协议／昼夜；不连接手机或上传，模拟操作不算实车通过。
 
 上游 0.2.15 的有效回归按当前 API 29／30、硬件候选和异步 Surface 实现适配；原版 Smooth video／parking、Speex、BYD 与 Android 7 专用用例在 test-scope 中逐项说明参考边界。`python3 e2e/checks/check_upstream_tests.py --upstream ../开源项目/DiPlay --require-results` 核对固定官方标签的全部测试文件去向、参考原文、活动类唯一性与实际执行 XML；参考用例不进入通过数。
+
+## 无线性能设备验证
+
+`wireless_performance_smoke.py --apk build/交付/对应版本.apk` 仅允许独占的 Android 11 AVD。先通过 Docker 构建 `:common:assembleDebugAndroidTest`；脚本安装指定产品包与测试包，暂时授权测试应用的本地 ADB 公钥并启用网络 ADB，以 UID 2000 验证实际 shell 热点读取、三轮扫描暂停／恢复、真实 AudioTrack 音乐与导航并行、音乐调速边界、音频线程优先级及播放线程／无线锁释放。[Goldfish 的 ADB 实现](https://github.com/aosp-mirror/platform_system_core/blob/android11-release/adb/transport_local.cpp)使用模拟器管道，AVD 用临时 `adb reverse` 将 guest 5555 接回该模拟器的真实 adbd 通道；开始前拒绝覆盖已有转发，结束移除桥接并恢复原 ADB 公钥列表和网络模式，不输出名称、密码或密钥。结果单独记录 `adb_authentication_enforced`；AVD 未启用认证时不能计为实车授权验证。三轮为合成音频管线的重新启动，不模拟蓝牙、iPhone 或实车 Direct 建链；结果写入忽略目录 `build/e2e/upstream-performance/`。

@@ -27,7 +27,9 @@ class NativeHotspotConfigurationTest {
         HotspotWriteShadow.writes = 0
         HotspotWriteShadow.config = null
     }
-    private fun access() = NativeHotspotConfiguration(RuntimeEnvironment.getApplication(), events::add)
+    private fun access() = NativeHotspotConfiguration(RuntimeEnvironment.getApplication(), events::add).apply {
+        shellRead = { _, _ -> NativeHotspotRead(problem = NativeHotspotProblem.UNSUPPORTED) }
+    }
 
     @Test fun acceptedWriteHasIndependentReadbackEvidenceAndNoCredentialsInLog() {
         assertNull(access().apply(proposed))

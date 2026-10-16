@@ -44,6 +44,7 @@ class NativeHotspotRead(val credentials: NativeHotspotCredentials? = null, val p
 
 /** 隐藏接口按能力调用；固件拒绝时交回原生设置，不绕过系统授权。 */
 class NativeHotspotConfiguration(context: Context, private val log: (String) -> Unit = {}) {
+    internal var shellRead: (Context, (String) -> Unit) -> NativeHotspotRead = GalaxyHotspotShellRead::read
     private val app = context.applicationContext
     private val wifi = app.getSystemService(WifiManager::class.java)
 
@@ -53,8 +54,11 @@ class NativeHotspotConfiguration(context: Context, private val log: (String) -> 
         if (legacy.credentials != null || Build.VERSION.SDK_INT < 30) return legacy
         val modern = readMethod("getSoftApConfiguration", ::modernCredentials)
         if (modern.credentials != null) return modern
+        val shell = shellRead(app, ::diagnostic)
+        if (shell.credentials?.valid() == true) return shell
         return NativeHotspotRead(problem = if (legacy.problem == NativeHotspotProblem.PERMISSION ||
-            modern.problem == NativeHotspotProblem.PERMISSION) NativeHotspotProblem.PERMISSION else modern.problem)
+            modern.problem == NativeHotspotProblem.PERMISSION || shell.problem == NativeHotspotProblem.PERMISSION)
+            NativeHotspotProblem.PERMISSION else modern.problem)
     }
 
     private fun readMethod(method: String, decode: (Any?) -> NativeHotspotRead): NativeHotspotRead = try {

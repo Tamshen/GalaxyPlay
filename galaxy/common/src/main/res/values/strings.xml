@@ -575,4 +575,8 @@
     <string name="audio_buffer_160">160 ms</string>
     <string name="audio_buffer_300">300 ms</string>
     <string name="audio_buffer_500">500 ms</string>
+    <string name="galaxy_wifi_scan_pause">Direct 连接时暂停后台扫描</string>
+    <string name="galaxy_wifi_scan_pause_hint">减少后台搜索网络造成的音画停顿，需要已授权的本地 ADB；断开后恢复。下一次连接生效。</string>
+    <string name="galaxy_wifi_performance_lock">无线传输性能优化</string>
+    <string name="galaxy_wifi_performance_lock_hint">投屏期间保持 Wi-Fi 高性能与低延迟，断开后释放。下一次连接生效。</string>
 </resources>

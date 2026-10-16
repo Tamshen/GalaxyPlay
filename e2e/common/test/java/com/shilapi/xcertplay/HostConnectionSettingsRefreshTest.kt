@@ -39,11 +39,16 @@ class HostConnectionSettingsRefreshTest {
         assertEquals(WirelessHotspotMode.MANUAL, manual.wirelessHotspotMode)
         assertEquals(30_000L, manual.wirelessFirstTcpTimeoutMillis)
         assertEquals(false, manual.wirelessStartupRefreshEnabled)
+        assertEquals(true, manual.wifiScanPauseEnabled)
+        assertEquals(true, manual.wifiHighPerformanceEnabled)
 
         // The user switches to a car hotspot with another name while the projection screen lives on.
         AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.WIFI_P2P)
         AirPlayPersistence.saveManualHotspotSsid(app, "New car")
         AirPlayPersistence.saveWifiP2pPreferredChannel(app, 149)
+        app.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .putBoolean(GalaxyWirelessPerformanceSettings.SCAN, false)
+            .putBoolean(GalaxyWirelessPerformanceSettings.LOCK, false).commit()
 
         host.pause().resume()
 
@@ -53,6 +58,8 @@ class HostConnectionSettingsRefreshTest {
         assertEquals(149, config.wifiP2pPreferredChannel)
         assertEquals(45_000L, config.wirelessFirstTcpTimeoutMillis)
         assertEquals(true, config.wirelessStartupRefreshEnabled)
+        assertEquals(false, config.wifiScanPauseEnabled)
+        assertEquals(false, config.wifiHighPerformanceEnabled)
     }
 
     private fun runtimeConfig(host: CarPlayHostActivity): CarPlayRuntimeConfig {

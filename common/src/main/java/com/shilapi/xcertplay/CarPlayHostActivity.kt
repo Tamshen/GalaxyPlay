@@ -189,6 +189,8 @@ class CarPlayHostActivity : ComponentActivity() {
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
         wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
         wifiP2pChannelPolicy = GalaxyP2pSettings.load(this).policy,
+        wifiScanPauseEnabled = GalaxyWirelessPerformanceSettings.enabled(this, GalaxyWirelessPerformanceSettings.SCAN),
+        wifiHighPerformanceEnabled = GalaxyWirelessPerformanceSettings.enabled(this, GalaxyWirelessPerformanceSettings.LOCK),
         wirelessFirstTcpTimeoutMillis = com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning
             .firstTcpMillis(wirelessEnabled, wirelessHotspotMode),
         wirelessStartupRefreshEnabled = com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning

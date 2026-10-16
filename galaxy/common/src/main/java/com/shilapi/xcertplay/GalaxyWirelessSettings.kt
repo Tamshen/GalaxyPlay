@@ -28,6 +28,7 @@ internal class GalaxyWirelessSettings(
     private var channelRow: L7SettingRow? = null
     private var regionRow: L7SettingRow? = null
     private var wifiRow: L7SettingRow? = null
+    private val performanceRows = mutableListOf<Pair<String, L7SettingRow>>()
 
     init {
         L7SettingsSection.add(parent, activity.getString(R.string.wireless_connection_method)) { card ->
@@ -35,6 +36,8 @@ internal class GalaxyWirelessSettings(
                 modeLabel(AirPlayPersistence.loadWirelessHotspotMode(activity)), ::chooseMode)
                 .apply { setDescription(activity.getString(R.string.wireless_connection_method_hint)) }
             card.addView(modeRow)
+            GalaxyWirelessPerformanceSettings.add(activity, card, false) { !closed && canEdit() }
+                .also { performanceRows += GalaxyWirelessPerformanceSettings.LOCK to it }
         }
         update()
     }
@@ -51,11 +54,17 @@ internal class GalaxyWirelessSettings(
             channelRow = L7Components.valueRow(activity, activity.getString(R.string.wifi_direct_channel_title), "",
                 ::chooseChannel).apply { setDescription(activity.getString(R.string.wifi_direct_channel_description)) }
                 .also(card::addView)
+            GalaxyWirelessPerformanceSettings.add(activity, card, true) { !closed && canEdit() }
+                .also { performanceRows += GalaxyWirelessPerformanceSettings.SCAN to it }
         }
         update()
     }
 
     fun update() {
+        performanceRows.forEach { (key, row) ->
+            row.isEnabled = !closed && canEdit()
+            row.setSwitchChecked(GalaxyWirelessPerformanceSettings.enabled(activity, key))
+        }
         modeRow.setValue(modeLabel(AirPlayPersistence.loadWirelessHotspotMode(activity)))
         modeRow.isEnabled = !closed && canEdit()
         channelRow?.setValue(channelLabel(AirPlayPersistence.loadWifiP2pPreferredChannel(activity)))
@@ -155,7 +164,7 @@ internal class GalaxyWirelessSettings(
         dialog?.isShowing == true && !activity.isFinishing && !activity.isDestroyed && canEdit()
 
     fun dismiss() { pickerGeneration++; dialog?.dismiss(); dialog = null }
-    fun dispose() { closed = true; dismiss() }
+    fun dispose() { closed = true; performanceRows.forEach { it.second.isEnabled = false }; dismiss() }
 
     companion object {
         fun supported(context: Context) = context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT) &&

@@ -6,15 +6,35 @@ import java.lang.reflect.Method;
 
 /** 在真实 Android VM 验证生成子类、参数装箱与各实例回调隔离；不调用厂商服务。 */
 public class SdkSubclassInstrumentation extends Instrumentation {
-    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+    private boolean wirelessPerformance;
+    private boolean wirelessPrepare;
+    @Override public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        wirelessPerformance = arguments != null && "wireless-performance".equals(arguments.getString("suite"));
+        wirelessPrepare = arguments != null && "wireless-prepare".equals(arguments.getString("suite"));
+        start();
+    }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
+            if (wirelessPrepare) {
+                com.shilapi.xcertplay.GalaxyWirelessPerformanceChecks.prepare(getTargetContext());
+                result.putString("stream", "WIRELESS_ADB_PREPARED"); finish(-1, result); return;
+            }
+            if (wirelessPerformance) {
+                com.shilapi.xcertplay.GalaxyWirelessPerformanceChecks.run(getTargetContext());
+                result.putString("stream", "WIRELESS_PERFORMANCE_ANDROID11_OK REAL_AUDIO_TRACK LOCK_RELEASE THREAD_PRIORITY THREE_PIPELINE_CYCLES");
+                finish(-1, result); return;
+            }
             testGeneratedSubclassCallbacksAndOldInstanceIsolation();
             com.shilapi.xcertplay.GalaxyOemMediaIntegrationChecks.run(getTargetContext());
             result.putString("stream", "SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK"); finish(-1, result);
         }
-        catch (Throwable error) { result.putString("stream", "SDK_SUBCLASS_FAILED " + error); finish(0, result); }
+        catch (Throwable error) {
+            result.putString("stream", "SDK_SUBCLASS_FAILED " +
+                ((wirelessPerformance || wirelessPrepare) ? android.util.Log.getStackTraceString(error) : error));
+            finish(0, result);
+        }
     }
     private void assertEquals(Object expected, Object actual) { if (!expected.equals(actual)) throw new AssertionError(expected + " != " + actual); }
     private void assertTrue(boolean value) { if (!value) throw new AssertionError("expected true"); }

@@ -129,13 +129,39 @@ class GalaxyWirelessSettingsTest {
         File(activity.filesDir, "configurations").deleteRecursively()
         AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
         AirPlayPersistence.saveWifiP2pPreferredChannel(activity, 149)
+        activity.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .putBoolean(GalaxyWirelessPerformanceSettings.SCAN, false)
+            .putBoolean(GalaxyWirelessPerformanceSettings.LOCK, false).commit()
         val repository = GalaxyProfiles(activity)
         for (model in listOf("l7", "l6", "custom")) {
             val profile = repository.applyTemplate(model)
             repository.resetCurrent(profile)
             assertEquals(WirelessHotspotMode.WIFI_P2P, AirPlayPersistence.loadWirelessHotspotMode(activity))
             assertEquals(149, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+            assertFalse(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.SCAN))
+            assertFalse(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.LOCK))
         }
+    }
+
+    @Test fun performanceSwitchesSaveIndependentlyAndRejectBusyOrDisposedEdits() {
+        settings.addDirect(parent)
+        val lock = rows().single { it.titleView.text == activity.getString(R.string.galaxy_wifi_performance_lock) }
+        val scan = rows().single { it.titleView.text == activity.getString(R.string.galaxy_wifi_scan_pause) }
+        lock.performClick()
+        assertFalse(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.LOCK))
+        assertTrue(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.SCAN))
+        editable = false
+        scan.performClick()
+        assertTrue(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.SCAN))
+        settings.update()
+        assertFalse(lock.isEnabled || scan.isEnabled)
+        editable = true
+        settings.update()
+        scan.performClick()
+        assertFalse(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.SCAN))
+        settings.dispose()
+        lock.performClick()
+        assertFalse(GalaxyWirelessPerformanceSettings.enabled(activity, GalaxyWirelessPerformanceSettings.LOCK))
     }
 
     @Test fun wifiOffShowsRecoveryWithoutEnablingTheRadio() {

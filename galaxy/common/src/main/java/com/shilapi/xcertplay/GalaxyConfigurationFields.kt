@@ -115,6 +115,7 @@ internal object GalaxyConfigurationFields {
             "cluster_map_enabled" to false, "adb_cluster_activity_enabled" to false,
             "wifi_p2p_preferred_channel" to 0, "existing_wifi_ssid" to "", "existing_wifi_passphrase" to "",
             "galaxy_p2p_region" to "MAINLAND_CHINA",
+            GalaxyWirelessPerformanceSettings.SCAN to true, GalaxyWirelessPerformanceSettings.LOCK to true,
             "manufacturer" to AirPlayPersistence.DEFAULT_MANUFACTURER, "model" to AirPlayPersistence.DEFAULT_MODEL,
             "oem_label" to AirPlayPersistence.DEFAULT_OEM_LABEL, GalaxyCarPlayAppearance.CUSTOM_LABEL to false,
             "mfi_i2c_path" to AirPlayPersistence.DEFAULT_MFI_I2C_PATH))
