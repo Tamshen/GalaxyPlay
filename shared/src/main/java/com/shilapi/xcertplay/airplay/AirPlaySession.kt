@@ -437,13 +437,14 @@ class AirPlaySession(
         )
 
     private fun runControl() {
-        com.shilapi.xcertplay.network.TcpLiveness.configure(socket) { debugLog(it) }
-        val input = BufferedInputStream(socket.getInputStream())
-        val output = BufferedOutputStream(socket.getOutputStream())
         var accumulated = ByteArray(0)
         val buffer = ByteArray(READ_CHUNK_BYTES)
         var closeReason = "session closed"
         try {
+            // 取消可能先于工作线程启动；初始化也必须进入统一的 I/O 失败与释放路径。
+            com.shilapi.xcertplay.network.TcpLiveness.configure(socket) { debugLog(it) }
+            val input = BufferedInputStream(socket.getInputStream())
+            val output = BufferedOutputStream(socket.getOutputStream())
             while (!closed.get()) {
                 val count = input.read(buffer)
                 if (count < 0) {
