@@ -28,6 +28,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, lint and source-only debug build
         run: ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintDebug :mobile:assembleDebug --stacktrace
+      - name: Upload source-only debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: galaxyplay-source-only-apk
+          path: mobile/build/outputs/apk/debug/mobile-debug.apk
+          if-no-files-found: error
+          retention-days: 7
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@v4
