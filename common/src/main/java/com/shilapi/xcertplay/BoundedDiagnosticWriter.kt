@@ -3,9 +3,10 @@ package com.shilapi.xcertplay
 import java.io.Closeable
 import java.util.ArrayDeque
 
-/** 单个后台写入线程，最多保留 maxPending 条待写记录及一条正在写入的记录。 */
+/** 单个后台线程；待写不超过 maxPending 条，批量入口一次最多处理 16 条。 */
 internal class BoundedDiagnosticWriter<T : Any>(
     private val maxPending: Int = 64,
+    private val writeBatch: ((List<T>) -> Unit)? = null,
     private val write: (T) -> Unit,
 ) : Closeable {
     private val monitor = Object()
@@ -43,11 +44,14 @@ internal class BoundedDiagnosticWriter<T : Any>(
                 while (pending.isEmpty() && !closed) monitor.wait()
                 if (pending.isEmpty()) return
                 active = true
-                pending.removeFirst()
+                buildList {
+                    add(pending.removeFirst())
+                    if (writeBatch != null) repeat(minOf(15, pending.size)) { add(pending.removeFirst()) }
+                }
             }
             // 磁盘或诊断回调失败不能阻止后续记录。
             try {
-                runCatching { write(next) }
+                runCatching { if (writeBatch != null) writeBatch.invoke(next) else write(next.single()) }
             } finally {
                 synchronized(monitor) {
                     active = false

@@ -228,11 +228,12 @@ class L7DebugOverlayService : Service() {
             CarPlayBackgroundSession.hasSession() -> R.string.l7_debug_connecting
             else -> R.string.l7_debug_disconnected
         })
-        val snapshot = L7DebugLog.buffer.snapshot(errorsOnly, 180)
+        val buffer = L7DebugLog.buffer.status()
         val status = getString(R.string.l7_debug_summary, state,
-            getString(if (paused) R.string.l7_debug_paused else R.string.l7_debug_live), snapshot.evicted)
+            getString(if (paused) R.string.l7_debug_paused else R.string.l7_debug_live), buffer.evicted)
         if (status != lastSummary) { summary.text = status; lastSummary = status }
-        if (collapsed || (paused && !force) || (!force && snapshot.revision == revision)) return
+        if (collapsed || (paused && !force) || (!force && buffer.revision == revision)) return
+        val snapshot = L7DebugLog.buffer.snapshot(errorsOnly, 180)
         revision = snapshot.revision
         // 最多每半秒绘制一次、每次至多 180 行，避免日志刷屏影响投屏。
         logText.text = snapshot.lines.joinToString("\n").ifEmpty {

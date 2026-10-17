@@ -9,6 +9,33 @@
          } finally {
              old.close(); current.close(); folder.deleteRecursively()
          }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/BoundedDiagnosticWriterTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/BoundedDiagnosticWriterTest.kt
+@@ -7,6 +7,24 @@
+ import org.junit.Test
+ 
+ class BoundedDiagnosticWriterTest {
++    @Test(timeout = 5000) fun batchedDrainKeepsBoundedQueueAndOriginalEventOrder() {
++        val entered = CountDownLatch(1); val release = CountDownLatch(1)
++        val written = Collections.synchronizedList(mutableListOf<Int>())
++        val batches = Collections.synchronizedList(mutableListOf<Int>())
++        val writer = BoundedDiagnosticWriter<Int>(writeBatch = { values ->
++            batches.add(values.size)
++            if (values.first() == -1) { entered.countDown(); release.await() }
++            written.addAll(values)
++        }) { fail("batch consumer required") }
++        try {
++            writer.enqueue(-1); assertTrue(entered.await(1, TimeUnit.SECONDS))
++            repeat(100) { writer.enqueue(it) }
++            assertEquals(64, writer.pendingCount); assertEquals(36L, writer.droppedCount)
++            release.countDown(); assertTrue(writer.awaitIdle(2000))
++            assertEquals(listOf(-1) + (36 until 100), written)
++            assertTrue(batches.all { it in 1..16 }); assertTrue(batches.any { it == 16 })
++        } finally { release.countDown(); writer.close() }
++    }
+     @Test(timeout = 5_000) fun aBlockedWriterCannotBlockEnqueueAndOnlyTheLatest64PendingEntriesSurvive() {
+         val entered = CountDownLatch(1)
+         val release = CountDownLatch(1)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
 @@ -48,6 +48,24 @@

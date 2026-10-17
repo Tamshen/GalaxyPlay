@@ -22,26 +22,41 @@ internal class SessionLogFile(val file: File, private val archiveNames: List<Str
     fun append(line: String, evidence: GalaxyConfigurationEvidence? = configuration) = synchronized(lock) {
         if (closed) return@synchronized
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
-        val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + safe + "\n").toByteArray(Charsets.UTF_8)
+        appendRedactedBatch(listOf(safe), evidence)
+    }
+
+    /** 内部安全正文按原顺序批量追加；每条仍遵守配置头和 UTF-8 轮转边界。 */
+    internal fun appendRedactedBatch(lines: List<String>, evidence: GalaxyConfigurationEvidence?) = synchronized(lock) {
+        if (closed || lines.isEmpty()) return@synchronized
         runCatching {
             file.parentFile?.mkdirs()
-            val header = evidence?.takeIf { writtenConfiguration != it.id || file.length() == 0L }
-                ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
-            val rotated = file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES
-            if (rotated) {
-                rotate()
-                file.writeText("")
-                writtenConfiguration = null
-            }
-            if (evidence != null && (writtenConfiguration != evidence.id || file.length() == 0L)) {
-                file.appendText(evidence.header + "\n")
-                writtenConfiguration = evidence.id
-            }
-            file.appendBytes(bytes)
+            var size = file.length()
+            var rotated = false
+            var stream = file.outputStreamAppend()
+            try {
+                for (line in lines) {
+                    val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + line + "\n").toByteArray(Charsets.UTF_8)
+                    var header = evidence?.takeIf { writtenConfiguration != it.id || size == 0L }
+                        ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
+                    if (size + bytes.size + (header?.size ?: 0) > MAX_BYTES) {
+                        stream.close(); rotate(); file.writeText("")
+                        stream = file.outputStreamAppend()
+                        size = 0; rotated = true; writtenConfiguration = null
+                        header = evidence?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
+                    }
+                    if (header != null) {
+                        stream.write(header); size += header.size
+                        writtenConfiguration = evidence?.id
+                    }
+                    stream.write(bytes); size += bytes.size
+                }
+            } finally { stream.close() }
             notifyStorage(rotated)
-        }
+        }.onFailure { writtenConfiguration = null }
         Unit
     }
+
+    private fun File.outputStreamAppend() = java.io.BufferedOutputStream(java.io.FileOutputStream(this, true), 8192)
     private fun rotate() {
         if (!file.exists() || file.length() == 0L) return
         for (index in archiveNames.lastIndex downTo 1) {

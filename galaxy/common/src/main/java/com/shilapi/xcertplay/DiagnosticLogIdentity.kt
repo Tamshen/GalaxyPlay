@@ -14,7 +14,9 @@ internal object DiagnosticLogIdentity {
         "diag_event=(evt_[g-v]{32}_([0-9]+)) event_ms=([0-9]{1,16}) ")
 
     fun next(): String = "evt_${process}_${sequence.incrementAndGet()}"
-    fun prefix(id: String, millis: Long) = "diag_event=$id event_ms=$millis "
+    private val safeId = Regex("evt_[g-v]{32}_[0-9]{1,19}")
+    fun prefix(id: String, millis: Long) = "diag_event=${id.takeIf(safeId::matches) ?: next()} " +
+        "event_ms=${millis.takeIf { it in 0..9_999_999_999_999_999L } ?: 0} "
     fun read(line: String): Event? = prefix.find(line)?.let { match ->
         val counter = match.groupValues[2].toLongOrNull() ?: return null
         val millis = match.groupValues[3].toLongOrNull() ?: return null

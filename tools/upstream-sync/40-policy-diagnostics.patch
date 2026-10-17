@@ -834,7 +834,7 @@
  }
 --- a/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/AsyncDiagnosticLog.kt
-@@ -1,19 +1,40 @@
+@@ -1,19 +1,65 @@
  package com.shilapi.xcertplay
  
 +import java.io.File
@@ -848,24 +848,50 @@
 -    private data class Entry(val target: SessionLogFile, val line: String)
 -    private val writer = BoundedDiagnosticWriter<Entry> { it.target.append(it.line) }
 +    private data class Entry(val target: SessionLogFile, val line: String, val generation: Long,
-+        val configuration: GalaxyConfigurationEvidence?)
++        val configuration: GalaxyConfigurationEvidence?, val timestamp: Long, val event: String)
 +    @Volatile private var generation = 0L
-+    private val writer = BoundedDiagnosticWriter<Entry> {
-+        synchronized(SessionLogFile.storageLock) {
-+            if (it.generation == generation) it.target.append(it.line, it.configuration)
-+        }
-+    }
++    // 格式器与文件批次都仅由同一写入线程使用，生产线程只脱敏并入队。
++    private val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
++    private val writer = BoundedDiagnosticWriter<Entry>(writeBatch = ::writeBatch) { writeBatch(listOf(it)) }
  
 -    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis()) {
++    private fun writeBatch(entries: List<Entry>) {
++        synchronized(SessionLogFile.storageLock) {
++            var index = 0
++            while (index < entries.size) {
++                val first = entries[index++]
++                val group = mutableListOf(first)
++                while (index < entries.size && entries[index].target === first.target &&
++                    entries[index].configuration === first.configuration && entries[index].generation == first.generation)
++                    group.add(entries[index++])
++                if (first.generation != generation) continue
++                first.target.appendRedactedBatch(group.map {
++                    "${timestamp.format(Date(it.timestamp))}  ${DiagnosticLogIdentity.prefix(it.event, it.timestamp)}${it.line}"
++                }, first.configuration)
++            }
++        }
++    }
++
 +    fun append(target: SessionLogFile?, message: String, nowMillis: Long = System.currentTimeMillis(),
 +        configuration: GalaxyConfigurationEvidence? = target?.configuration,
 +        eventId: String = DiagnosticLogIdentity.next()) {
          if (target == null) return
 +        val captured = generation
          val safe = DiagnosticRedactor.redact(message) ?: return
-         val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
+-        val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))
 -        runCatching { writer.enqueue(Entry(target, "$timestamp  $safe")) }
-+        runCatching { writer.enqueue(Entry(target, "$timestamp  ${DiagnosticLogIdentity.prefix(eventId, nowMillis)}$safe", captured, configuration)) }
++        enqueue(target, safe, nowMillis, configuration, eventId, captured)
++    }
++
++    /** 仅供内部已脱敏正文使用；时间和事件标识仍由受控编码生成。 */
++    internal fun appendRedacted(target: SessionLogFile?, safe: String, nowMillis: Long,
++        configuration: GalaxyConfigurationEvidence?, eventId: String) {
++        if (target == null) return
++        enqueue(target, safe, nowMillis, configuration, eventId, generation)
++    }
++    private fun enqueue(target: SessionLogFile, safe: String, nowMillis: Long,
++        configuration: GalaxyConfigurationEvidence?, eventId: String, captured: Long) {
++        runCatching { writer.enqueue(Entry(target, safe, captured, configuration, nowMillis, eventId)) }
 +    }
 +
 +    /** 由后台维护任务调用，当前会话仍可从新代次继续记录。 */
@@ -911,16 +937,19 @@
  
 --- a/common/src/main/java/com/shilapi/xcertplay/BoundedDiagnosticWriter.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/BoundedDiagnosticWriter.kt
-@@ -3,7 +3,7 @@
+@@ -3,9 +3,10 @@
  import java.io.Closeable
  import java.util.ArrayDeque
  
 -/** One daemon writer, with at most [maxPending] queued entries plus its active write. */
-+/** 单个后台写入线程，最多保留 maxPending 条待写记录及一条正在写入的记录。 */
++/** 单个后台线程；待写不超过 maxPending 条，批量入口一次最多处理 16 条。 */
  internal class BoundedDiagnosticWriter<T : Any>(
      private val maxPending: Int = 64,
++    private val writeBatch: ((List<T>) -> Unit)? = null,
      private val write: (T) -> Unit,
-@@ -22,7 +22,7 @@
+ ) : Closeable {
+     private val monitor = Object()
+@@ -22,7 +23,7 @@
          }
      }
  
@@ -929,16 +958,25 @@
      fun enqueue(entry: T): Boolean = synchronized(monitor) {
          if (closed) return@synchronized false
          if (pending.size == maxPending) {
-@@ -45,7 +45,7 @@
+@@ -43,11 +44,14 @@
+                 while (pending.isEmpty() && !closed) monitor.wait()
+                 if (pending.isEmpty()) return
                  active = true
-                 pending.removeFirst()
+-                pending.removeFirst()
++                buildList {
++                    add(pending.removeFirst())
++                    if (writeBatch != null) repeat(minOf(15, pending.size)) { add(pending.removeFirst()) }
++                }
              }
 -            // Disk failures or a broken diagnostic callback must not stop later writes.
 +            // 磁盘或诊断回调失败不能阻止后续记录。
              try {
-                 runCatching { write(next) }
+-                runCatching { write(next) }
++                runCatching { if (writeBatch != null) writeBatch.invoke(next) else write(next.single()) }
              } finally {
-@@ -57,7 +57,7 @@
+                 synchronized(monitor) {
+                     active = false
+@@ -57,7 +61,7 @@
          }
      }
  
@@ -947,7 +985,7 @@
      fun awaitIdle(timeoutMillis: Long): Boolean = synchronized(monitor) {
          val deadline = System.nanoTime() + timeoutMillis.coerceAtLeast(0) * 1_000_000L
          while (active || pending.isNotEmpty()) {
-@@ -68,7 +68,7 @@
+@@ -68,7 +72,7 @@
          true
      }
  
@@ -6123,7 +6161,7 @@
      fun setRect(value: SafeAreaRect, sourceWidthPixels: Int, sourceHeightPixels: Int) {
 --- a/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/SessionLogFile.kt
-@@ -3,43 +3,63 @@
+@@ -3,43 +3,78 @@
  import java.io.Closeable
  import java.io.File
  
@@ -6150,28 +6188,47 @@
 +    fun append(line: String, evidence: GalaxyConfigurationEvidence? = configuration) = synchronized(lock) {
          if (closed) return@synchronized
          val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
-+        val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + safe + "\n").toByteArray(Charsets.UTF_8)
++        appendRedactedBatch(listOf(safe), evidence)
++    }
++
++    /** 内部安全正文按原顺序批量追加；每条仍遵守配置头和 UTF-8 轮转边界。 */
++    internal fun appendRedactedBatch(lines: List<String>, evidence: GalaxyConfigurationEvidence?) = synchronized(lock) {
++        if (closed || lines.isEmpty()) return@synchronized
          runCatching {
 -            if (file.length() > MAX_BYTES) {
-+            file.parentFile?.mkdirs()
-+            val header = evidence?.takeIf { writtenConfiguration != it.id || file.length() == 0L }
-+                ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
-+            val rotated = file.length() + bytes.size + (header?.size ?: 0) > MAX_BYTES
-+            if (rotated) {
-                 rotate()
-                 file.writeText("")
-+                writtenConfiguration = null
-             }
+-                rotate()
+-                file.writeText("")
+-            }
 -            file.appendText(safe + "\n")
-+            if (evidence != null && (writtenConfiguration != evidence.id || file.length() == 0L)) {
-+                file.appendText(evidence.header + "\n")
-+                writtenConfiguration = evidence.id
-+            }
-+            file.appendBytes(bytes)
+-        }
++            file.parentFile?.mkdirs()
++            var size = file.length()
++            var rotated = false
++            var stream = file.outputStreamAppend()
++            try {
++                for (line in lines) {
++                    val bytes = ((evidence?.let { "config_ref=${it.id} " } ?: "") + line + "\n").toByteArray(Charsets.UTF_8)
++                    var header = evidence?.takeIf { writtenConfiguration != it.id || size == 0L }
++                        ?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
++                    if (size + bytes.size + (header?.size ?: 0) > MAX_BYTES) {
++                        stream.close(); rotate(); file.writeText("")
++                        stream = file.outputStreamAppend()
++                        size = 0; rotated = true; writtenConfiguration = null
++                        header = evidence?.let { (it.header + "\n").toByteArray(Charsets.UTF_8) }
++                    }
++                    if (header != null) {
++                        stream.write(header); size += header.size
++                        writtenConfiguration = evidence?.id
++                    }
++                    stream.write(bytes); size += bytes.size
++                }
++            } finally { stream.close() }
 +            notifyStorage(rotated)
-         }
++        }.onFailure { writtenConfiguration = null }
          Unit
      }
++
++    private fun File.outputStreamAppend() = java.io.BufferedOutputStream(java.io.FileOutputStream(this, true), 8192)
      private fun rotate() {
          if (!file.exists() || file.length() == 0L) return
 -        for (index in ARCHIVE_NAMES.lastIndex downTo 1) {
