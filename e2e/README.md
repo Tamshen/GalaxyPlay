@@ -96,6 +96,8 @@ e2e/
 
 有线启动专项：`L7VpnConsentTest` 覆盖 VPN 已准备、缺少授权页面、服务／启动拒绝、其他调用异常、用户拒绝／取消、重复请求和销毁后的迟到回调；`L7WiredJournalTest` 覆盖关闭自动连接时的崩溃摘要、两次尝试、退出分类、旧尝试隔离、容量淘汰、主动结束及清空；`L7WiredUploadTest` 验证媒体／探测记录挤满预算时仍保留两次失败摘要与退出诊断，不包含异常消息。
 
+USB 配对与恢复专项：`WiredGenerationTest`、`CarPlayVpnScopeTest` 检查旧结果／监听隔离、取消和阻塞保存不阻塞关闭；`NcmWriteRecoveryTest`、`WiredStartRecoveryTest` 检查完整写入才计恢复、最多三次补发、同端点／原截止时间、500 ms 轮询上限与取消；`LockdownPhoneIdentityTest`、`WiredPairingSessionTest`、`GalaxyLockdownRecordsTest` 覆盖公钥读取与原预算、缓存命中不 Pair／不写盘、双手机隔离、旧记录迁移、持久化失败的内存隔离及安全诊断。`CloseSequenceTest`、`UsbCloseFailuresTest`、`WiredResourcesTest` 覆盖某项关闭抛错后继续清理、真实线程等待、自身／超时／中断和 UNKNOWN 重连门禁。这些测试使用合成身份和 USB／协议边界替身，不替代真实 iPhone USB、MFi、首帧或连接速度验收。
+
 USB 授权回调专项：`IphoneUsbPermissionGateTest` 覆盖相同设备重复发现、设备替换、同路径重连、并发广播／轮询一次消费及取消失效；`IphoneUsbCallbackTest` 在 API 29／30／33 调用真实控制器回调与 PendingIntent 边界，检查旧设备／旧请求拒绝不误伤新尝试、拒绝后迟到成功、关闭与后续协议阶段拦截、成功后实际权限复查、已排队旧任务与失败提示失效、控制器重建广播隔离、请求编号解析，以及 iPhone／CH341 的系统 PendingIntent 回调交付。仅使用合成 USB 设备，不建立真实手机链路。
 
 
