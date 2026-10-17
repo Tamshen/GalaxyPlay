@@ -41,4 +41,12 @@ class L7MediaCommandDispatcherTest {
         dispatcher.dispatch(CarPlayMediaButton.PLAY, "mediacenter")
         assertEquals(1, waiting.size)
     }
+
+    @Test fun lateNativeCallbackCannotCaptureTheReplacementPhone() {
+        val old = owner!!
+        owner = Any()
+        dispatcher.dispatch(CarPlayMediaButton.NEXT, "native-key:200087", expectedOwner = old)
+        assertTrue(waiting.isEmpty())
+        assertTrue(sent.isEmpty())
+    }
 }

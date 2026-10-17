@@ -38,10 +38,10 @@ internal class CarPlayMediaSession(
         discard = Bitmap::recycle,
     )
     private var artworkOwner: Any? = artworkQueue.newSession()
-    private var connected = false
+    @Volatile private var connected = false
     private var connectionKnown = false
-    private var audioActive = false
-    private var phonePlaying: Boolean? = null
+    @Volatile private var audioActive = false
+    @Volatile private var phonePlaying: Boolean? = null
     @Volatile private var closed = false
     internal var session: MediaSession? = null
         private set
@@ -54,12 +54,17 @@ internal class CarPlayMediaSession(
 
     private fun command(index: Int, source: String, trace: L7SteeringTrace?) {
         if (closed) { trace?.step("DROP", "MEDIA_SESSION_CLOSED"); return }
-        val command = if (index == CarPlayMediaButton.PLAY_PAUSE && phonePlaying != null) {
-            if (phonePlaying == true) CarPlayMediaButton.PAUSE else CarPlayMediaButton.PLAY
-        } else index
+        val command = mapCommand(index)
         trace?.step("MAPPED", "index=$command phonePlaying=$phonePlaying streamActive=$audioActive connected=$connected")
         emit("command source=$source index=$command phonePlaying=$phonePlaying streamActive=$audioActive")
         if (trace != null && traceSend != null) traceSend.invoke(command, source, trace) else send(command, source)
+    }
+
+    fun mapCommand(index: Int): Int {
+        val playing = phonePlaying
+        return if (index == CarPlayMediaButton.PLAY_PAUSE && playing != null)
+            if (playing) CarPlayMediaButton.PAUSE else CarPlayMediaButton.PLAY
+        else index
     }
 
     /** 当前 CarPlay 窗口收到标准媒体键时走同一命令路径，不交给残留蓝牙媒体会话。 */

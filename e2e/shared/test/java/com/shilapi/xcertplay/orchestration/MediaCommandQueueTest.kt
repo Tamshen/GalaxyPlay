@@ -32,7 +32,7 @@ class MediaCommandQueueTest {
                 assertTrue(reasons.contains("QUEUE_FULL"))
                 ReflectionHelpers.setField(controller, "activeSession", next)
                 release.countDown()
-                val executor = ReflectionHelpers.getField<ExecutorService>(controller, "touchExecutor")
+                val executor = ReflectionHelpers.getField<ExecutorService>(controller, "mediaExecutor")
                 executor.submit { }.get(2, TimeUnit.SECONDS)
                 verify(old, times(1)).sendMediaChecked(anyInt())
                 verify(next, never()).sendMediaChecked(anyInt())
@@ -40,6 +40,23 @@ class MediaCommandQueueTest {
                 assertTrue(controller.sendMediaButton(3, next))
                 executor.submit { }.get(2, TimeUnit.SECONDS)
                 verify(next).sendMediaChecked(3)
+            } finally { release.countDown() }
+        }
+    }
+
+    @Test fun stalledTouchQueueDoesNotDelayMediaCommands() {
+        withController { controller, _ ->
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            val touch = ReflectionHelpers.getField<ExecutorService>(controller, "touchExecutor")
+            touch.execute { entered.countDown(); release.await(2, TimeUnit.SECONDS) }
+            val phone = mock(AirPlaySession::class.java)
+            val written = CountDownLatch(1)
+            `when`(phone.sendMediaChecked(anyInt())).thenAnswer { written.countDown(); true }
+            ReflectionHelpers.setField(controller, "activeSession", phone)
+            try {
+                assertTrue(entered.await(1, TimeUnit.SECONDS))
+                assertTrue(controller.sendMediaButton(3, phone))
+                assertTrue(written.await(1, TimeUnit.SECONDS))
             } finally { release.countDown() }
         }
     }

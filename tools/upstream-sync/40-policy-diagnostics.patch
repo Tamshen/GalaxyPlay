@@ -1464,6 +1464,17 @@
      /** Whether [decoder] accepts a [side] x [side] stream when asked to configure for it. */
      private fun configures(decoder: String, mime: String, side: Int): Boolean {
          var codec: MediaCodec? = null
+--- a/common/src/main/java/com/shilapi/xcertplay/CarPlayVideo.kt
++++ b/common/src/main/java/com/shilapi/xcertplay/CarPlayVideo.kt
+@@ -46,7 +46,7 @@
+     var playing = false
+         private set
+     var pendingSeekMillis: Int? = null
+-    var activity: CarPlayVideoActivity? = null
++    @Volatile var activity: CarPlayVideoActivity? = null
+ 
+     fun attach(context: Context, next: CarPlayController) {
+         appContext = context.applicationContext
 --- a/common/src/main/java/com/shilapi/xcertplay/CarPlayVideoSurface.kt
 +++ /dev/null
 @@ -1,75 +0,0 @@

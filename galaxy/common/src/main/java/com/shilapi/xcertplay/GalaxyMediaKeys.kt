@@ -9,9 +9,9 @@ import com.shilapi.xcertplay.orchestration.CarPlayController
 
 /** 媒体键只维护会话和转发命令，系统焦点统一由实际播放模块持有。 */
 internal object GalaxyMediaKeys {
-    private var controller: CarPlayController? = null
-    private var bridge: CarPlayMediaSession? = null
-    private var commandGate = L7MediaCommandGate()
+    @Volatile private var controller: CarPlayController? = null
+    @Volatile private var bridge: CarPlayMediaSession? = null
+    @Volatile private var commandGate = L7MediaCommandGate()
     private var mediaCenter: L7MediaCenterSession? = null
     private var navigation: L7NavigationSession? = null
     private var navigationTick: Runnable? = null
@@ -20,11 +20,14 @@ internal object GalaxyMediaKeys {
     private var pendingArtwork: Pair<Int, ByteArray>? = null
     private var mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
     private var steeringWheel: L7SteeringWheel? = null
+    private var nativeWheel: GalaxyHardKeyBridge? = null
 
     @Synchronized fun attach(context: Context, next: CarPlayController, onPlaybackStarted: () -> Unit,
                              assistantActive: () -> Boolean = { false }) {
         if (controller === next) return
         val context = context.applicationContext
+        nativeWheel?.close()
+        nativeWheel = null
         controller?.sessionStateListener = null
         controller?.navigationListener = null
         stopNavigation()
@@ -50,7 +53,7 @@ internal object GalaxyMediaKeys {
         }
         val dispatch: (Int, String) -> Unit = { index, source -> traced(index, source, L7SteeringDiagnostics.begin(source, index)) }
         bridge = if (next.localMediaAudioEnabled) CarPlayMediaSession(context.applicationContext, onPlaybackStarted, dispatch, traced) else null
-        next.sessionStateListener = { active -> onConnection(context, next, active, dispatch, traced) }
+        next.sessionStateListener = { active -> onConnection(context, next, active, dispatch, traced, commands) }
         next.navigationListener = { value -> synchronized(this) { if (controller === next) navigation?.update(value) } }
         next.playbackListener = { playing ->
             synchronized(this) { if (controller === next) { L7SteeringDiagnostics.store.state("phonePlayback", "playing=$playing"); bridge?.onIphonePlaying(playing) } }
@@ -83,24 +86,42 @@ internal object GalaxyMediaKeys {
                 synchronized(this) { controller === next && next.requestSiri() }
             }.also { it.start() }
         }
-        onConnection(context, next, next.hasActiveSession(), dispatch, traced)
+        onConnection(context, next, next.hasActiveSession(), dispatch, traced, commands)
     }
 
     private fun dispatcher(next: CarPlayController, onPlaybackStarted: () -> Unit): L7MediaCommandDispatcher =
         L7MediaCommandDispatcher(next::activeMediaSessionOwner,
-            { synchronized(this) { controller === next } },
-            { index, source -> synchronized(this) { commandGate.accept(index, source) } },
+            { controller === next },
+            { index, source -> commandGate.accept(index, source) },
             { index, action -> CarPlayBackgroundSession.beforeMediaCommand(next, index, action) },
-            CarPlayVideo::onMediaKey, { index, owner -> next.sendMediaButton(index, owner) }, onPlaybackStarted,
+            { index -> localMedia(next, index) }, { index, owner -> next.sendMediaButton(index, owner) },
+            {
+                val owner = next.activeMediaSessionOwner()
+                handler.post { if (controller === next && owner != null && next.activeMediaSessionOwner() === owner) onPlaybackStarted() }
+            },
             traceSend = { index, owner, trace -> next.sendMediaButton(index, owner, trace::step) },
             traceBefore = { index, action, dropped -> CarPlayBackgroundSession.beforeMediaCommand(next, index, action, dropped) })
 
+    private fun localMedia(next: CarPlayController, index: Int): Boolean {
+        val player = CarPlayVideo.activity ?: return false
+        if (android.os.Looper.myLooper() == handler.looper) return CarPlayVideo.onMediaKey(index)
+        val owner = next.activeMediaSessionOwner()
+        handler.post {
+            if (controller === next && owner != null && next.activeMediaSessionOwner() === owner && CarPlayVideo.activity === player)
+                CarPlayVideo.onMediaKey(index)
+        }
+        return true
+    }
+
     @Synchronized private fun onConnection(context: Context, next: CarPlayController, active: Boolean,
-                                              dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit) {
+                                              dispatch: (Int, String) -> Unit, traced: (Int, String, L7SteeringTrace) -> Unit,
+                                              commands: L7MediaCommandDispatcher) {
         if (controller !== next) return
         L7SteeringDiagnostics.store.connection(active)
         bridge?.onConnected(active)
         if (!active) {
+            nativeWheel?.close()
+            nativeWheel = null
             commandGate = L7MediaCommandGate()
             stopNavigation()
             mediaCenter?.close()
@@ -110,10 +131,31 @@ internal object GalaxyMediaKeys {
             mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
             pendingArtwork = null
         } else if (context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
+            if (nativeWheel == null) startNativeWheel(context, next, commands)
             if (navigation == null && GalaxyVehiclePreferences.navigationReporting(context)) startNavigation(context, next)
             if (mediaCenter == null && GalaxyVehiclePreferences.mediaReporting(context)) startMediaReporting(context, next, dispatch, traced)
         }
         if (active) bridge?.onNowPlayingChanged(mediaInfo)
+    }
+
+    private fun startNativeWheel(context: Context, next: CarPlayController,
+                                 commands: L7MediaCommandDispatcher) {
+        val selected = context.getSharedPreferences("l7_audio_templates", 0).getString("model", null)
+        if (selected !in setOf("l7", "l6") || !GalaxyVehiclePreferences.steering(context)) return
+        val owner = next.activeMediaSessionOwner() ?: return
+        val gate = commandGate
+        val media = bridge
+        nativeWheel = GalaxyHardKeyBridge(context,
+            { controller === next && next.activeMediaSessionOwner() === owner && GalaxyVehiclePreferences.steering(context) },
+            { event, key ->
+                val trace = L7SteeringDiagnostics.begin("native-key", -1, "event=$event code=$key")
+                gate.nativeEvent(event, key)?.let { index ->
+                    val source = "native-key:$key"
+                    val mapped = media?.mapCommand(index) ?: index
+                    trace.step("MAPPED", "index=$mapped")
+                    commands.dispatch(mapped, source, trace, owner)
+                } ?: trace.step("FILTER", if (key == 200231) "VOICE_SEMANTICS_UNVERIFIED" else "RELEASE_REPEAT_OR_UNSUPPORTED")
+            }, gate::clearNative).also { it.start() }
     }
 
     private fun startNavigation(context: Context, next: CarPlayController) {
@@ -148,6 +190,8 @@ internal object GalaxyMediaKeys {
 
     @Synchronized fun detach(expected: CarPlayController?) {
         if (expected == null || controller !== expected) return
+        nativeWheel?.close()
+        nativeWheel = null
         expected.sessionStateListener = null
         expected.navigationListener = null
         stopNavigation()
@@ -179,7 +223,7 @@ internal object GalaxyMediaKeys {
         if (controller === expected) { L7SteeringDiagnostics.store.state("audioStream", "active=$active"); bridge?.onMediaAudioChanged(active) }
     }
 
-    @Synchronized fun onHardwareKey(expected: CarPlayController?, event: KeyEvent): Boolean {
+    fun onHardwareKey(expected: CarPlayController?, event: KeyEvent): Boolean {
         VehicleSteeringInputLog.key(event, "vehicle-window-key")
         if (CarPlayMediaButton.forKeyCode(event.keyCode) == null) return false
         if (expected == null || controller !== expected || !expected.hasActiveSession()) {

@@ -46,7 +46,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
     var playing = false
         private set
     var pendingSeekMillis: Int? = null
-    var activity: CarPlayVideoActivity? = null
+    @Volatile var activity: CarPlayVideoActivity? = null
 
     fun attach(context: Context, next: CarPlayController) {
         appContext = context.applicationContext

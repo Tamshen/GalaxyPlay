@@ -213,6 +213,10 @@ class CarPlayController(
     // 媒体 IPC 卡住时拒绝额外按键，不合并连续切歌，也不影响触控队列语义。
     private val mediaCommands = java.util.concurrent.Semaphore(32)
     private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    // 媒体保持独立顺序与原 32 项预算，避免排在慢触控写入之后。
+    private val mediaExecutor: ExecutorService = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "galaxy-media-command").apply { isDaemon = true }
+    }
     private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val hostId = UUID.randomUUID().toString().uppercase(Locale.US)
@@ -661,7 +665,7 @@ class CarPlayController(
         if (!mediaCommands.tryAcquire()) { anchor("DROP", "QUEUE_FULL"); return false }
         return try {
             anchor("QUEUE_SUBMIT")
-            touchExecutor.execute {
+            mediaExecutor.execute {
                 try {
                     anchor("QUEUE_EXECUTE")
                     if (closed || activeSession !== session) {
@@ -715,6 +719,7 @@ class CarPlayController(
         permissionPollGeneration += 1
         invalidateIphonePermission()
         touchExecutor.shutdownNow()
+        mediaExecutor.shutdownNow()
         tunnelExecutor.shutdownNow()
         val service = vpnService
         val closingWiredResources = wiredResources
@@ -755,7 +760,10 @@ class CarPlayController(
                     var executorTerminated = false
                     try {
                         executorTerminated = executor.awaitTermination(EXECUTOR_CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+                        if (!mediaExecutor.awaitTermination(EXECUTOR_CLOSE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+                            closeFailures.incrementAndGet()
                     } catch (_: InterruptedException) {
+                        closeFailures.incrementAndGet()
                         Thread.currentThread().interrupt()
                     }
                     connectionDiagnostic(
