@@ -113,7 +113,7 @@ Authentication materials are separate from the source-code license and are not d
 
 Selected upstream improvements in GalaxyPlay 0.1.142
 
-DiPlay (GPL-3.0): Wi-Fi Direct scan pause (#570), audio worker priorities (#740), music clock trim (#788), and sustained packet backlog recovery (#814). The read-only hotspot fallback follows the approach in the unmerged PR #769; no hotspot-write commands from that PR are included.
+DiPlay (GPL-3.0): Wi-Fi Direct scan pause (#570), audio worker priorities (#740), and sustained packet backlog recovery (#814). Music clock trim (#788), introduced in 0.1.142, was removed in 0.1.143 because changing the playback sample rate also changes pitch. The read-only hotspot fallback follows the approach in the unmerged PR #769; no hotspot-write commands from that PR are included.
 https://github.com/shihabal3amri/DiPlay
 
 xcertplay, by shilapi (GPL-3.0): wireless performance locks (57221e4491dbabe6cde605044ca172a46705f4f3) and media thread scheduling (1836c279054c602f5826b3f99728d0925fc25fb1). GalaxyPlay adds closed-controller and diagnostic-failure guards.

@@ -375,4 +375,6 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 
 ## 无线性能设备验证
 
-`wireless_performance_smoke.py --apk build/交付/对应版本.apk` 仅允许独占的 Android 11 AVD。先通过 Docker 构建 `:common:assembleDebugAndroidTest`；脚本安装指定产品包与测试包，暂时授权测试应用的本地 ADB 公钥并启用网络 ADB，以 UID 2000 验证实际 shell 热点读取、三轮扫描暂停／恢复、真实 AudioTrack 音乐与导航并行、音乐调速边界、音频线程优先级及播放线程／无线锁释放。[Goldfish 的 ADB 实现](https://github.com/aosp-mirror/platform_system_core/blob/android11-release/adb/transport_local.cpp)使用模拟器管道，AVD 用临时 `adb reverse` 将 guest 5555 接回该模拟器的真实 adbd 通道；开始前拒绝覆盖已有转发，结束移除桥接并恢复原 ADB 公钥列表和网络模式，不输出名称、密码或密钥。结果单独记录 `adb_authentication_enforced`；AVD 未启用认证时不能计为实车授权验证。三轮为合成音频管线的重新启动，不模拟蓝牙、iPhone 或实车 Direct 建链；结果写入忽略目录 `build/e2e/upstream-performance/`。
+`AudioPitchStabilityTest` 在 API 29／30 经实际建轨及 PCM 写入入口验证音乐低／高水位、欠载恢复、无线抖动水位调整与新曲目保持协商采样率，并核对 PCM 样本不变及源／实际播放采样率日志；44.1／48 kHz、有线／无线分别覆盖。替身测试不代表实际车机听感。
+
+`wireless_performance_smoke.py --apk build/交付/对应版本.apk` 仅允许独占的 Android 11 AVD。先通过 Docker 构建 `:common:assembleDebugAndroidTest`；脚本安装指定产品包与测试包，暂时授权测试应用的本地 ADB 公钥并启用网络 ADB，以 UID 2000 验证实际 shell 热点读取、三轮扫描暂停／恢复、真实 AudioTrack 音乐与导航并行、音乐／导航保持原采样率、音频线程优先级及播放线程／无线锁释放。[Goldfish 的 ADB 实现](https://github.com/aosp-mirror/platform_system_core/blob/android11-release/adb/transport_local.cpp)使用模拟器管道，AVD 用临时 `adb reverse` 将 guest 5555 接回该模拟器的真实 adbd 通道；开始前拒绝覆盖已有转发，结束移除桥接并恢复原 ADB 公钥列表和网络模式，不输出名称、密码或密钥。结果单独记录 `adb_authentication_enforced`；AVD 未启用认证时不能计为实车授权验证。三轮为合成音频管线的重新启动，不模拟蓝牙、iPhone 或实车 Direct 建链；结果写入忽略目录 `build/e2e/upstream-performance/`。

@@ -177,12 +177,11 @@ object GalaxyWirelessPerformanceChecks {
                 ?: error("AUDIO_TRACK_MISSING stage=${field(media, "diagnosticStage")}")
             check(track.state == AudioTrack.STATE_INITIALIZED && track.playbackHeadPosition > 0)
             check(track.playState == AudioTrack.PLAYSTATE_PLAYING)
-            check(track.playbackRate in 47_280..48_720)
+            check(track.sampleRate == music.sampleRate && track.playbackRate == music.sampleRate)
             val navTrack = field(navigation, "track") as? AudioTrack ?: error("NAVIGATION_TRACK_MISSING")
             check(navTrack.state == AudioTrack.STATE_INITIALIZED && navTrack.playbackHeadPosition > 0)
             check(track.audioAttributes.usage == 1 && navTrack.audioAttributes.usage == 12)
-            check(field(media, "clockTrim") != null)
-            check(field(navigation, "clockTrim") == null)
+            check(navTrack.sampleRate == nav.sampleRate && navTrack.playbackRate == nav.sampleRate)
             val tids = File("/proc/self/task").listFiles().orEmpty().filter {
                 runCatching { File(it, "comm").readText().trim() == "carplay-audio" }.getOrDefault(false)
             }
