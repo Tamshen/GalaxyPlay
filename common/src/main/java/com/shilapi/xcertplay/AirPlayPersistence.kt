@@ -35,15 +35,6 @@ object AirPlayPersistence {
     private const val KEY_IDENT_PUBLIC = "identity_public"
     private const val KEY_PAIRING_ID = "pairing_id"
     private const val KEY_PAIRING_IDS = "pairing_ids"
-    private const val KEY_LOCKDOWN_HOST_ID = "lockdown_host_id"
-    private const val KEY_LOCKDOWN_SYSTEM_BUID = "lockdown_system_buid"
-    private const val KEY_LOCKDOWN_WIFI_MAC = "lockdown_wifi_mac"
-    private const val KEY_LOCKDOWN_DEVICE_PUBLIC = "lockdown_device_public"
-    private const val KEY_LOCKDOWN_DEVICE_CERT = "lockdown_device_cert"
-    private const val KEY_LOCKDOWN_HOST_PRIVATE = "lockdown_host_private"
-    private const val KEY_LOCKDOWN_HOST_CERT = "lockdown_host_cert"
-    private const val KEY_LOCKDOWN_ROOT_PRIVATE = "lockdown_root_private"
-    private const val KEY_LOCKDOWN_ROOT_CERT = "lockdown_root_cert"
     private const val KEY_DISPLAY_SCALE_TENTHS = "display_scale_tenths"
     private const val KEY_UI_SCALE_PERCENT = "ui_scale_percent"
     private const val KEY_HEVC_ENABLED = "hevc_enabled"
@@ -870,61 +861,14 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadLockdownRecord(context: Context): LockdownPairRecord? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val hostId = prefs.getString(KEY_LOCKDOWN_HOST_ID, null) ?: return null
-        val systemBuid = prefs.getString(KEY_LOCKDOWN_SYSTEM_BUID, null) ?: return null
-        val wifiMac = prefs.getString(KEY_LOCKDOWN_WIFI_MAC, null) ?: return null
-        val devicePublic = prefs.getString(KEY_LOCKDOWN_DEVICE_PUBLIC, null) ?: return null
-        val deviceCert = prefs.getString(KEY_LOCKDOWN_DEVICE_CERT, null) ?: return null
-        val hostPrivate = prefs.getString(KEY_LOCKDOWN_HOST_PRIVATE, null) ?: return null
-        val hostCert = prefs.getString(KEY_LOCKDOWN_HOST_CERT, null) ?: return null
-        val rootPrivate = prefs.getString(KEY_LOCKDOWN_ROOT_PRIVATE, null) ?: return null
-        val rootCert = prefs.getString(KEY_LOCKDOWN_ROOT_CERT, null) ?: return null
-        return try {
-            LockdownPairRecord.restore(
-                hostId = hostId,
-                systemBuid = systemBuid,
-                wifiMacAddress = wifiMac,
-                devicePublicKeyPem = devicePublic.decodeHex(),
-                deviceCertificatePem = deviceCert.decodeHex(),
-                hostPrivateKeyPem = hostPrivate.decodeHex(),
-                hostCertificatePem = hostCert.decodeHex(),
-                rootPrivateKeyPem = rootPrivate.decodeHex(),
-                rootCertificatePem = rootCert.decodeHex(),
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun loadLockdownRecord(context: Context, devicePublicKey: ByteArray? = null): LockdownPairRecord? =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).load(devicePublicKey)
 
-    fun saveLockdownRecord(context: Context, record: LockdownPairRecord) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_LOCKDOWN_HOST_ID, record.hostId)
-            .putString(KEY_LOCKDOWN_SYSTEM_BUID, record.systemBuid)
-            .putString(KEY_LOCKDOWN_WIFI_MAC, record.wifiMacAddress)
-            .putString(KEY_LOCKDOWN_DEVICE_PUBLIC, record.devicePublicKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_DEVICE_CERT, record.deviceCertificatePem.toHex())
-            .putString(KEY_LOCKDOWN_HOST_PRIVATE, record.hostPrivateKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_HOST_CERT, record.hostCertificatePem.toHex())
-            .putString(KEY_LOCKDOWN_ROOT_PRIVATE, record.rootPrivateKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_ROOT_CERT, record.rootCertificatePem.toHex())
-            .apply()
-    }
+    fun saveLockdownRecord(context: Context, record: LockdownPairRecord) =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).save(record)
 
-    fun clearLockdownRecord(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .remove(KEY_LOCKDOWN_HOST_ID)
-            .remove(KEY_LOCKDOWN_SYSTEM_BUID)
-            .remove(KEY_LOCKDOWN_WIFI_MAC)
-            .remove(KEY_LOCKDOWN_DEVICE_PUBLIC)
-            .remove(KEY_LOCKDOWN_DEVICE_CERT)
-            .remove(KEY_LOCKDOWN_HOST_PRIVATE)
-            .remove(KEY_LOCKDOWN_HOST_CERT)
-            .remove(KEY_LOCKDOWN_ROOT_PRIVATE)
-            .remove(KEY_LOCKDOWN_ROOT_CERT)
-            .apply()
-    }
+    fun clearLockdownRecord(context: Context, devicePublicKey: ByteArray? = null) =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).clear(devicePublicKey)
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
 

@@ -166,9 +166,9 @@ class CarPlayController(
     listener: AirPlaySessionListener,
     private val media: AirPlayMediaHandler,
     reportStatus: (CarPlayStatus) -> Unit,
-    private val loadPairRecord: () -> LockdownPairRecord? = { null },
+    private val loadPairRecord: (ByteArray) -> LockdownPairRecord? = { null },
     private val savePairRecord: (LockdownPairRecord) -> Unit = {},
-    private val clearPairRecord: () -> Unit = {},
+    private val clearPairRecord: (ByteArray) -> Unit = {},
     private val locationProvider: Iap2LocationProvider? = null,
     private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
     diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
@@ -2211,10 +2211,23 @@ class CarPlayController(
             debugLog("wired USBMUX host opened")
             onStatus(CarPlayStatus.Pairing, generation)
             val pairingClient = LockdownPairingClient(mux)
+            val pairingDeadline = System.nanoTime() + PAIR_TIMEOUT_MILLIS * 1_000_000L
+            fun remainingPairingBudget(): Long {
+                val remaining = (pairingDeadline - System.nanoTime()) / 1_000_000L
+                if (remaining <= 0) throw LockdownPairingException.TimedOut
+                return remaining
+            }
             requireCurrentWired(resources, generation)
-            val savedPairRecord = loadPairRecord()
+            val phoneKey = pairingClient.readDevicePublicKey(config.label, remainingPairingBudget()) { !isCurrentWired(resources, generation) }
             requireCurrentWired(resources, generation)
-            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient, resources, generation)
+            var savedPairRecord: LockdownPairRecord? = null
+            if (!withCurrentWired(resources, generation) {
+                    savedPairRecord = loadPairRecord(phoneKey.copyOf())?.takeIf {
+                        java.security.MessageDigest.isEqual(it.devicePublicKeyPem, phoneKey)
+                    }
+                }) throw LockdownPairingException.Cancelled
+            requireCurrentWired(resources, generation)
+            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient, resources, generation, phoneKey, remainingPairingBudget())
             debugLog(
                 if (savedPairRecord != null) {
                     "wired using saved Lockdown pair record"
@@ -2230,8 +2243,8 @@ class CarPlayController(
                 val rejection = rejectedPairRecordError(error)
                 if (savedPairRecord == null || rejection == null) throw error
                 debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
-                if (!withCurrentWired(resources, generation) { clearPairRecord() }) throw LockdownPairingException.Cancelled
-                pairRecord = pairNewRecord(pairingClient, resources, generation)
+                if (!withCurrentWired(resources, generation) { clearPairRecord(phoneKey.copyOf()) }) throw LockdownPairingException.Cancelled
+                pairRecord = pairNewRecord(pairingClient, resources, generation, phoneKey, remainingPairingBudget())
                 carKitClient.open(pairRecord, config.label) { !isCurrentWired(resources, generation) }
             }
             if (!resources.own("CARKIT", carkit)) return
@@ -2371,16 +2384,22 @@ class CarPlayController(
             if (!isCurrentWired(resources, generation)) false else { operation(); true }
         }
 
-    private fun pairNewRecord(client: LockdownPairingClient, resources: WiredResources, generation: Int): LockdownPairRecord =
-        client.pair(
+    private fun pairNewRecord(client: LockdownPairingClient, resources: WiredResources, generation: Int,
+                              phoneKey: ByteArray, timeoutMillis: Long): LockdownPairRecord {
+        val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
+        return client.pair(
             label = config.label,
             hostId = hostId,
             systemBuid = systemBuid,
-            totalTimeoutMillis = PAIR_TIMEOUT_MILLIS,
+            totalTimeoutMillis = timeoutMillis,
             isCancelled = { !isCurrentWired(resources, generation) },
         ).pairRecord.also { record ->
+            if (System.nanoTime() >= deadline) throw LockdownPairingException.TimedOut
+            if (!java.security.MessageDigest.isEqual(record.devicePublicKeyPem, phoneKey))
+                throw LockdownPairingException.InvalidResponse("Phone identity changed during pairing")
             if (!withCurrentWired(resources, generation) { savePairRecord(record) }) throw LockdownPairingException.Cancelled
         }
+    }
 
     private fun rejectedPairRecordError(error: Throwable): String? {
         var cause: Throwable? = error

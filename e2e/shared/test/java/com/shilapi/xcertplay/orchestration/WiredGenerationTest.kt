@@ -24,7 +24,8 @@ class WiredGenerationTest {
         byteArrayOf(1), byteArrayOf(2), byteArrayOf(3), byteArrayOf(4), byteArrayOf(5), byteArrayOf(6))
     private fun pair(c: CarPlayController, client: LockdownPairingClient, owner: WiredResources, gen: Int): Any? =
         CarPlayController::class.java.getDeclaredMethod("pairNewRecord", LockdownPairingClient::class.java,
-            WiredResources::class.java, Int::class.javaPrimitiveType).apply { isAccessible = true }.invoke(c, client, owner, gen)
+            WiredResources::class.java, Int::class.javaPrimitiveType, ByteArray::class.java,
+            Long::class.javaPrimitiveType).apply { isAccessible = true }.invoke(c, client, owner, gen, byteArrayOf(1), 5_000L)
 
     @Test fun pairingResultReturnedAfterInvalidationCannotBeSaved() = withController { controller, _ ->
         val saved = mutableListOf<LockdownPairRecord>()

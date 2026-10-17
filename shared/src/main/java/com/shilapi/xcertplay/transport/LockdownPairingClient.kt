@@ -15,6 +15,23 @@ import java.security.GeneralSecurityException
 class LockdownPairingClient(
     private val host: Iap2UsbMuxHost,
 ) {
+    /** 复用配对记录前读取手机实际公钥，预算与取消条件由当前有线尝试传入。 */
+    fun readDevicePublicKey(label: String, totalTimeoutMillis: Long,
+                            isCancelled: () -> Boolean = { false }): ByteArray {
+        require(label.isNotBlank())
+        require(totalTimeoutMillis in 1..MAXIMUM_TOTAL_TIMEOUT_MILLIS)
+        val deadline = Deadline(totalTimeoutMillis)
+        checkCancelled(isCancelled)
+        val connection = host.connect(Iap2UsbMuxHost.LOCKDOWN_PORT, stepTimeoutMillis(deadline))
+        return LockdownPlistChannel(connection).use { channel ->
+            val value = getValue(channel, label, "DevicePublicKey", deadline, isCancelled) as? LockdownPlistValue.Data
+                ?: throw LockdownPairingException.InvalidResponse("DevicePublicKey was not data")
+            value.bytes.also {
+                if (it.isEmpty() || it.size > 65_536) throw LockdownPairingException.InvalidResponse("Invalid DevicePublicKey size")
+                deadline.remainingMillis()
+            }
+        }
+    }
     /**
      * Fetches the two pairing inputs, generates the local record, and sends plaintext Pair.
      *
@@ -244,6 +261,7 @@ class PairedRecord internal constructor(
 
 /** Typed pairing failures; their messages never include pairing keys, certificates, or escrow data. */
 sealed class LockdownPairingException(message: String) : IOException(message) {
+    data object PersistenceFailed : LockdownPairingException("Could not persist the Lockdown pairing record")
     data object Cancelled : LockdownPairingException("Lockdown pairing was cancelled")
     data object TimedOut : LockdownPairingException("Lockdown pairing timed out")
     data object UserDeniedPairing : LockdownPairingException("The user denied Lockdown pairing")

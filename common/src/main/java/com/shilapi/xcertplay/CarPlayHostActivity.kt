@@ -3557,9 +3557,9 @@ class CarPlayHostActivity : ComponentActivity() {
             reportStatus = createStatusReporter(controllerGeneration),
             diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
             localMediaAudioEnabled = localMusic,
-            loadPairRecord = { AirPlayPersistence.loadLockdownRecord(this) },
+            loadPairRecord = { key -> AirPlayPersistence.loadLockdownRecord(this, key) },
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
-            clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
+            clearPairRecord = { key -> AirPlayPersistence.clearLockdownRecord(this, key) },
             locationProvider = locationProvider,
             vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphone(this)) {
                 com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext)

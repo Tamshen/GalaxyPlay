@@ -54,7 +54,7 @@
  import com.shilapi.xcertplay.airplay.CarPlayUiScale
  import com.shilapi.xcertplay.airplay.AirPlayIdentity
  import com.shilapi.xcertplay.airplay.PairingStore
-@@ -16,14 +17,19 @@
+@@ -16,41 +17,35 @@
  import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
  import com.shilapi.xcertplay.orchestration.MfiTarget
  import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
@@ -76,7 +76,20 @@
      private const val PREFS = "xcertplay_airplay"
      private const val KEY_IDENT_PRIVATE = "identity_private"
      private const val KEY_IDENT_PUBLIC = "identity_public"
-@@ -44,13 +50,11 @@
+     private const val KEY_PAIRING_ID = "pairing_id"
+     private const val KEY_PAIRING_IDS = "pairing_ids"
+-    private const val KEY_LOCKDOWN_HOST_ID = "lockdown_host_id"
+-    private const val KEY_LOCKDOWN_SYSTEM_BUID = "lockdown_system_buid"
+-    private const val KEY_LOCKDOWN_WIFI_MAC = "lockdown_wifi_mac"
+-    private const val KEY_LOCKDOWN_DEVICE_PUBLIC = "lockdown_device_public"
+-    private const val KEY_LOCKDOWN_DEVICE_CERT = "lockdown_device_cert"
+-    private const val KEY_LOCKDOWN_HOST_PRIVATE = "lockdown_host_private"
+-    private const val KEY_LOCKDOWN_HOST_CERT = "lockdown_host_cert"
+-    private const val KEY_LOCKDOWN_ROOT_PRIVATE = "lockdown_root_private"
+-    private const val KEY_LOCKDOWN_ROOT_CERT = "lockdown_root_cert"
+     private const val KEY_DISPLAY_SCALE_TENTHS = "display_scale_tenths"
+     private const val KEY_UI_SCALE_PERCENT = "ui_scale_percent"
+     private const val KEY_HEVC_ENABLED = "hevc_enabled"
      private const val KEY_HEVC_SOFTWARE_DECODER = "hevc_software_decoder"
      private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
      private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
@@ -90,7 +103,7 @@
      private const val KEY_MANUAL_HOTSPOT_SSID = "manual_hotspot_ssid"
      private const val KEY_MANUAL_HOTSPOT_PASSPHRASE = "manual_hotspot_passphrase"
      private const val KEY_MANUAL_HOTSPOT_BAND = "manual_hotspot_band"
-@@ -60,18 +64,11 @@
+@@ -60,18 +55,11 @@
      private const val KEY_MANUFACTURER = "manufacturer"
      private const val KEY_MODEL = "model"
      private const val KEY_OEM_LABEL = "oem_label"
@@ -109,7 +122,7 @@
      private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
      private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
      private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
-@@ -81,15 +78,6 @@
+@@ -81,15 +69,6 @@
      private const val KEY_CLUSTER_CONTENT = "cluster_content"
      private const val KEY_CLUSTER_MARKER_X = "cluster_marker_horizontal_step"
      private const val KEY_CLUSTER_MARKER_Y = "cluster_marker_vertical_step"
@@ -125,7 +138,7 @@
      private const val KEY_WIDTH_PHYSICAL_MM = "display_width_physical_mm"
      private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
      private const val KEY_MAX_DETECTED_WIDTH = "display_max_detected_width"
-@@ -110,7 +98,7 @@
+@@ -110,7 +89,7 @@
  
      const val DEFAULT_MANUFACTURER = "DiPlay"
      const val DEFAULT_MODEL = "DiPlay"
@@ -134,7 +147,7 @@
      const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
  
      fun loadAmbientDelaySeconds(context: Context): Int =
-@@ -157,14 +145,14 @@
+@@ -157,14 +136,14 @@
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getBoolean(KEY_HEVC_ENABLED, false)
  
@@ -151,7 +164,7 @@
      }
  
      fun saveHevcEnabled(context: Context, enabled: Boolean) {
-@@ -183,9 +171,7 @@
+@@ -183,9 +162,7 @@
              .apply()
      }
  
@@ -162,7 +175,7 @@
  
      fun saveAdvancedAudioChannelMapping(context: Context, enabled: Boolean) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-@@ -203,9 +189,7 @@
+@@ -203,9 +180,7 @@
              .apply()
      }
  
@@ -173,7 +186,7 @@
  
      fun saveAudioFocusEnabled(context: Context, enabled: Boolean) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-@@ -213,39 +197,35 @@
+@@ -213,39 +188,35 @@
              .apply()
      }
  
@@ -242,7 +255,7 @@
  
      fun loadWirelessEnabled(context: Context): Boolean =
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-@@ -269,6 +249,9 @@
+@@ -269,6 +240,9 @@
              .apply()
      }
  
@@ -252,7 +265,7 @@
      fun loadMfiI2cPath(context: Context): String =
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getString(KEY_MFI_I2C_PATH, null)
-@@ -303,22 +286,9 @@
+@@ -303,22 +277,9 @@
              .apply()
      }
  
@@ -278,7 +291,7 @@
  
      fun loadWifiP2pPreferredChannel(context: Context): Int = runCatching {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-@@ -350,6 +320,9 @@
+@@ -350,6 +311,9 @@
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getString(KEY_MANUAL_HOTSPOT_SSID, null)
              .orEmpty()
@@ -288,7 +301,7 @@
  
      fun saveManualHotspotSsid(context: Context, ssid: String) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-@@ -463,16 +436,10 @@
+@@ -463,16 +427,10 @@
              .apply()
      }
  
@@ -307,7 +320,7 @@
      }
  
      fun loadAmbientLightThreshold(context: Context): AmbientLightThreshold = AmbientLightThreshold.fromStored(
-@@ -483,15 +450,6 @@
+@@ -483,15 +441,6 @@
      fun saveAmbientLightThreshold(context: Context, threshold: AmbientLightThreshold) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
              .putInt(KEY_AMBIENT_LUX_THRESHOLD, threshold.lux).apply()
@@ -323,7 +336,7 @@
      }
  
      fun loadCarPlayNightMode(context: Context): CarPlayNightMode = CarPlayNightMode.fromKey(
-@@ -503,24 +461,6 @@
+@@ -503,24 +452,6 @@
              .putString(KEY_CARPLAY_NIGHT_MODE, mode.key).apply()
      }
  
@@ -348,7 +361,7 @@
      fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
              .getInt(KEY_FPS, 30),
-@@ -539,40 +479,9 @@
+@@ -539,40 +470,9 @@
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_MAIN_BUFFERED_AUDIO, enabled).apply()
      }
  
@@ -389,7 +402,7 @@
      }
  
      fun saveFps(context: Context, fps: Int) {
-@@ -628,8 +537,7 @@
+@@ -628,8 +528,7 @@
              .apply()
      }
  
@@ -399,7 +412,7 @@
  
      fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADB_CLUSTER_ACTIVITY, false)
-@@ -818,36 +726,6 @@
+@@ -818,36 +717,6 @@
      fun saveClusterMarkerVerticalStep(context: Context, step: Int) {
          context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
              .putInt(KEY_CLUSTER_MARKER_Y, step.coerceIn(CarPlayClusterDisplay.verticalSteps)).apply()
@@ -436,7 +449,7 @@
      }
  
      // Cluster mapping has its own key; never reuse the main display mapping at the same resolution.
-@@ -949,14 +827,11 @@
+@@ -949,14 +818,11 @@
          File(context.filesDir, CUSTOM_ICON_FILE).takeIf { it.isFile }
  
      fun saveCustomAirPlayIcon(context: Context, encodedImage: ByteArray) {
@@ -453,6 +466,76 @@
      }
  
      fun loadIdentity(context: Context): AirPlayIdentity {
+@@ -995,61 +861,14 @@
+             .apply()
+     }
+ 
+-    fun loadLockdownRecord(context: Context): LockdownPairRecord? {
+-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        val hostId = prefs.getString(KEY_LOCKDOWN_HOST_ID, null) ?: return null
+-        val systemBuid = prefs.getString(KEY_LOCKDOWN_SYSTEM_BUID, null) ?: return null
+-        val wifiMac = prefs.getString(KEY_LOCKDOWN_WIFI_MAC, null) ?: return null
+-        val devicePublic = prefs.getString(KEY_LOCKDOWN_DEVICE_PUBLIC, null) ?: return null
+-        val deviceCert = prefs.getString(KEY_LOCKDOWN_DEVICE_CERT, null) ?: return null
+-        val hostPrivate = prefs.getString(KEY_LOCKDOWN_HOST_PRIVATE, null) ?: return null
+-        val hostCert = prefs.getString(KEY_LOCKDOWN_HOST_CERT, null) ?: return null
+-        val rootPrivate = prefs.getString(KEY_LOCKDOWN_ROOT_PRIVATE, null) ?: return null
+-        val rootCert = prefs.getString(KEY_LOCKDOWN_ROOT_CERT, null) ?: return null
+-        return try {
+-            LockdownPairRecord.restore(
+-                hostId = hostId,
+-                systemBuid = systemBuid,
+-                wifiMacAddress = wifiMac,
+-                devicePublicKeyPem = devicePublic.decodeHex(),
+-                deviceCertificatePem = deviceCert.decodeHex(),
+-                hostPrivateKeyPem = hostPrivate.decodeHex(),
+-                hostCertificatePem = hostCert.decodeHex(),
+-                rootPrivateKeyPem = rootPrivate.decodeHex(),
+-                rootCertificatePem = rootCert.decodeHex(),
+-            )
+-        } catch (_: Exception) {
+-            null
+-        }
+-    }
+-
+-    fun saveLockdownRecord(context: Context, record: LockdownPairRecord) {
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .putString(KEY_LOCKDOWN_HOST_ID, record.hostId)
+-            .putString(KEY_LOCKDOWN_SYSTEM_BUID, record.systemBuid)
+-            .putString(KEY_LOCKDOWN_WIFI_MAC, record.wifiMacAddress)
+-            .putString(KEY_LOCKDOWN_DEVICE_PUBLIC, record.devicePublicKeyPem.toHex())
+-            .putString(KEY_LOCKDOWN_DEVICE_CERT, record.deviceCertificatePem.toHex())
+-            .putString(KEY_LOCKDOWN_HOST_PRIVATE, record.hostPrivateKeyPem.toHex())
+-            .putString(KEY_LOCKDOWN_HOST_CERT, record.hostCertificatePem.toHex())
+-            .putString(KEY_LOCKDOWN_ROOT_PRIVATE, record.rootPrivateKeyPem.toHex())
+-            .putString(KEY_LOCKDOWN_ROOT_CERT, record.rootCertificatePem.toHex())
+-            .apply()
+-    }
+-
+-    fun clearLockdownRecord(context: Context) {
+-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+-            .remove(KEY_LOCKDOWN_HOST_ID)
+-            .remove(KEY_LOCKDOWN_SYSTEM_BUID)
+-            .remove(KEY_LOCKDOWN_WIFI_MAC)
+-            .remove(KEY_LOCKDOWN_DEVICE_PUBLIC)
+-            .remove(KEY_LOCKDOWN_DEVICE_CERT)
+-            .remove(KEY_LOCKDOWN_HOST_PRIVATE)
+-            .remove(KEY_LOCKDOWN_HOST_CERT)
+-            .remove(KEY_LOCKDOWN_ROOT_PRIVATE)
+-            .remove(KEY_LOCKDOWN_ROOT_CERT)
+-            .apply()
+-    }
++    fun loadLockdownRecord(context: Context, devicePublicKey: ByteArray? = null): LockdownPairRecord? =
++        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).load(devicePublicKey)
++
++    fun saveLockdownRecord(context: Context, record: LockdownPairRecord) =
++        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).save(record)
++
++    fun clearLockdownRecord(context: Context, devicePublicKey: ByteArray? = null) =
++        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).clear(devicePublicKey)
+ 
+     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
+ 
 --- a/common/src/main/java/com/shilapi/xcertplay/AppAppearance.kt
 +++ /dev/null
 @@ -1,107 +0,0 @@

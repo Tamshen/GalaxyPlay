@@ -3652,11 +3652,13 @@
              listener = createSessionListener(controllerGeneration),
              media = media,
              reportStatus = createStatusReporter(controllerGeneration),
+-            loadPairRecord = { AirPlayPersistence.loadLockdownRecord(this) },
 +            diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
 +            localMediaAudioEnabled = localMusic,
-             loadPairRecord = { AirPlayPersistence.loadLockdownRecord(this) },
++            loadPairRecord = { key -> AirPlayPersistence.loadLockdownRecord(this, key) },
              savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
-             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
+-            clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
++            clearPairRecord = { key -> AirPlayPersistence.clearLockdownRecord(this, key) },
              locationProvider = locationProvider,
 -            vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this)) {
 +            vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphone(this)) {
