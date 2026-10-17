@@ -97,4 +97,31 @@ class WiredGenerationTest {
         ReflectionHelpers.setField(controller, "vpnService", null)
         ReflectionHelpers.setField(controller, "vpnBound", false)
     }
+
+    @Test fun recoveryEventsAreConsumedOnceAndSuppressedAfterControlOrCancellation() = withController { controller, _ ->
+        var count = 0L
+        var connected = false
+        val ncm = mock(NcmUsbBridge::class.java) { call ->
+            if (call.method.name == "getWriteRecoveryCount") count else RETURNS_DEFAULTS.answer(call)
+        }
+        val service = mock(com.shilapi.xcertplay.network.CarPlayVpnService::class.java) { call ->
+            if (call.method.name == "hasWiredControl") connected else RETURNS_DEFAULTS.answer(call)
+        }
+        ReflectionHelpers.setField(controller, "vpnService", service)
+        val method = CarPlayController::class.java.getDeclaredMethod("wiredDataPathRecovery", NcmUsbBridge::class.java,
+            com.shilapi.xcertplay.iap2.session.Iap2Session::class.java, WiredResources::class.java,
+            Int::class.javaPrimitiveType).apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST") val signal = method.invoke(controller, ncm,
+            mock(com.shilapi.xcertplay.iap2.session.Iap2Session::class.java), resources(controller), generation(controller)) as () -> Boolean
+        assertFalse(signal()); count++; assertTrue(signal()); assertFalse(signal())
+        connected = true; count++; assertFalse(signal())
+        connected = false; assertFalse(signal())
+        ReflectionHelpers.setField(controller, "activeSession", mock(AirPlaySession::class.java))
+        count++; assertFalse(signal())
+        ReflectionHelpers.setField(controller, "activeSession", null)
+        assertFalse(signal())
+        ReflectionHelpers.callInstanceMethod<Unit>(controller, "invalidateIphonePermission")
+        count++; assertFalse(signal())
+        ReflectionHelpers.setField(controller, "vpnService", null)
+    }
 }

@@ -38,6 +38,9 @@ class NcmUsbBridge internal constructor(
     private var failure: IphoneUsbException? = null
     private var sequence = 0
     private var loggedWriteTimeout = false
+    private val writeRecoveries = java.util.concurrent.atomic.AtomicLong()
+    val writeRecoveryCount: Long get() = writeRecoveries.get()
+    val isClosed: Boolean get() = synchronized(stateLock) { closed }
     private val frames = ArrayDeque<ByteArray>()
     private var queuedBytes = 0
     private var buffered = ByteArray(0)
@@ -85,7 +88,13 @@ class NcmUsbBridge internal constructor(
         }
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
-            Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
+            val recovered = synchronized(stateLock) {
+                if (closed) false else { writeRecoveries.incrementAndGet(); true }
+            }
+            if (recovered) {
+                Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
+                runCatching { onDiagnostic("NCM write recovered count=${writeRecoveries.get()}") }
+            }
         }
     }
 

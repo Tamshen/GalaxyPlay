@@ -29,6 +29,8 @@ class Iap2WiredControlClient(
         vehicleStatusProvider: VehicleStatusProvider? = null,
         onIncoming: (Iap2Frame) -> Unit = {},
         onProgress: (String) -> Unit = {},
+        dataPathRecovery: (() -> Boolean)? = null,
+        isCancelled: () -> Boolean = { false },
     ): Iap2WiredControlResult {
         require(availableCurrentMilliAmps in 0..0xffff) {
             "availableCurrentMilliAmps must be in 0..65535"
@@ -38,16 +40,20 @@ class Iap2WiredControlClient(
         }
 
         val deadlineNanos = Iap2ControlDeadline(timeoutMillis)
+        fun checkCurrent() { if (isCancelled()) throw LockdownPairingException.Cancelled }
+        checkCurrent()
         val identified = identification.withVehicleStatusFrom(vehicleStatusProvider)
         if (identified.vehicleStatusEnabled != identification.vehicleStatusEnabled) {
             onProgress("iap2 no battery reading: not declaring an electric vehicle")
         }
         Iap2IdentificationClient(session).identify(identified, requireRemaining(deadlineNanos))
         onProgress("iap2 identification accepted")
+        checkCurrent()
         var stage = Iap2WiredControlStage.IDENTIFIED
         mfi.run(session, requireRemaining(deadlineNanos), onProgress)
         stage = Iap2WiredControlStage.AUTHENTICATED
         onProgress("iap2 authentication accepted")
+        checkCurrent()
         deadlineNanos.authenticated()
 
         send(powerSourceUpdate(availableCurrentMilliAmps), deadlineNanos)
@@ -57,17 +63,30 @@ class Iap2WiredControlClient(
 
         var forwardedFrames = 0
         var carPlayStartSessions = 0
+        var recoveryRetries = 0
         val location = Iap2LocationReporter(locationProvider, onProgress)
         val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
         try {
             while (true) {
+                if (isCancelled() || session.isClosed) return Iap2WiredControlResult(
+                    Iap2WiredControlTerminal.CHANNEL_CLOSED, stage, forwardedFrames, carPlayStartSessions)
                 val remaining = remainingMillis(deadlineNanos)
                 if (remaining == 0L) {
                     return Iap2WiredControlResult(Iap2WiredControlTerminal.TIMED_OUT, stage, forwardedFrames, carPlayStartSessions)
                 }
+                // 每轮消费一次事件，即使尚未首次启动或已达上限，也不积攒旧恢复信号。
+                val recovered = dataPathRecovery?.invoke() == true
+                if (recovered && carPlayStartSessions > 0 && recoveryRetries < 3 &&
+                    !isCancelled() && !session.isClosed && remainingMillis(deadlineNanos) > 0) {
+                    send(carPlayStartSession(endpoint), deadlineNanos)
+                    carPlayStartSessions++
+                    recoveryRetries++
+                    onProgress("iap2 tx=0x4301 stage=NCM_WRITE_RECOVERY retry=$recoveryRetries")
+                }
                 location.tick { send(it, deadlineNanos) }
                 vehicleStatus.tick { send(it, deadlineNanos) }
-                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val normalPoll = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val pollTimeout = if (dataPathRecovery == null) normalPoll else minOf(normalPoll, 500L)
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -91,10 +110,13 @@ class Iap2WiredControlClient(
 
                 when (incoming.messageId) {
                     CARPLAY_AVAILABILITY -> {
+                        checkCurrent()
                         onProgress("iap2 rx=0x4300 carplay-availability")
                         onProgress(carPlayAvailabilitySummary(incoming.payload))
                         // LIVI sends its wired answer on every availability notification; do not gate it on
                         // the phone's advertised availability boolean.
+                        dataPathRecovery?.invoke()
+                        checkCurrent()
                         send(carPlayStartSession(endpoint), deadlineNanos)
                         stage = Iap2WiredControlStage.CARPLAY_START_SENT
                         carPlayStartSessions++

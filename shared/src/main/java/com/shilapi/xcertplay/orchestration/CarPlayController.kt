@@ -2327,6 +2327,8 @@ class CarPlayController(
                 vehicleStatusProvider = vehicleStatusProvider,
                 onIncoming = routeFrameHandler(),
                 onProgress = { message -> debugLog("wired $message") },
+                isCancelled = { !isCurrentWired(resources, generation) },
+                dataPathRecovery = wiredDataPathRecovery(ncm, csm, resources, generation),
             )
             onStatus(
                 when (result.terminal) {
@@ -2347,6 +2349,18 @@ class CarPlayController(
 
     private fun isCurrentWired(resources: WiredResources, generation: Int): Boolean =
         !closed && generation == iphoneGeneration.get() && wiredResources === resources && !resources.isClosed
+
+    private fun wiredDataPathRecovery(ncm: NcmUsbBridge, csm: Iap2Session,
+                                      resources: WiredResources, generation: Int): () -> Boolean {
+        var observed = ncm.writeRecoveryCount
+        return {
+            val count = ncm.writeRecoveryCount
+            val changed = count > observed
+            observed = count
+            changed && isCurrentWired(resources, generation) && !ncm.isClosed && !csm.isClosed &&
+                activeSession == null && vpnService?.hasWiredControl(resources) == false
+        }
+    }
 
     private fun requireCurrentWired(resources: WiredResources, generation: Int) {
         if (!isCurrentWired(resources, generation)) throw LockdownPairingException.Cancelled
