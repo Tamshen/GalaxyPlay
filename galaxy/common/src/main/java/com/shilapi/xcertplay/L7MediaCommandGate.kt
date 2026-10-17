@@ -8,7 +8,8 @@ internal class L7MediaCommandGate(private val clock: () -> Long = SystemClock::e
     private var lastOrigin: String? = null
     private var lastAt = 0L
     private var lastToggle = false
-    private val nativeHeld = mutableMapOf<Int, Int?>()
+    private data class Held(val at: Long, var command: Int? = null)
+    private val nativeHeld = mutableMapOf<Int, Held>()
 
     /** 仅确认的媒体键按下即发；按住期间的迟到标准副本不会再次触发。 */
     @Synchronized fun nativeEvent(event: Int, key: Int): Int? {
@@ -18,9 +19,9 @@ internal class L7MediaCommandGate(private val clock: () -> Long = SystemClock::e
             200088 -> com.shilapi.xcertplay.airplay.CarPlayMediaButton.PREVIOUS
             else -> return null
         }
-        if (event == 1 && !nativeHeld.containsKey(index)) { nativeHeld[index] = null; return index }
+        if (event == 1 && !nativeHeld.containsKey(index)) { nativeHeld[index] = Held(clock()); return index }
         if (event == 2 || event == 3) {
-            if (nativeHeld.remove(index) != null && lastOrigin == "NATIVE") lastAt = clock()
+            if (nativeHeld.remove(index)?.command != null && lastOrigin == "NATIVE") lastAt = clock()
         }
         return null
     }
@@ -35,13 +36,13 @@ internal class L7MediaCommandGate(private val clock: () -> Long = SystemClock::e
         }
         val now = clock()
         val toggle = source.contains("PLAY_PAUSE") || source.contains("HEADSETHOOK") || source == "native-key:200085"
-        val held = nativeHeld.entries.firstOrNull { (raw, mapped) -> raw == index || mapped == index ||
-            toggle && raw == com.shilapi.xcertplay.airplay.CarPlayMediaButton.PLAY_PAUSE }
-        if (origin != "NATIVE" && held?.value != null) return false
+        val held = nativeHeld.entries.firstOrNull { (raw, press) -> now - press.at in 0..5000 &&
+            (raw == index || press.command == index || toggle && raw == com.shilapi.xcertplay.airplay.CarPlayMediaButton.PLAY_PAUSE) }
+        if (origin != "NATIVE" && held?.value?.command != null && (toggle || index == lastIndex)) return false
         val duplicate = (index == lastIndex || toggle && lastToggle) && origin != lastOrigin && now - lastAt in 0..80
         if (origin == "NATIVE") {
             val raw = if (toggle) com.shilapi.xcertplay.airplay.CarPlayMediaButton.PLAY_PAUSE else index
-            if (nativeHeld.containsKey(raw)) nativeHeld[raw] = index
+            nativeHeld[raw]?.command = index
         }
         if (duplicate) return false
         lastIndex = index

@@ -16,11 +16,18 @@ internal class L7MediaCommandDispatcher(
     private val traceBefore: ((Int, () -> Unit, (String) -> Unit) -> Unit)? = null,
 ) {
     fun dispatch(index: Int, source: String, trace: L7SteeringTrace? = null, expectedOwner: Any? = null) {
-        val expected = expectedOwner ?: owner()
-        val accepted = expected != null && owner() === expected && current() && accept(index, source)
+        val actualOwner = owner()
+        val expected = expectedOwner ?: actualOwner
+        val currentController = current()
+        val accepted = expected != null && actualOwner === expected && currentController && accept(index, source)
         log("Audio: media input source=$source index=$index accepted=$accepted")
         if (!accepted) {
-            trace?.step("DROP", when { expected == null -> "NO_SESSION"; !current() -> "STALE_CONTROLLER"; else -> "CROSS_ORIGIN_DUPLICATE" })
+            trace?.step("DROP", when {
+                expected == null -> "NO_SESSION"
+                actualOwner !== expected -> "STALE_SESSION"
+                !currentController -> "STALE_CONTROLLER"
+                else -> "CROSS_ORIGIN_DUPLICATE"
+            })
             return
         }
         trace?.step("GATE_ACCEPTED")

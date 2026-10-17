@@ -46,7 +46,10 @@ class GalaxyHardKeyBridgeTest {
         var callback: IBinder? = null
         var registering: () -> Unit = {}
         var reject = false
+        var death: IBinder.DeathRecipient? = null
         init { attachInterface(null, descriptor) }
+        override fun linkToDeath(recipient: IBinder.DeathRecipient, flags: Int) { death = recipient }
+        override fun unlinkToDeath(recipient: IBinder.DeathRecipient, flags: Int): Boolean { death = null; return true }
         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
             data.enforceInterface(GalaxyHardKeyBridge.SERVICE)
             callback = data.readStrongBinder()
@@ -117,5 +120,28 @@ class GalaxyHardKeyBridgeTest {
         app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, Remote()); worker.drain()
         remote.input(1, 200087)
         assertTrue(events.isEmpty()); assertEquals(listOf(1, 2), remote.codes)
+    }
+    @Test fun binderDeathImmediatelyRevokesInputAndUnregisters() = scenario { app, worker, bridge, events, logs, _ ->
+        bridge.start(); val remote = Remote()
+        app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, remote); worker.drain()
+        remote.death!!.binderDied(); remote.input(1, 200087); worker.drain()
+        assertTrue(events.isEmpty()); assertTrue(logs.any { "BINDER_DIED" in it })
+        assertEquals(listOf(1, 2), remote.codes)
+    }
+    @Test fun fastReplacementWaitsWithinItsBudgetForPreviousUnregistration() = scenario { app, worker, bridge, _, _, _ ->
+        bridge.start(); val remote = Remote()
+        app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, remote); worker.drain()
+        bridge.close()
+        val nextApp = Boundary(); val nextWorker = Worker(); val events = mutableListOf<Pair<Int, Int>>()
+        val next = GalaxyHardKeyBridge(nextApp, { true }, { event, key -> events.add(event to key) }, {}, {}, nextWorker)
+        try {
+            next.start(); assertNull(nextApp.connection)
+            worker.drain(); shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            assertNotNull(nextApp.connection)
+            val replacement = Remote()
+            nextApp.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, replacement); nextWorker.drain()
+            remote.input(1, 200087); replacement.input(1, 200088)
+            assertEquals(listOf(1 to 200088), events); assertEquals(listOf(1, 2), remote.codes)
+        } finally { next.close(); nextWorker.drain() }
     }
 }

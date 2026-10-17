@@ -21,6 +21,7 @@ internal object GalaxyMediaKeys {
     private var mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
     private var steeringWheel: L7SteeringWheel? = null
     private var nativeWheel: GalaxyHardKeyBridge? = null
+    private var nativeOwner: Any? = null
 
     @Synchronized fun attach(context: Context, next: CarPlayController, onPlaybackStarted: () -> Unit,
                              assistantActive: () -> Boolean = { false }) {
@@ -28,6 +29,7 @@ internal object GalaxyMediaKeys {
         val context = context.applicationContext
         nativeWheel?.close()
         nativeWheel = null
+        nativeOwner = null
         controller?.sessionStateListener = null
         controller?.navigationListener = null
         stopNavigation()
@@ -122,6 +124,7 @@ internal object GalaxyMediaKeys {
         if (!active) {
             nativeWheel?.close()
             nativeWheel = null
+            nativeOwner = null
             commandGate = L7MediaCommandGate()
             stopNavigation()
             mediaCenter?.close()
@@ -131,6 +134,9 @@ internal object GalaxyMediaKeys {
             mediaInfo = com.shilapi.xcertplay.media.CarPlayNowPlaying()
             pendingArtwork = null
         } else if (context.resources.getBoolean(com.shilapi.xcertplay.host.R.bool.config_l7_product_ui)) {
+            if (nativeOwner !== next.activeMediaSessionOwner()) {
+                nativeWheel?.close(); nativeWheel = null; nativeOwner = null
+            }
             if (nativeWheel == null) startNativeWheel(context, next, commands)
             if (navigation == null && GalaxyVehiclePreferences.navigationReporting(context)) startNavigation(context, next)
             if (mediaCenter == null && GalaxyVehiclePreferences.mediaReporting(context)) startMediaReporting(context, next, dispatch, traced)
@@ -143,6 +149,7 @@ internal object GalaxyMediaKeys {
         val selected = context.getSharedPreferences("l7_audio_templates", 0).getString("model", null)
         if (selected !in setOf("l7", "l6") || !GalaxyVehiclePreferences.steering(context)) return
         val owner = next.activeMediaSessionOwner() ?: return
+        nativeOwner = owner
         val gate = commandGate
         val media = bridge
         nativeWheel = GalaxyHardKeyBridge(context,
@@ -192,6 +199,7 @@ internal object GalaxyMediaKeys {
         if (expected == null || controller !== expected) return
         nativeWheel?.close()
         nativeWheel = null
+        nativeOwner = null
         expected.sessionStateListener = null
         expected.navigationListener = null
         stopNavigation()

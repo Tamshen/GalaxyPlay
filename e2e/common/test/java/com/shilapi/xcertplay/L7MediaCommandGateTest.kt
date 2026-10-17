@@ -40,6 +40,16 @@ class L7MediaCommandGateTest {
         assertTrue(gate.accept(button.PAUSE, "native-key:200085"))
         assertFalse(gate.accept(button.PLAY, "window-key:KEYCODE_MEDIA_PLAY_PAUSE"))
         assertTrue(gate.accept(button.PLAY, "controller-play"))
+        assertTrue(gate.accept(button.PAUSE, "controller-pause"))
+    }
+    @Test fun missingNativeReleaseCannotPermanentlySuppressStandardKeys() {
+        var time = 100L
+        val gate = L7MediaCommandGate { time }
+        val next = gate.nativeEvent(1, 200087)!!
+        assertTrue(gate.accept(next, "native-key:200087"))
+        time += 6000
+        assertTrue(gate.accept(next, "window-key"))
+        assertNull(gate.nativeEvent(1, 200087))
     }
     @Test fun crossSourceDuplicateDropsButSameSourceDoublePressAndOppositeCommandSurvive() {
         var time = 100L

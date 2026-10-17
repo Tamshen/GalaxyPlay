@@ -229,6 +229,35 @@ class L7BluetoothMediaGuardTest {
         failed.close()
     }
 
+    @Test fun backgroundPauseInvalidatesPlayBeforeAlreadyQueuedBluetoothClear() {
+        val guard = guard()
+        guard.start(); idle()
+        val drops = mutableListOf<String>()
+        var plays = 0
+        guard.beforePlay({ plays++ }, drops::add)
+        port.connected = false; port.changed()
+        Thread { guard.cancelPendingPlay() }.apply { start(); join() }
+        idle()
+        assertEquals(0, plays)
+        assertEquals(listOf("CANCELLED_BY_PAUSE"), drops)
+        guard.close()
+    }
+
+    @Test fun queuedOldCancellationCannotDiscardNewPlayAfterPause() {
+        val guard = guard()
+        guard.start(); idle()
+        var old = 0
+        var current = 0
+        guard.beforePlay { old++ }
+        Thread { guard.cancelPendingPlay() }.apply { start(); join() }
+        guard.beforePlay { current++ }
+        idle()
+        port.connected = false; port.changed(); idle()
+        assertEquals(0, old)
+        assertEquals(1, current)
+        guard.close()
+    }
+
     private fun guard(address: String? = TARGET, automatic: Boolean = true) =
         L7BluetoothMediaGuard(address, automatic, port, statuses::add)
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()

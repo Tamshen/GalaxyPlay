@@ -24,6 +24,8 @@ internal class L7BluetoothMediaGuard(
     private var attempts = 0
     private var generation = 0
     private var lastStatus: BluetoothMediaStatus? = null
+    private val playEpoch = java.util.concurrent.atomic.AtomicLong()
+    private var pendingEpoch = 0L
     private var pendingPlay: (() -> Unit)? = null
     private var pendingDropped: ((String) -> Unit)? = null
     private val diagnosticWaits = java.util.concurrent.ConcurrentHashMap.newKeySet<(String) -> Unit>()
@@ -32,6 +34,7 @@ internal class L7BluetoothMediaGuard(
     fun beforePlay(action: () -> Unit) = beforePlay(action) { }
 
     fun beforePlay(action: () -> Unit, onDropped: (String) -> Unit) {
+        val epoch = playEpoch.get()
         val completed = java.util.concurrent.atomic.AtomicBoolean()
         lateinit var dropped: (String) -> Unit
         dropped = { reason ->
@@ -41,11 +44,16 @@ internal class L7BluetoothMediaGuard(
         diagnosticWaits.add(dropped)
         playDispatch {
             if (closed) { dropped("BLUETOOTH_CLOSED"); return@playDispatch }
+            if (epoch != playEpoch.get()) { dropped("CANCELLED_BY_PAUSE"); return@playDispatch }
             dropPending("SUPERSEDED_PLAY")
+            pendingEpoch = epoch
             pendingDropped = dropped
             pendingPlay = {
-                diagnosticWaits.remove(dropped)
-                if (completed.compareAndSet(false, true)) action()
+                if (epoch != playEpoch.get()) dropped("CANCELLED_BY_PAUSE")
+                else {
+                    diagnosticWaits.remove(dropped)
+                    if (completed.compareAndSet(false, true)) action()
+                }
             }
             emit("explicit play waiting status=$lastStatus")
             if (failed || !automatic || lastStatus in PLAY_FALLBACK) flushPlay()
@@ -54,9 +62,15 @@ internal class L7BluetoothMediaGuard(
     }
 
     /** 暂停应立即生效，同时取消尚未送往手机的播放。 */
-    fun cancelPendingPlay() = playDispatch {
-        if (pendingPlay != null) emit("pending play cancelled")
-        dropPending("CANCELLED_BY_PAUSE")
+    fun cancelPendingPlay() {
+        // Binder 线程先撤销旧播放；主线程中排在取消之前的蓝牙回调也不能恢复它。
+        val cutoff = playEpoch.incrementAndGet()
+        playDispatch {
+            if (pendingPlay != null && pendingEpoch < cutoff) {
+                emit("pending play cancelled")
+                dropPending("CANCELLED_BY_PAUSE")
+            }
+        }
     }
 
     private fun dropPending(reason: String) {
@@ -151,6 +165,10 @@ internal class L7BluetoothMediaGuard(
     }
 
     private fun flushPlay() {
+        if (pendingPlay != null && pendingEpoch != playEpoch.get()) {
+            dropPending("CANCELLED_BY_PAUSE")
+            return
+        }
         val action = pendingPlay
         pendingPlay = null
         pendingDropped = null
@@ -170,6 +188,7 @@ internal class L7BluetoothMediaGuard(
 
     override fun close() {
         closed = true
+        playEpoch.incrementAndGet()
         diagnosticWaits.toList().forEach { it("BLUETOOTH_CLOSED") }
         pendingPlay = null
         pendingDropped = null

@@ -32,7 +32,9 @@ internal class GalaxyHardKeyBridge(
     @Volatile private var remote: IBinder? = null
     @Volatile private var attempted = false
     @Volatile private var registered = false
+    @Volatile private var deadline = 0L
     private val timeout = Runnable { if (!registered) fail("TIMEOUT") }
+    private val retry = Runnable { start() }
     private val death = IBinder.DeathRecipient { fail("BINDER_DIED") }
     private val callback = object : Binder() {
         init { attachInterface(null, CALLBACK) }
@@ -42,7 +44,7 @@ internal class GalaxyHardKeyBridge(
             data.enforceInterface(CALLBACK)
             val key = data.readInt()
             if (data.dataAvail() != 0) return false
-            if (!closed.get() && registered && current()) runCatching { event(code, key) }.onFailure { record("INPUT_FAILED") }
+            if (!closed.get() && registered && valid()) runCatching { event(code, key) }.onFailure { record("INPUT_FAILED") }
             reply?.writeNoException()
             reply?.writeInt(0)
             return true
@@ -50,17 +52,20 @@ internal class GalaxyHardKeyBridge(
     }
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            if (closed.get() || !current()) { close(); return }
+            if (closed.get() || !valid()) { close(); return }
             if (remote != null) return
             remote = binder
             submit {
                 try {
-                    if (closed.get() || !current()) return@submit
+                    if (closed.get() || !valid()) return@submit
+                    if (android.os.SystemClock.elapsedRealtime() >= deadline) { fail("TIMEOUT"); return@submit }
                     check(binder.interfaceDescriptor == SERVICE)
                     binder.linkToDeath(death, 0)
                     attempted = true
                     registration(binder, 1)
-                    if (closed.get() || !current()) cleanup()
+                    if (closed.get() || !valid() || android.os.SystemClock.elapsedRealtime() >= deadline) {
+                        fail("LATE_REGISTER"); cleanup()
+                    }
                     else { registered = true; main.removeCallbacks(timeout); record("REGISTERED") }
                 } catch (_: Exception) { fail("REGISTER_FAILED"); cleanup() }
             }
@@ -72,9 +77,17 @@ internal class GalaxyHardKeyBridge(
 
     fun start() {
         if (Looper.myLooper() != Looper.getMainLooper()) { main.post(::start); return }
-        if (closed.get() || bound || !current()) return
-        if (!lease.compareAndSet(null, this)) { fail("IPC_BUSY"); return }
-        main.postDelayed(timeout, 3000)
+        if (closed.get() || bound) return
+        if (!valid()) { close(); return }
+        if (deadline == 0L) {
+            deadline = android.os.SystemClock.elapsedRealtime() + 3000
+            main.postDelayed(timeout, 3000)
+        }
+        if (!lease.compareAndSet(null, this)) {
+            if (android.os.SystemClock.elapsedRealtime() >= deadline) fail("IPC_BUSY")
+            else { main.removeCallbacks(retry); main.postDelayed(retry, 100) }
+            return
+        }
         try {
             bound = app.bindService(Intent().setComponent(COMPONENT), connection, Context.BIND_AUTO_CREATE)
             if (!bound) fail("UNAVAILABLE") else if (closed.get()) unbind()
@@ -85,6 +98,7 @@ internal class GalaxyHardKeyBridge(
         try { worker.execute(task) } catch (_: java.util.concurrent.RejectedExecutionException) { fail("IPC_BUSY") }
     }
     private fun record(result: String) { runCatching { report("HARDKEY result=$result") } }
+    private fun valid() = runCatching(current).getOrDefault(false)
     private fun fail(reason: String) { record(reason); close() }
     private fun registration(binder: IBinder, code: Int) {
         val data = Parcel.obtain()
@@ -112,9 +126,10 @@ internal class GalaxyHardKeyBridge(
         if (!closed.compareAndSet(false, true)) return
         registered = false
         main.removeCallbacks(timeout)
+        main.removeCallbacks(retry)
         runCatching(lost)
         if (Looper.myLooper() == Looper.getMainLooper()) unbind() else main.post(::unbind)
-        if (lease.get() === this || remote != null) submit(::cleanup)
+        if (remote == null) cleanup() else submit(::cleanup)
     }
 
     companion object {
