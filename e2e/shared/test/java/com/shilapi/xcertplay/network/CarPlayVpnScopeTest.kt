@@ -126,12 +126,35 @@ class CarPlayVpnScopeTest {
         val server = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
         val owner = Any()
         ReflectionHelpers.setField(service, "wiredOwner", owner)
-        service.detachWired(Any())
+        val unrelated = service.detachWired(Any())
+        assertTrue(service.awaitDetached(100, unrelated))
         assertFalse(server.isClosed)
         assertNotNull(service.wiredPort(owner))
         service.detachWired(owner)
         assertTrue(server.isClosed)
         assertReleased(service)
+    }
+
+    @Test fun listenerAndBridgeCloseFailuresStillCloseOtherListenersAndTun() = withService { service ->
+        val primary = org.mockito.Mockito.mock(ServerSocket::class.java)
+        val extra = org.mockito.Mockito.mock(ServerSocket::class.java)
+        val bridge = org.mockito.Mockito.mock(Ipv6NcmBridge::class.java)
+        val tun = org.mockito.Mockito.mock(ParcelFileDescriptor::class.java)
+        org.mockito.Mockito.doThrow(java.io.IOException("listener close failed")).`when`(primary).close()
+        org.mockito.Mockito.doThrow(java.io.IOException("bridge close failed")).`when`(bridge).close()
+        ReflectionHelpers.setField(service, "serverSocket", primary)
+        ReflectionHelpers.setField(service, "additionalServers", listOf(extra))
+        ReflectionHelpers.setField(service, "bridge", bridge)
+        ReflectionHelpers.setField(service, "tun", tun)
+        val error = org.junit.Assert.assertThrows(java.io.IOException::class.java) { service.detach() }
+        assertEquals(2, error.suppressed.size)
+        org.mockito.Mockito.verify(primary).close()
+        org.mockito.Mockito.verify(extra).close()
+        org.mockito.Mockito.verify(bridge).close()
+        org.mockito.Mockito.verify(tun).close()
+        assertReleased(service)
+        service.detach()
+        org.mockito.Mockito.verifyNoMoreInteractions(primary, extra, bridge, tun)
     }
 
     private fun attachWired(service: CarPlayVpnService, isCurrent: () -> Boolean = { true }): CarPlayVpnService.AttachResult =

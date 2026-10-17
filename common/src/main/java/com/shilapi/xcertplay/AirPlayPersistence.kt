@@ -861,14 +861,15 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadLockdownRecord(context: Context, devicePublicKey: ByteArray? = null): LockdownPairRecord? =
-        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).load(devicePublicKey)
+    fun loadLockdownRecord(context: Context, devicePublicKey: ByteArray? = null,
+                           isCurrent: () -> Boolean = { true }): LockdownPairRecord? =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE), L7DebugLog::record).load(devicePublicKey, isCurrent)
 
-    fun saveLockdownRecord(context: Context, record: LockdownPairRecord) =
-        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).save(record)
+    fun saveLockdownRecord(context: Context, record: LockdownPairRecord, isCurrent: () -> Boolean = { true }) =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE), L7DebugLog::record).save(record, isCurrent)
 
-    fun clearLockdownRecord(context: Context, devicePublicKey: ByteArray? = null) =
-        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).clear(devicePublicKey)
+    fun clearLockdownRecord(context: Context, devicePublicKey: ByteArray? = null, isCurrent: () -> Boolean = { true }) =
+        GalaxyLockdownRecords(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE), L7DebugLog::record).clear(devicePublicKey, isCurrent)
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
 

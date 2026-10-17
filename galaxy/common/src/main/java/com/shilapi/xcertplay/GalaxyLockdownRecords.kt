@@ -7,41 +7,50 @@ import java.security.MessageDigest
 import java.util.WeakHashMap
 
 /** 手机记录沿用原私有配置文件；索引与配对材料均不进入日志或配置导出。 */
-internal class GalaxyLockdownRecords(private val prefs: SharedPreferences) {
-    fun load(deviceKey: ByteArray?): LockdownPairRecord? = synchronized(lock) {
+internal class GalaxyLockdownRecords(private val prefs: SharedPreferences, private val report: (String) -> Unit = {}) {
+    private fun event(outcome: String) { runCatching { report("LOCKDOWN_STORE outcome=$outcome") } }
+    private fun checkCurrent(isCurrent: () -> Boolean) { if (!isCurrent()) throw LockdownPairingException.Cancelled }
+    fun load(deviceKey: ByteArray?, isCurrent: () -> Boolean = { true }): LockdownPairRecord? = synchronized(lock) {
+        checkCurrent(isCurrent)
         val key = deviceKey?.copyOf()
         if (key != null && key.isEmpty()) return null
         val prefix = key?.let(::prefix)
         val failed = failedWrites[prefs].orEmpty()
         if (prefix != null) {
-            if (prefix in failed) return null
+            if (prefix in failed) { event("UNPERSISTED"); return null }
             if (fields.any { prefs.contains(prefix + it) }) {
-                return read(prefix)?.takeIf { MessageDigest.isEqual(it.devicePublicKeyPem, key) }
+                val record = read(prefix)?.takeIf { MessageDigest.isEqual(it.devicePublicKeyPem, key) }
+                event(if (record == null) "INVALID" else "HIT")
+                return record
             }
         }
         if ("" in failed) return null
-        val legacy = read("") ?: return null
+        val legacy = read("") ?: run { event("MISS"); return null }
         if (key == null) return legacy
         if (!MessageDigest.isEqual(legacy.devicePublicKeyPem, key)) return null
         // 先确认新记录持久化成功，再清理旧记录；不能只靠 SharedPreferences 的内存视图。
-        save(legacy)
+        save(legacy, isCurrent)
         val cleanup = prefs.edit()
         fields.forEach(cleanup::remove)
         runCatching { cleanup.commit() }
+        event("MIGRATED")
         legacy
     }
 
-    fun save(record: LockdownPairRecord) = synchronized(lock) {
+    fun save(record: LockdownPairRecord, isCurrent: () -> Boolean = { true }) = synchronized(lock) {
+        checkCurrent(isCurrent)
         val prefix = prefix(record.devicePublicKeyPem)
         val values = listOf(record.hostId, record.systemBuid, record.wifiMacAddress,
             record.devicePublicKeyPem.hex(), record.deviceCertificatePem.hex(), record.hostPrivateKeyPem.hex(),
             record.hostCertificatePem.hex(), record.rootPrivateKeyPem.hex(), record.rootCertificatePem.hex())
         val edit = prefs.edit()
         fields.zip(values).forEach { (field, value) -> edit.putString(prefix + field, value) }
-        commit(edit, setOf(prefix))
+        commit(edit, setOf(prefix), isCurrent)
+        event("SAVED")
     }
 
-    fun clear(deviceKey: ByteArray?) = synchronized(lock) {
+    fun clear(deviceKey: ByteArray?, isCurrent: () -> Boolean = { true }) = synchronized(lock) {
+        checkCurrent(isCurrent)
         val key = deviceKey?.copyOf()
         val edit = prefs.edit()
         val targets = mutableSetOf<String>()
@@ -61,15 +70,18 @@ internal class GalaxyLockdownRecords(private val prefs: SharedPreferences) {
                 targets.add("")
             }
         }
-        commit(edit, targets)
+        commit(edit, targets, isCurrent)
+        event("CLEARED")
     }
 
-    private fun commit(edit: SharedPreferences.Editor, targets: Set<String>) {
+    private fun commit(edit: SharedPreferences.Editor, targets: Set<String>, isCurrent: () -> Boolean) {
+        checkCurrent(isCurrent)
         val failed = failedWrites.getOrPut(prefs) { mutableSetOf() }
         val stored = try { edit.commit() } catch (_: Exception) { false }
         if (!stored) {
             // commit 失败也可能已更新内存，阻止下一次连接把未确认落盘的材料当作成功记录。
             failed.addAll(targets)
+            event("SAVE_FAILED")
             throw LockdownPairingException.PersistenceFailed
         }
         failed.removeAll(targets)

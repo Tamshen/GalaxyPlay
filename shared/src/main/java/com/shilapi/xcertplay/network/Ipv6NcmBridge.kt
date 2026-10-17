@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.shilapi.xcertplay.transport.EthernetIpv6Codec
 import com.shilapi.xcertplay.transport.NcmUsbBridge
+import com.shilapi.xcertplay.transport.CloseSequence
 import java.io.Closeable
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -54,13 +55,12 @@ class Ipv6NcmBridge(
 
     override fun close() {
         if (!running.compareAndSet(true, false)) return
-        try { ncm.close() } finally {
-            tun.close()
-            if (::ncmToTunThread.isInitialized) join(ncmToTunThread)
-            if (::tunToNcmThread.isInitialized) join(tunToNcmThread)
-        }
-        if (::ncmToTunThread.isInitialized && ncmToTunThread.isAlive ||
-            ::tunToNcmThread.isInitialized && tunToNcmThread.isAlive) throw IOException("NCM/VPN workers still closing")
+        val closing = CloseSequence("NCM/VPN")
+        closing.step { ncm.close() }
+        closing.step { tun.close() }
+        if (::ncmToTunThread.isInitialized) closing.await(ncmToTunThread, JOIN_TIMEOUT_MILLIS)
+        if (::tunToNcmThread.isInitialized) closing.await(tunToNcmThread, JOIN_TIMEOUT_MILLIS)
+        closing.finish()
     }
 
     private fun runNcmToTun() {
@@ -140,16 +140,6 @@ class Ipv6NcmBridge(
         } catch (error: RuntimeException) {
             if (running.get()) onError(error)
         }
-    }
-
-    private fun join(thread: Thread) {
-        if (thread === Thread.currentThread()) return
-        try {
-            thread.join(JOIN_TIMEOUT_MILLIS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
-        if (thread.isAlive) thread.interrupt()
     }
 
     private fun ByteArray.macString(): String =

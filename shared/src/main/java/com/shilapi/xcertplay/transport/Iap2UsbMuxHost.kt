@@ -64,16 +64,11 @@ class Iap2UsbMuxHost private constructor(
             closed = true
             connections.values.toList().also { connections.clear() }
         }
-        activeConnections.forEach(Iap2UsbMuxTcpConnection::closeFromHost)
-        pipe.close()
-        if (::readerThread.isInitialized && Thread.currentThread() !== readerThread) {
-            try {
-                readerThread.join(readTimeoutMillis + CLOSE_JOIN_MARGIN_MILLIS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            if (readerThread.isAlive) throw java.io.IOException("USBMUX reader still closing")
-        }
+        val closing = CloseSequence("USBMUX")
+        activeConnections.forEach { closing.step { it.closeFromHost() } }
+        closing.step { pipe.close() }
+        if (::readerThread.isInitialized) closing.await(readerThread, readTimeoutMillis + CLOSE_JOIN_MARGIN_MILLIS)
+        closing.finish()
     }
 
     internal fun sendTcp(

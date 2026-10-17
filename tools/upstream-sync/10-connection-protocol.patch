@@ -891,7 +891,12 @@
          } catch (_: Exception) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/CarPlayVpnService.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/CarPlayVpnService.kt
-@@ -56,6 +56,7 @@
+@@ -52,10 +52,12 @@
+         val media: AirPlayMediaHandler,
+         val additionalAddresses: List<InetAddress> = emptyList(),
+         val listenerIdentity: AirPlayListenerIdentity? = null,
++        val onTcpAccepted: () -> Unit = {},
+     )
  
      private val binder = LocalBinder()
      private val active = AtomicBoolean(false)
@@ -899,7 +904,7 @@
      private val sessionsLock = Any()
      private val sessions = mutableSetOf<AirPlaySession>()
      @Volatile private var attachment: AirPlayAttachment? = null
-@@ -64,6 +65,7 @@
+@@ -64,6 +66,7 @@
      private var bridge: Ipv6NcmBridge? = null
      private var tun: ParcelFileDescriptor? = null
      private var attachGeneration = 0
@@ -907,12 +912,13 @@
  
      override fun onBind(intent: Intent?): IBinder = binder
  
-@@ -78,12 +80,17 @@
+@@ -78,12 +81,18 @@
          mfi: MfiAuthenticator?,
          listener: AirPlaySessionListener,
          media: AirPlayMediaHandler,
 +        owner: Any? = null,
 +        isCurrent: () -> Boolean = { true },
++        onTcpAccepted: () -> Unit = {},
      ): AttachResult {
 +        if (!isCurrent()) return AttachResult.Failed("Wired attempt cancelled")
          if (active.get()) {
@@ -925,7 +931,7 @@
          val generation = ++attachGeneration
          return try {
              val address = InetAddress.getByName(linkLocal)
-@@ -98,12 +105,12 @@
+@@ -98,12 +107,12 @@
                  .setSession(SESSION_NAME)
                  .setMtu(TUN_MTU)
                  .setBlocking(true)
@@ -940,22 +946,28 @@
  
              val ipv6Bridge = Ipv6NcmBridge(ncm, tunFd, hostMac) { error ->
                  onTransportError(generation, listener, error)
-@@ -115,6 +122,7 @@
+@@ -113,8 +122,9 @@
+ 
+             startAirPlayServer(
                  generation,
-                 AirPlayAttachment(address, config, identity, pairings, mfi, listener, media),
+-                AirPlayAttachment(address, config, identity, pairings, mfi, listener, media),
++                AirPlayAttachment(address, config, identity, pairings, mfi, listener, media, onTcpAccepted = onTcpAccepted),
              )
 +            if (!isCurrent()) throw IOException("Wired attempt cancelled")
              AttachResult.Started
          } catch (error: Exception) {
              releaseLocked()
-@@ -163,14 +171,42 @@
+@@ -163,14 +173,45 @@
          releaseLocked()
      }
  
 +    /** 旧任务清理只能释放自己的接入；不调用控制器锁，避免关闭与接入反向等待。 */
 +    @Synchronized
-+    fun detachWired(owner: Any) {
-+        if (wiredOwner === owner) releaseLocked()
++    fun detachWired(owner: Any): Array<Thread> {
++        if (wiredOwner !== owner) return emptyArray()
++        val workers = acceptWorkers.toTypedArray()
++        releaseLocked()
++        return workers
 +    }
 +
 +    @Synchronized
@@ -970,19 +982,19 @@
      }
  
 +    /** 非主线程等实际 accept 退出；关闭请求与 worker 退出分别判定。 */
-+    fun awaitDetached(timeoutMillis: Long): Boolean {
++    fun awaitDetached(timeoutMillis: Long, workers: Array<out Thread> = acceptWorkers.toTypedArray()): Boolean {
 +        require(timeoutMillis >= 0)
 +        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
 +        // Kotlin 小集合转换会先读 size 再取首项；并发退出可使该首项已经消失。
 +        // ConcurrentHashMap 的数组快照容忍并发删除，再按同一总预算等待。
-+        for (worker in acceptWorkers.toTypedArray()) {
++        for (worker in workers) {
 +            if (worker === Thread.currentThread()) return false
 +            val remaining = deadline - System.nanoTime()
-+            if (remaining <= 0) return acceptWorkers.none { it.isAlive }
++            if (remaining <= 0) return workers.none { it.isAlive }
 +            try { worker.join((remaining / 1_000_000L).coerceAtLeast(1L)) }
 +            catch (_: InterruptedException) { Thread.currentThread().interrupt(); return false }
 +        }
-+        return acceptWorkers.none { it.isAlive }
++        return workers.none { it.isAlive }
 +    }
 +
      fun isAttached(): Boolean = active.get() && attachment != null
@@ -992,7 +1004,7 @@
      fun boundPort(): Int? = attachment?.config?.port
  
      override fun onDestroy() {
-@@ -201,10 +237,11 @@
+@@ -201,10 +242,11 @@
                  "airplay listener ready family=${if (bound.inetAddress is Inet6Address) "IPv6" else "IPv4"} port=${bound.localPort}",
              ) }
              Thread(
@@ -1005,24 +1017,61 @@
                  start()
              }
          }
-@@ -335,15 +372,16 @@
+@@ -234,6 +276,7 @@
+                         return
+                     }
+                     val internalPeer = isInternalAirPlayPeer(socket.inetAddress, socket.localAddress)
++                    runCatching { current.onTcpAccepted() }
+                     current.listenerIdentity?.let { owner ->
+                         current.listener.onTcpAccepted(AirPlayTcpAccepted(
+                             owner, internalPeer, acceptedAtNanos,
+@@ -292,16 +335,10 @@
+     }
+ 
+     private fun closeSessionsLocked() {
+-        synchronized(sessionsLock) {
+-            sessions.toList().forEach { session ->
+-                try {
+-                    session.close()
+-                } catch (error: Exception) {
+-                    Log.w(TAG, "AirPlay session replacement failed", error)
+-                }
+-            }
+-            sessions.clear()
+-        }
++        val closing = com.shilapi.xcertplay.transport.CloseSequence("AirPlay sessions")
++        val owned = synchronized(sessionsLock) { sessions.toList().also { sessions.clear() } }
++        owned.forEach { session -> closing.step { session.close() } }
++        closing.finish()
+     }
+ 
+     private fun onTransportError(
+@@ -335,15 +372,23 @@
          attachGeneration += 1
          active.set(false)
          attachment = null
+-        serverSocket?.close()
 +        wiredOwner = null
-         serverSocket?.close()
++        val closing = com.shilapi.xcertplay.transport.CloseSequence("AirPlay transport")
++        val primary = serverSocket
++        val extra = additionalServers
++        val oldBridge = bridge
++        val oldTun = tun
          serverSocket = null
-         additionalServers.forEach { it.close() }
+-        additionalServers.forEach { it.close() }
          additionalServers = emptyList()
-         closeSessionsLocked()
+-        closeSessionsLocked()
 -        bridge?.close()
--        bridge = null
+         bridge = null
 -        tun?.close()
--        tun = null
-+        try { bridge?.close() } finally {
-+            bridge = null
-+            try { tun?.close() } finally { tun = null }
-+        }
+         tun = null
++        // 某个监听／会话关闭失败也必须继续解除 NCM 和 TUN，失败仍向资源门禁传播。
++        closing.step { primary?.close() }
++        extra.forEach { server -> closing.step { server.close() } }
++        closing.step { closeSessionsLocked() }
++        closing.step { oldBridge?.close() }
++        closing.step { oldTun?.close() }
++        closing.finish()
      }
  
      companion object {
@@ -1088,7 +1137,15 @@
          for (address in addresses) {
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/Ipv6NcmBridge.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/Ipv6NcmBridge.kt
-@@ -54,10 +54,13 @@
+@@ -4,6 +4,7 @@
+ import android.util.Log
+ import com.shilapi.xcertplay.transport.EthernetIpv6Codec
+ import com.shilapi.xcertplay.transport.NcmUsbBridge
++import com.shilapi.xcertplay.transport.CloseSequence
+ import java.io.Closeable
+ import java.io.FileInputStream
+ import java.io.FileOutputStream
+@@ -54,10 +55,12 @@
  
      override fun close() {
          if (!running.compareAndSet(true, false)) return
@@ -1096,16 +1153,32 @@
 -        tun.close()
 -        join(ncmToTunThread)
 -        join(tunToNcmThread)
-+        try { ncm.close() } finally {
-+            tun.close()
-+            if (::ncmToTunThread.isInitialized) join(ncmToTunThread)
-+            if (::tunToNcmThread.isInitialized) join(tunToNcmThread)
-+        }
-+        if (::ncmToTunThread.isInitialized && ncmToTunThread.isAlive ||
-+            ::tunToNcmThread.isInitialized && tunToNcmThread.isAlive) throw IOException("NCM/VPN workers still closing")
++        val closing = CloseSequence("NCM/VPN")
++        closing.step { ncm.close() }
++        closing.step { tun.close() }
++        if (::ncmToTunThread.isInitialized) closing.await(ncmToTunThread, JOIN_TIMEOUT_MILLIS)
++        if (::tunToNcmThread.isInitialized) closing.await(tunToNcmThread, JOIN_TIMEOUT_MILLIS)
++        closing.finish()
      }
  
      private fun runNcmToTun() {
+@@ -139,16 +142,6 @@
+         }
+     }
+ 
+-    private fun join(thread: Thread) {
+-        if (thread === Thread.currentThread()) return
+-        try {
+-            thread.join(JOIN_TIMEOUT_MILLIS)
+-        } catch (_: InterruptedException) {
+-            Thread.currentThread().interrupt()
+-        }
+-        if (thread.isAlive) thread.interrupt()
+-    }
+-
+     private fun ByteArray.macString(): String =
+         joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
+ 
 --- a/shared/src/main/java/com/shilapi/xcertplay/network/LocalOnlyHotspotManager.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/network/LocalOnlyHotspotManager.kt
 @@ -2,6 +2,7 @@
@@ -2311,10 +2384,11 @@
      private val media: AirPlayMediaHandler,
      reportStatus: (CarPlayStatus) -> Unit,
 -    private val loadPairRecord: () -> LockdownPairRecord? = { null },
-+    private val loadPairRecord: (ByteArray) -> LockdownPairRecord? = { null },
-     private val savePairRecord: (LockdownPairRecord) -> Unit = {},
+-    private val savePairRecord: (LockdownPairRecord) -> Unit = {},
 -    private val clearPairRecord: () -> Unit = {},
-+    private val clearPairRecord: (ByteArray) -> Unit = {},
++    private val loadPairRecord: (ByteArray, () -> Boolean) -> LockdownPairRecord? = { _, _ -> null },
++    private val savePairRecord: (LockdownPairRecord, () -> Boolean) -> Unit = { _, _ -> },
++    private val clearPairRecord: (ByteArray, () -> Boolean) -> Unit = { _, _ -> },
      private val locationProvider: Iap2LocationProvider? = null,
      private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
 +    diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
@@ -2412,7 +2486,7 @@
      private val startupTimer = java.util.concurrent.ScheduledThreadPoolExecutor(1) { task ->
          Thread(task, "diplay-first-tcp-timeout").apply { isDaemon = true }
      }.apply { removeOnCancelPolicy = true }
-@@ -263,13 +299,13 @@
+@@ -263,24 +299,26 @@
      private val wirelessHandoffRequested = AtomicBoolean(false)
      private val wirelessTunnelReady = AtomicBoolean(false)
      private val wirelessActiveReported = AtomicBoolean(false)
@@ -2427,7 +2501,20 @@
      private var ch341PermissionCloseable: Closeable? = null
      private var vpnLatch = CountDownLatch(1)
      private val teardownComplete = CountDownLatch(1)
-@@ -288,10 +324,21 @@
+ 
+     private val serviceConnection = object : ServiceConnection {
+         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
++            if (closed || !vpnBound) return
+             vpnService = (binder as CarPlayVpnService.LocalBinder).service
+             vpnLatch.countDown()
+         }
+ 
+         override fun onServiceDisconnected(name: ComponentName) {
++            if (closed || !vpnBound) return
+             vpnService = null
+             fail(IphoneUsbException.DeviceUnavailable("CarPlay VPN service disconnected"))
+         }
+@@ -288,10 +326,21 @@
  
      private val sessionListener = object : AirPlaySessionListener {
          override fun onSessionActive(session: AirPlaySession) {
@@ -2451,7 +2538,7 @@
                  com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                  // The gear may have changed since /info.
                  if (videoListener != null) {
-@@ -299,7 +346,9 @@
+@@ -299,7 +348,9 @@
                      debugLog("video in car session allowed=${VideoInCar.allowed} delivery=$delivery")
                  }
              }
@@ -2462,7 +2549,7 @@
              if (replacement) restoreDashboardContent(session)
              debugLog(
                  "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
-@@ -309,18 +358,25 @@
+@@ -309,18 +360,25 @@
          }
  
          override fun onSessionEnded(session: AirPlaySession) {
@@ -2497,7 +2584,7 @@
              }
              debugLog("AirPlay session ended peer=${session.host}")
              uiListener?.onSessionEnded(session)
-@@ -417,6 +473,9 @@
+@@ -417,6 +475,9 @@
              if (closed) return
          }
          connectionDiagnostic("start transport=${config.transport}")
@@ -2507,7 +2594,7 @@
          if (!hasRequiredUsbService()) return
          videoListener?.let { listener ->
              videoGate = VideoInCarGate(
-@@ -435,6 +494,7 @@
+@@ -435,6 +496,7 @@
          if (config.transport == CarPlayTransport.WIRED) {
              permissionCloseable = iphoneHost.registerPermissionReceiver(::onIphonePermission)
              attachCloseable = iphoneHost.registerAttachReceiver(::onIphoneAttached)
@@ -2515,7 +2602,7 @@
          }
          startMfi()
      }
-@@ -447,14 +507,22 @@
+@@ -447,14 +509,22 @@
      }
  
      /** Re-runs iPhone discovery/bring-up using the already-open MFi session. */
@@ -2540,7 +2627,7 @@
          }
      }
  
-@@ -469,6 +537,8 @@
+@@ -469,6 +539,8 @@
          }
      }
  
@@ -2549,7 +2636,7 @@
      /** Moves CarPlay on the main screen to its declared view area [index], for example another dock edge. */
      fun showViewArea(index: Int): Boolean {
          if (closed) return false
-@@ -575,23 +645,59 @@
+@@ -575,23 +647,59 @@
          }
      }
  
@@ -2615,7 +2702,7 @@
          firstTcpWatchdog?.terminate()
          startupTimer.shutdownNow()
          (hotspot as? ManualHotspotManager)?.close()
-@@ -605,9 +711,11 @@
+@@ -605,9 +713,11 @@
          availabilityPollGeneration.incrementAndGet()
          wirelessGeneration.incrementAndGet()
          permissionPollGeneration += 1
@@ -2627,7 +2714,7 @@
          unbindVpn()
          Thread(
              {
-@@ -617,19 +725,29 @@
+@@ -617,19 +727,29 @@
                          closeBestEffort("Wi-Fi scan pause") { wifiScanPause?.close() }
                          wifiScanPause = null
                      } else {
@@ -2645,8 +2732,8 @@
                      if (config.transport == CarPlayTransport.WIRED) {
 -                        closeBestEffort("VPN/NCM") { service?.detach() }
 +                        closeBestEffort("VPN/NCM") {
-+                            service?.detachWired(closingWiredResources)
-+                            if (service != null && !service.awaitDetached(EXECUTOR_CLOSE_TIMEOUT_MILLIS))
++                            val workers = service?.detachWired(closingWiredResources).orEmpty()
++                            if (service != null && !service.awaitDetached(EXECUTOR_CLOSE_TIMEOUT_MILLIS, workers))
 +                                throw IOException("AirPlay accept workers still closing")
 +                        }
                      }
@@ -2660,7 +2747,7 @@
                  } finally {
                      executor.shutdownNow()
                      var executorTerminated = false
-@@ -642,6 +760,12 @@
+@@ -642,6 +762,12 @@
                          "teardown end elapsedMs=${elapsedMillis(teardownStarted)} " +
                              "executorTerminated=$executorTerminated",
                      )
@@ -2673,7 +2760,7 @@
                      teardownComplete.countDown()
                  }
              },
-@@ -731,7 +855,7 @@
+@@ -731,7 +857,7 @@
      fun awaitClosed(timeoutMillis: Long): Boolean {
          require(timeoutMillis >= 0) { "timeoutMillis must not be negative" }
          return try {
@@ -2682,7 +2769,7 @@
          } catch (_: InterruptedException) {
              Thread.currentThread().interrupt()
              false
-@@ -740,28 +864,41 @@
+@@ -740,28 +866,41 @@
  
      // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
      private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
@@ -2735,7 +2822,7 @@
          when (config.mfiTarget) {
              MfiTarget.LOCAL -> openLocalMfi(offlineDirectory)
              MfiTarget.USB_CH341 -> {
-@@ -1142,13 +1279,18 @@
+@@ -1142,13 +1281,18 @@
                  },
                  onTimeout = {
                      if (!closed && generation == wirelessGeneration.get()) {
@@ -2756,7 +2843,7 @@
              )
              firstTcpWatchdog = watchdog
              val mfi = mfiSession?.client
-@@ -1159,10 +1301,22 @@
+@@ -1159,10 +1303,22 @@
              }
              pauseWifiScans(hotspotInfo.backend)
              val startedHotspot = hotspot
@@ -2780,7 +2867,7 @@
                  ?: throw IOException(
                      "Wireless hotspot did not provide a usable host address",
                  )
-@@ -1215,6 +1369,7 @@
+@@ -1215,6 +1371,7 @@
                  ?: throw IOException("Bluetooth adapter is unavailable")
              if (!adapter.isEnabled) throw IOException("Bluetooth is not enabled")
              val device = selectWirelessBluetoothDevice(adapter)
@@ -2788,7 +2875,7 @@
              val hostBluetoothMac = accessoryBluetoothMac(adapter)
              debugLog(
                  "wireless selected Bluetooth target name=${device.name ?: "unknown"} " +
-@@ -1241,7 +1396,8 @@
+@@ -1241,7 +1398,8 @@
                          listener = wirelessSessionListener(generation, watchdog),
                          listenerIdentity = watchdog.listener,
                          media = media,
@@ -2798,7 +2885,7 @@
                      )
                  ) {
                      CarPlayVpnService.AttachResult.Started -> Unit
-@@ -1251,13 +1407,10 @@
+@@ -1251,13 +1409,10 @@
                          throw IOException(result.message)
                  }
              }
@@ -2815,7 +2902,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1272,7 +1425,8 @@
+@@ -1272,7 +1427,8 @@
                  // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
                  useInterfaceMdns = true,
                  onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
@@ -2825,7 +2912,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) return
-@@ -1283,6 +1437,10 @@
+@@ -1283,6 +1439,10 @@
              startedBonjour = bonjourClient
              diagnostics.start()
              debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
@@ -2836,7 +2923,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1301,8 +1459,7 @@
+@@ -1301,8 +1461,7 @@
              val bluetoothStarted = System.nanoTime()
              try {
                  connectBluetoothSocket(socket, device.address)
@@ -2846,7 +2933,7 @@
              } catch (error: Throwable) {
                  connectionDiagnostic(
                      "Bluetooth connect failed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
-@@ -1312,7 +1469,6 @@
+@@ -1312,7 +1471,6 @@
                  throw error
              }
              debugLog("wireless RFCOMM connected address=${device.address}")
@@ -2854,7 +2941,7 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
-@@ -1321,8 +1477,7 @@
+@@ -1321,8 +1479,7 @@
                  try {
                      BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
                  } finally {
@@ -2864,7 +2951,7 @@
                      if (bluetoothSocket === socket) bluetoothSocket = null
                  }
              }
-@@ -1330,7 +1485,7 @@
+@@ -1330,7 +1487,7 @@
                  stream,
                  traceContext = "wireless-rfcomm",
                  onTrace = ::debugLog,
@@ -2873,7 +2960,7 @@
              )
              synchronized(wirelessResourceLock) {
                  if (isStaleWirelessRun(generation)) {
-@@ -1343,14 +1498,12 @@
+@@ -1343,14 +1500,12 @@
              if (isStaleWirelessRun(generation)) {
                  return
              }
@@ -2891,7 +2978,7 @@
              )
              val endpoint = Iap2WirelessCarPlayEndpoint(
                  ssid = hotspotInfo.ssid,
-@@ -1379,6 +1532,7 @@
+@@ -1379,6 +1534,7 @@
                      "location=false vehicleStatus=false",
              )
              startedHotspot?.validateReady()
@@ -2899,7 +2986,7 @@
              val result = Iap2WirelessControlClient(
                  session = channel,
                  mfi = Iap2MfiAuthenticationClient(mfi),
-@@ -1388,8 +1542,23 @@
+@@ -1388,8 +1544,23 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  keepAliveAfterDeadline = { keepBluetoothControlAlive(generation) },
                  beforeStartSession = { startedHotspot?.validateReady() },
@@ -2925,7 +3012,7 @@
                  onProgress = { message ->
                      diagnostics.controlProgress(message)
                      debugLog(message)
-@@ -1458,7 +1627,7 @@
+@@ -1458,7 +1629,7 @@
                  stream,
                  traceContext = "wireless-tunnel",
                  onTrace = ::debugLog,
@@ -2934,7 +3021,7 @@
              )
          } catch (error: Throwable) {
              debugLog("Could not open the tunneled iAP2 link", error)
-@@ -1466,11 +1635,8 @@
+@@ -1466,11 +1637,8 @@
          }
          wirelessTunnelChannel = channel
          val generation = wirelessGeneration.get()
@@ -2948,7 +3035,7 @@
          return try {
              tunnelExecutor.execute {
                  try {
-@@ -1486,7 +1652,7 @@
+@@ -1486,7 +1654,7 @@
                          onReady = {
                              onWirelessTunnelReady(generation)
                          },
@@ -2957,7 +3044,7 @@
                          onProgress = { message -> debugLog("iAP tunnel $message") },
                      )
                      if (closed || generation != wirelessGeneration.get()) return@execute
-@@ -1524,7 +1690,10 @@
+@@ -1524,7 +1692,10 @@
  
              override fun onTcpAccepted(event: AirPlayTcpAccepted) {
                  if (isStaleWirelessRun(generation)) return
@@ -2969,7 +3056,7 @@
              }
  
              override fun onTransportError(message: String) {
-@@ -1534,12 +1703,18 @@
+@@ -1534,12 +1705,18 @@
              }
  
              override fun onSessionActive(session: AirPlaySession) {
@@ -2989,7 +3076,7 @@
                  // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
                  // the Bluetooth bootstrap after the tunneled iAP2 channel is ready.
                  sessionListener.onSessionActive(session)
-@@ -1555,13 +1730,17 @@
+@@ -1555,13 +1732,17 @@
                  if (isStaleWirelessRun(generation) || activeSession !== session) return
                  if (!watchdog.sessionEstablished()) return
                  wirelessConnectionProof.rendered(generation, session)
@@ -3008,7 +3095,7 @@
              }
  
              override fun onDebugLog(message: String) {
-@@ -1606,6 +1785,7 @@
+@@ -1606,6 +1787,7 @@
                          wirelessFailureReported.get() || !wirelessTunnelReady.get()) return@Thread
                      debugLog("wireless handoff ready; closing Bluetooth bootstrap transport")
                      closeBluetoothBootstrapTransport()
@@ -3016,7 +3103,7 @@
                      onStatus(CarPlayStatus.WirelessActive, generation)
                  }
              },
-@@ -1657,9 +1837,6 @@
+@@ -1657,9 +1839,6 @@
          if (activeSession != null && wirelessConnectionProof.hasRenderedFrame(generation)) {
              if (!wirelessActiveReported.compareAndSet(false, true)) return@synchronized
              wirelessHandoffFellBack.set(true)
@@ -3026,7 +3113,7 @@
              debugLog("wireless handoff fallback after rendered video; tunnel iAP2 unavailable; " +
                  "preserving AirPlay and keeping the Bluetooth bootstrap for iAP2 control")
              onStatus(CarPlayStatus.WirelessActiveFallback, generation)
-@@ -1683,146 +1860,255 @@
+@@ -1683,146 +1862,255 @@
          if (activeSocket != null) closeBestEffort("wireless Bluetooth socket") { activeSocket.close() }
      }
  
@@ -3366,7 +3453,7 @@
          }
      }
  
-@@ -1842,28 +2128,47 @@
+@@ -1842,28 +2130,48 @@
          )
      }
  
@@ -3388,6 +3475,7 @@
          onStatus(CarPlayStatus.OpeningDataPaths)
 +        val generation = iphoneGeneration.get()
 +        val resources = wiredResources
++        resources.beginStartup()
          iphoneHost.openIap2UsbSessionAsync(device, executor) { result ->
 +            if (!isCurrentWired(resources, generation) || phase != Phase.DATAPATHS) {
 +                if (result is IphoneUsbHost.Iap2SessionResult.Connected) result.session.close()
@@ -3424,7 +3512,7 @@
          val configuration = IphoneCarPlayConfiguration.find(device)
              ?: throw IphoneUsbException.Protocol(
                  "iPhone exposes no CarPlay configuration for NCM",
-@@ -1878,21 +2183,51 @@
+@@ -1878,72 +2186,39 @@
          )
          val connection = requireUsbManager().openDevice(device)
              ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
@@ -3462,37 +3550,18 @@
 +            connectionDiagnostic("wired stage=USBMUX_OPEN result=COMPLETED")
              debugLog("wired USBMUX host opened")
 -            onStatus(CarPlayStatus.Pairing)
-+            onStatus(CarPlayStatus.Pairing, generation)
-             val pairingClient = LockdownPairingClient(mux)
+-            val pairingClient = LockdownPairingClient(mux)
 -            val savedPairRecord = loadPairRecord()
 -            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient)
-+            val pairingDeadline = System.nanoTime() + PAIR_TIMEOUT_MILLIS * 1_000_000L
-+            fun remainingPairingBudget(): Long {
-+                val remaining = (pairingDeadline - System.nanoTime()) / 1_000_000L
-+                if (remaining <= 0) throw LockdownPairingException.TimedOut
-+                return remaining
-+            }
-+            requireCurrentWired(resources, generation)
-+            val phoneKey = pairingClient.readDevicePublicKey(config.label, remainingPairingBudget()) { !isCurrentWired(resources, generation) }
-+            requireCurrentWired(resources, generation)
-+            var savedPairRecord: LockdownPairRecord? = null
-+            if (!withCurrentWired(resources, generation) {
-+                    savedPairRecord = loadPairRecord(phoneKey.copyOf())?.takeIf {
-+                        java.security.MessageDigest.isEqual(it.devicePublicKeyPem, phoneKey)
-+                    }
-+                }) throw LockdownPairingException.Cancelled
-+            requireCurrentWired(resources, generation)
-+            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient, resources, generation, phoneKey, remainingPairingBudget())
-             debugLog(
-                 if (savedPairRecord != null) {
-                     "wired using saved Lockdown pair record"
-@@ -1900,50 +2235,20 @@
-                     "wired created a new Lockdown pair record"
-                 },
-             )
+-            debugLog(
+-                if (savedPairRecord != null) {
+-                    "wired using saved Lockdown pair record"
+-                } else {
+-                    "wired created a new Lockdown pair record"
+-                },
+-            )
 -            onStatus(CarPlayStatus.ConnectingControl)
-+            onStatus(CarPlayStatus.ConnectingControl, generation)
-             val carKitClient = LockdownCarKitClient(mux)
+-            val carKitClient = LockdownCarKitClient(mux)
 -            // Temporary lab capture, limited to accessory/authentication messages and two minutes.
 -            try {
 -                val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
@@ -3525,27 +3594,27 @@
 -            } catch (error: Exception) {
 -                debugLog("phone authentication diagnostics unavailable: ${error.message}")
 -            }
-             val carkit = try {
+-            val carkit = try {
 -                carKitClient.open(pairRecord, config.label)
-+                carKitClient.open(pairRecord, config.label) { !isCurrentWired(resources, generation) }
-             } catch (error: Throwable) {
-                 val rejection = rejectedPairRecordError(error)
-                 if (savedPairRecord == null || rejection == null) throw error
-                 debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
+-            } catch (error: Throwable) {
+-                val rejection = rejectedPairRecordError(error)
+-                if (savedPairRecord == null || rejection == null) throw error
+-                debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
 -                clearPairRecord()
 -                pairRecord = pairNewRecord(pairingClient)
 -                carKitClient.open(pairRecord, config.label)
 -            }
-+                if (!withCurrentWired(resources, generation) { clearPairRecord(phoneKey.copyOf()) }) throw LockdownPairingException.Cancelled
-+                pairRecord = pairNewRecord(pairingClient, resources, generation, phoneKey, remainingPairingBudget())
-+                carKitClient.open(pairRecord, config.label) { !isCurrentWired(resources, generation) }
-+            }
++            onStatus(CarPlayStatus.Pairing, generation)
++            val pairing = pairingSession(LockdownPairingClient(mux), resources, generation)
++            pairing.record()
++            onStatus(CarPlayStatus.ConnectingControl, generation)
++            val carkit = pairing.openCarKit(LockdownCarKitClient(mux))
 +            if (!resources.own("CARKIT", carkit)) return
 +            requireCurrentWired(resources, generation)
              debugLog("wired com.apple.carkit.service stream opened")
              // Lab transport diagnostics: packet headers only, never certificate or challenge data.
              fun wireSummary(bytes: ByteArray): String {
-@@ -1960,7 +2265,7 @@
+@@ -1960,7 +2235,7 @@
                      var result = ConnectionIoDiagnostics.Result.FAILED
                      try {
                          debugLog("wired link TX begin ${wireSummary(data)}")
@@ -3554,7 +3623,7 @@
                          for (offset in data.indices step 256) {
                              carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
                          }
-@@ -1994,33 +2299,33 @@
+@@ -1994,33 +2269,33 @@
                  tracedCarkit,
                  traceContext = "wired",
                  onTrace = ::debugLog,
@@ -3598,7 +3667,7 @@
              debugLog(
                  "wired iAP2 runtime control starting " +
                      "location=${config.identification.locationInformationEnabled} " +
-@@ -2033,33 +2338,68 @@
+@@ -2033,44 +2308,56 @@
                  timeoutMillis = controlLoopTimeoutMillis(),
                  locationProvider = locationProvider,
                  vehicleStatusProvider = vehicleStatusProvider,
@@ -3630,6 +3699,23 @@
 -
 -    private fun pairNewRecord(client: LockdownPairingClient): LockdownPairRecord =
 -        client.pair(
+-            label = config.label,
+-            hostId = hostId,
+-            systemBuid = systemBuid,
+-            totalTimeoutMillis = PAIR_TIMEOUT_MILLIS,
+-            isCancelled = { closed },
+-        ).pairRecord.also(savePairRecord)
+-
+-    private fun rejectedPairRecordError(error: Throwable): String? {
+-        var cause: Throwable? = error
+-        while (cause != null) {
+-            val message = cause.message.orEmpty()
+-            if (message.contains("InvalidPairRecord", ignoreCase = true)) return "InvalidPairRecord"
+-            if (message.contains("InvalidHostID", ignoreCase = true)) return "InvalidHostID"
+-            cause = cause.cause
+-        }
+-        return null
+-    }
 +            if (ncmOwnedLocally) resources.release(ncm)
 +        }
 +    }
@@ -3658,29 +3744,14 @@
 +            if (!isCurrentWired(resources, generation)) false else { operation(); true }
 +        }
 +
-+    private fun pairNewRecord(client: LockdownPairingClient, resources: WiredResources, generation: Int,
-+                              phoneKey: ByteArray, timeoutMillis: Long): LockdownPairRecord {
-+        val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
-+        return client.pair(
-             label = config.label,
-             hostId = hostId,
-             systemBuid = systemBuid,
--            totalTimeoutMillis = PAIR_TIMEOUT_MILLIS,
--            isCancelled = { closed },
--        ).pairRecord.also(savePairRecord)
-+            totalTimeoutMillis = timeoutMillis,
-+            isCancelled = { !isCurrentWired(resources, generation) },
-+        ).pairRecord.also { record ->
-+            if (System.nanoTime() >= deadline) throw LockdownPairingException.TimedOut
-+            if (!java.security.MessageDigest.isEqual(record.devicePublicKeyPem, phoneKey))
-+                throw LockdownPairingException.InvalidResponse("Phone identity changed during pairing")
-+            if (!withCurrentWired(resources, generation) { savePairRecord(record) }) throw LockdownPairingException.Cancelled
-+        }
-+    }
++    private fun pairingSession(client: LockdownPairingClient, resources: WiredResources, generation: Int) =
++        com.shilapi.xcertplay.transport.WiredPairingSession(client, config.label, hostId, systemBuid,
++            PAIR_TIMEOUT_MILLIS, { isCurrentWired(resources, generation) }, loadPairRecord, savePairRecord,
++            clearPairRecord, ::connectionDiagnostic)
  
-     private fun rejectedPairRecordError(error: Throwable): String? {
-         var cause: Throwable? = error
-@@ -2108,13 +2448,8 @@
+     private fun isBluetoothHandoffCommand(type: String): Boolean =
+         type.equals("disableBluetooth", ignoreCase = true) ||
+@@ -2108,13 +2395,8 @@
          }
          val manager: WirelessHotspotManager = when (hotspotMode) {
              WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
@@ -3696,7 +3767,7 @@
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
                  onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-@@ -2165,6 +2500,7 @@
+@@ -2165,6 +2447,7 @@
      // Kept across reconnects within this controller: resuming between attempts would start a scan.
      private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
          if (closed || !WifiScanPause.eligible(backend)) return@synchronized
@@ -3704,7 +3775,7 @@
          (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
      }
  
-@@ -2253,7 +2589,6 @@
+@@ -2253,7 +2536,6 @@
          }
      }
  
@@ -3712,7 +3783,7 @@
      private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
          try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-@@ -2262,20 +2597,11 @@
+@@ -2262,20 +2544,11 @@
                  connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
                  return
              }
@@ -3735,7 +3806,7 @@
                      "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
              )
          } catch (error: RuntimeException) {
-@@ -2289,8 +2615,12 @@
+@@ -2289,8 +2562,12 @@
              val owner = firstTcpWatchdog?.listener
              firstTcpWatchdog?.terminate()
              val diagnostics = wirelessDiagnostics
@@ -3748,7 +3819,7 @@
              wirelessConnectionProof.clear()
              media.setIapTunnelHandler(null)
              val activeTunnel = wirelessTunnelChannel
-@@ -2301,7 +2631,10 @@
+@@ -2301,7 +2578,10 @@
  
              val activeBonjour = bonjour
              bonjour = null
@@ -3760,7 +3831,7 @@
  
              val activeHotspot = hotspot
              hotspot = null
-@@ -2399,6 +2732,7 @@
+@@ -2399,6 +2679,7 @@
              close()
              completed = true
          } catch (error: Throwable) {
@@ -3768,7 +3839,7 @@
              debugLog("$name teardown failed", error)
          } finally {
              connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
-@@ -2408,18 +2742,18 @@
+@@ -2408,18 +2689,18 @@
      private fun controlLoopTimeoutMillis(): Long = when {
          config.transport == CarPlayTransport.WIRED -> Iap2WiredControlClient.NO_TIMEOUT_MILLIS
          config.locationReportingEnabled -> LOCATION_CONTROL_LOOP_TIMEOUT_MILLIS
@@ -3791,7 +3862,7 @@
          debugLog("wired VPN service bound; attaching NCM transport")
          val result = try {
              service.attach(
-@@ -2430,12 +2764,14 @@
+@@ -2430,12 +2711,19 @@
                  identity = identity,
                  pairings = pairings,
                  mfi = mfiSession?.client,
@@ -3800,6 +3871,11 @@
                  media = media,
 +                owner = resources,
 +                isCurrent = { isCurrentWired(resources, generation) },
++                onTcpAccepted = {
++                    if (isCurrentWired(resources, generation)) resources.startupElapsedMillis("FIRST_TCP")?.let {
++                        connectionDiagnostic("wired stage=FIRST_TCP elapsedMs=$it")
++                    }
++                },
              )
          } catch (error: Throwable) {
              ncm.close()
@@ -3808,7 +3884,7 @@
              return false
          }
          return when (result) {
-@@ -2451,11 +2787,24 @@
+@@ -2451,11 +2739,52 @@
              is CarPlayVpnService.AttachResult.Failed -> {
                  debugLog("wired VPN/NCM transport attach result=failed ${result.message}")
                  ncm.close()
@@ -3821,20 +3897,48 @@
 +
 +    private fun wiredSessionListener(resources: WiredResources, generation: Int): AirPlaySessionListener =
 +        object : AirPlaySessionListener {
-+            override fun onSessionActive(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onSessionActive(session) } }
-+            override fun onSessionEnded(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onSessionEnded(session) } }
-+            override fun onTransportError(message: String) { withCurrentWired(resources, generation) { sessionListener.onTransportError(message) } }
-+            override fun onDebugLog(message: String) { if (isCurrentWired(resources, generation)) sessionListener.onDebugLog(message) }
-+            override fun onDeviceInfo(session: AirPlaySession, info: AirPlayDeviceInfo) { withCurrentWired(resources, generation) { sessionListener.onDeviceInfo(session, info) } }
-+            override fun onHostUiRequested(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onHostUiRequested(session) } }
-+            override fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) { withCurrentWired(resources, generation) { sessionListener.onCommand(session, type, params) } }
-+            override fun onRemoteControlMessage(session: AirPlaySession, streamId: Long, message: Map<String, Any?>) { withCurrentWired(resources, generation) { sessionListener.onRemoteControlMessage(session, streamId, message) } }
-+            override fun onVideoPlaybackUiRequested(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onVideoPlaybackUiRequested(session) } }
++            override fun onVideoFrameRendered(session: AirPlaySession) {
++                withCurrentWired(resources, generation) {
++                    if (activeSession === session) {
++                        resources.startupElapsedMillis("FIRST_FRAME")?.let {
++                            connectionDiagnostic("wired stage=FIRST_FRAME elapsedMs=$it")
++                        }
++                        uiListener?.onVideoFrameRendered(session)
++                    }
++                }
++            }
++            override fun onSessionActive(session: AirPlaySession) {
++                withCurrentWired(resources, generation) { sessionListener.onSessionActive(session) }
++            }
++            override fun onSessionEnded(session: AirPlaySession) {
++                withCurrentWired(resources, generation) { sessionListener.onSessionEnded(session) }
++            }
++            override fun onTransportError(message: String) {
++                withCurrentWired(resources, generation) { sessionListener.onTransportError(message) }
++            }
++            override fun onDebugLog(message: String) {
++                if (isCurrentWired(resources, generation)) sessionListener.onDebugLog(message)
++            }
++            override fun onDeviceInfo(session: AirPlaySession, info: AirPlayDeviceInfo) {
++                withCurrentWired(resources, generation) { sessionListener.onDeviceInfo(session, info) }
++            }
++            override fun onHostUiRequested(session: AirPlaySession) {
++                withCurrentWired(resources, generation) { sessionListener.onHostUiRequested(session) }
++            }
++            override fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) {
++                withCurrentWired(resources, generation) { sessionListener.onCommand(session, type, params) }
++            }
++            override fun onRemoteControlMessage(session: AirPlaySession, streamId: Long, message: Map<String, Any?>) {
++                withCurrentWired(resources, generation) { sessionListener.onRemoteControlMessage(session, streamId, message) }
++            }
++            override fun onVideoPlaybackUiRequested(session: AirPlaySession) {
++                withCurrentWired(resources, generation) { sessionListener.onVideoPlaybackUiRequested(session) }
++            }
 +        }
  
      private fun ByteArray.macString(): String =
          joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
-@@ -2498,7 +2847,7 @@
+@@ -2498,7 +2827,7 @@
      }
  
      private fun closeReceivers() {
@@ -3843,7 +3947,7 @@
              try {
                  it.close()
              } catch (_: Exception) {
-@@ -2507,6 +2856,7 @@
+@@ -2507,6 +2836,7 @@
          }
          permissionCloseable = null
          attachCloseable = null
@@ -3851,7 +3955,7 @@
          ch341PermissionCloseable = null
      }
  
-@@ -2524,6 +2874,9 @@
+@@ -2524,6 +2854,9 @@
          }
      }
  
@@ -3861,7 +3965,7 @@
      private fun requireUsbManager(): UsbManager =
          usbManager ?: throw IOException("USB service is unavailable on this device")
  
-@@ -2536,7 +2889,7 @@
+@@ -2536,7 +2869,7 @@
  
      private fun fail(error: Throwable, generation: Int? = null) {
          synchronized(wirelessResourceLock) {
@@ -3870,7 +3974,7 @@
              val wireless = config.transport == CarPlayTransport.WIRELESS
              if (wireless) {
                  if (!wirelessFailureReported.compareAndSet(false, true)) return
-@@ -2561,11 +2914,11 @@
+@@ -2561,11 +2894,11 @@
  
      private fun connectionDiagnostic(message: String) {
          try {
@@ -3885,7 +3989,7 @@
          }
      }
  
-@@ -2589,9 +2942,23 @@
+@@ -2589,9 +2922,23 @@
      private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
          if (closed) return
          mainHandler.post {
@@ -3910,7 +4014,7 @@
                  uiListener?.onDebugLog(status.debugLogMessage())
                  uiStatusReporter?.invoke(status)
              }
-@@ -2618,6 +2985,12 @@
+@@ -2618,6 +2965,12 @@
              "STEP bt/rfcomm: connecting to the iPhone iAP2 RFCOMM service"
          CarPlayStatus.RunningWireless ->
              "STEP iap2/wireless: Bluetooth control loop running"
@@ -4070,6 +4174,36 @@
          )
      }
  
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/transport/CloseSequence.kt
+@@ -0,0 +1,27 @@
++package com.shilapi.xcertplay.transport
++
++import java.io.IOException
++
++/** 关闭步骤互不短路；调用者在驱动／状态锁外等待，并把汇总失败交给原资源门禁。 */
++internal class CloseSequence(private val component: String) {
++    private val failures = mutableListOf<Throwable>()
++    fun step(action: () -> Unit) {
++        try { action() } catch (error: Throwable) {
++            if (error is InterruptedException) Thread.currentThread().interrupt()
++            failures.add(error)
++        }
++    }
++    fun await(thread: Thread, timeoutMillis: Long) {
++        require(timeoutMillis > 0)
++        if (thread !== Thread.currentThread()) step { thread.join(timeoutMillis) }
++        if (thread.isAlive) {
++            step { thread.interrupt() }
++            failures.add(IOException("$component worker still closing"))
++        }
++    }
++    fun finish() {
++        if (failures.isNotEmpty()) throw IOException("$component close incomplete").also { error ->
++            failures.forEach(error::addSuppressed)
++        }
++    }
++}
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2FileTransferReceiver.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2FileTransferReceiver.kt
 @@ -2,15 +2,13 @@
@@ -4245,15 +4379,28 @@
          else remainingMillis
 --- a/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2UsbMuxHost.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/transport/Iap2UsbMuxHost.kt
-@@ -72,6 +72,7 @@
-             } catch (_: InterruptedException) {
-                 Thread.currentThread().interrupt()
-             }
-+            if (readerThread.isAlive) throw java.io.IOException("USBMUX reader still closing")
+@@ -64,15 +64,11 @@
+             closed = true
+             connections.values.toList().also { connections.clear() }
          }
+-        activeConnections.forEach(Iap2UsbMuxTcpConnection::closeFromHost)
+-        pipe.close()
+-        if (::readerThread.isInitialized && Thread.currentThread() !== readerThread) {
+-            try {
+-                readerThread.join(readTimeoutMillis + CLOSE_JOIN_MARGIN_MILLIS)
+-            } catch (_: InterruptedException) {
+-                Thread.currentThread().interrupt()
+-            }
+-        }
++        val closing = CloseSequence("USBMUX")
++        activeConnections.forEach { closing.step { it.closeFromHost() } }
++        closing.step { pipe.close() }
++        if (::readerThread.isInitialized) closing.await(readerThread, readTimeoutMillis + CLOSE_JOIN_MARGIN_MILLIS)
++        closing.finish()
      }
  
-@@ -142,8 +143,7 @@
+     internal fun sendTcp(
+@@ -142,8 +138,7 @@
              Log.i("xcertplay-usb", "discarding stale usbmux TCP frame before version reply")
          }
          Log.i("xcertplay-usb", "usbmux version accepted: ${reply.word8}")
@@ -4295,7 +4442,7 @@
          deadlineNanos.authenticated()
  
          send(powerSourceUpdate(availableCurrentMilliAmps), deadlineNanos)
-@@ -57,17 +63,30 @@
+@@ -57,17 +63,35 @@
  
          var forwardedFrames = 0
          var carPlayStartSessions = 0
@@ -4312,6 +4459,8 @@
                  }
 +                // 每轮消费一次事件，即使尚未首次启动或已达上限，也不积攒旧恢复信号。
 +                val recovered = dataPathRecovery?.invoke() == true
++                if (isCancelled() || session.isClosed) return Iap2WiredControlResult(
++                    Iap2WiredControlTerminal.CHANNEL_CLOSED, stage, forwardedFrames, carPlayStartSessions)
 +                if (recovered && carPlayStartSessions > 0 && recoveryRetries < 3 &&
 +                    !isCancelled() && !session.isClosed && remainingMillis(deadlineNanos) > 0) {
 +                    send(carPlayStartSession(endpoint), deadlineNanos)
@@ -4322,12 +4471,15 @@
                  location.tick { send(it, deadlineNanos) }
                  vehicleStatus.tick { send(it, deadlineNanos) }
 -                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
-+                val normalPoll = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
++                val pollBudget = remainingMillis(deadlineNanos)
++                if (pollBudget == 0L) return Iap2WiredControlResult(
++                    Iap2WiredControlTerminal.TIMED_OUT, stage, forwardedFrames, carPlayStartSessions)
++                val normalPoll = vehicleStatus.pollTimeout(location.pollTimeout(pollBudget))
 +                val pollTimeout = if (dataPathRecovery == null) normalPoll else minOf(normalPoll, 500L)
                  val incoming = session.recv(pollTimeout)
                  if (incoming == null) {
                      if (session.isClosed) {
-@@ -91,10 +110,13 @@
+@@ -91,10 +115,13 @@
  
                  when (incoming.messageId) {
                      CARPLAY_AVAILABILITY -> {
@@ -4576,15 +4728,21 @@
              } catch (_: TimeoutException) {
                  drainCancelledRead(request)
                  return@synchronized null
-@@ -423,7 +446,6 @@
+@@ -422,9 +445,10 @@
+             closed = true
              pendingRead
          }
-         requestToCancel?.cancel()
+-        requestToCancel?.cancel()
 -        requests.close()
-         connection.close()
+-        connection.close()
++        val closing = CloseSequence("USB pipe")
++        closing.step { requestToCancel?.cancel() }
++        closing.step { connection.close() }
++        closing.finish()
      }
  
-@@ -441,7 +463,7 @@
+     private fun checkOpen() {
+@@ -441,7 +465,7 @@
              throw failSession("Android could not cancel timed out USBMUX read request")
          }
          val completed = try {
@@ -4853,18 +5011,43 @@
          }
      }
  
-@@ -138,9 +146,9 @@
-                 // Best-effort release; the connection close below is authoritative.
-             }
+@@ -121,26 +129,16 @@
+             closed = true
+             readRequest
          }
+-        // Wakes a reader blocked in requestWait(); it then observes the closed state.
+-        runCatching { requestToClose?.cancel() }
+-        statusThread?.let { thread ->
+-            thread.interrupt()
+-            try {
+-                thread.join(STATUS_POLL_TIMEOUT_MILLIS + 250L)
+-            } catch (_: InterruptedException) {
+-                Thread.currentThread().interrupt()
+-            }
+-        }
++        val closing = CloseSequence("NCM")
++        closing.step { requestToClose?.cancel() }
++        closing.step { statusThread?.interrupt() }
+         for (usbInterface in claimedInterfaces.asReversed()) {
+-            try {
+-                connection.releaseInterface(usbInterface)
+-            } catch (_: RuntimeException) {
+-                // Best-effort release; the connection close below is authoritative.
+-            }
+-        }
 -        readRequests.close()
-         connection.close()
-         runCatching { requestToClose?.close() }
-+        if (statusThread?.isAlive == true) throw java.io.IOException("NCM status worker still closing")
+-        connection.close()
+-        runCatching { requestToClose?.close() }
++            closing.step { connection.releaseInterface(usbInterface) }
++        }
++        closing.step { connection.close() }
++        closing.step { requestToClose?.close() }
++        statusThread?.let { closing.await(it, STATUS_POLL_TIMEOUT_MILLIS + 250L) }
++        closing.finish()
      }
  
      private fun drainStatus(endpoint: UsbEndpoint) {
-@@ -238,7 +246,7 @@
+@@ -238,7 +236,7 @@
                  }
                  if (!readQueued) {
                      directReadBuffer.clear()
@@ -4873,7 +5056,7 @@
                      if (!queued.queued) throw failSession(
                          "Android could not queue the NCM read request (api=${Build.VERSION.SDK_INT} " +
                              "endpoint=${describeUsbEndpoint(inEndpoint)} firstBytes=${queued.firstBytes} " +
-@@ -252,7 +260,7 @@
+@@ -252,7 +250,7 @@
          } catch (error: RuntimeException) {
              throw failSession("NCM read failed", error)
          }
@@ -4882,7 +5065,7 @@
          acceptedFallback?.let { queued ->
              runCatching {
                  onDiagnostic(
-@@ -264,7 +272,7 @@
+@@ -264,7 +262,7 @@
          }
          try {
              val completed = try {
@@ -5102,3 +5285,105 @@
 -        }
 -    }
 -}
+--- /dev/null
++++ b/shared/src/main/java/com/shilapi/xcertplay/transport/WiredPairingSession.kt
+@@ -0,0 +1,99 @@
++package com.shilapi.xcertplay.transport
++
++import java.security.MessageDigest
++
++/** 一次 USB 尝试共用身份查询与 Pair 预算；缓存只保存配对材料，不保存活动连接。 */
++internal class WiredPairingSession(
++    private val client: LockdownPairingClient,
++    private val label: String,
++    private val hostId: String,
++    private val systemBuid: String,
++    timeoutMillis: Long,
++    private val isCurrent: () -> Boolean,
++    private val load: (ByteArray, () -> Boolean) -> LockdownPairRecord?,
++    private val save: (LockdownPairRecord, () -> Boolean) -> Unit,
++    private val clear: (ByteArray, () -> Boolean) -> Unit,
++    private val report: (String) -> Unit,
++    private val clock: () -> Long = System::nanoTime,
++) {
++    private val deadline = clock() + timeoutMillis * 1_000_000L
++    private var phoneKey: ByteArray? = null
++    private var currentRecord: LockdownPairRecord? = null
++    private var cached = false
++    private var repaired = false
++
++    private fun checkCurrent() {
++        if (!isCurrent()) throw LockdownPairingException.Cancelled
++    }
++    private fun remaining(): Long {
++        val millis = (deadline - clock()) / 1_000_000L
++        if (millis <= 0) throw LockdownPairingException.TimedOut
++        return millis
++    }
++    private fun event(message: String) { runCatching { report(message) } }
++    private fun <T> timed(stage: String, operation: () -> T): T {
++        checkCurrent()
++        remaining()
++        val start = clock()
++        var succeeded = false
++        try {
++            val result = operation()
++            try { checkCurrent(); remaining() } catch (error: Throwable) {
++                if (result is AutoCloseable) runCatching { result.close() }
++                throw error
++            }
++            succeeded = true
++            return result
++        } finally {
++            event("wired stage=$stage result=${if (succeeded) "COMPLETED" else "FAILED"} elapsedMs=${(clock() - start) / 1_000_000L}")
++        }
++    }
++
++    fun record(): LockdownPairRecord {
++        checkCurrent()
++        currentRecord?.let { return it }
++        val key = phoneKey ?: timed("PHONE_IDENTITY") {
++            client.readDevicePublicKey(label, minOf(remaining(), 5_000L)) { !isCurrent() }
++        }.also { phoneKey = it.copyOf() }
++        val found = timed("PAIR_CACHE") { load(key.copyOf(), isCurrent) }
++        val valid = found?.takeIf { MessageDigest.isEqual(it.devicePublicKeyPem, key) }
++        event("wired stage=PAIR_CACHE outcome=${if (valid != null) "HIT" else if (found == null) "MISS" else "INVALID"}")
++        cached = valid != null
++        return (valid ?: newRecord(key)).also { currentRecord = it }
++    }
++
++    private fun newRecord(key: ByteArray): LockdownPairRecord {
++        val record = timed("PAIR") { client.pair(label, hostId, systemBuid, remaining()) { !isCurrent() }.pairRecord }
++        if (!MessageDigest.isEqual(record.devicePublicKeyPem, key))
++            throw LockdownPairingException.InvalidResponse("Phone identity changed during pairing")
++        timed("PAIR_SAVE") { save(record, isCurrent) }
++        return record
++    }
++
++    fun openCarKit(carKit: LockdownCarKitClient): BlockingDuplexByteStream {
++        var record = record()
++        try {
++            return timed("CARKIT_OPEN") { carKit.open(record, label) { !isCurrent() } }
++        } catch (error: Throwable) {
++            if (!cached || repaired || !rejected(error)) throw error
++            checkCurrent()
++            repaired = true
++            event("wired stage=PAIR_CACHE outcome=REJECTED")
++            timed("PAIR_CLEAR") { clear(phoneKey!!.copyOf(), isCurrent) }
++            record = newRecord(phoneKey!!)
++            currentRecord = record
++            cached = false
++            return timed("CARKIT_OPEN") { carKit.open(record, label) { !isCurrent() } }
++        }
++    }
++
++    private fun rejected(error: Throwable): Boolean {
++        var cause: Throwable? = error
++        while (cause != null) {
++            val message = cause.message.orEmpty()
++            if (message.contains("InvalidPairRecord", true) || message.contains("InvalidHostID", true)) return true
++            cause = cause.cause
++        }
++        return false
++    }
++}

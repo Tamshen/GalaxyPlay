@@ -69,4 +69,27 @@ class WiredResourcesTest {
             assertEquals(count, statuses.size)
         }
     }
+    @Test fun closeFailureKeepsTheReconnectGateAndUnknownTeardownResult() {
+        withController(expectClean = false) { controller, statuses ->
+            val owner = ReflectionHelpers.getField<WiredResources>(controller, "wiredResources")
+            owner.own("NCM", Closeable { throw IOException("test close failure") })
+            owner.close()
+            ReflectionHelpers.callInstanceMethod<Unit>(controller, "startIphone")
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            assertSame(owner, ReflectionHelpers.getField<WiredResources>(controller, "wiredResources"))
+            assertTrue(statuses.last() is CarPlayStatus.Failed)
+            assertEquals(1, ReflectionHelpers.getField<java.util.concurrent.atomic.AtomicInteger>(controller, "closeFailures").get())
+        }
+    }
+    @Test fun startupTimingsAreBoundedToOneResourceOwnerAndOneMilestone() {
+        val old = WiredResources(); val next = WiredResources()
+        assertNull(old.startupElapsedMillis("FIRST_TCP"))
+        old.beginStartup(); next.beginStartup()
+        assertNotNull(old.startupElapsedMillis("FIRST_TCP"))
+        assertNull(old.startupElapsedMillis("FIRST_TCP"))
+        old.close()
+        assertNull(old.startupElapsedMillis("FIRST_FRAME"))
+        assertNotNull(next.startupElapsedMillis("FIRST_FRAME"))
+        next.close()
+    }
 }

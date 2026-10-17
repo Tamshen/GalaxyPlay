@@ -76,6 +76,8 @@ class Iap2WiredControlClient(
                 }
                 // 每轮消费一次事件，即使尚未首次启动或已达上限，也不积攒旧恢复信号。
                 val recovered = dataPathRecovery?.invoke() == true
+                if (isCancelled() || session.isClosed) return Iap2WiredControlResult(
+                    Iap2WiredControlTerminal.CHANNEL_CLOSED, stage, forwardedFrames, carPlayStartSessions)
                 if (recovered && carPlayStartSessions > 0 && recoveryRetries < 3 &&
                     !isCancelled() && !session.isClosed && remainingMillis(deadlineNanos) > 0) {
                     send(carPlayStartSession(endpoint), deadlineNanos)
@@ -85,7 +87,10 @@ class Iap2WiredControlClient(
                 }
                 location.tick { send(it, deadlineNanos) }
                 vehicleStatus.tick { send(it, deadlineNanos) }
-                val normalPoll = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val pollBudget = remainingMillis(deadlineNanos)
+                if (pollBudget == 0L) return Iap2WiredControlResult(
+                    Iap2WiredControlTerminal.TIMED_OUT, stage, forwardedFrames, carPlayStartSessions)
+                val normalPoll = vehicleStatus.pollTimeout(location.pollTimeout(pollBudget))
                 val pollTimeout = if (dataPathRecovery == null) normalPoll else minOf(normalPoll, 500L)
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {

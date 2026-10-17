@@ -445,8 +445,10 @@ class Iap2UsbSession internal constructor(
             closed = true
             pendingRead
         }
-        requestToCancel?.cancel()
-        connection.close()
+        val closing = CloseSequence("USB pipe")
+        closing.step { requestToCancel?.cancel() }
+        closing.step { connection.close() }
+        closing.finish()
     }
 
     private fun checkOpen() {

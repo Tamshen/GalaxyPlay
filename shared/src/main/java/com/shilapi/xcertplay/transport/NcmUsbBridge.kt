@@ -129,26 +129,16 @@ class NcmUsbBridge internal constructor(
             closed = true
             readRequest
         }
-        // Wakes a reader blocked in requestWait(); it then observes the closed state.
-        runCatching { requestToClose?.cancel() }
-        statusThread?.let { thread ->
-            thread.interrupt()
-            try {
-                thread.join(STATUS_POLL_TIMEOUT_MILLIS + 250L)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-        }
+        val closing = CloseSequence("NCM")
+        closing.step { requestToClose?.cancel() }
+        closing.step { statusThread?.interrupt() }
         for (usbInterface in claimedInterfaces.asReversed()) {
-            try {
-                connection.releaseInterface(usbInterface)
-            } catch (_: RuntimeException) {
-                // Best-effort release; the connection close below is authoritative.
-            }
+            closing.step { connection.releaseInterface(usbInterface) }
         }
-        connection.close()
-        runCatching { requestToClose?.close() }
-        if (statusThread?.isAlive == true) throw java.io.IOException("NCM status worker still closing")
+        closing.step { connection.close() }
+        closing.step { requestToClose?.close() }
+        statusThread?.let { closing.await(it, STATUS_POLL_TIMEOUT_MILLIS + 250L) }
+        closing.finish()
     }
 
     private fun drainStatus(endpoint: UsbEndpoint) {

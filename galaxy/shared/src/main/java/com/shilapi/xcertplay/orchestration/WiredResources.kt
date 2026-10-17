@@ -13,6 +13,16 @@ internal class WiredResources(
     private val lock = Any()
     private val active = LinkedHashMap<AutoCloseable, String>()
     private var closed = false
+    private var startupNs = 0L
+    private val startupMilestones = mutableSetOf<String>()
+    fun beginStartup() = synchronized(lock) {
+        if (!closed && startupNs == 0L) startupNs = System.nanoTime()
+    }
+    fun startupElapsedMillis(stage: String): Long? = synchronized(lock) {
+        require(stage == "FIRST_TCP" || stage == "FIRST_FRAME")
+        if (closed || startupNs == 0L || !startupMilestones.add(stage)) null
+        else (System.nanoTime() - startupNs) / 1_000_000L
+    }
     private val released = CountDownLatch(1)
     val isClosed get() = synchronized(lock) { closed }
     fun own(name: String, resource: AutoCloseable): Boolean {

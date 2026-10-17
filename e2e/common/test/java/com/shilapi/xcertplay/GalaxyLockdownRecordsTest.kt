@@ -75,12 +75,14 @@ class GalaxyLockdownRecordsTest {
         assertEquals(setOf("keep"), prefs.all.keys)
     }
 
-    private fun failingStore(): GalaxyLockdownRecords {
+    private fun failingStore(shouldFail: () -> Boolean = { true }): GalaxyLockdownRecords {
         val failing = mock(SharedPreferences::class.java) { call ->
             if (call.method.name == "edit") {
                 val delegate = prefs.edit()
                 mock(SharedPreferences.Editor::class.java) { edit ->
-                    if (edit.method.name == "commit") { delegate.apply(); false }
+                    if (edit.method.name == "commit") {
+                        if (shouldFail()) { delegate.apply(); false } else delegate.commit()
+                    }
                     else edit.method.invoke(delegate, *edit.arguments)
                 }
             } else call.method.invoke(prefs, *call.arguments)
@@ -109,5 +111,32 @@ class GalaxyLockdownRecordsTest {
         try { broken.clear(a.devicePublicKeyPem); fail() } catch (_: LockdownPairingException.PersistenceFailed) { }
         assertNull(broken.load(a.devicePublicKeyPem))
         assertEquals("host2", broken.load(b.devicePublicKeyPem)?.hostId)
+    }
+
+    @Test fun successfulRetryReplacesTheUnconfirmedMemoryRecord() {
+        var failWrite = true
+        val store = failingStore { failWrite }
+        try { store.save(a); fail() } catch (_: LockdownPairingException.PersistenceFailed) { }
+        assertNull(store.load(a.devicePublicKeyPem))
+        failWrite = false; store.save(a)
+        assertEquals("host1", store.load(a.devicePublicKeyPem)?.hostId)
+    }
+
+    @Test fun perPhoneRecordKeysAreExcludedFromConfigurationExports() {
+        records.save(a); records.save(b)
+        assertTrue(prefs.all.keys.all { !GalaxyConfigurationFields.allowed("xcertplay_airplay", it) })
+    }
+
+    @Test fun cancellationImmediatelyBeforeCommitDoesNotChangeTheStore() {
+        var checks = 0
+        try { records.save(a) { ++checks < 2 }; fail() } catch (_: LockdownPairingException.Cancelled) { }
+        assertTrue(prefs.all.isEmpty())
+    }
+
+    @Test fun storageDiagnosticsDoNotContainPhoneIdentityOrPairingMaterial() {
+        val logs = mutableListOf<String>()
+        val store = GalaxyLockdownRecords(prefs, logs::add)
+        store.save(a); store.load(a.devicePublicKeyPem); store.clear(a.devicePublicKeyPem)
+        assertEquals(listOf("LOCKDOWN_STORE outcome=SAVED", "LOCKDOWN_STORE outcome=HIT", "LOCKDOWN_STORE outcome=CLEARED"), logs)
     }
 }

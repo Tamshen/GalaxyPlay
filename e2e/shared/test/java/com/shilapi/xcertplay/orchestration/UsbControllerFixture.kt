@@ -9,7 +9,7 @@ import org.robolectric.util.ReflectionHelpers
 import java.lang.reflect.Proxy
 
 /** 共享 Android USB 测试边界；不启动真实认证或手机协议。 */
-internal fun withController(check: (CarPlayController, MutableList<CarPlayStatus>) -> Unit) {
+internal fun withController(expectClean: Boolean = true, check: (CarPlayController, MutableList<CarPlayStatus>) -> Unit) {
     val statuses = mutableListOf<CarPlayStatus>()
     val config = CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL,
         identification = Iap2IdentificationConfig("test", "test", "test", "test", "1", "1", 3))
@@ -17,7 +17,10 @@ internal fun withController(check: (CarPlayController, MutableList<CarPlayStatus
         AirPlayConfig("test", "00:00:00:00:00:01", "00:00:00:00:00:02", "1", AirPlayDisplayConfig(800, 480), port = 0),
         AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
         object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, { statuses += it })
-    try { check(controller, statuses) } finally { controller.close(); assertTrue(controller.awaitClosed(4000)) }
+    try { check(controller, statuses) } finally {
+        controller.close()
+        org.junit.Assert.assertEquals(expectClean, controller.awaitClosed(4000))
+    }
 }
 
 internal fun gate(controller: CarPlayController): IphoneUsbPermissionGate = ReflectionHelpers.getField(controller, "iphonePermission")

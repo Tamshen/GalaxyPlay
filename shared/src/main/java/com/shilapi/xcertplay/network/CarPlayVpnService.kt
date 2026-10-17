@@ -52,6 +52,7 @@ class CarPlayVpnService : VpnService() {
         val media: AirPlayMediaHandler,
         val additionalAddresses: List<InetAddress> = emptyList(),
         val listenerIdentity: AirPlayListenerIdentity? = null,
+        val onTcpAccepted: () -> Unit = {},
     )
 
     private val binder = LocalBinder()
@@ -82,6 +83,7 @@ class CarPlayVpnService : VpnService() {
         media: AirPlayMediaHandler,
         owner: Any? = null,
         isCurrent: () -> Boolean = { true },
+        onTcpAccepted: () -> Unit = {},
     ): AttachResult {
         if (!isCurrent()) return AttachResult.Failed("Wired attempt cancelled")
         if (active.get()) {
@@ -120,7 +122,7 @@ class CarPlayVpnService : VpnService() {
 
             startAirPlayServer(
                 generation,
-                AirPlayAttachment(address, config, identity, pairings, mfi, listener, media),
+                AirPlayAttachment(address, config, identity, pairings, mfi, listener, media, onTcpAccepted = onTcpAccepted),
             )
             if (!isCurrent()) throw IOException("Wired attempt cancelled")
             AttachResult.Started
@@ -173,8 +175,11 @@ class CarPlayVpnService : VpnService() {
 
     /** 旧任务清理只能释放自己的接入；不调用控制器锁，避免关闭与接入反向等待。 */
     @Synchronized
-    fun detachWired(owner: Any) {
-        if (wiredOwner === owner) releaseLocked()
+    fun detachWired(owner: Any): Array<Thread> {
+        if (wiredOwner !== owner) return emptyArray()
+        val workers = acceptWorkers.toTypedArray()
+        releaseLocked()
+        return workers
     }
 
     @Synchronized
@@ -189,19 +194,19 @@ class CarPlayVpnService : VpnService() {
     }
 
     /** 非主线程等实际 accept 退出；关闭请求与 worker 退出分别判定。 */
-    fun awaitDetached(timeoutMillis: Long): Boolean {
+    fun awaitDetached(timeoutMillis: Long, workers: Array<out Thread> = acceptWorkers.toTypedArray()): Boolean {
         require(timeoutMillis >= 0)
         val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
         // Kotlin 小集合转换会先读 size 再取首项；并发退出可使该首项已经消失。
         // ConcurrentHashMap 的数组快照容忍并发删除，再按同一总预算等待。
-        for (worker in acceptWorkers.toTypedArray()) {
+        for (worker in workers) {
             if (worker === Thread.currentThread()) return false
             val remaining = deadline - System.nanoTime()
-            if (remaining <= 0) return acceptWorkers.none { it.isAlive }
+            if (remaining <= 0) return workers.none { it.isAlive }
             try { worker.join((remaining / 1_000_000L).coerceAtLeast(1L)) }
             catch (_: InterruptedException) { Thread.currentThread().interrupt(); return false }
         }
-        return acceptWorkers.none { it.isAlive }
+        return workers.none { it.isAlive }
     }
 
     fun isAttached(): Boolean = active.get() && attachment != null
@@ -271,6 +276,7 @@ class CarPlayVpnService : VpnService() {
                         return
                     }
                     val internalPeer = isInternalAirPlayPeer(socket.inetAddress, socket.localAddress)
+                    runCatching { current.onTcpAccepted() }
                     current.listenerIdentity?.let { owner ->
                         current.listener.onTcpAccepted(AirPlayTcpAccepted(
                             owner, internalPeer, acceptedAtNanos,
@@ -329,16 +335,10 @@ class CarPlayVpnService : VpnService() {
     }
 
     private fun closeSessionsLocked() {
-        synchronized(sessionsLock) {
-            sessions.toList().forEach { session ->
-                try {
-                    session.close()
-                } catch (error: Exception) {
-                    Log.w(TAG, "AirPlay session replacement failed", error)
-                }
-            }
-            sessions.clear()
-        }
+        val closing = com.shilapi.xcertplay.transport.CloseSequence("AirPlay sessions")
+        val owned = synchronized(sessionsLock) { sessions.toList().also { sessions.clear() } }
+        owned.forEach { session -> closing.step { session.close() } }
+        closing.finish()
     }
 
     private fun onTransportError(
@@ -373,15 +373,22 @@ class CarPlayVpnService : VpnService() {
         active.set(false)
         attachment = null
         wiredOwner = null
-        serverSocket?.close()
+        val closing = com.shilapi.xcertplay.transport.CloseSequence("AirPlay transport")
+        val primary = serverSocket
+        val extra = additionalServers
+        val oldBridge = bridge
+        val oldTun = tun
         serverSocket = null
-        additionalServers.forEach { it.close() }
         additionalServers = emptyList()
-        closeSessionsLocked()
-        try { bridge?.close() } finally {
-            bridge = null
-            try { tun?.close() } finally { tun = null }
-        }
+        bridge = null
+        tun = null
+        // 某个监听／会话关闭失败也必须继续解除 NCM 和 TUN，失败仍向资源门禁传播。
+        closing.step { primary?.close() }
+        extra.forEach { server -> closing.step { server.close() } }
+        closing.step { closeSessionsLocked() }
+        closing.step { oldBridge?.close() }
+        closing.step { oldTun?.close() }
+        closing.finish()
     }
 
     companion object {

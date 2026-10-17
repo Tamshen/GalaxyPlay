@@ -22,17 +22,21 @@ class WiredGenerationTest {
     private fun generation(c: CarPlayController): Int = ReflectionHelpers.getField<AtomicInteger>(c, "iphoneGeneration").get()
     private fun record() = LockdownPairRecord.restore("test", "test", "00:00:00:00:00:01",
         byteArrayOf(1), byteArrayOf(2), byteArrayOf(3), byteArrayOf(4), byteArrayOf(5), byteArrayOf(6))
-    private fun pair(c: CarPlayController, client: LockdownPairingClient, owner: WiredResources, gen: Int): Any? =
-        CarPlayController::class.java.getDeclaredMethod("pairNewRecord", LockdownPairingClient::class.java,
-            WiredResources::class.java, Int::class.javaPrimitiveType, ByteArray::class.java,
-            Long::class.javaPrimitiveType).apply { isAccessible = true }.invoke(c, client, owner, gen, byteArrayOf(1), 5_000L)
+    private fun client(): LockdownPairingClient = mock(LockdownPairingClient::class.java).also {
+        `when`(it.readDevicePublicKey(anyString(), anyLong(), any<() -> Boolean>() ?: { false })).thenReturn(byteArrayOf(1))
+    }
+    private fun pair(c: CarPlayController, client: LockdownPairingClient, owner: WiredResources, gen: Int): Any? {
+        val session = CarPlayController::class.java.getDeclaredMethod("pairingSession", LockdownPairingClient::class.java,
+            WiredResources::class.java, Int::class.javaPrimitiveType).apply { isAccessible = true }.invoke(c, client, owner, gen)
+        return session.javaClass.getDeclaredMethod("record").invoke(session)
+    }
 
     @Test fun pairingResultReturnedAfterInvalidationCannotBeSaved() = withController { controller, _ ->
         val saved = mutableListOf<LockdownPairRecord>()
-        ReflectionHelpers.setField(controller, "savePairRecord", { value: LockdownPairRecord -> saved.add(value); Unit })
+        ReflectionHelpers.setField(controller, "savePairRecord", { value: LockdownPairRecord, _: () -> Boolean -> saved.add(value); Unit })
         val entered = CountDownLatch(1)
         val finish = CountDownLatch(1)
-        val client = mock(LockdownPairingClient::class.java)
+        val client = client()
         `when`(client.pair(anyString(), anyString(), anyString(), anyLong(), any<() -> Boolean>() ?: { false })).thenAnswer {
             entered.countDown(); assertTrue(finish.await(2, TimeUnit.SECONDS)); PairedRecord(record(), null)
         }
@@ -50,7 +54,7 @@ class WiredGenerationTest {
 
     @Test fun pairingPollUsesResourceOwnershipAsWellAsControllerClose() = withController { controller, _ ->
         val owner = resources(controller); val gen = generation(controller)
-        val client = mock(LockdownPairingClient::class.java)
+        val client = client()
         `when`(client.pair(anyString(), anyString(), anyString(), anyLong(), any<() -> Boolean>() ?: { false })).thenAnswer {
             val cancelled = it.getArgument<() -> Boolean>(4)
             assertFalse(cancelled())
@@ -124,5 +128,23 @@ class WiredGenerationTest {
         ReflectionHelpers.callInstanceMethod<Unit>(controller, "invalidateIphonePermission")
         count++; assertFalse(signal())
         ReflectionHelpers.setField(controller, "vpnService", null)
+    }
+
+    @Test fun pendingDiskCommitCannotBlockTheCloseRequest() = withController { controller, _ ->
+        val entered = CountDownLatch(1); val finish = CountDownLatch(1); val closed = CountDownLatch(1)
+        ReflectionHelpers.setField(controller, "savePairRecord", { _: LockdownPairRecord, _: () -> Boolean ->
+            entered.countDown(); assertTrue(finish.await(2, TimeUnit.SECONDS))
+        })
+        val client = client()
+        `when`(client.pair(anyString(), anyString(), anyString(), anyLong(), any<() -> Boolean>() ?: { false }))
+            .thenReturn(PairedRecord(record(), null))
+        val owner = resources(controller); val gen = generation(controller)
+        val worker = Thread { try { pair(controller, client, owner, gen) } catch (_: InvocationTargetException) { } }
+        worker.start(); assertTrue(entered.await(2, TimeUnit.SECONDS))
+        val closer = Thread { controller.close(); closed.countDown() }
+        closer.start()
+        try { assertTrue("关闭请求不能等待磁盘提交", closed.await(500, TimeUnit.MILLISECONDS)) }
+        finally { finish.countDown(); worker.join(2_000); closer.join(2_000) }
+        assertFalse(worker.isAlive); assertFalse(closer.isAlive)
     }
 }
