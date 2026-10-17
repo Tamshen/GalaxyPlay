@@ -8,15 +8,22 @@ import java.lang.reflect.Method;
 public class SdkSubclassInstrumentation extends Instrumentation {
     private boolean wirelessPerformance;
     private boolean wirelessPrepare;
+    private boolean performance;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         wirelessPerformance = arguments != null && "wireless-performance".equals(arguments.getString("suite"));
         wirelessPrepare = arguments != null && "wireless-prepare".equals(arguments.getString("suite"));
+        performance = arguments != null && "performance-monitor".equals(arguments.getString("suite"));
         start();
     }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
+            if (performance) {
+                com.shilapi.xcertplay.GalaxyPerformanceAndroidChecks.run(getTargetContext(), this);
+                result.putString("stream", "PERFORMANCE_ANDROID11_OK FOUR_IDLE_MODES TOUCH_THROUGH FRAME_COUNTERS BINDER_PARCEL CLEAN_STOP");
+                finish(-1, result); return;
+            }
             if (wirelessPrepare) {
                 com.shilapi.xcertplay.GalaxyWirelessPerformanceChecks.prepare(getTargetContext());
                 result.putString("stream", "WIRELESS_ADB_PREPARED"); finish(-1, result); return;
@@ -32,7 +39,7 @@ public class SdkSubclassInstrumentation extends Instrumentation {
         }
         catch (Throwable error) {
             result.putString("stream", "SDK_SUBCLASS_FAILED " +
-                ((wirelessPerformance || wirelessPrepare) ? android.util.Log.getStackTraceString(error) : error));
+                ((wirelessPerformance || wirelessPrepare || performance) ? android.util.Log.getStackTraceString(error) : error));
             finish(0, result);
         }
     }

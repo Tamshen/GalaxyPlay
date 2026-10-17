@@ -29,6 +29,19 @@ internal class VideoStats(
     private var touchSamples = 0
     private var touchLatencySumNs = 0L
     private var maxTouchLatencyNs = 0L
+    private val epoch = epochs.incrementAndGet()
+    private var totalReceived = 0L
+    private var totalInput = 0L
+    private var totalSubmitted = 0L
+    private var totalPresented = 0L
+    private var totalDropped = 0L
+    private var queueFrames = 0
+    private var queueBytes = 0L
+
+    @Synchronized fun performance(stream: Int, codec: String?, width: Int, height: Int, fps: Int) =
+        GalaxyVideoPerformance(stream, epoch, totalReceived + received, totalInput + input,
+            totalSubmitted + submitted, totalPresented + rendered,
+            totalDropped + dropped, queueFrames, queueBytes, codec, width, height, fps)
 
     @Synchronized fun onReceived(size: Int) {
         val now = nanoTime()
@@ -47,6 +60,7 @@ internal class VideoStats(
     }
 
     @Synchronized fun onQueued(frames: Int, bytes: Long, discarded: Int) {
+        queueFrames = frames; queueBytes = bytes
         queueHighWaterFrames = maxOf(queueHighWaterFrames, frames)
         queueHighWaterBytes = maxOf(queueHighWaterBytes, bytes)
         dropped += discarded
@@ -91,6 +105,8 @@ internal class VideoStats(
         TouchLatencyProbe.maxSendNs = 0
         Log.i(TAG, line)
         windowStartNs = now
+        totalReceived += received; totalInput += input; totalSubmitted += submitted
+        totalPresented += rendered; totalDropped += dropped
         received = 0; rendered = 0; recoveries = 0; bytes = 0; maxArrivalGapNs = 0
         input = 0; submitted = 0; dropped = 0; queueHighWaterFrames = 0; queueHighWaterBytes = 0
         inputAge.clear(); decodeAge.clear(); outputAge.clear(); presentedAge.clear(); dropReasons.fill(0)
@@ -99,6 +115,7 @@ internal class VideoStats(
     }
 
     private companion object {
+        val epochs = java.util.concurrent.atomic.AtomicLong()
         const val TAG = "DiPlay-VideoStats"
         const val WINDOW_NS = 5_000_000_000L
         const val IDLE_GAP_NS = 2_000_000_000L // longer gaps are a static screen, not lag

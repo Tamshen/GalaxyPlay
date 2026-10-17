@@ -5,7 +5,7 @@ internal object L7Routes {
     val settings = setOf("settings", "settings-vehicle", "settings-auth", "settings-connection", "settings-display",
         "settings-audio", "settings-general", "settings-permissions",
         "settings-about", "settings-debug", "settings-debug-full", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-scenario", "settings-debug-steering", "settings-debug-voice", "settings-debug-codec", "settings-debug-media", "settings-debug-navigation",
-        "settings-connection-wireless", "settings-connection-usb")
+        "settings-connection-wireless", "settings-connection-usb", "settings-debug-performance")
     private val aliases = mapOf("connection" to "settings-connection", "diagnostics" to "settings-debug",
         "settings-diagnostics" to "settings-debug", "settings-debug-logs" to "settings-logs", "about" to "settings-about")
     private val roots = setOf("home", "wireless-recovery")

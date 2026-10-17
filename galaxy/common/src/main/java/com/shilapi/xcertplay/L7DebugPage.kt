@@ -45,6 +45,10 @@ internal class L7DebugPage(
                 onNavigate("settings-debug-full")
             })
         }
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.performance_title),
+                labels.text(R.string.performance_hint)) { onNavigate("settings-debug-performance") })
+        }
         val advanced = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         L7SettingsSection.add(parent) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.full_debug_logs)) { onNavigate("settings-logs") })

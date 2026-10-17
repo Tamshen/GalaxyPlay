@@ -97,6 +97,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun codecProbeOccupied() = CarPlayBackgroundSession.hasSession() || CarPlayBackgroundSession.isStopping()
     private val codecProbeController by lazy { GalaxyCodecProbeController(applicationContext, ::codecProbeOccupied) }
     private var voiceDebugPage: L7VoiceInputDebugPage? = null
+    private var performancePage: GalaxyPerformancePage? = null
     private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         voiceDebugPage?.permissionResult(granted)
         fullDebugPage?.permissionResult(granted)
@@ -322,6 +323,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         codecProbeController.close()
         steeringDebugPage?.close(); steeringDebugPage = null
         debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
+        performancePage = null
         audioModelConfirmation.close()
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
@@ -353,6 +355,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         if (!L7Agreement.require(this)) return
         steeringDebugPage?.close(); steeringDebugPage = null
         debugPage?.close(); scenarioDebugPage?.close(); scenarioDebugPage = null
+        performancePage = null
         reportingTestPage?.close(); reportingTestPage = null
         voiceDebugPage?.close(); voiceDebugPage = null
         codecProbePage?.close(); codecProbePage = null
@@ -408,6 +411,7 @@ class GalaxySettingsActivity : ComponentActivity() {
             "settings-auth", "settings-display", "settings-audio", "settings-general", "settings-permissions" -> settings(content)
             "settings-debug-scenario" -> scenarioDebugPage = GalaxyScenarioDebugPage(this, content) { page = "settings-logs"; render() }
             "settings-debug-steering" -> steeringDebugPage = L7SteeringDebugPage(this, content) { page = "settings-logs"; render() }
+            "settings-debug-performance" -> performancePage = GalaxyPerformancePage(this, content)
             "settings-debug-codec" -> codecProbePage = GalaxyCodecProbePage(this, content, codecProbeController, ::codecProbeOccupied) { page = "settings-logs"; render() }
             "settings-debug-full" -> {
                 val startNow = pendingFullDebugStart; pendingFullDebugStart = false
@@ -519,6 +523,7 @@ class GalaxySettingsActivity : ComponentActivity() {
         "settings-debug-scenario" -> R.string.debug_guide_scenario
         "settings-debug-full" -> R.string.full_debug_title
         "settings-debug-steering" -> R.string.l7_steering_title
+        "settings-debug-performance" -> R.string.performance_title
         "settings-debug-codec" -> R.string.codec_probe_title
         "settings-debug-voice" -> R.string.l7_voice_title
         "settings-debug-media" -> R.string.l7_report_media_title
@@ -949,6 +954,7 @@ class GalaxySettingsActivity : ComponentActivity() {
     private fun refreshStatus() {
         diagnosticSettings?.update(exportInProgress)
         debugPage?.update()
+        performancePage?.update()
         steeringDebugPage?.update()
         reportingTestPage?.update()
         voiceDebugPage?.update()

@@ -35,6 +35,11 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-enabled floating diagnostic log viewer for CarPlay connection debugging" />
         </service>
+        <service android:name="com.shilapi.xcertplay.GalaxyPerformanceService"
+            android:exported="false" android:stopWithTask="true" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started CPU memory and presentation-rate diagnostic monitor" />
+        </service>
         <service android:name="com.shilapi.xcertplay.L7DesktopNavigationService"
             android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="performance_title">Performance monitor</string>
+    <string name="performance_hint">Manually inspect CPU, memory and projection FPS. Off by default; sampling ends when stopped.</string>
+    <string name="performance_state">Monitor status</string>
+    <string name="performance_start">Start monitoring</string>
+    <string name="performance_stop">Stop monitoring</string>
+    <string name="performance_running">Basic monitoring active</string>
+    <string name="performance_stopped">Monitoring stopped</string>
+    <string name="performance_deep_running">Deep sampling active; returns to basic mode after 15 seconds</string>
+    <string name="performance_fallback">Basic monitoring active without overlay permission; results appear here</string>
+    <string name="performance_failed">Action incomplete. Check system permissions and retry; this page shows the actual monitor status.</string>
+    <string name="performance_overlay">Top-left performance overlay</string>
+    <string name="performance_overlay_hint">Two read-only lines. All touches pass through; projection layout stays unchanged.</string>
+    <string name="performance_permission_hint">Allow to display over other pages. Monitoring remains available here if denied.</string>
+    <string name="performance_deep">Sample threads for 15 seconds</string>
+    <string name="performance_deep_hint">Reads this process’s thread CPU counters at additional cost. Start manually when investigating stalls.</string>
+    <string name="performance_details">Monitor details</string>
+    <string name="performance_cpu_hint">App CPU time divided by elapsed time, summed per core. May exceed 100%; this is not whole-device usage.</string>
+    <string name="performance_memory">Memory</string>
+    <string name="performance_memory_hint">Java and Native heaps are separate. PSS and RSS update about every 10 seconds; do not add these values together.</string>
+    <string name="performance_fps">Projection frame rate</string>
+    <string name="performance_fps_hint">FPS counts presentation callbacks for the current projection. Receive rate is separate; missing samples appear as unknown.</string>
+    <string name="performance_no_stream">Waiting for projection; FPS unknown</string>
+    <string name="performance_cost">Monitoring overhead</string>
+    <string name="performance_cost_value">Current query %1$s ms · overlay drawing %2$s ms</string>
+    <string name="performance_budget">Monitoring took longer than expected. Hide the overlay or let deep sampling finish.</string>
+    <string name="performance_extra">GC and deep thread sampling</string>
+    <string name="performance_measurement_hint">Query and drawing times do not measure the monitor’s full CPU cost. Keep the same workload when comparing off, basic, overlay and deep modes. Stopped values are history; restarting clears them.</string>
+    <string name="performance_notification">Manually monitoring CPU, memory and projection FPS. Stop at any time.</string>
+</resources>

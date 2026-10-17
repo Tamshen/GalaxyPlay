@@ -58,6 +58,7 @@ internal object L7AppExit {
         L7ProbeRunner.stop()
         L7DesktopNavigation.stop(context)
         L7DebugOverlayService.stop(context)
+        GalaxyPerformanceService.stop(context)
         var completed = false
         val finish = Runnable {
             if (!completed) { completed = true; completion() }
@@ -88,5 +89,6 @@ internal object L7AppExit {
         context.stopService(Intent(context, DiPlaySessionService::class.java))
         context.stopService(Intent(context, CarPlayVpnService::class.java))
         L7DebugOverlayService.stop(context)
+        GalaxyPerformanceService.stop(context)
     }
 }

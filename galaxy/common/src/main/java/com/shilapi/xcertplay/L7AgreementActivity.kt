@@ -92,6 +92,7 @@ class L7AgreementActivity : ComponentActivity() {
         RemoteLogUpload.cancel()
         L7DesktopNavigation.stop(context)
         L7DebugOverlayService.stop(context)
+        GalaxyPerformanceService.stop(context)
         // 控制器释放有界；若清理卡住则结束应用，不能在旧连接仍运行时重新同意。
         val timeout = Runnable { L7AppExit.exit(context) }
         handler.postDelayed(timeout, 6_000)

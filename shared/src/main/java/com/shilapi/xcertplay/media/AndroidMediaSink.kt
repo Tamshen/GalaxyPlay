@@ -208,6 +208,12 @@ class AndroidMediaSink(
     /** 宿主执行排队回调时再核对状态，不能让已退休 worker 清除新视频的失败提示。 */
     fun currentVideoFailure(): Pair<VideoCodec, String>? = mainVideoFailure
 
+    /** 只复制当前流的累计快照，不查询 codec／AudioTrack，不改变诊断统计窗口。 */
+    fun videoPerformance(): List<GalaxyVideoPerformance> =
+        if (closed) emptyList() else videoDecoders.values.asSequence().mapNotNull { it.performance() }.take(8).toList()
+    fun audioPerformance(): List<GalaxyAudioPerformance> =
+        if (closed) emptyList() else audioRenderers.values.asSequence().mapNotNull { it.performance }.take(8).toList()
+
     /** 用户只重试主屏解码与关键帧，不关闭连接、音频或麦克风通道。 */
     fun retryMainVideo(): Boolean = synchronized(videoLifecycleLock) {
         if (closed) return@synchronized false
@@ -417,7 +423,7 @@ internal fun videoOperatingRate(type: Int, frameRate: Int): Int =
 
 /** Serial MediaCodec video decoder: one worker owns configure and frame feeding. */
 private class VideoDecoder(
-    streamType: Int,
+    private val streamType: Int,
     surface: Surface?,
     private val width: Int,
     private val height: Int,
@@ -462,6 +468,12 @@ private class VideoDecoder(
     private var lastKeyFrameRequestNs = 0L
     // 主屏统计不添加流类型后缀，其余流独立标记。
     private val stats = VideoStats(if (streamType == 110) "" else " stream=$streamType")
+    @Volatile private var performanceCodec: String? = null
+    @Volatile private var outputSize = 0 to 0
+    fun performance(): GalaxyVideoPerformance? {
+        val size = outputSize
+        return if (!running) null else stats.performance(streamType, performanceCodec, size.first, size.second, fps)
+    }
     private val queue = VideoDecodeQueue(onDepth = stats::onQueued)
     private val thread = Thread(::run, "carplay-video").apply { isDaemon = true; start() }
 
@@ -651,6 +663,7 @@ private class VideoDecoder(
             val info = next.codecInfo
             val hardware = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isHardwareAccelerated
             val software = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly
+            performanceCodec = next.name
             report("decoder=${next.name} hardware=$hardware software=$software mime=$mime size=${width}x$height")
             Log.i(
                 TAG,
@@ -942,6 +955,7 @@ private class VideoDecoder(
             (format.intOrNull("crop-left") ?: 0) + 1).coerceIn(1, codedWidth.coerceAtLeast(1))
         val visibleHeight = ((format.intOrNull("crop-bottom") ?: (codedHeight - 1)) -
             (format.intOrNull("crop-top") ?: 0) + 1).coerceIn(1, codedHeight.coerceAtLeast(1))
+        outputSize = visibleWidth to visibleHeight
         onOutputSize(visibleWidth, visibleHeight)
         report("output format requested=${width}x${height} " +
             "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
@@ -966,6 +980,8 @@ private class VideoDecoder(
     private fun releaseDecoder() {
         val codec = decoder
         decoder = null
+        performanceCodec = null
+        outputSize = 0 to 0
         configuredRate = 0
         inputTiming.clear()
         inputSlot.clear(); inputProgress.reset()
@@ -1081,6 +1097,8 @@ private class AudioRenderer(
     private var lastPlaybackHeadFrames: Long? = null
     private var maxWriteMs = 0L
     private var statsWindowStartNs = 0L
+    @Volatile var performance: GalaxyAudioPerformance? = null
+        private set
     private var statsLastUnderruns = 0
     private var bytesPerSecond = 0
     private val bufferProgress = AudioBufferProgress(if (format.channels >= 2) 4 else 2)
@@ -1765,6 +1783,9 @@ private class AudioRenderer(
         if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
         routeBinding?.reportActual()
         val underruns = track?.underrunCount ?: 0
+        performance = if (GalaxyPerformanceObservation.active) GalaxyAudioPerformance(mappedChannel.toString(), format.codec.toString(),
+            android.os.SystemClock.elapsedRealtime(), (now - statsWindowStartNs) / 1_000_000,
+            if (track == null) null else (underruns - statsLastUnderruns).coerceAtLeast(0), queue.size) else null
         val lastRx = lastArrivalNs.get()
         val currentTrack = track
         val playbackHeadFrames = currentTrack?.playbackHeadPosition
