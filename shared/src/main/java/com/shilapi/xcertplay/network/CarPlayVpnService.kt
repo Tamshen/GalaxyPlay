@@ -65,6 +65,7 @@ class CarPlayVpnService : VpnService() {
     private var bridge: Ipv6NcmBridge? = null
     private var tun: ParcelFileDescriptor? = null
     private var attachGeneration = 0
+    private var wiredOwner: Any? = null
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -79,12 +80,17 @@ class CarPlayVpnService : VpnService() {
         mfi: MfiAuthenticator?,
         listener: AirPlaySessionListener,
         media: AirPlayMediaHandler,
+        owner: Any? = null,
+        isCurrent: () -> Boolean = { true },
     ): AttachResult {
+        if (!isCurrent()) return AttachResult.Failed("Wired attempt cancelled")
         if (active.get()) {
             Log.i(TAG, "replacing stale NCM/VPN attachment")
             releaseLocked()
         }
+        if (!isCurrent()) return AttachResult.Failed("Wired attempt cancelled")
         active.set(true)
+        wiredOwner = owner
         val generation = ++attachGeneration
         return try {
             val address = InetAddress.getByName(linkLocal)
@@ -104,6 +110,7 @@ class CarPlayVpnService : VpnService() {
                 .establish()
                 ?: throw IOException("VpnService.establish returned null")
             tun = tunFd
+            if (!isCurrent()) throw IOException("Wired attempt cancelled")
 
             val ipv6Bridge = Ipv6NcmBridge(ncm, tunFd, hostMac) { error ->
                 onTransportError(generation, listener, error)
@@ -115,6 +122,7 @@ class CarPlayVpnService : VpnService() {
                 generation,
                 AirPlayAttachment(address, config, identity, pairings, mfi, listener, media),
             )
+            if (!isCurrent()) throw IOException("Wired attempt cancelled")
             AttachResult.Started
         } catch (error: Exception) {
             releaseLocked()
@@ -162,6 +170,18 @@ class CarPlayVpnService : VpnService() {
     fun detach() {
         releaseLocked()
     }
+
+    /** 旧任务清理只能释放自己的接入；不调用控制器锁，避免关闭与接入反向等待。 */
+    @Synchronized
+    fun detachWired(owner: Any) {
+        if (wiredOwner === owner) releaseLocked()
+    }
+
+    @Synchronized
+    fun wiredPort(owner: Any): Int? = if (wiredOwner === owner) attachment?.config?.port else null
+
+    @Synchronized
+    fun hasWiredControl(owner: Any): Boolean = wiredOwner === owner && synchronized(sessionsLock) { sessions.isNotEmpty() }
 
     @Synchronized
     fun detachWireless(owner: AirPlayListenerIdentity) {
@@ -352,6 +372,7 @@ class CarPlayVpnService : VpnService() {
         attachGeneration += 1
         active.set(false)
         attachment = null
+        wiredOwner = null
         serverSocket?.close()
         serverSocket = null
         additionalServers.forEach { it.close() }

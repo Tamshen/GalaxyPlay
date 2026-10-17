@@ -19,18 +19,22 @@ class LockdownCarKitClient(
         open(pairedRecord.pairRecord, label)
 
     @Throws(IphoneUsbException::class, GeneralSecurityException::class)
-    fun open(pairRecord: LockdownPairRecord, label: String): BlockingDuplexByteStream =
-        openService(pairRecord, label, CARKIT_SERVICE)
+    fun open(pairRecord: LockdownPairRecord, label: String, isCancelled: () -> Boolean = { false }): BlockingDuplexByteStream =
+        openService(pairRecord, label, CARKIT_SERVICE, isCancelled)
 
-    fun openService(pairRecord: LockdownPairRecord, label: String, serviceName: String): BlockingDuplexByteStream {
+    fun openService(pairRecord: LockdownPairRecord, label: String, serviceName: String,
+                    isCancelled: () -> Boolean = { false }): BlockingDuplexByteStream {
         require(label.isNotBlank()) { "label must not be blank" }
         require(serviceName.isNotBlank()) { "serviceName must not be blank" }
 
+        fun checkCurrent() { if (isCancelled()) throw LockdownPairingException.Cancelled }
+        checkCurrent()
         val lockdownConnection = host.connect(
             destinationPort = Iap2UsbMuxHost.LOCKDOWN_PORT,
             timeoutMillis = STEP_TIMEOUT_MILLIS,
         )
         val sessionTls = LockdownPlistChannel(lockdownConnection).use { plaintext ->
+            checkCurrent()
             val response = plaintext.request(
                 LockdownPlistValue.Dictionary(
                     linkedMapOf(
@@ -43,6 +47,7 @@ class LockdownCarKitClient(
                 STEP_TIMEOUT_MILLIS,
             )
             rejectError(response, "StartSession")
+            checkCurrent()
             val enableSessionSsl = (response.entries["EnableSessionSSL"] as? LockdownPlistValue.Boolean)?.value
                 ?: throw IphoneUsbException.Protocol("StartSession response omitted boolean EnableSessionSSL")
             if (!enableSessionSsl) {
@@ -57,7 +62,9 @@ class LockdownCarKitClient(
 
         val secureLockdown = LockdownPlistChannel(sessionTls)
         var serviceStream: BlockingDuplexByteStream? = null
+        var handedOff = false
         try {
+            checkCurrent()
             val response = secureLockdown.request(
                 LockdownPlistValue.Dictionary(
                     linkedMapOf(
@@ -68,6 +75,7 @@ class LockdownCarKitClient(
                 STEP_TIMEOUT_MILLIS,
             )
             rejectError(response, "StartService")
+            checkCurrent()
             val port = (response.entries["Port"] as? LockdownPlistValue.Integer)?.value
                 ?: throw IphoneUsbException.Protocol("StartService response omitted integer Port")
             if (port !in 1..0xffff) {
@@ -80,6 +88,8 @@ class LockdownCarKitClient(
                 destinationPort = port.toInt(),
                 timeoutMillis = STEP_TIMEOUT_MILLIS,
             )
+            serviceStream = serviceConnection
+            checkCurrent()
             val readyStream = if (enableServiceSsl) {
                 TlsDuplexChannel.open(
                     underlying = serviceConnection,
@@ -90,13 +100,14 @@ class LockdownCarKitClient(
                 serviceConnection
             }
             serviceStream = readyStream
+            checkCurrent()
             val ownedStream = CarkitServiceStream(readyStream, secureLockdown)
-            serviceStream = null
+            handedOff = true
             return ownedStream
         } finally {
-            if (serviceStream != null) {
+            if (!handedOff) {
                 try {
-                    serviceStream.close()
+                    serviceStream?.close()
                 } finally {
                     secureLockdown.close()
                 }

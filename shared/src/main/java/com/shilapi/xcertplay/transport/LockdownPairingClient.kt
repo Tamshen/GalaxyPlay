@@ -50,6 +50,7 @@ class LockdownPairingClient(
             )
             var pending = false
             LockdownPlistChannel(connection).use { channel ->
+                checkCancelled(isCancelled)
                 setUntrustedHostBuid(channel, label, systemBuid, deadline, isCancelled)
                 val record = pairRecord ?: generatePairRecord(
                     channel = channel,
@@ -68,6 +69,7 @@ class LockdownPairingClient(
                     )
                 }
                 Log.i(TAG, "lockdown pair attempt=$attempt")
+                checkCancelled(isCancelled)
                 val response = channel.request(pairRequest(label, record), stepTimeoutMillis(deadline))
                 checkCancelled(isCancelled)
                 when (val error = response.errorCodeOrNull()) {

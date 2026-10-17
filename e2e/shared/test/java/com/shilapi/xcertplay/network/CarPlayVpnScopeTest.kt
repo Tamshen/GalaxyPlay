@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -111,9 +112,31 @@ class CarPlayVpnScopeTest {
         try { check(controller.get()) } finally { controller.destroy() }
     }
 
-    private fun attachWired(service: CarPlayVpnService): CarPlayVpnService.AttachResult =
+    @Test fun cancelledWiredTaskCannotReplaceAnExistingListener() = withService { service ->
+        assertEquals(CarPlayVpnService.AttachResult.Started, attachWireless(service))
+        val server = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
+        assertEquals(CarPlayVpnService.AttachResult.Failed("Wired attempt cancelled"), attachWired(service) { false })
+        assertFalse(server.isClosed)
+        assertTrue(service.isAttached())
+        assertTrue(VpnScopeBoundary.calls.isEmpty())
+    }
+
+    @Test fun ownerScopedCleanupDoesNotCloseAReplacementListener() = withService { service ->
+        assertEquals(CarPlayVpnService.AttachResult.Started, attachWireless(service))
+        val server = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
+        val owner = Any()
+        ReflectionHelpers.setField(service, "wiredOwner", owner)
+        service.detachWired(Any())
+        assertFalse(server.isClosed)
+        assertNotNull(service.wiredPort(owner))
+        service.detachWired(owner)
+        assertTrue(server.isClosed)
+        assertReleased(service)
+    }
+
+    private fun attachWired(service: CarPlayVpnService, isCurrent: () -> Boolean = { true }): CarPlayVpnService.AttachResult =
         service.attach(ncm(), "fe80::1234", ByteArray(6), config, identity, PairingStore(), null,
-            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {})
+            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, isCurrent = isCurrent)
 
     private fun attachWireless(service: CarPlayVpnService): CarPlayVpnService.AttachResult =
         service.attachWireless(InetAddress.getLoopbackAddress(), config, identity, PairingStore(), null,

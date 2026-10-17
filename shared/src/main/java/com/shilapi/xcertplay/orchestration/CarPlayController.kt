@@ -89,6 +89,7 @@ import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.LinuxI2cTransport
 import com.shilapi.xcertplay.transport.LockdownCarKitClient
 import com.shilapi.xcertplay.transport.LockdownPairingClient
+import com.shilapi.xcertplay.transport.LockdownPairingException
 import com.shilapi.xcertplay.transport.LockdownPairRecord
 import com.shilapi.xcertplay.transport.NcmFunctionDiscovery
 import com.shilapi.xcertplay.transport.NcmUsbBridge
@@ -517,6 +518,7 @@ class CarPlayController(
             invalidateIphonePermission()
             Thread({
                 previous.close()
+                vpnService?.detachWired(previous)
                 if (previous.awaitClosed(EXECUTOR_CLOSE_TIMEOUT_MILLIS)) synchronized(lifecycleLock) {
                     if (!closed && wiredResources === previous) startIphone()
                 }
@@ -683,7 +685,7 @@ class CarPlayController(
     }
 
     override fun close() {
-        synchronized(this) {
+        synchronized(lifecycleLock) {
             if (closed) return
             closed = true
             dashboardMapOutputVisible = false
@@ -713,6 +715,7 @@ class CarPlayController(
         touchExecutor.shutdownNow()
         tunnelExecutor.shutdownNow()
         val service = vpnService
+        val closingWiredResources = wiredResources
         unbindVpn()
         Thread(
             {
@@ -723,7 +726,7 @@ class CarPlayController(
                         wifiScanPause = null
                     } else {
                         closeBestEffort("wired resources") {
-                            val resources = wiredResources
+                            val resources = closingWiredResources
                             resources.close()
                             if (!resources.awaitClosed(EXECUTOR_CLOSE_TIMEOUT_MILLIS)) throw IOException("Wired resources still closing")
                         }
@@ -733,7 +736,7 @@ class CarPlayController(
                     mux = null
                     if (config.transport == CarPlayTransport.WIRED) {
                         closeBestEffort("VPN/NCM") {
-                            service?.detach()
+                            service?.detachWired(closingWiredResources)
                             if (service != null && !service.awaitDetached(EXECUTOR_CLOSE_TIMEOUT_MILLIS))
                                 throw IOException("AirPlay accept workers still closing")
                         }
@@ -1857,7 +1860,8 @@ class CarPlayController(
         if (activeSocket != null) closeBestEffort("wireless Bluetooth socket") { activeSocket.close() }
     }
 
-    private fun invalidateIphonePermission() {
+    private fun invalidateIphonePermission() = synchronized(lifecycleLock) {
+        if (config.transport == CarPlayTransport.WIRED) activeSession?.let(sessionListener::onSessionEnded)
         iphoneGeneration.incrementAndGet()
         iphonePermission.invalidate()
         iphoneReenumeration.clear()
@@ -2143,7 +2147,7 @@ class CarPlayController(
         val generation = iphoneGeneration.get()
         val resources = wiredResources
         iphoneHost.openIap2UsbSessionAsync(device, executor) { result ->
-            if (closed || generation != iphoneGeneration.get() || phase != Phase.DATAPATHS) {
+            if (!isCurrentWired(resources, generation) || phase != Phase.DATAPATHS) {
                 if (result is IphoneUsbHost.Iap2SessionResult.Connected) result.session.close()
                 return@openIap2UsbSessionAsync
             }
@@ -2193,22 +2197,24 @@ class CarPlayController(
     }
 
     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, resources: WiredResources, generation: Int) {
-        phase = Phase.CONTROL
         var ncmOwnedLocally = true
         try {
             if (!resources.own("USB", usbSession)) { ncm.close(); return }
             if (!resources.own("NCM", ncm)) return
-            if (closed || generation != iphoneGeneration.get()) return
+            if (!withCurrentWired(resources, generation) { phase = Phase.CONTROL }) throw LockdownPairingException.Cancelled
+            requireCurrentWired(resources, generation)
             connectionDiagnostic("wired stage=USBMUX_OPEN result=BEGIN")
             val mux = Iap2UsbMuxHost.open(usbSession, onDiagnostic = ::connectionDiagnostic)
             if (!resources.transfer(usbSession, "USBMUX", mux)) return
-            this.mux = mux
+            if (!withCurrentWired(resources, generation) { this.mux = mux }) return
             connectionDiagnostic("wired stage=USBMUX_OPEN result=COMPLETED")
             debugLog("wired USBMUX host opened")
-            onStatus(CarPlayStatus.Pairing)
+            onStatus(CarPlayStatus.Pairing, generation)
             val pairingClient = LockdownPairingClient(mux)
+            requireCurrentWired(resources, generation)
             val savedPairRecord = loadPairRecord()
-            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient)
+            requireCurrentWired(resources, generation)
+            var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient, resources, generation)
             debugLog(
                 if (savedPairRecord != null) {
                     "wired using saved Lockdown pair record"
@@ -2216,18 +2222,20 @@ class CarPlayController(
                     "wired created a new Lockdown pair record"
                 },
             )
-            onStatus(CarPlayStatus.ConnectingControl)
+            onStatus(CarPlayStatus.ConnectingControl, generation)
             val carKitClient = LockdownCarKitClient(mux)
             val carkit = try {
-                carKitClient.open(pairRecord, config.label)
+                carKitClient.open(pairRecord, config.label) { !isCurrentWired(resources, generation) }
             } catch (error: Throwable) {
                 val rejection = rejectedPairRecordError(error)
                 if (savedPairRecord == null || rejection == null) throw error
                 debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
-                clearPairRecord()
-                pairRecord = pairNewRecord(pairingClient)
-                carKitClient.open(pairRecord, config.label)
+                if (!withCurrentWired(resources, generation) { clearPairRecord() }) throw LockdownPairingException.Cancelled
+                pairRecord = pairNewRecord(pairingClient, resources, generation)
+                carKitClient.open(pairRecord, config.label) { !isCurrentWired(resources, generation) }
             }
+            if (!resources.own("CARKIT", carkit)) return
+            requireCurrentWired(resources, generation)
             debugLog("wired com.apple.carkit.service stream opened")
             // Lab transport diagnostics: packet headers only, never certificate or challenge data.
             fun wireSummary(bytes: ByteArray): String {
@@ -2280,33 +2288,31 @@ class CarPlayController(
                 onTrace = ::debugLog,
                 onArtwork = artworkTransferHandler(),
             )
-            if (!resources.own("CSM", csm)) return
-            this.csm = csm
+            if (!resources.transfer(carkit, "CSM", csm)) return
+            if (!withCurrentWired(resources, generation) { this.csm = csm }) return
             connectionDiagnostic("wired stage=CSM_OPEN result=COMPLETED")
             debugLog("wired iAP2 CSM channel opened")
 
             val ncmHostMac = ncm.hostMac ?: config.hostMac
             debugLog("ncm using hostMac=${ncmHostMac.macString()}")
-            if (!attachVpn(ncm, ncmHostMac)) {
+            if (!attachVpn(ncm, ncmHostMac, resources, generation)) {
                 throw IphoneUsbException.DeviceUnavailable("Could not attach the NCM/VPN AirPlay transport")
             }
             ncmOwnedLocally = false
             debugLog("wired NCM/VPN AirPlay transport attached")
-            if (closed) {
-                vpnService?.detach()
-                return
-            }
+            requireCurrentWired(resources, generation)
 
             val mfi = mfiSession?.client
                 ?: throw IphoneUsbException.DeviceUnavailable("MFi coprocessor client is unavailable")
             val endpoint = Iap2WiredCarPlayEndpoint(
                 ipv6Addresses = listOf(config.linkLocal),
-                airPlayPort = vpnService?.boundPort() ?: throw IOException("AirPlay listener is not attached"),
+                airPlayPort = vpnService?.wiredPort(resources) ?: throw IOException("AirPlay listener is not attached"),
                 publicKey = identity.publicKeyHex,
                 sourceVersion = airPlayConfig.sourceVersion,
                 deviceIdentifier = ncmHostMac.macString(),
             )
-            onStatus(CarPlayStatus.RunningControl)
+            requireCurrentWired(resources, generation)
+            onStatus(CarPlayStatus.RunningControl, generation)
             debugLog(
                 "wired iAP2 runtime control starting " +
                     "location=${config.identification.locationInformationEnabled} " +
@@ -2327,26 +2333,40 @@ class CarPlayController(
                     Iap2WiredControlTerminal.TIMED_OUT -> CarPlayStatus.ControlEnded
                     Iap2WiredControlTerminal.CHANNEL_CLOSED ->
                         CarPlayStatus.Failed("CarPlay control channel closed")
-                },
+                }, generation,
             )
         } catch (error: Throwable) {
             debugLog("wired bring-up failed", error)
             resources.close()
-            if (!ncmOwnedLocally) vpnService?.detach()
+            if (!ncmOwnedLocally) vpnService?.detachWired(resources)
             fail(error, generation)
         } finally {
             if (ncmOwnedLocally) resources.release(ncm)
         }
     }
 
-    private fun pairNewRecord(client: LockdownPairingClient): LockdownPairRecord =
+    private fun isCurrentWired(resources: WiredResources, generation: Int): Boolean =
+        !closed && generation == iphoneGeneration.get() && wiredResources === resources && !resources.isClosed
+
+    private fun requireCurrentWired(resources: WiredResources, generation: Int) {
+        if (!isCurrentWired(resources, generation)) throw LockdownPairingException.Cancelled
+    }
+
+    private fun withCurrentWired(resources: WiredResources, generation: Int, operation: () -> Unit): Boolean =
+        synchronized(lifecycleLock) {
+            if (!isCurrentWired(resources, generation)) false else { operation(); true }
+        }
+
+    private fun pairNewRecord(client: LockdownPairingClient, resources: WiredResources, generation: Int): LockdownPairRecord =
         client.pair(
             label = config.label,
             hostId = hostId,
             systemBuid = systemBuid,
             totalTimeoutMillis = PAIR_TIMEOUT_MILLIS,
-            isCancelled = { closed },
-        ).pairRecord.also(savePairRecord)
+            isCancelled = { !isCurrentWired(resources, generation) },
+        ).pairRecord.also { record ->
+            if (!withCurrentWired(resources, generation) { savePairRecord(record) }) throw LockdownPairingException.Cancelled
+        }
 
     private fun rejectedPairRecordError(error: Throwable): String? {
         var cause: Throwable? = error
@@ -2692,13 +2712,15 @@ class CarPlayController(
         else -> CONTROL_LOOP_TIMEOUT_MILLIS
     }
 
-    private fun attachVpn(ncm: NcmUsbBridge, hostMac: ByteArray): Boolean {
-        onStatus(CarPlayStatus.AttachingNetwork)
+    private fun attachVpn(ncm: NcmUsbBridge, hostMac: ByteArray, resources: WiredResources, generation: Int): Boolean {
+        requireCurrentWired(resources, generation)
+        onStatus(CarPlayStatus.AttachingNetwork, generation)
         val service = awaitVpnService() ?: run {
             debugLog("wired VPN service bind failed")
             ncm.close()
             return false
         }
+        requireCurrentWired(resources, generation)
         debugLog("wired VPN service bound; attaching NCM transport")
         val result = try {
             service.attach(
@@ -2709,12 +2731,14 @@ class CarPlayController(
                 identity = identity,
                 pairings = pairings,
                 mfi = mfiSession?.client,
-                listener = sessionListener,
+                listener = wiredSessionListener(resources, generation),
                 media = media,
+                owner = resources,
+                isCurrent = { isCurrentWired(resources, generation) },
             )
         } catch (error: Throwable) {
             ncm.close()
-            onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName))
+            onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName), generation)
             return false
         }
         return when (result) {
@@ -2730,11 +2754,24 @@ class CarPlayController(
             is CarPlayVpnService.AttachResult.Failed -> {
                 debugLog("wired VPN/NCM transport attach result=failed ${result.message}")
                 ncm.close()
-                onStatus(CarPlayStatus.Failed(result.message))
+                onStatus(CarPlayStatus.Failed(result.message), generation)
                 false
             }
         }
     }
+
+    private fun wiredSessionListener(resources: WiredResources, generation: Int): AirPlaySessionListener =
+        object : AirPlaySessionListener {
+            override fun onSessionActive(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onSessionActive(session) } }
+            override fun onSessionEnded(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onSessionEnded(session) } }
+            override fun onTransportError(message: String) { withCurrentWired(resources, generation) { sessionListener.onTransportError(message) } }
+            override fun onDebugLog(message: String) { if (isCurrentWired(resources, generation)) sessionListener.onDebugLog(message) }
+            override fun onDeviceInfo(session: AirPlaySession, info: AirPlayDeviceInfo) { withCurrentWired(resources, generation) { sessionListener.onDeviceInfo(session, info) } }
+            override fun onHostUiRequested(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onHostUiRequested(session) } }
+            override fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) { withCurrentWired(resources, generation) { sessionListener.onCommand(session, type, params) } }
+            override fun onRemoteControlMessage(session: AirPlaySession, streamId: Long, message: Map<String, Any?>) { withCurrentWired(resources, generation) { sessionListener.onRemoteControlMessage(session, streamId, message) } }
+            override fun onVideoPlaybackUiRequested(session: AirPlaySession) { withCurrentWired(resources, generation) { sessionListener.onVideoPlaybackUiRequested(session) } }
+        }
 
     private fun ByteArray.macString(): String =
         joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
