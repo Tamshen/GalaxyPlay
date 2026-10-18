@@ -22,7 +22,7 @@ class GalaxyConfigurationShareTest {
     @Before fun reset() {
         File(app.filesDir, "configurations").deleteRecursively()
         GalaxyConfigurationFields.names.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() }
-        app.getSharedPreferences("galaxy_configuration_sharing", 0).edit().clear().commit()
+        app.getSharedPreferences("galaxy_configuration_names", 0).edit().clear().commit()
     }
 
     @Test fun completeVehicleParametersAndNameRoundTripThroughJsonAndCopiedCode() {
@@ -47,12 +47,12 @@ class GalaxyConfigurationShareTest {
         assertEquals("Profile 07", GalaxyConfigurationNames.display(english, "配置07"))
         assertEquals("配置01", GalaxyConfigurationNames.display(chinese, "Existing configuration"))
         assertEquals("Profile 01", GalaxyConfigurationNames.display(english, "原有配置"))
-        assertEquals("配置01", GalaxyConfigurationNames.forShare(chinese, profile.copy(name = "Existing configuration")))
+        assertEquals("配置01", GalaxyConfigurationNames.forSave(chinese, profile.copy(name = "Existing configuration")))
         GalaxyConfigurationNames.used(app)
-        assertEquals("Profile 02", GalaxyConfigurationNames.forShare(english, profile.copy(name = "原有配置")))
+        assertEquals("Profile 02", GalaxyConfigurationNames.forSave(english, profile.copy(name = "原有配置")))
         for (name in listOf("家用 L7", "My L7", "Profile for work")) {
             assertEquals(name, GalaxyConfigurationNames.display(chinese, name))
-            assertEquals(name, GalaxyConfigurationNames.forShare(english, profile.copy(name = name)))
+            assertEquals(name, GalaxyConfigurationNames.forSave(english, profile.copy(name = name)))
         }
         assertEquals(profile, repository.active())
     }
@@ -67,7 +67,7 @@ class GalaxyConfigurationShareTest {
     @Test fun standardPresetsOmitUnchangedParametersAndAudioWhileRestoringTheFullSnapshot() {
         for (id in GalaxyConfigurationShareBase.ids) {
             val profile = repository.applyTemplate(id)
-            val value = GalaxyConfigurationShare.from(profile, "配置01")
+            val value = GalaxyConfigurationShare.from(profile)
             // 固定基线不得随今后默认值修改；新默认值应作为差异传输。
             assertEquals(value.configuration, GalaxyConfigurationShareBase.configuration(id))
             val compact = JSONObject(GalaxyConfigurationShareCompact.encode(value))
@@ -104,7 +104,7 @@ class GalaxyConfigurationShareTest {
 
     @Test fun unknownBaselinesAndInjectedPreferencePathsAreRejectedWithoutChangingTheVehicle() {
         val profile = repository.applyTemplate("l7")
-        val value = GalaxyConfigurationShare.from(profile, "配置01")
+        val value = GalaxyConfigurationShare.from(profile)
         val encoded = GalaxyConfigurationShareCompact.encode(value)
         val badBase = JSONObject(encoded).put("baseline", 99)
         val injected = JSONObject(encoded).put("changes", org.json.JSONArray().put(org.json.JSONArray()
@@ -114,6 +114,21 @@ class GalaxyConfigurationShareTest {
             assertTrue(runCatching { GalaxyConfigurationShare.parse(data.toString()) }.isFailure)
             assertEquals(profile, repository.active())
         }
+    }
+
+    @Test fun optionalSharingRemarkNeverReplacesTheSavedNameAndOldPayloadsHaveNoRemark() {
+        val profile = repository.applyTemplate("l7").copy(name = "我的日常配置")
+        val share = GalaxyConfigurationShare.from(profile, "头枕音频设置，仅供参考")
+        assertEquals(profile.name, share.name)
+        assertEquals("头枕音频设置，仅供参考", share.remark)
+        assertEquals(share, GalaxyConfigurationShare.parse(share.json()))
+        assertEquals(share, GalaxyConfigurationShare.parse(share.code()))
+        val old = JSONObject(share.json()).apply { remove("remark") }
+        assertEquals("", GalaxyConfigurationShare.parse(old.toString()).remark)
+        assertEquals(profile.name, GalaxyConfigurationShare.parse(old.toString()).name)
+        assertFalse(JSONObject(GalaxyConfigurationShare.from(profile).json()).has("remark"))
+        assertTrue(runCatching { GalaxyConfigurationShare.parse(JSONObject(share.json())
+            .put("remark", "x".repeat(GalaxyConfigurationShare.MAX_REMARK + 1)).toString()) }.isFailure)
     }
 
     @Test fun sharingCannotIncludeConnectionOrAuthenticationMaterial() {
@@ -132,7 +147,7 @@ class GalaxyConfigurationShareTest {
 
     @Test fun invalidVersionTruncatedCodeAndOversizedInputNeverReplaceCurrentConfiguration() {
         val current = repository.applyTemplate("l7")
-        val share = GalaxyConfigurationShare.from(current, "配置01")
+        val share = GalaxyConfigurationShare.from(current)
         for (text in listOf("garbage", share.code().dropLast(8),
             JSONObject(share.json()).put("version", 99).toString(), "x".repeat(GalaxyConfigurationShare.MAX_TEXT + 1))) {
             assertTrue(runCatching { GalaxyConfigurationShare.parse(text) }.isFailure)
@@ -152,7 +167,7 @@ class GalaxyConfigurationShareTest {
         val frozen = GalaxyConfigurationContext(app, current, runtimeOnly = true)
         AirPlayPersistence.saveManualHotspotSsid(app, "synthetic-network")
         val shared = GalaxyConfigurationShare.from(current.copy(configuration =
-            GalaxyVehicleTemplates.find("l7_no_headrest")!!.create(app), templateId = "l7_no_headrest"), "朋友的配置")
+            GalaxyVehicleTemplates.find("l7_no_headrest")!!.create(app), templateId = "l7_no_headrest", name = "朋友的配置"), "借用朋友的参数")
         val imported = repository.importShared(current, shared)
         assertEquals(current.id, imported.id)
         assertEquals("朋友的配置", imported.name)

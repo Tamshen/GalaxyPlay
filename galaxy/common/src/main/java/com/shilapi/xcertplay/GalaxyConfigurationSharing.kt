@@ -27,23 +27,22 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
     fun share() {
         if (closed || files.busy) return
         val profile = draft() ?: return
-        val name = input(GalaxyConfigurationNames.forShare(activity, profile), 40)
+        val remark = input("", GalaxyConfigurationShare.MAX_REMARK).apply {
+            hint = activity.getString(R.string.config_share_remark)
+            minLines = 2; maxLines = 3
+        }
         dialog?.dismiss()
         dialog = L7Dialogs.builder(activity).setTitle(R.string.config_share_title)
-            .setMessage(R.string.config_share_name_hint).setView(name)
+            .setMessage(R.string.config_share_name_hint).setView(remark)
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.config_share_generate, null).create()
         dialog!!.setOnShowListener {
             dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (!validName(name)) return@setOnClickListener
                 val token = ++operation
                 progress()
-                files.prepare(profile, name.text.toString()) { result ->
+                files.prepare(profile, remark.text.toString()) { result ->
                     if (closed || operation != token) return@prepare
                     dialog?.dismiss()
-                    result.onSuccess {
-                        GalaxyConfigurationNames.used(activity)
-                        showShared(it)
-                    }.onFailure { notice(R.string.config_share_invalid) }
+                    result.onSuccess { showShared(it) }.onFailure { notice(R.string.config_share_invalid) }
                 }
             }
         }
@@ -74,15 +73,14 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
     private fun review(value: GalaxyConfigurationShare) {
         if (closed) return
         val before = expected ?: return
-        val name = input(GalaxyConfigurationNames.display(activity, value.name), 40)
         dialog?.dismiss()
         dialog = L7Dialogs.builder(activity).setTitle(R.string.config_share_preview)
-            .setMessage(summary(value) + "\n\n" + activity.getString(R.string.config_share_replace_hint)).setView(name)
+            .setMessage(summary(value) + remark(value) + "\n\n" + activity.getString(R.string.config_share_replace_hint))
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.config_share_apply, null).create()
         dialog!!.setOnShowListener {
             dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (closed || !validName(name)) return@setOnClickListener
-                val result = runCatching { GalaxyProfiles(activity).importShared(before, value.copy(name = name.text.toString().trim())) }
+                if (closed) return@setOnClickListener
+                val result = runCatching { GalaxyProfiles(activity).importShared(before, value) }
                 result.onSuccess { dialog?.dismiss(); applied(it) }.onFailure { notice(R.string.profile_save_failed) }
             }
         }
@@ -107,7 +105,8 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
         })
         if (prepared.qr != null) body.addView(L7Components.actionButton(activity,
             activity.getString(R.string.config_share_save_qr), R.drawable.ic_l7_save) { files.exportImage(value.name, prepared.qr) })
-        dialog = L7Dialogs.builder(activity).setTitle(value.name).setMessage(R.string.config_share_qr_hint)
+        dialog = L7Dialogs.builder(activity).setTitle(GalaxyConfigurationNames.display(activity, value.name))
+            .setMessage(activity.getString(R.string.config_share_qr_hint) + remark(value))
             .setView(body).setNegativeButton(R.string.close, null).show()
     }
 
@@ -128,11 +127,8 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
     private fun input(value: String, maximum: Int) = EditText(activity).apply {
         L7Ui.input(this); filters = arrayOf(InputFilter.LengthFilter(maximum)); setText(value)
     }
-    private fun validName(input: EditText): Boolean = input.text.toString().trim().let {
-        (it.isNotEmpty() && it.length <= 40 && it.none { char -> char.code < 32 }).also { valid ->
-            if (!valid) input.error = activity.getString(R.string.profile_invalid_value)
-        }
-    }
+    private fun remark(value: GalaxyConfigurationShare) = if (value.remark.isEmpty()) "" else
+        "\n\n" + activity.getString(R.string.config_share_remark_value, value.remark)
     private fun progress() {
         dialog?.dismiss()
         dialog = L7Dialogs.builder(activity).setTitle(R.string.config_share_title).setMessage(R.string.config_share_preparing)

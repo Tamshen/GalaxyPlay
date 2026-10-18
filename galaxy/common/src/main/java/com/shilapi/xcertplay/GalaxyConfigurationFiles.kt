@@ -37,11 +37,11 @@ internal class GalaxyConfigurationFiles(private val activity: ComponentActivity,
         task({ GalaxyConfigurationShare.parse(text) }, imported)
     }
 
-    fun prepare(profile: GalaxyProfile, name: String, done: (Result<Prepared>) -> Unit) {
+    fun prepare(profile: GalaxyProfile, remark: String, done: (Result<Prepared>) -> Unit) {
         if (busy || closed) return
         busy = true
         task({
-            val value = GalaxyConfigurationShare.from(profile, name)
+            val value = GalaxyConfigurationShare.from(profile, remark)
             val code = value.code()
             Prepared(value, code, runCatching { GalaxyConfigurationQr.encode(code) }.getOrNull())
         }, done)

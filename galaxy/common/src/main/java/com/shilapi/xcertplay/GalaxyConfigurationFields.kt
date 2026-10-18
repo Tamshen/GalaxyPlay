@@ -12,7 +12,7 @@ internal object GalaxyConfigurationFields {
         "l7_audio_templates", "l7_authentication", "l7_remote_log", "carplay_picture")
     private const val MAIN = "xcertplay_airplay"
     val fields = listOf(
-        Field(R.string.config_page_common, MAIN, GalaxyP2pAddressSettings.KEY, R.string.galaxy_p2p_address_mode,
+        Field(R.string.config_page_connection, MAIN, GalaxyP2pAddressSettings.KEY, R.string.galaxy_p2p_address_mode,
             "IPV4_ONLY", listOf("IPV4_ONLY", "IPV6_ONLY", "DUAL_STACK"),
             listOf(R.string.galaxy_p2p_ipv4_only, R.string.galaxy_p2p_ipv6_only, R.string.galaxy_p2p_dual_stack)),
         Field(R.string.l7_section_projection, MAIN, "display_scale_tenths", R.string.resolution, 10,

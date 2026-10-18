@@ -7,26 +7,33 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** 名称是配置元数据；修改进入同一草稿，取消不影响文件和参数。 */
+/** 配置名称只读展示，保存时才命名；取消保留草稿，确认成功后关闭。 */
 internal object GalaxyConfigurationNameField {
-    fun add(context: Context, parent: LinearLayout, name: String, changed: (String) -> Unit) {
-        val displayed = GalaxyConfigurationNames.display(context, name)
+    fun add(context: Context, parent: LinearLayout, name: String) {
         L7SettingsSection.add(parent) { card ->
-            card.addView(L7Components.valueRow(context, context.getString(R.string.config_profile_name), displayed) {
-                val input = EditText(context).apply {
-                    L7Ui.input(this); setText(displayed); filters = arrayOf(InputFilter.LengthFilter(40)); setSingleLine()
-                }
-                val dialog = L7Dialogs.builder(context).setTitle(R.string.config_profile_name).setView(input)
-                    .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.profile_update_draft, null).create()
-                dialog.setOnShowListener {
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val value = input.text.toString().trim()
-                        if (value.isEmpty() || value.any { it.code < 32 }) input.error = context.getString(R.string.profile_invalid_value)
-                        else { dialog.dismiss(); changed(value) }
-                    }
-                }
-                dialog.show()
+            card.addView(L7SettingRow(context, context.getString(R.string.config_profile_name)).apply {
+                setValue(GalaxyConfigurationNames.display(context, name))
             })
         }
+    }
+    fun save(context: Context, name: String, commit: (String) -> Boolean): AlertDialog {
+        val input = EditText(context).apply {
+            L7Ui.input(this); setText(name); filters = arrayOf(InputFilter.LengthFilter(40)); setSingleLine()
+        }
+        val dialog = L7Dialogs.builder(context).setTitle(R.string.config_save_title)
+            .setMessage(R.string.config_save_name_hint).setView(input)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create()
+        var applied = false
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (applied) return@setOnClickListener
+                val value = input.text.toString().trim()
+                if (value.isEmpty() || value.any { it.code < 32 }) input.error = context.getString(R.string.profile_invalid_value)
+                else if (commit(value)) { applied = true; dialog.dismiss() }
+                else input.error = context.getString(R.string.profile_save_failed)
+            }
+        }
+        dialog.show()
+        return dialog
     }
 }

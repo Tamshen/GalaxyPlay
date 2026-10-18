@@ -8,9 +8,10 @@ import java.util.zip.Inflater
 
 /** 文件保留完整参数，二维码使用固定基线差异；两者恢复同一配置，不包含连接凭据。 */
 internal data class GalaxyConfigurationShare(val name: String, val configuration: GalaxyConfiguration,
-    val template: String = "custom") {
+    val template: String = "custom", val remark: String = "") {
     fun json(): String = JSONObject().put("format", FORMAT).put("version", 1).put("name", name)
-        .put("template", template).put("configuration", configuration.json()).toString()
+        .put("template", template).put("configuration", configuration.json())
+        .also { if (remark.isNotEmpty()) it.put("remark", remark) }.toString()
 
     fun code(): String {
         val bytes = GalaxyConfigurationShareCompact.encode(this).toByteArray(Charsets.UTF_8)
@@ -33,10 +34,11 @@ internal data class GalaxyConfigurationShare(val name: String, val configuration
         const val PREFIX = "GALAXYPLAY2:"
         const val LEGACY_PREFIX = "GALAXYPLAY1:"
         const val MAX_TEXT = 96 * 1024
+        const val MAX_REMARK = 200
         private const val FORMAT = "galaxyplay-vehicle"
 
-        fun from(profile: GalaxyProfile, name: String): GalaxyConfigurationShare {
-            val shared = GalaxyConfigurationShare(name.trim(), GalaxyApplicationPreferences.vehicle(profile.configuration), profile.template)
+        fun from(profile: GalaxyProfile, remark: String = ""): GalaxyConfigurationShare {
+            val shared = GalaxyConfigurationShare(profile.name, GalaxyApplicationPreferences.vehicle(profile.configuration), profile.template, remark.trim())
             return parse(shared.json())
         }
 
@@ -50,6 +52,8 @@ internal data class GalaxyConfigurationShare(val name: String, val configuration
             require(data.getString("format") == FORMAT && data.getInt("version") in 1..2)
             val name = data.getString("name").trim()
             require(name.isNotEmpty() && name.length <= 40 && name.none { it.code < 32 })
+            val remark = if (data.has("remark")) (data.get("remark") as? String ?: error("CONFIG_REMARK_TYPE")).trim() else ""
+            require(remark.length <= MAX_REMARK && remark.none { it.code < 32 && it != '\n' })
             val template = data.getString("template")
             require(GalaxyVehicleTemplates.find(template) != null)
             val configuration = if (data.getInt("version") == 2) GalaxyConfigurationShareCompact.decode(data)
@@ -61,7 +65,7 @@ internal data class GalaxyConfigurationShare(val name: String, val configuration
             require(configuration.preferences["l7_audio_templates"]?.get("model") in setOf("l7", "l6", "custom"))
             require(configuration.audio.keys.containsAll(setOf("l7", "l6", "custom")))
             GalaxyConfigurationFields.validate(configuration)
-            return GalaxyConfigurationShare(name, configuration, template)
+            return GalaxyConfigurationShare(name, configuration, template, remark)
         }
 
         private fun inflate(encoded: String): String {

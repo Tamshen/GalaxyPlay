@@ -5,9 +5,9 @@ import android.content.res.Configuration
 import java.util.Locale
 import com.shilapi.xcertplay.host.R
 
-/** 名称计数只属于分享操作，不作为车型参数或连接条件。 */
+/** 名称计数只在用户确认保存成功后递增，不作为车型参数或连接条件。 */
 internal object GalaxyConfigurationNames {
-    private fun preferences(context: Context) = context.getSharedPreferences("galaxy_configuration_sharing", 0)
+    private fun preferences(context: Context) = context.getSharedPreferences("galaxy_configuration_names", 0)
     fun next(context: Context): String = context.getString(R.string.config_share_default_name,
         preferences(context).getInt("next", 1).coerceIn(1, 999999))
     /** 自动名称随当前语言显示；只调整展示，不因切换语言改写车型文件。 */
@@ -15,7 +15,7 @@ internal object GalaxyConfigurationNames {
         legacy(context, name) -> context.getString(R.string.config_share_default_name, 1)
         else -> ordinal(name)?.let { context.getString(R.string.config_share_default_name, it) } ?: name
     }
-    fun forShare(context: Context, profile: GalaxyProfile): String =
+    fun forSave(context: Context, profile: GalaxyProfile): String =
         if (ordinal(profile.name) != null || legacy(context, profile.name)) next(context) else profile.name
     private fun ordinal(name: String): Int? = Regex("(?:配置|Profile )([0-9]{2,6})")
         .matchEntire(name)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in 1..999999 }

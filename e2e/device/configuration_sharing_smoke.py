@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仅在独立 configuration147 AVD 验证预设、IP、改名和文字分享；不连接手机。"""
+"""仅在独立配置验证 AVD 验证预设、IP、改名和文字分享；不连接手机。"""
 import argparse
 import base64
 import hashlib
@@ -27,7 +27,7 @@ def adb(*args, data=None, binary=False):
     return r.stdout if binary else r.stdout.decode('utf-8')
 
 
-assert adb('emu', 'avd', 'name').splitlines()[0].strip() == 'configuration147', '只允许本任务独立 AVD'
+assert adb('emu', 'avd', 'name').splitlines()[0].strip() in {'configuration147', 'configuration151'}, '只允许本任务独立 AVD'
 assert adb('shell', 'getprop', 'ro.build.version.sdk').strip() == '30'
 adb('install', '-r', str(a.apk.resolve()))
 adb('shell', 'am', 'force-stop', package)
@@ -63,7 +63,7 @@ def click(text, contains=False):
     for _ in range(5):
         root = tree()
         parents = {child: parent for parent in root.iter() for child in parent}
-        for n in root.iter('node'):
+        for n in sorted(root.iter('node'), key=lambda n: n.get('class') != 'android.widget.Button'):
             label = n.get('text', '') or n.get('content-desc', '')
             if not (text in label if contains else label == text):
                 continue
@@ -121,31 +121,40 @@ assert without['preferences']['xcertplay_airplay']['audio_focus_enabled']['value
 adjusted = json.loads(json.dumps(without))
 adjusted['preferences']['xcertplay_airplay']['audio_focus_enabled']['value'] = False
 assert adjusted == with_headrest
+click('连接')
 for mode, stored in [('仅 IPv6','IPV6_ONLY'), ('IPv4 + IPv6','DUAL_STACK'), ('仅 IPv4','IPV4_ONLY')]:
     click('Wi-Fi Direct IP 模式')
     wait_text('IPv4 + IPv6')
     screenshot('ip-modes-' + stored)
     click(mode)
     click('确定')
+    if stored == 'IPV6_ONLY':
+        before_save = current()
+        click('保存')
+        wait_text('保存配置')
+        screenshot('save-name')
+        set_text('Cancelled151')
+        click('取消')
+        assert current() == before_save
+    click('保存')
+    wait_text('保存配置')
     click('保存')
     assert current()['configuration']['preferences']['xcertplay_airplay']['galaxy_p2p_address_mode']['value'] == stored
-# 重跑时先换成不同名称，保证随后仍验证真实改名与保存。
-if current()['profile_name'] == 'Demo147':
-    click('配置名称')
-    set_text('Before147')
-    click('确定')
-    click('保存')
-click('配置名称')
+click('常用')
+click('保存')
+wait_text('保存配置')
 set_text('Demo147')
-click('确定')
 click('保存')
 assert current()['profile_name'] == 'Demo147'
+before_share = current()
 click('分享')
+set_text('note147')
 click('生成分享配置')
 wait_text('复制配置文本', 20)
 screenshot('share-qr')
 click('复制配置文本')
 click('关闭')
+assert current() == before_share
 click('导入')
 click('粘贴文本')
 root = tree()
@@ -153,6 +162,7 @@ code = next(n.get('text','') for n in root.iter('node') if n.get('class') == 'an
 assert code.startswith('GALAXYPLAY2:')
 click('预览配置')
 wait_text('导入并应用')
+assert any('note147' in n.get('text','') for n in tree().iter('node'))
 screenshot('import-preview')
 before = current()
 click('取消')

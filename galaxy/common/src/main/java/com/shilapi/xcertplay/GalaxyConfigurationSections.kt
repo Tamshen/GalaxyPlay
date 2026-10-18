@@ -14,7 +14,6 @@ internal object GalaxyConfigurationSections {
                     listOf(100, 80, 60), listOf(R.string.config_quality_clear, R.string.config_quality_balanced, R.string.config_quality_light))
                 quickChoice(context, card, "display_fps", R.string.config_smoothness,
                     listOf(30, 60), listOf(R.string.config_smoothness_standard, R.string.config_smoothness_high))
-                GalaxyProfileFieldsView.add(context, card, R.string.config_page_common)
                 quickChoice(context, card, "media_buffer_ms", R.string.config_music_stability,
                     listOf(300, 500, 1000, 0), listOf(R.string.config_music_fast, R.string.config_music_stable,
                         R.string.config_music_safest, R.string.audio_buffer_phone))
@@ -23,17 +22,20 @@ internal object GalaxyConfigurationSections {
                     AirPlayPersistence.saveBluetoothMediaExclusive(context, it)
                 })
             }
-            1 -> L7SettingsSection.add(parent, description = text(R.string.config_steering_hint)) { card ->
+            1 -> L7SettingsSection.add(parent) { card ->
+                GalaxyProfileFieldsView.add(context, card, R.string.config_page_connection)
+            }
+            2 -> L7SettingsSection.add(parent, description = text(R.string.config_steering_hint)) { card ->
                 GalaxyProfileFieldsView.add(context, card, R.string.config_page_steering)
             }
-            2 -> {
+            3 -> {
                 val audio = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
                 parent.addView(audio)
                 L7AudioSettings.page(context, audio) { title, current, role, apply ->
                     L7AudioRouteDialog.show(context, title, current, role, apply)
                 }
             }
-            3 -> L7SettingsSection.add(parent) { card ->
+            4 -> L7SettingsSection.add(parent) { card ->
                 GalaxyProfileFieldsView.add(context, card, R.string.l7_section_projection,
                     setOf("hide_top_bar", "hide_bottom_bar", "right_hand_drive"))
                 GalaxyVideoDecoderSettings.add(context, card)

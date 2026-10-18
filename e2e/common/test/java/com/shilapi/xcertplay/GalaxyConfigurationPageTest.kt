@@ -19,32 +19,55 @@ import org.robolectric.shadows.ShadowAlertDialog
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class GalaxyConfigurationPageTest {
-    @Test fun configurationNameIsEditableMetadataAndDoesNotChangeVehicleParameters() {
+    @Test fun configurationNameIsOnlyEditedWhenSavingAndCancelKeepsTheDraft() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)
         val original = repository.applyTemplate("l7")
         val page = GalaxyConfigurationPage(activity) {}
-        descendants(page.view.fields).filterIsInstance<L7SettingRow>().single {
+        val row = descendants(page.view.fields).filterIsInstance<L7SettingRow>().single {
             it.titleView.text == activity.getString(R.string.config_profile_name)
-        }.performClick()
+        }
+        assertFalse(row.isClickable)
+        page.view.commitButton.performClick()
+        val cancelled = dialog()
+        descendants(cancelled.window!!.decorView).filterIsInstance<android.widget.EditText>().single().setText("未保存名称")
+        cancelled.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(original, repository.active())
+        assertFalse(page.dirty)
+        page.view.commitButton.performClick()
         val editor = dialog()
+        page.view.commitButton.performClick()
+        assertSame(editor, dialog())
         val input = descendants(editor.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
         input.setText("头枕日常配置")
-        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        assertTrue(page.dirty)
         assertEquals(original, repository.active())
-        assertEquals(original.configuration, state(activity).draft!!.configuration)
-        page.view.commitButton.performClick()
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(original.revision + 1, repository.active().revision)
         assertEquals("头枕日常配置", repository.active().name)
         assertEquals("l7", repository.active().template)
         assertEquals(original.configuration, repository.active().configuration)
         page.close()
+    }
+    @Test fun closingThePageRejectsLateNameConfirmationWithoutWriting() {
+        val activity = activity()
+        val original = GalaxyProfiles(activity).applyTemplate("l7")
+        val page = GalaxyConfigurationPage(activity) {}
+        modify(page, activity)
+        page.view.commitButton.performClick()
+        val editor = dialog()
+        page.close()
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertEquals(original, GalaxyProfiles(activity).active())
     }
     @Test fun ipModePickerHasThreeChoicesAndOnlyCommitsTheDraftOnSave() {
         val activity = activity()
         val repository = GalaxyProfiles(activity)
         val original = repository.applyTemplate("l7_no_headrest")
         val page = GalaxyConfigurationPage(activity) {}
+        page.view.tabs.buttons[1].performClick()
+        assertEquals(activity.getString(R.string.config_page_connection), page.view.tabs.buttons[1].text)
         fun open(): AlertDialog {
             descendants(page.view.fields).filterIsInstance<L7SettingRow>().single {
                 it.titleView.text == activity.getString(R.string.galaxy_p2p_address_mode)
@@ -62,7 +85,7 @@ class GalaxyConfigurationPageTest {
         assertTrue(page.dirty)
         assertEquals(original, repository.active())
         assertEquals("DUAL_STACK", state(activity).draft!!.configuration.preferences.getValue("xcertplay_airplay")[GalaxyP2pAddressSettings.KEY])
-        page.view.commitButton.performClick()
+        save(page)
         assertEquals(com.shilapi.xcertplay.network.P2pAddressMode.DUAL_STACK, GalaxyP2pAddressSettings.load(activity))
         assertEquals("l7", repository.active().model)
         page.close()
@@ -70,6 +93,10 @@ class GalaxyConfigurationPageTest {
     private fun activity() = Robolectric.buildActivity(ComponentActivity::class.java).setup().get().apply {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
         java.io.File(filesDir, "configurations").deleteRecursively()
+    }
+    private fun save(page: GalaxyConfigurationPage) {
+        page.view.commitButton.performClick()
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
     }
     private fun state(activity: ComponentActivity) = ViewModelProvider(activity)[GalaxyConfigurationState::class.java]
     private fun dialog(): AlertDialog {
@@ -104,7 +131,7 @@ class GalaxyConfigurationPageTest {
         assertEquals("l6", l6.model)
         assertEquals(1, repository.list().size)
         assertFalse(page.dirty)
-        assertFalse(page.view.commitButton.isEnabled)
+        assertTrue(page.view.commitButton.isEnabled)
         template(page, "l7")
         assertEquals("l7", repository.active().model)
         assertEquals(l6.id, repository.active().id)
@@ -123,7 +150,7 @@ class GalaxyConfigurationPageTest {
         assertEquals(GalaxyConfiguration.parse(GalaxyConfigurationFields.factory(activity, "custom").json()),
             repository.active().configuration)
         modify(page, activity)
-        page.view.commitButton.performClick()
+        save(page)
         assertEquals("custom", repository.active().model)
         assertEquals(1, repository.list().size)
         page.close()
@@ -143,7 +170,7 @@ class GalaxyConfigurationPageTest {
             modify(page, activity)
             assertEquals(model, repository.active().template)
             assertTrue(page.view.vehicleButton.text.toString().contains(activity.getString(GalaxyVehicleTemplates.find(model)!!.title)))
-            page.view.commitButton.performClick()
+            save(page)
             val saved = repository.active()
             assertEquals("custom", saved.template)
             assertEquals(model, saved.model)
@@ -239,12 +266,14 @@ class GalaxyConfigurationPageTest {
         assertEquals(applied, repository.active())
         assertTrue(page.dirty)
         page.view.commitButton.performClick()
+        val confirmation = dialog()
+        confirmation.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         val saved = repository.active()
         assertEquals(applied.id, saved.id)
         assertEquals("l6", saved.model)
         assertEquals(applied.revision + 1, saved.revision)
         assertEquals(60, saved.configuration.preferences["xcertplay_airplay"]!!["display_fps"])
-        page.view.commitButton.performClick()
+        confirmation.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertEquals(saved, repository.active())
         assertEquals(1, repository.list().size)
         page.close()
@@ -270,7 +299,7 @@ class GalaxyConfigurationPageTest {
         modify(page, activity)
         descendants(page.view).filterIsInstance<android.widget.Button>()
             .first { it.text.toString() == activity.getString(R.string.config_page_video) }.performClick()
-        assertEquals(3, state(activity).group)
+        assertEquals(4, state(activity).group)
         assertTrue(page.dirty)
         assertEquals(original, repository.active())
         assertEquals(60, state(activity).draft!!.configuration.preferences["xcertplay_airplay"]!!["display_fps"])
@@ -298,11 +327,11 @@ class GalaxyConfigurationPageTest {
         val original = repository.active()
         val page = GalaxyConfigurationPage(activity) {}
         modify(page, activity)
-        state(activity).group = 3
+        state(activity).group = 4
         page.close()
         val rebuilt = GalaxyConfigurationPage(activity) {}
         assertTrue(rebuilt.dirty)
-        assertEquals(3, state(activity).group)
+        assertEquals(4, state(activity).group)
         assertEquals(original, repository.active())
         rebuilt.close()
     }
@@ -375,7 +404,7 @@ class GalaxyConfigurationPageTest {
             assertFalse(repository.active().configuration.preferences.getValue("xcertplay_airplay").containsKey("ui_scale_percent"))
         }
         val page = GalaxyConfigurationPage(activity) {}
-        for (group in 0..4) {
+        for (group in page.view.tabs.buttons.indices) {
             page.view.tabs.buttons[group].performClick()
             assertFalse(descendants(page.view.fields).filterIsInstance<L7SettingRow>().any {
                 it.titleView.text.toString() == activity.getString(R.string.config_icon_size)
@@ -444,7 +473,7 @@ class GalaxyConfigurationPageTest {
         L7Ui.refresh(tabs)
         assertEquals(activity.getColor(R.color.product_ui_primary_text), tabs.buttons.last().currentTextColor)
         assertEquals(activity.getColor(R.color.product_ui_text), tabs.buttons.first().currentTextColor)
-        assertEquals(4, state(activity).group)
+        assertEquals(5, state(activity).group)
         assertTrue(tabs.scrollX > 0)
         assertTrue(tabs.buttons.last().right <= tabs.scrollX + tabs.width)
         page.close()
@@ -456,7 +485,7 @@ class GalaxyConfigurationPageTest {
         template(page, "l7")
         val original = repository.active()
         val titles = mutableListOf<String>()
-        for (group in 0..4) {
+        for (group in page.view.tabs.buttons.indices) {
             page.view.tabs.buttons[group].performClick()
             titles += descendants(page.view.fields).filterIsInstance<L7SettingRow>().map { it.titleView.text.toString() }
         }
@@ -470,7 +499,7 @@ class GalaxyConfigurationPageTest {
             .first { it.titleView.text.toString() == activity.getString(R.string.config_media_reporting) }.performClick()
         assertTrue(page.dirty)
         assertEquals(original, repository.active())
-        page.view.commitButton.performClick()
+        save(page)
         assertFalse(GalaxyVehiclePreferences.mediaReporting(activity))
         assertEquals("custom", repository.active().template)
         page.close()
@@ -480,7 +509,7 @@ class GalaxyConfigurationPageTest {
         val repository = GalaxyProfiles(activity)
         val original = repository.active()
         val page = GalaxyConfigurationPage(activity) {}
-        page.view.tabs.buttons[3].performClick()
+        page.view.tabs.buttons[4].performClick()
         fun rows() = descendants(page.view.fields).filterIsInstance<L7SettingRow>()
         assertTrue(rows().any { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) })
         rows().first { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) }.performClick()
@@ -489,7 +518,7 @@ class GalaxyConfigurationPageTest {
         page.close()
         val rebuilt = GalaxyConfigurationPage(activity) {}
         assertTrue(rebuilt.dirty)
-        assertEquals(3, state(activity).group)
+        assertEquals(4, state(activity).group)
         assertTrue(descendants(rebuilt.view.fields).filterIsInstance<L7SettingRow>()
             .any { it.titleView.text.toString() == activity.getString(R.string.profile_software_hevc) })
         rebuilt.close()
@@ -501,7 +530,7 @@ class GalaxyConfigurationPageTest {
         val page = GalaxyConfigurationPage(activity) {}
         fun rows() = descendants(page.view.fields).filterIsInstance<L7SettingRow>()
         val titles = mutableListOf<String>()
-        for (group in 0..4) {
+        for (group in page.view.tabs.buttons.indices) {
             page.view.tabs.buttons[group].performClick()
             titles += rows().map { it.titleView.text.toString() }
         }
@@ -534,7 +563,7 @@ class GalaxyConfigurationPageTest {
         assertTrue(page.dirty)
         assertEquals(original, repository.active())
         assertEquals(activity.getString(R.string.config_percent_value, 73), quality.valueView.text.toString())
-        page.view.commitButton.performClick()
+        save(page)
         assertEquals(73, repository.active().configuration.preferences.getValue("xcertplay_airplay")["display_scale_percent"])
         page.close()
     }

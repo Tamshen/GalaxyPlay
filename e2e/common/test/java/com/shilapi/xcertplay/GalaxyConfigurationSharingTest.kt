@@ -71,14 +71,15 @@ class GalaxyConfigurationSharingTest {
     @Test fun sharingGeneratesACopyableCodeWithoutSavingTheVehicleOrLaunchingAnImporter() {
         sharing.share()
         val name = descendants().filterIsInstance<EditText>().single()
-        assertTrue(name.text.isNotEmpty())
-        name.setText("配置01")
+        assertTrue(name.text.isEmpty())
+        name.setText("头枕日常备注")
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         await { descendants().filterIsInstance<Button>().any { it.text == activity.getString(R.string.config_share_copy) } }
         click(R.string.config_share_copy)
         val code = activity.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString()
         val shared = GalaxyConfigurationShare.parse(code)
-        assertEquals("配置01", shared.name)
+        assertEquals(original.name, shared.name)
+        assertEquals("头枕日常备注", shared.remark)
         assertEquals(original.configuration, shared.configuration)
         assertEquals(original, GalaxyProfiles(activity).active())
         assertNull(shadowOf(activity).nextStartedActivity)

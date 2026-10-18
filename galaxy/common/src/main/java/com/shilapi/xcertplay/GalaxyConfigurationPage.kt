@@ -14,6 +14,7 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private val observers = mutableListOf<android.content.SharedPreferences.OnSharedPreferenceChangeListener>()
     private var templateDialog: AlertDialog? = null
     private var resetDialog: AlertDialog? = null
+    private var saveDialog: AlertDialog? = null
     private var closed = false
     private val sharing = lazy { GalaxyConfigurationSharing(activity, { state.original }, { state.draft }) {
         state.load(it); bind(); changed()
@@ -63,17 +64,15 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         }
         view.feedback(hint)
         view.resetButton.isEnabled = dirty
-        view.commitButton.isEnabled = dirty
+        view.commitButton.isEnabled = true
     }
     private fun renderFields() {
         val context = draft ?: return
         view.fields.removeAllViews()
         view.category(state.group)
-        if (state.group == 0) GalaxyConfigurationNameField.add(context, view.fields, context.profile.name) { name ->
-            if (!closed) { state.draft = context.profile.copy(name = name, configuration = context.configuration()); bind() }
-        }
+        if (state.group == 0) GalaxyConfigurationNameField.add(context, view.fields, context.profile.name)
         GalaxyConfigurationSections.add(context, view.fields, state.group)
-        if (state.group == 2 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
+        if (state.group == 3 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
         view.scroll.post { view.scroll.scrollTo(0, state.scroll[state.group] ?: 0) }
     }
@@ -159,12 +158,18 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         changed()
     }
     private fun commit() {
+        if (closed || saveDialog?.isShowing == true) return
         val profile = state.draft ?: return
-        val result = runCatching { repository.save(profile) }
-        if (result.isFailure) { view.feedback(text(R.string.profile_save_failed), true); return }
-        state.load(result.getOrThrow())
-        bind()
-        changed()
+        saveDialog = GalaxyConfigurationNameField.save(activity, GalaxyConfigurationNames.forSave(activity, profile)) { name ->
+            if (closed || state.draft != profile) false else {
+                val result = runCatching { repository.save(profile.copy(name = name)) }
+                result.onSuccess {
+                    GalaxyConfigurationNames.used(activity)
+                    state.load(it); bind(); changed()
+                }
+                result.isSuccess
+            }
+        }.also { dialog -> dialog.setOnDismissListener { if (saveDialog === dialog) saveDialog = null } }
     }
     private fun detach() {
         draft?.let { context ->
@@ -180,6 +185,7 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         if (sharing.isInitialized()) sharing.value.close()
         templateDialog?.dismiss()
         templateDialog = null
+        saveDialog?.dismiss(); saveDialog = null
         resetDialog?.dismiss()
         resetDialog = null
         state.scroll[state.group] = view.scroll.scrollY

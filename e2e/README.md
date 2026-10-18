@@ -21,9 +21,9 @@
 
 `GalaxyVehiclePresetsTest` 验证两套 L7 预设均为 60 fps／80%／默认 IPv4，只有音频焦点不同，实际车型标识仍为 L7，预设标识随文件与日志往返。`P2pHostAddressesTest`、`P2pAddressWiringTest`、`WifiP2pAddressWaitTest`、`HostConnectionSettingsRefreshTest` 覆盖用户选择 IPv4／IPv6／双栈、接口地址先后、单栈不跨族补位、真实管理器地址快照与运行参数冻结。配置页回归覆盖名称和 IP 草稿、取消与保存。
 
-`GalaxyConfigurationShareTest` 和 `GalaxyConfigurationSharingTest` 检查专用文件／压缩文本的完整往返、备注与默认顺序名称、二维码经测试专用解码器识别后与复制文本一致、车型白名单／凭据隔离、大小与展开预算、损坏版本拒绝、粘贴预览和确认、取消／关闭／版本冲突不覆盖文件。产品 APK 只生成二维码，ZXing 解码器只在 testImplementation。精简格式额外覆盖固定基线、预设省略重复项、自定义参数／音频／空值／删除项的完整还原、旧码导入及未知基线／非法字段拒绝；两份 L7 预设均核对默认 C2。
+`GalaxyConfigurationShareTest` 和 `GalaxyConfigurationSharingTest` 检查专用文件／压缩文本的完整往返、备注与默认顺序名称、二维码经测试专用解码器识别后与复制文本一致、车型白名单／凭据隔离、大小与展开预算、损坏版本拒绝、粘贴预览和确认、取消／关闭／版本冲突不覆盖文件。产品 APK 只生成二维码，ZXing 解码器只在 testImplementation。保存名称的确认／取消／重复点击／关闭隔离、可选分享备注与保存名称独立、备注往返和旧载荷兼容、新增连接 TAB 内的 IP 草稿均有对应回归。精简格式额外覆盖固定基线、预设省略重复项、自定义参数／音频／空值／删除项的完整还原、旧码导入及未知基线／非法字段拒绝；两份 L7 预设均核对默认 C2。
 
-`configuration_sharing_smoke.py --adb /path/to/adb --apk /path/to/apk --output-dir /path/to/output` 只接受独立 Android 11 `configuration147` AVD（默认 emulator-5570），安装包并写入临时自动化协议及中文／关闭自动连接夹具；不操作日常 AVD 或真实车辆。检查两预设差异、三种 IP 模式、配置名称、二维码展示／复制、文字粘贴预览／取消／应用及系统 JSON／PNG 导出。屏幕截图与合成配置结果放在忽略目录；该设备测试不代表真实手机连接、拍照识别或实车音频通过。
+`configuration_sharing_smoke.py --adb /path/to/adb --apk /path/to/apk --output-dir /path/to/output` 只接受独立 Android 11 `configuration147`／`configuration151` AVD（默认 emulator-5570），安装包并写入临时自动化协议及中文／关闭自动连接夹具；不操作日常 AVD 或真实车辆。检查两预设差异、三种 IP 模式、配置名称、二维码展示／复制、文字粘贴预览／取消／应用及系统 JSON／PNG 导出。屏幕截图与合成配置结果放在忽略目录；该设备测试不代表真实手机连接、拍照识别或实车音频通过。
 
 `GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`L7WifiDirectPolicyTest`、`P2pAddressWiringTest`、`WifiP2pAddressWaitTest` 和 `HostConnectionSettingsRefreshTest` 覆盖 L7 车型隔离、实际双栈接口下仅发布 IPv4、IPv4 晚到／缺失、同地址补发、149 信道与地区限制、下一次会话快照；`GalaxyWirelessAddressRecoveryTest` 覆盖其他车型保留的 Direct 地址恢复、保持原生热点偏好隔离、单栈／晚到地址／取消／关闭及其他后端边界。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、所选单栈模式的同地址补发及双栈模式的地址族补发、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
 

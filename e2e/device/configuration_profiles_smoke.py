@@ -326,7 +326,7 @@ def configuration_smoke():
     assert active() == original_id and current_app_values() == independent
     screenshot('03-custom-applied')
     category('common')
-    click(label('smoothness')); click(label('fps60')); click(label('confirm')); click(label('save'))
+    click(label('smoothness')); click(label('fps60')); click(label('confirm')); click(label('save')); click(label('save'))
     custom_saved = private(path)
     click(label('bluetooth'))
     click(label('reset'))
@@ -427,7 +427,7 @@ def configuration_smoke():
             str((x1 + x2) // 2), str(y2 - (y2 - y1) // 5), '300')
     assert not any(value in texts() for value in ['高级设置', 'Advanced settings', '收起高级设置', 'Hide advanced settings'])
     screenshot('05-display-direct')
-    click(label('right')); click(label('save'))
+    click(label('right')); click(label('save')); click(label('save'))
     edited = json.loads(private(path))
     assert edited['template_id'] == 'custom', '保存改动未切换为自定义配置'
     assert any(value.startswith(label('vehicle')) and label('custom_vehicle') in value for value in texts()), '保存后车型仍显示模板'
@@ -488,7 +488,7 @@ def audio_auth_smoke():
     template('l6')
     category('audio')
     exercise_audio_routes()
-    click(label('save'))
+    click(label('save')); click(label('save'))
     edited = json.loads(private(path))
     assert edited['template_id'] == 'custom'
     assert edited['configuration']['audio_templates']['l6']['choices']['phone'] == 101
