@@ -60,8 +60,17 @@ class GalaxyWirelessAddressRecoveryTest {
     }
 
     @Test fun directSingleStackAndLateUnboundIpv6KeepTheOriginalEndpoint() {
-        val recovery = policy(info(WirelessHotspotBackend.WIFI_P2P, listOf(ipv4)))!!
-        assertEquals(endpoint.ipAddresses, recovery.refresh(endpoint)!!.ipAddresses)
+        val addresses = p2pHostAddresses(ipv4, live, 22, ipv4Only = true)
+        val recovery = policy(info(WirelessHotspotBackend.WIFI_P2P, addresses))!!
+        val refreshed = recovery.refresh(endpoint)!!
+        assertEquals(endpoint.ipAddresses, refreshed.ipAddresses)
+        assertEquals(endpoint.airPlayPort, refreshed.airPlayPort)
+        assertEquals(endpoint.ssid, refreshed.ssid)
+        assertEquals(endpoint.passphrase, refreshed.passphrase)
+        assertEquals(endpoint.deviceIdentifier, refreshed.deviceIdentifier)
+        assertEquals(listOf(ipv4), recovery.publishedAddresses)
+        assertNull(recovery.refresh(endpoint))
+        recovery.close()
     }
 
     @Test fun directRemovedAddressesAndCancelledRunsCannotPublish() {

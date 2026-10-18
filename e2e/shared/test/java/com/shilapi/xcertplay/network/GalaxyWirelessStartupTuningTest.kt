@@ -28,6 +28,7 @@ class GalaxyWirelessStartupTuningTest {
     @Test fun coreDefaultsRemainThirtySecondsAndRejectUnboundedDeadlines() {
         assertEquals(30_000L, config().wirelessFirstTcpTimeoutMillis)
         assertFalse(config().wirelessStartupRefreshEnabled)
+        assertFalse(config().wifiP2pIpv4Only)
         assertEquals(45_000L, config(45_000).wirelessFirstTcpTimeoutMillis)
         for (timeout in listOf(0L, -1L, 60_001L, Long.MAX_VALUE))
             assertThrows(IllegalArgumentException::class.java) { config(timeout) }

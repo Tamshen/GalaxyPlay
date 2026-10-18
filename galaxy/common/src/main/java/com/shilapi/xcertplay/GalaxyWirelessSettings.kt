@@ -67,12 +67,15 @@ internal class GalaxyWirelessSettings(
         }
         modeRow.setValue(modeLabel(AirPlayPersistence.loadWirelessHotspotMode(activity)))
         modeRow.isEnabled = !closed && canEdit()
-        channelRow?.setValue(channelLabel(AirPlayPersistence.loadWifiP2pPreferredChannel(activity)))
-        channelRow?.isEnabled = !closed && canEdit()
+        val fixedChannel = GalaxyP2pSettings.fixedChannel(activity)
+        channelRow?.setValue(channelLabel(GalaxyP2pSettings.effectiveChannel(activity)))
+        channelRow?.isEnabled = fixedChannel == null && !closed && canEdit()
+        channelRow?.setDescription(activity.getString(if (fixedChannel != null)
+            R.string.galaxy_l7_direct_channel_hint else R.string.wifi_direct_channel_description))
         val region = GalaxyP2pSettings.load(activity)
         regionRow?.setValue(regionLabel(region))
         regionRow?.isEnabled = !closed && canEdit()
-        val channel = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
+        val channel = GalaxyP2pSettings.effectiveChannel(activity)
         val invalid = channel != WifiP2pChannels.AUTO && !region.policy.allows(channel)
         channelRow?.setFeedback(if (invalid) activity.getString(R.string.galaxy_p2p_region_channel_invalid) else "", error = invalid)
         val available = supported(activity)
@@ -108,7 +111,7 @@ internal class GalaxyWirelessSettings(
     }
 
     private fun chooseChannel() {
-        if (closed || !canEdit()) return
+        if (closed || !canEdit() || GalaxyP2pSettings.fixedChannel(activity) != null) return
         val region = GalaxyP2pSettings.load(activity)
         val choices = listOf(WifiP2pChannels.AUTO) + region.policy.channels
         val current = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
@@ -122,6 +125,7 @@ internal class GalaxyWirelessSettings(
                 if (canConfirm(generation) && selection != current &&
                     AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
                     GalaxyP2pSettings.load(activity) == region &&
+                    GalaxyP2pSettings.fixedChannel(activity) == null &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.WIFI_P2P) {
                     AirPlayPersistence.saveWifiP2pPreferredChannel(activity, selection)
                     update()

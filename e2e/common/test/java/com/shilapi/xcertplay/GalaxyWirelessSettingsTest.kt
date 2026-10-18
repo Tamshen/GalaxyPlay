@@ -35,6 +35,7 @@ class GalaxyWirelessSettingsTest {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         activity.setTheme(R.style.Theme_Xcertplay)
         activity.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
+        activity.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l6").commit()
         shadowOf(activity.packageManager).setSystemFeature(PackageManager.FEATURE_WIFI_DIRECT, true)
         activity.getSystemService(WifiManager::class.java).isWifiEnabled = true
         parent = LinearLayout(activity)
@@ -123,6 +124,25 @@ class GalaxyWirelessSettingsTest {
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(149, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
         assertEquals("synthetic-native", AirPlayPersistence.loadManualHotspotSsid(activity))
+    }
+
+    @Test fun l7ShowsFixedChannelWithoutReplacingSavedChannelForOtherModels() {
+        activity.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l7").commit()
+        AirPlayPersistence.saveWifiP2pPreferredChannel(activity, 153)
+        settings.addDirect(parent)
+        val row = rows().single { it.titleView.text == activity.getString(R.string.wifi_direct_channel_title) }
+        assertFalse(row.isEnabled)
+        assertEquals(149, GalaxyP2pSettings.effectiveChannel(activity))
+        assertEquals(153, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
+        GalaxyP2pSettings.save(activity, com.shilapi.xcertplay.network.GalaxyP2pRegion.OTHER_CONSERVATIVE)
+        settings.update()
+        assertTrue(row.isEnabled)
+        assertNull(GalaxyP2pSettings.fixedChannel(activity))
+        activity.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l6").commit()
+        GalaxyP2pSettings.save(activity, com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA)
+        settings.update()
+        assertTrue(row.isEnabled)
+        assertEquals(153, GalaxyP2pSettings.effectiveChannel(activity))
     }
 
     @Test fun templateAndResetPreserveDirectModeAndChannel() {

@@ -32,9 +32,9 @@ class FirstTcpWatchdogTest {
         val scanTimer = timer!!
         now = 5_000; watch.startSessionSent(now * 1_000_000)
         assertEquals(45_000L, deadline)
-        now = 35_000
+        now = 39_000
         assertTrue(watch.accepted(event()))
-        assertEquals(65_000L, deadline)
+        assertEquals(69_000L, deadline)
         scanTimer()
         assertEquals(0, failures)
         assertTrue(watch.sessionEstablished())

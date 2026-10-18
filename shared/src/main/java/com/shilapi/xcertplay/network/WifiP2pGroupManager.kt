@@ -42,6 +42,7 @@ class WifiP2pGroupManager(
     private val preferredChannel: Int = WifiP2pChannels.AUTO,
     private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
     private val channelPolicy: P2pChannelPolicy? = null,
+    private val ipv4Only: Boolean = false,
 ) : WirelessHotspotManager {
     init {
         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -116,6 +117,7 @@ class WifiP2pGroupManager(
             "WifiP2pGroupManager.start must not run on the main thread"
         }
         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
+        diagnostic("Wi-Fi P2P address policy=${if (ipv4Only) "IPv4_only" else "dual_stack"}")
 
         val attempt = StartAttempt()
         synchronized(stateLock) {
@@ -710,6 +712,7 @@ class WifiP2pGroupManager(
         val info = result.get() ?: return null
         if (!info.groupFormed) return null
         return info.groupOwnerAddress?.takeUnless(InetAddress::isAnyLocalAddress)
+            ?.takeIf { !ipv4Only || it is Inet4Address }
     }
 
     private fun await(latch: CountDownLatch, timeoutNanos: Long): Boolean = try {
@@ -723,14 +726,15 @@ class WifiP2pGroupManager(
     private fun interfaceHostAddresses(interfaceName: String, primary: InetAddress): List<InetAddress> {
         val selected = networkInterface(interfaceName)
         val addresses = p2pHostAddresses(primary,
-            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0)
+            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0, ipv4Only)
         diagnostic("Wi-Fi P2P listener families=${addresses.joinToString(",") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
         return addresses
     }
 
     private fun interfaceAddress(interfaceName: String): InetAddress? {
         val networkInterface = networkInterface(interfaceName) ?: return null
-        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
+        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses)
+            .filter { !ipv4Only || it is Inet4Address })
             ?: return null
         if (address !is Inet6Address || address.scopeId == networkInterface.index) return address
         return runCatching { Inet6Address.getByAddress(null, address.address, networkInterface) }

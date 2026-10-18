@@ -19,7 +19,7 @@
 
 ## 原生热点连接恢复
 
-`GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`GalaxyWirelessAddressRecoveryTest` 覆盖产品策略启用后的 Direct 地址恢复、保持原生热点偏好隔离、单栈／晚到地址／取消／关闭及其他后端边界。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、Direct 产品策略实际补发 IPv6、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
+`GalaxyHotspotAddressRecoveryTest`、`GalaxyHotspotAddressMemoryTest` 和 `GalaxyHotspotControllerRecoveryTest` 覆盖原生热点在已监听的双栈地址之间单次恢复、实际会话端点沿用、真实首帧后才记录成功地址族、同热点重建读回、其他网络隔离、无作用域／晚到未绑定／消失地址拒绝，以及关闭和旧会话回调隔离；偏好与日志失败不影响连接。`L7WifiDirectPolicyTest`、`P2pAddressWiringTest`、`WifiP2pAddressWaitTest` 和 `HostConnectionSettingsRefreshTest` 覆盖 L7 车型隔离、实际双栈接口下仅发布 IPv4、IPv4 晚到／缺失、同地址补发、149 信道与地区限制、下一次会话快照；`GalaxyWirelessAddressRecoveryTest` 覆盖其他车型保留的 Direct 地址恢复、保持原生热点偏好隔离、单栈／晚到地址／取消／关闭及其他后端边界。`WirelessStartSessionRecoveryTest`、`WirelessStartupRefreshTest` 和 `FirstTcpWatchdogTest` 检查真实控制循环写出的地址、L7 IPv4 专属路径的同地址补发及其他车型双栈补发、身份和端口保留、不额外发送 Wi-Fi 配置、无注入策略时仍原样重发、原期限不延长、TCP 在查询或预检期间到达时不重发，以及手机后续启动请求不退回旧端点。`GalaxyWirelessConnectionProgressTest`、`WirelessStartupRecoveryTest` 继续覆盖五步、真实失败阶段和重试显示。以上为软件回归，不建立真实手机链路。
 
 `P2pCredentialsTest`、`WifiP2pGroupManagerTest` 覆盖明确请求的密码与系统回读一致、外层引号兼容、默认组缺凭据拒绝、真实单播 AP 提示、发送前配置变化拒绝；日志仅保留匹配结果。`ConnectionCancellationTest` 在 Android 10／11 验证应用首页先于旧宿主关闭、重复取消幂等、延迟释放不再跳转、旧宿主不停止新会话。`RemoteLogEvidenceRetentionTest` 覆盖同事件跨来源合并、真实重复故障保留、事件时间排序、媒体压力下阶段／错误证据与 1 MiB JSON 预算、会话关闭后释放证据仍落盘。
 
@@ -68,7 +68,7 @@ e2e/
 
 [L7UiDensityTest](common/test/java/com/shilapi/xcertplay/L7UiDensityTest.kt) 检查默认中档、自定义保存、非法输入保护、窗口 dp 换算与系统/投屏配置隔离。
 
-无线扫描／快速重试使用 `GalaxyWirelessStartupTuningTest`、`FirstTcpWatchdogTest`、`WirelessStartupRefreshTest`、`GalaxyWirelessRecoveryTest`、`WirelessStartupRecoveryTest` 和 `ConnectionCancellationTest`：检查 Direct 的 45 秒首 TCP 窗口、模拟手机 35 秒才接入、同链路五秒单次补发且不重发凭据／延长期限，1／2／4／5／5 秒有限退避、蓝牙未分类错误进入同一预算、停止后的迟到错误不改写失败反馈。`HostConnectionSettingsRefreshTest` 核对连接方式切换后策略进入下一次真实运行配置；有线与其他后端保留原约束。替身计时及 Docker 回环不代表真实手机扫描或连接提速已经通过。
+无线扫描／快速重试使用 `GalaxyWirelessStartupTuningTest`、`FirstTcpWatchdogTest`、`WirelessStartupRefreshTest`、`GalaxyWirelessRecoveryTest`、`WirelessStartupRecoveryTest` 和 `ConnectionCancellationTest`：检查 Direct 的 45 秒首 TCP 窗口、模拟手机 39 秒才接入、同链路五秒单次补发且不重发凭据／延长期限，1／2／4／5／5 秒有限退避、蓝牙未分类错误进入同一预算、停止后的迟到错误不改写失败反馈。`HostConnectionSettingsRefreshTest` 核对连接方式切换后策略进入下一次真实运行配置；有线与其他后端保留原约束。替身计时及 Docker 回环不代表真实手机扫描或连接提速已经通过。
 
 [L7AgreementTest](common/test/java/com/shilapi/xcertplay/L7AgreementTest.kt) 检查默认未同意、正文摘要失配需重签、撤回保留连接配置、完整协议资源、文末等待 4999/5000 毫秒边界、主动勾选、停止期间禁止确认、后台返回重计时及布局/主题刷新保持倒计时。
 

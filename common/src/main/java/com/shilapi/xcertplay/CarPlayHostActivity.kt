@@ -187,8 +187,10 @@ class CarPlayHostActivity : ComponentActivity() {
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
         // USB 有线连接不依赖未填写的无线热点参数。
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
-        wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
+        wifiP2pPreferredChannel = GalaxyP2pSettings.effectiveChannel(this),
         wifiP2pChannelPolicy = GalaxyP2pSettings.load(this).policy,
+        wifiP2pIpv4Only = com.shilapi.xcertplay.network.L7WifiDirectPolicy
+            .enabled(L7AudioTemplates.model(this).id, wirelessEnabled, wirelessHotspotMode),
         wifiScanPauseEnabled = GalaxyWirelessPerformanceSettings.enabled(this, GalaxyWirelessPerformanceSettings.SCAN),
         wifiHighPerformanceEnabled = GalaxyWirelessPerformanceSettings.enabled(this, GalaxyWirelessPerformanceSettings.LOCK),
         wirelessFirstTcpTimeoutMillis = com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning

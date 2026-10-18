@@ -2403,7 +2403,8 @@ class CarPlayController(
         }
         val manager: WirelessHotspotManager = when (hotspotMode) {
             WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
-                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy)
+                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy,
+                ipv4Only = config.wifiP2pIpv4Only)
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
             WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                 appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,

@@ -1505,16 +1505,17 @@
  import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
  import java.io.IOException
  import java.net.Inet4Address
-@@ -42,6 +40,8 @@
+@@ -42,6 +40,9 @@
      context: Context,
      private val diagnostic: (String) -> Unit = {},
      private val preferredChannel: Int = WifiP2pChannels.AUTO,
 +    private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
 +    private val channelPolicy: P2pChannelPolicy? = null,
++    private val ipv4Only: Boolean = false,
  ) : WirelessHotspotManager {
      init {
          require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
-@@ -76,6 +76,7 @@
+@@ -76,6 +77,7 @@
      private var created = false
      private var closed = false
      private var startAttempt: StartAttempt? = null
@@ -1522,7 +1523,7 @@
      @Volatile private var observedCreatedName: String? = null
      @Volatile private var requestedName: String? = null
  
-@@ -104,6 +105,9 @@
+@@ -104,6 +106,9 @@
      }
  
      override fun start(timeoutMillis: Long): WirelessHotspotInfo {
@@ -1532,7 +1533,15 @@
          val legacyChannels = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
          if (legacyChannels) {
              diagnostic("Wi-Fi P2P legacy channel API sdk=${Build.VERSION.SDK_INT}")
-@@ -135,13 +139,13 @@
+@@ -112,6 +117,7 @@
+             "WifiP2pGroupManager.start must not run on the main thread"
+         }
+         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
++        diagnostic("Wi-Fi P2P address policy=${if (ipv4Only) "IPv4_only" else "dual_stack"}")
+ 
+         val attempt = StartAttempt()
+         synchronized(stateLock) {
+@@ -135,13 +141,13 @@
              val preferred = remembered?.takeIf {
                  preferredChannel == WifiP2pChannels.AUTO && it.stationMHz == stationFrequency
              }
@@ -1549,7 +1558,7 @@
                          "first" else "deferred"
                      "Wi-Fi P2P remembered $position mode=${preferred.request.mode} frequencyMHz=${preferred.request.frequencyMHz ?: "auto"}"
                  }
-@@ -182,8 +186,7 @@
+@@ -182,8 +188,7 @@
                  stationFrequency = stationFrequency,
                  preferred = preferred?.request,
                  preferredChannel = preferredChannel,
@@ -1559,7 +1568,7 @@
                  beforeRetry = {
                      ensureStartActive(attempt)
                      // Do not cancel discovery, toggle Wi-Fi, or remove a newly observed group.
-@@ -204,11 +207,7 @@
+@@ -204,11 +209,7 @@
                              val builder = WifiP2pConfig.Builder()
                                  .setNetworkName(credentials.ssid)
                                  .setPassphrase(credentials.passphrase)
@@ -1572,7 +1581,7 @@
                              builder.build()
                          }
                      }
-@@ -266,14 +265,7 @@
+@@ -266,14 +267,7 @@
                      "actualMHz=unavailable matched=unverified")
              } else {
                  diagnostic("Wi-Fi P2P channel requestedMHz=${creation.frequencyMHz ?: "auto"} actualMHz=${group.frequencyMHz} matched=${creation.frequencyMHz?.let { it == group.frequencyMHz } ?: "system_selected"}")
@@ -1588,7 +1597,7 @@
                      throw P2pChannelUnavailableException(preferredChannel,
                          "The car selected channel ${group.channel} instead.")
                  }
-@@ -281,6 +273,7 @@
+@@ -281,6 +275,7 @@
              synchronized(stateLock) {
                  ensureStartActiveLocked(attempt)
                  created = true
@@ -1596,7 +1605,7 @@
                  startAttempt = null
                  // Manual experiments must not replace the proven automatic configuration.
                  pendingSuccess = if (!legacyChannels && preferredChannel == WifiP2pChannels.AUTO) {
-@@ -295,6 +288,31 @@
+@@ -295,6 +290,31 @@
              cleanupFailedStart(attempt)
              throw failure
          }
@@ -1628,7 +1637,7 @@
      }
  
      override fun onCarPlayConfirmed() = synchronized(stateLock) {
-@@ -318,6 +336,7 @@
+@@ -318,6 +338,7 @@
                  if (configurationMemory.forget(it)) diagnostic("Wi-Fi P2P remembered cleared=session_unconfirmed")
              }
              pendingSuccess = null
@@ -1636,7 +1645,7 @@
              attempt = startAttempt
              attempt?.stopped = true
              stateLock.notifyAll()
-@@ -334,7 +353,7 @@
+@@ -334,7 +355,7 @@
          }
          synchronized(legacyChannelLock) {
              if (activeChannel != null) releaseLegacyChannelRestriction(activeChannel)
@@ -1645,7 +1654,7 @@
          }
          activeThread?.quitSafely()
      }
-@@ -513,6 +532,7 @@
+@@ -513,6 +534,7 @@
                  timeoutNanos = minOf(remainingNanos, REQUEST_POLL_NANOS),
              )
              if (group == null) continue
@@ -1653,7 +1662,7 @@
              if (!group.isGroupOwner) {
                  throw IOException("Wi-Fi P2P device became a group client instead of owner")
              }
-@@ -521,8 +541,8 @@
+@@ -521,8 +543,8 @@
              if (credentials != null && networkName != null && networkName != credentials.ssid) {
                  throw IOException("Wi-Fi Direct returned an unexpected group")
              }
@@ -1664,7 +1673,7 @@
              val interfaceName = group.getInterface()?.takeIf { it.isNotBlank() }
              val frequencyMHz = group.frequency
              val channelNumber = wifiFrequencyMhzToChannel(frequencyMHz)
-@@ -552,18 +572,24 @@
+@@ -552,18 +574,24 @@
                  continue
              }
  
@@ -1691,7 +1700,7 @@
              )
          }
      }
-@@ -597,7 +623,7 @@
+@@ -597,7 +625,7 @@
              }
  
              val networkName = group.networkName?.takeIf { it.isNotBlank() }
@@ -1700,7 +1709,7 @@
              val interfaceName = legacyGroupInterface(group)
              if (networkName == null || passphrase == null || interfaceName == null) {
                  lastReason = "incomplete group details ssid=${networkName != null} " +
-@@ -618,6 +644,7 @@
+@@ -618,6 +646,7 @@
  
              val requestedChannel = creation.frequencyMHz
                  ?.let(WifiP2pLegacyChannels::operatingChannelFor) ?: UNKNOWN_CHANNEL
@@ -1708,7 +1717,7 @@
              return WirelessHotspotInfo(
                  ssid = networkName,
                  passphrase = passphrase,
-@@ -627,7 +654,8 @@
+@@ -627,7 +656,8 @@
                  bssid = interfaceHardwareAddress(interfaceName)
                      ?: group.owner?.deviceAddress?.takeIf { it.isNotBlank() },
                  interfaceName = interfaceName,
@@ -1718,22 +1727,35 @@
                  bandLabel = if (requestedChannel == UNKNOWN_CHANNEL) "Auto"
                      else WifiP2pLegacyChannels.bandLabelFor(requestedChannel),
                  backend = WirelessHotspotBackend.WIFI_P2P,
-@@ -692,6 +720,14 @@
+@@ -682,6 +712,7 @@
+         val info = result.get() ?: return null
+         if (!info.groupFormed) return null
+         return info.groupOwnerAddress?.takeUnless(InetAddress::isAnyLocalAddress)
++            ?.takeIf { !ipv4Only || it is Inet4Address }
+     }
+ 
+     private fun await(latch: CountDownLatch, timeoutNanos: Long): Boolean = try {
+@@ -692,9 +723,18 @@
          throw IOException("Interrupted while waiting for Wi-Fi P2P", interrupted)
      }
  
 +    private fun interfaceHostAddresses(interfaceName: String, primary: InetAddress): List<InetAddress> {
 +        val selected = networkInterface(interfaceName)
 +        val addresses = p2pHostAddresses(primary,
-+            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0)
++            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0, ipv4Only)
 +        diagnostic("Wi-Fi P2P listener families=${addresses.joinToString(",") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
 +        return addresses
 +    }
 +
      private fun interfaceAddress(interfaceName: String): InetAddress? {
          val networkInterface = networkInterface(interfaceName) ?: return null
-         val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
-@@ -736,7 +772,7 @@
+-        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
++        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses)
++            .filter { !ipv4Only || it is Inet4Address })
+             ?: return null
+         if (address !is Inet6Address || address.scopeId == networkInterface.index) return address
+         return runCatching { Inet6Address.getByAddress(null, address.address, networkInterface) }
+@@ -736,7 +776,7 @@
          val fiveGhzSupported = runCatching { wifi?.is5GHzBandSupported }.getOrNull()
          val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
          val locationEnabled = runCatching {
@@ -1742,7 +1764,7 @@
          }.getOrNull()
          val required = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES
              else Manifest.permission.ACCESS_FINE_LOCATION
-@@ -771,9 +807,15 @@
+@@ -771,9 +811,15 @@
              ?.joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
  
      private fun networkInterface(interfaceName: String): NetworkInterface? = try {
@@ -1759,7 +1781,7 @@
      }
  
      private fun groupSecurity(group: WifiP2pGroup): Iap2WirelessSecurity {
-@@ -843,7 +885,7 @@
+@@ -843,7 +889,7 @@
          }
          synchronized(legacyChannelLock) {
              if (failedChannel != null) releaseLegacyChannelRestriction(failedChannel)
@@ -3764,7 +3786,7 @@
  
      private fun isBluetoothHandoffCommand(type: String): Boolean =
          type.equals("disableBluetooth", ignoreCase = true) ||
-@@ -2108,13 +2403,8 @@
+@@ -2108,13 +2403,9 @@
          }
          val manager: WirelessHotspotManager = when (hotspotMode) {
              WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
@@ -3775,12 +3797,13 @@
 -                throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
 -                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
 -            }
-+                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy)
++                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy,
++                ipv4Only = config.wifiP2pIpv4Only)
 +            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
                  onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-@@ -2165,6 +2455,7 @@
+@@ -2165,6 +2456,7 @@
      // Kept across reconnects within this controller: resuming between attempts would start a scan.
      private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
          if (closed || !WifiScanPause.eligible(backend)) return@synchronized
@@ -3788,7 +3811,7 @@
          (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
      }
  
-@@ -2253,7 +2544,6 @@
+@@ -2253,7 +2545,6 @@
          }
      }
  
@@ -3796,7 +3819,7 @@
      private fun logBluetoothConnectionSnapshot(device: BluetoothDevice, point: String) {
          try {
              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-@@ -2262,20 +2552,11 @@
+@@ -2262,20 +2553,11 @@
                  connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
                  return
              }
@@ -3819,7 +3842,7 @@
                      "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
              )
          } catch (error: RuntimeException) {
-@@ -2289,8 +2570,12 @@
+@@ -2289,8 +2571,12 @@
              val owner = firstTcpWatchdog?.listener
              firstTcpWatchdog?.terminate()
              val diagnostics = wirelessDiagnostics
@@ -3832,7 +3855,7 @@
              wirelessConnectionProof.clear()
              media.setIapTunnelHandler(null)
              val activeTunnel = wirelessTunnelChannel
-@@ -2301,7 +2586,10 @@
+@@ -2301,7 +2587,10 @@
  
              val activeBonjour = bonjour
              bonjour = null
@@ -3844,7 +3867,7 @@
  
              val activeHotspot = hotspot
              hotspot = null
-@@ -2399,6 +2687,7 @@
+@@ -2399,6 +2688,7 @@
              close()
              completed = true
          } catch (error: Throwable) {
@@ -3852,7 +3875,7 @@
              debugLog("$name teardown failed", error)
          } finally {
              connectionDiagnostic("teardown resource=$name completed=$completed elapsedMs=${elapsedMillis(started)}")
-@@ -2408,18 +2697,18 @@
+@@ -2408,18 +2698,18 @@
      private fun controlLoopTimeoutMillis(): Long = when {
          config.transport == CarPlayTransport.WIRED -> Iap2WiredControlClient.NO_TIMEOUT_MILLIS
          config.locationReportingEnabled -> LOCATION_CONTROL_LOOP_TIMEOUT_MILLIS
@@ -3875,7 +3898,7 @@
          debugLog("wired VPN service bound; attaching NCM transport")
          val result = try {
              service.attach(
-@@ -2430,12 +2719,19 @@
+@@ -2430,12 +2720,19 @@
                  identity = identity,
                  pairings = pairings,
                  mfi = mfiSession?.client,
@@ -3897,7 +3920,7 @@
              return false
          }
          return when (result) {
-@@ -2451,11 +2747,52 @@
+@@ -2451,11 +2748,52 @@
              is CarPlayVpnService.AttachResult.Failed -> {
                  debugLog("wired VPN/NCM transport attach result=failed ${result.message}")
                  ncm.close()
@@ -3951,7 +3974,7 @@
  
      private fun ByteArray.macString(): String =
          joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
-@@ -2498,7 +2835,7 @@
+@@ -2498,7 +2836,7 @@
      }
  
      private fun closeReceivers() {
@@ -3960,7 +3983,7 @@
              try {
                  it.close()
              } catch (_: Exception) {
-@@ -2507,6 +2844,7 @@
+@@ -2507,6 +2845,7 @@
          }
          permissionCloseable = null
          attachCloseable = null
@@ -3968,7 +3991,7 @@
          ch341PermissionCloseable = null
      }
  
-@@ -2524,6 +2862,9 @@
+@@ -2524,6 +2863,9 @@
          }
      }
  
@@ -3978,7 +4001,7 @@
      private fun requireUsbManager(): UsbManager =
          usbManager ?: throw IOException("USB service is unavailable on this device")
  
-@@ -2536,7 +2877,7 @@
+@@ -2536,7 +2878,7 @@
  
      private fun fail(error: Throwable, generation: Int? = null) {
          synchronized(wirelessResourceLock) {
@@ -3987,7 +4010,7 @@
              val wireless = config.transport == CarPlayTransport.WIRELESS
              if (wireless) {
                  if (!wirelessFailureReported.compareAndSet(false, true)) return
-@@ -2561,11 +2902,11 @@
+@@ -2561,11 +2903,11 @@
  
      private fun connectionDiagnostic(message: String) {
          try {
@@ -4002,7 +4025,7 @@
          }
      }
  
-@@ -2589,9 +2930,23 @@
+@@ -2589,9 +2931,23 @@
      private fun onStatus(status: CarPlayStatus, generation: Int? = null) {
          if (closed) return
          mainHandler.post {
@@ -4027,7 +4050,7 @@
                  uiListener?.onDebugLog(status.debugLogMessage())
                  uiStatusReporter?.invoke(status)
              }
-@@ -2618,6 +2973,12 @@
+@@ -2618,6 +2974,12 @@
              "STEP bt/rfcomm: connecting to the iPhone iAP2 RFCOMM service"
          CarPlayStatus.RunningWireless ->
              "STEP iap2/wireless: Bluetooth control loop running"
@@ -4042,7 +4065,7 @@
          CarPlayStatus.WirelessActiveFallback ->
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
-@@ -66,10 +66,16 @@
+@@ -66,10 +66,17 @@
      val wirelessBluetoothDeviceAddress: String? = null,
      val locationReportingEnabled: Boolean = false,
      val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
@@ -4053,6 +4076,7 @@
 +    val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,
 +    val wirelessFirstTcpTimeoutMillis: Long = com.shilapi.xcertplay.network.WirelessStartupPolicy.FIRST_TCP_MILLIS,
 +    val wirelessStartupRefreshEnabled: Boolean = false,
++    val wifiP2pIpv4Only: Boolean = false,
  ) {
      init {
 +        require(wirelessFirstTcpTimeoutMillis in 1..60_000) { "Wireless first TCP timeout must be in 1..60000ms" }

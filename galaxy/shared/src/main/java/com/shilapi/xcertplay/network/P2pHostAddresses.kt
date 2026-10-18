@@ -1,9 +1,16 @@
 package com.shilapi.xcertplay.network
 
 import java.net.InetAddress
+import java.net.Inet4Address
+import java.io.IOException
 
-/** 主地址仍用于 iAP2；发现与 TCP 同时覆盖本轮 P2P 接口的两种地址族。 */
-internal fun p2pHostAddresses(primary: InetAddress, addresses: List<InetAddress>, interfaceIndex: Int): List<InetAddress> {
+/** 发现、监听和 iAP2 使用同一地址快照；L7 固定 IPv4，不受 IPv6 到达时序影响。 */
+internal fun p2pHostAddresses(primary: InetAddress, addresses: List<InetAddress>, interfaceIndex: Int,
+                              ipv4Only: Boolean = false): List<InetAddress> {
     val scopedPrimary = wirelessHostAddress(listOf(primary), interfaceIndex) ?: primary
-    return (listOf(scopedPrimary) + existingWifiHostAddresses(addresses, interfaceIndex)).distinct()
+    val selected = (listOf(scopedPrimary) + existingWifiHostAddresses(addresses, interfaceIndex)).distinct()
+    if (!ipv4Only) return selected
+    return selected.filterIsInstance<Inet4Address>().ifEmpty {
+        throw IOException("Wi-Fi Direct has no usable IPv4 address")
+    }
 }

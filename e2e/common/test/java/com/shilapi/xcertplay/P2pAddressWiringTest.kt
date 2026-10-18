@@ -34,6 +34,31 @@ import javax.jmdns.ServiceListener
 @Config(sdk = [29, 30], manifest = Config.NONE,
     shadows = [WifiP2pGroupManagerTest.P2pRadio::class, WifiP2pGroupManagerTest.P2pChannel::class])
 class P2pAddressWiringTest {
+    @Test fun l7KeepsOnlyIpv4ForDiscoveryAndListenerEvenWithIpv6Present() {
+        val app = RuntimeEnvironment.getApplication()
+        shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        app.getSystemService(WifiManager::class.java).isWifiEnabled = true
+        val ipv4 = InetAddress.getByName("192.168.49.1")
+        val ipv6 = Inet6Address.getByAddress(null, InetAddress.getByName("fe80::1234").address, 7)
+        val iface = mock(NetworkInterface::class.java)
+        `when`(iface.index).thenReturn(7)
+        `when`(iface.inetAddresses).thenAnswer { Collections.enumeration(listOf(ipv6, ipv4)) }
+        val logs = mutableListOf<String>()
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            WifiP2pGroupManager(app, logs::add, preferredChannel = 149, interfaceLookup = { iface },
+                channelPolicy = com.shilapi.xcertplay.network.GalaxyP2pRegion.MAINLAND_CHINA.policy,
+                ipv4Only = true).use { manager ->
+                val info = worker.submit<WirelessHotspotInfo> { manager.start(5000) }.get(8, TimeUnit.SECONDS)
+                assertEquals(149, info.channel)
+                assertEquals(ipv4, info.hostAddress)
+                assertEquals(listOf(ipv4), info.hostAddresses)
+                assertTrue(logs.contains("Wi-Fi P2P listener families=IPv4"))
+                assertFalse(logs.any { info.ssid in it || info.passphrase in it })
+            }
+        } finally { worker.shutdownNow() }
+    }
+
     @Test fun ipv6OnlyGroupUsesTheSameCorrectedScopeForPrimaryAndAdditionalAddressMetadata() {
         val app = RuntimeEnvironment.getApplication()
         shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)

@@ -27,6 +27,7 @@ class HostConnectionSettingsRefreshTest {
 
     @Before fun setUp() {
         app.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
+        app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l7").commit()
     }
 
     @Test fun projectionScreenUsesConnectionSettingsSavedWhileItWasInTheBackground() {
@@ -39,6 +40,7 @@ class HostConnectionSettingsRefreshTest {
         assertEquals(WirelessHotspotMode.MANUAL, manual.wirelessHotspotMode)
         assertEquals(30_000L, manual.wirelessFirstTcpTimeoutMillis)
         assertEquals(false, manual.wirelessStartupRefreshEnabled)
+        assertEquals(false, manual.wifiP2pIpv4Only)
         assertEquals(true, manual.wifiScanPauseEnabled)
         assertEquals(true, manual.wifiHighPerformanceEnabled)
 
@@ -58,8 +60,35 @@ class HostConnectionSettingsRefreshTest {
         assertEquals(149, config.wifiP2pPreferredChannel)
         assertEquals(45_000L, config.wirelessFirstTcpTimeoutMillis)
         assertEquals(true, config.wirelessStartupRefreshEnabled)
+        assertEquals(true, config.wifiP2pIpv4Only)
         assertEquals(false, config.wifiScanPauseEnabled)
         assertEquals(false, config.wifiHighPerformanceEnabled)
+    }
+
+    @Test fun l7DirectIsFrozenInRuntimeConfigAndOtherModelsKeepTheirSavedChannel() {
+        AirPlayPersistence.saveWirelessEnabled(app, true)
+        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.WIFI_P2P)
+        AirPlayPersistence.saveWifiP2pPreferredChannel(app, 153)
+        val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
+        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", true)
+        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessHotspotMode", WirelessHotspotMode.WIFI_P2P)
+        val l7 = runtimeConfig(host)
+        assertEquals(true, l7.wifiP2pIpv4Only)
+        assertEquals(149, l7.wifiP2pPreferredChannel)
+        assertEquals(45_000L, l7.wirelessFirstTcpTimeoutMillis)
+        for (model in listOf("l6", "custom")) {
+            app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", model).commit()
+            val other = runtimeConfig(host)
+            assertEquals(false, other.wifiP2pIpv4Only)
+            assertEquals(153, other.wifiP2pPreferredChannel)
+            assertEquals(true, l7.wifiP2pIpv4Only)
+        }
+        app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l7").commit()
+        GalaxyP2pSettings.save(app, com.shilapi.xcertplay.network.GalaxyP2pRegion.OTHER_CONSERVATIVE)
+        AirPlayPersistence.saveWifiP2pPreferredChannel(app, 6)
+        assertEquals(6, runtimeConfig(host).wifiP2pPreferredChannel)
+        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", false)
+        assertEquals(false, runtimeConfig(host).wifiP2pIpv4Only)
     }
 
     private fun runtimeConfig(host: CarPlayHostActivity): CarPlayRuntimeConfig {

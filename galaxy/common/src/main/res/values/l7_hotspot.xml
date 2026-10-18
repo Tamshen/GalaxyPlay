@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_l7_direct_channel_hint">L7 专用连接固定使用 5 GHz 149 信道，修改使用地区后按对应地区配置连接。</string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct 使用地区</string>
     <string name="galaxy_p2p_region_mainland">中国大陆车载</string>
     <string name="galaxy_p2p_region_other">其他地区（2.4 GHz 保守模式）</string>

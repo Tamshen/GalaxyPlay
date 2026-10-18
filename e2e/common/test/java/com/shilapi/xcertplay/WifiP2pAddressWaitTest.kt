@@ -37,8 +37,13 @@ class WifiP2pAddressWaitTest {
         assertEquals(ipv6, waitWith(listOf(listOf(ipv6))))
     }
 
-    private fun waitWith(snapshots: List<List<InetAddress>>): InetAddress? {
-        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication())
+    @Test fun fixedIpv4WaitsForDhcpAndNeverPublishesLinkLocalAtTheDeadline() {
+        assertEquals(ipv4, waitWith(listOf(listOf(ipv6), listOf(ipv6, ipv4)), ipv4Only = true))
+        assertNull(waitWith(listOf(listOf(ipv6)), ipv4Only = true))
+    }
+
+    private fun waitWith(snapshots: List<List<InetAddress>>, ipv4Only: Boolean = false): InetAddress? {
+        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication(), ipv4Only = ipv4Only)
         val attemptClass = Class.forName(
             "com.shilapi.xcertplay.network.WifiP2pGroupManager\$StartAttempt")
         val attempt = attemptClass.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
