@@ -190,9 +190,11 @@ class GalaxyWirelessSettingsTest {
         assertFalse(GalaxyWirelessSettings.ensure(activity))
         assertFalse(wifi.isWifiEnabled)
         assertNull(shadowOf(activity).nextStartedActivity)
-        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        val openSettings = ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE)
+        assertEquals(activity.getString(R.string.open_car_hotspot_settings), openSettings.text)
+        openSettings.performClick()
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(android.provider.Settings.ACTION_WIFI_SETTINGS, shadowOf(activity).nextStartedActivity.action)
+        assertEquals(android.provider.Settings.ACTION_WIRELESS_SETTINGS, shadowOf(activity).nextStartedActivity.action)
     }
 
     @Test fun oldIndoorChannelIsPreservedButNotSelectableForMainlandVehicles() {

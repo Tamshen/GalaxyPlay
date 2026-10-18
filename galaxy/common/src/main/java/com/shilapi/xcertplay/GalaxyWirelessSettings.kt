@@ -3,11 +3,9 @@ package com.shilapi.xcertplay
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pManager
-import android.provider.Settings
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.network.WifiP2pChannels
@@ -45,8 +43,8 @@ internal class GalaxyWirelessSettings(
     fun addDirect(parent: LinearLayout) {
         L7SettingsSection.add(parent, activity.getString(R.string.wifi_direct),
             activity.getString(R.string.hotspot_hint_p2p)) { card ->
-            wifiRow = L7Components.actionRow(activity, activity.getString(R.string.l7_hotspot_wifi_settings)) {
-                openWifiSettings(activity)
+            wifiRow = L7Components.actionRow(activity, activity.getString(R.string.open_car_hotspot_settings)) {
+                L7HotspotSettings.openSettings(activity)
             }.also(card::addView)
             regionRow = L7Components.valueRow(activity, activity.getString(R.string.galaxy_p2p_region_title), "",
                 ::chooseRegion).apply { setDescription(activity.getString(R.string.galaxy_p2p_region_hint)) }
@@ -188,17 +186,11 @@ internal class GalaxyWirelessSettings(
                     else -> R.string.wifi_direct_wifi_off
                 })
                 .setNegativeButton(R.string.close, null)
-            if (available) builder.setPositiveButton(R.string.l7_hotspot_wifi_settings) { _, _ -> openWifiSettings(activity) }
+            if (available) builder.setPositiveButton(R.string.open_car_hotspot_settings) { _, _ ->
+                L7HotspotSettings.openSettings(activity)
+            }
             builder.show()
             return false
-        }
-
-
-        private fun openWifiSettings(activity: Activity) {
-            if (runCatching { activity.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }.isFailure) {
-                L7Dialogs.builder(activity).setTitle(R.string.wifi_direct).setMessage(R.string.wifi_direct_settings_missing)
-                    .setPositiveButton(R.string.close, null).show()
-            }
         }
     }
 }
