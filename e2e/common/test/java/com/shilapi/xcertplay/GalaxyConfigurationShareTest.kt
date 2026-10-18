@@ -37,6 +37,26 @@ class GalaxyConfigurationShareTest {
         assertEquals(app.getString(com.shilapi.xcertplay.host.R.string.config_share_default_name, 2), GalaxyConfigurationNames.next(app))
     }
 
+    @Test fun automaticNamesFollowTheDisplayLanguageAndCustomNamesRemainUnchanged() {
+        fun localized(language: String): android.content.Context = app.createConfigurationContext(
+            android.content.res.Configuration(app.resources.configuration).apply { setLocale(java.util.Locale.forLanguageTag(language)) })
+        val chinese = localized("zh-CN")
+        val english = localized("en")
+        val profile = repository.applyTemplate("l7")
+        assertEquals("配置07", GalaxyConfigurationNames.display(chinese, "Profile 07"))
+        assertEquals("Profile 07", GalaxyConfigurationNames.display(english, "配置07"))
+        assertEquals("配置01", GalaxyConfigurationNames.display(chinese, "Existing configuration"))
+        assertEquals("Profile 01", GalaxyConfigurationNames.display(english, "原有配置"))
+        assertEquals("配置01", GalaxyConfigurationNames.forShare(chinese, profile.copy(name = "Existing configuration")))
+        GalaxyConfigurationNames.used(app)
+        assertEquals("Profile 02", GalaxyConfigurationNames.forShare(english, profile.copy(name = "原有配置")))
+        for (name in listOf("家用 L7", "My L7", "Profile for work")) {
+            assertEquals(name, GalaxyConfigurationNames.display(chinese, name))
+            assertEquals(name, GalaxyConfigurationNames.forShare(english, profile.copy(name = name)))
+        }
+        assertEquals(profile, repository.active())
+    }
+
     @Test fun sharingCannotIncludeConnectionOrAuthenticationMaterial() {
         val profile = repository.applyTemplate("l7")
         val groups = profile.configuration.preferences.toMutableMap()

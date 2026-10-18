@@ -74,7 +74,7 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
     private fun review(value: GalaxyConfigurationShare) {
         if (closed) return
         val before = expected ?: return
-        val name = input(value.name, 40)
+        val name = input(GalaxyConfigurationNames.display(activity, value.name), 40)
         dialog?.dismiss()
         dialog = L7Dialogs.builder(activity).setTitle(R.string.config_share_preview)
             .setMessage(summary(value) + "\n\n" + activity.getString(R.string.config_share_replace_hint)).setView(name)
@@ -120,7 +120,7 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
             com.shilapi.xcertplay.network.P2pAddressMode.IPV6_ONLY -> R.string.galaxy_p2p_ipv6_only
             else -> R.string.galaxy_p2p_dual_stack
         })
-        return activity.getString(R.string.config_share_summary, value.name, model.uppercase(),
+        return activity.getString(R.string.config_share_summary, GalaxyConfigurationNames.display(activity, value.name), model.uppercase(),
             main["display_fps"] as? Int ?: 30, main["display_scale_percent"] as? Int ?: 100, modeLabel,
             activity.getString(if (main["audio_focus_enabled"] == false) R.string.config_share_off else R.string.config_share_on))
     }

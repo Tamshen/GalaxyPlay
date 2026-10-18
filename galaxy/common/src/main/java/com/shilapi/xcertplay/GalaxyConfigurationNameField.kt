@@ -10,10 +10,11 @@ import com.shilapi.xcertplay.host.R
 /** 名称是配置元数据；修改进入同一草稿，取消不影响文件和参数。 */
 internal object GalaxyConfigurationNameField {
     fun add(context: Context, parent: LinearLayout, name: String, changed: (String) -> Unit) {
+        val displayed = GalaxyConfigurationNames.display(context, name)
         L7SettingsSection.add(parent) { card ->
-            card.addView(L7Components.valueRow(context, context.getString(R.string.config_profile_name), name) {
+            card.addView(L7Components.valueRow(context, context.getString(R.string.config_profile_name), displayed) {
                 val input = EditText(context).apply {
-                    L7Ui.input(this); setText(name); filters = arrayOf(InputFilter.LengthFilter(40)); setSingleLine()
+                    L7Ui.input(this); setText(displayed); filters = arrayOf(InputFilter.LengthFilter(40)); setSingleLine()
                 }
                 val dialog = L7Dialogs.builder(context).setTitle(R.string.config_profile_name).setView(input)
                     .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.profile_update_draft, null).create()
