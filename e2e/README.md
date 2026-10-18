@@ -380,3 +380,17 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 `AudioPitchStabilityTest` 在 API 29／30 经实际建轨及 PCM 写入入口验证音乐低／高水位、欠载恢复、无线抖动水位调整与新曲目保持协商采样率，并核对 PCM 样本不变及源／实际播放采样率日志；44.1／48 kHz、有线／无线分别覆盖。替身测试不代表实际车机听感。
 
 `wireless_performance_smoke.py --apk build/交付/对应版本.apk` 仅允许独占的 Android 11 AVD。先通过 Docker 构建 `:common:assembleDebugAndroidTest`；脚本安装指定产品包与测试包，暂时授权测试应用的本地 ADB 公钥并启用网络 ADB，以 UID 2000 验证实际 shell 热点读取、三轮扫描暂停／恢复、真实 AudioTrack 音乐与导航并行、音乐／导航保持原采样率、音频线程优先级及播放线程／无线锁释放。[Goldfish 的 ADB 实现](https://github.com/aosp-mirror/platform_system_core/blob/android11-release/adb/transport_local.cpp)使用模拟器管道，AVD 用临时 `adb reverse` 将 guest 5555 接回该模拟器的真实 adbd 通道；开始前拒绝覆盖已有转发，结束移除桥接并恢复原 ADB 公钥列表和网络模式，不输出名称、密码或密钥。结果单独记录 `adb_authentication_enforced`；AVD 未启用认证时不能计为实车授权验证。三轮为合成音频管线的重新启动，不模拟蓝牙、iPhone 或实车 Direct 建链；结果写入忽略目录 `build/e2e/upstream-performance/`。
+
+## 原生按键与手动性能检测
+
+`GalaxyHardKeyBridgeTest` 覆盖真实 Parcel 布局、注册失败／超时、迟到注册、Binder 死亡、快速替换和注销；媒体键／去重／调度／蓝牙回归覆盖按住、丢失释放、标准通道前后到、相反操作、owner 隔离和后台暂停先于已排队 CLEAR 取消旧 PLAY。`MediaCommandQueueTest` 阻塞真实触控队列，验证独立媒体 FIFO 可继续发送。原生语音只观察，不用测试替身宣称实车长短按已确认。
+
+`GalaxyPerformanceRatesTest`、`GalaxyPerformanceMonitorTest`、`GalaxyPerformanceReaderTest`、`GalaxyPerformanceServiceTest` 与 shared `GalaxyVideoPerformanceTest` 覆盖默认无任务、手动开关、60 快照、十五秒深度到期、慢／失败查询、十秒重查询间隔、无权限回退、窗口 flags、无呈现证据未知、owner／decoder 基线以及停止拒绝迟到发布。`DiagnosticBatchWriteTest` 比较相同完整事件量的逐条安全入口与内部可信批量写入部分；不将其结果换算成整车 CPU 收益。
+
+真实 Android 11 AVD 检查使用 Docker 构建 `:common:assembleDebugAndroidTest`，安装 `common/build/outputs/apk/androidTest/debug/common-debug-androidTest.apk`。该测试 APK 自包含、UID 为 `com.shilapi.xcertplay.host.test`；私有 HarnessActivity 和测试服务只在 androidTest 清单，不进入产品包。只对测试包授予模拟器悬浮权限，然后运行：
+
+```sh
+../tools/scripts/adb.sh -s emulator-5556 shell am instrument -w -e suite performance-monitor com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation
+```
+
+检查关闭／基础／悬浮／深度四种空闲模式、窗口安全区位置稳定（防止 Insets 反馈振荡）、实际窗口边界的背景和中心触控透传、不抢焦点、深度到期及线程释放；另用固定 H.264 样本走真实 MediaCodec／Surface／呈现计数，并以自有 Binder 检查 Parcel 和旧 owner 失效。结果保存在测试包 cache/performance-android-checks.json，结束恢复测试包原悬浮权限。空闲对照是测试包环境，不是手机投屏工作负载、OEM HardKey 服务或实车改善。产品 GUI 另以交付 APK 安装检查，未投屏时必须显示 FPS 未知。
