@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.ViewModelProvider
 import com.shilapi.xcertplay.host.R
 
-/** 只有当前配置；车型弹窗确认后覆盖，后续参数编辑仍先写草稿。 */
+/** 内置配置只作新文件起点；用户文件明确切换，参数修改先留草稿。 */
 internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private val changed: () -> Unit) {
     private val repository = GalaxyProfiles(activity)
@@ -16,14 +16,14 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private var resetDialog: AlertDialog? = null
     private var saveDialog: AlertDialog? = null
     private var closed = false
-    private val sharing = lazy { GalaxyConfigurationSharing(activity, { state.original }, { state.draft }) {
+    private val sharing = lazy { GalaxyConfigurationSharing(activity, { state.original }, { state.draft }, importer = ::importShared) {
         state.load(it); bind(); changed()
     } }
     val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::resetCurrent, ::restore, ::commit,
         share = { if (!closed) sharing.value.share() }, paste = { if (!closed) sharing.value.paste() })
     val dirty get() = state.dirty
     init {
-        if (state.draft == null || !state.dirty) runCatching { repository.refresh() }.onSuccess { current ->
+        if (state.draft == null || (!state.dirty && state.draft?.revision != 0)) runCatching { repository.refresh() }.onSuccess { current ->
             if (state.draft?.id != current.id || state.draft?.revision != current.revision) state.load(current)
         }
         bind()
@@ -52,11 +52,12 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val profile = state.draft ?: return
         val active = runCatching { repository.active() }.getOrNull()
         val effective = CarPlayBackgroundSession.configuration
-        val model = L7AudioTemplates.model(activity)
-        val name = GalaxyVehicleTemplates.find(active?.template ?: model.id)?.let { text(it.title) }
-            ?: L7AudioModelConfirmation.name(activity, model)
+        val name = GalaxyConfigurationNames.display(activity, profile.name)
+        val creating = profile.revision == 0
         view.vehicleButton.text = activity.getString(R.string.template_current, name)
+        view.commitButton.setText(if (creating) R.string.config_file_create else R.string.save)
         val hint = when {
+            creating -> text(if (state.sourceTemplate != null) R.string.config_file_builtin_hint else R.string.config_file_new_draft_hint)
             dirty -> text(R.string.config_page_unsaved)
             effective != null && (effective.id != active?.id || effective.revision != active?.revision) ->
                 text(R.string.template_pending_connection)
@@ -86,14 +87,14 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         L7Dialogs.builder(activity).setTitle(R.string.profile_discard_title)
             .setMessage(R.string.profile_discard_message)
             .setNegativeButton(R.string.profile_keep_editing, null)
-            .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let(state::load); bind() }.show()
+            .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let { state.load(it, state.selected ?: it, state.sourceTemplate) }; bind() }.show()
     }
     fun requestLeave(action: () -> Unit) {
         if (!dirty) { action(); return }
         L7Dialogs.builder(activity).setTitle(R.string.profile_discard_title)
             .setMessage(R.string.profile_discard_message)
             .setNegativeButton(R.string.profile_keep_editing, null)
-            .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let(state::load); bind(); action() }.show()
+            .setPositiveButton(R.string.profile_discard) { _, _ -> state.original?.let { state.load(it, state.selected ?: it, state.sourceTemplate) }; bind(); action() }.show()
     }
     private fun resetCurrent() {
         if (closed || resetDialog?.isShowing == true || templateDialog?.isShowing == true) return
@@ -113,60 +114,76 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
                 if (closed || applied) return@setOnClickListener
                 applied = true
                 dialog.dismiss()
-                val result = runCatching { repository.resetCurrent(profile) }
+                val result = runCatching {
+                    check(state.original == profile)
+                    if (profile.revision == 0) {
+                        repository.requireCurrent(state.selected!!)
+                        profile.copy(configuration = state.sourceTemplate?.let { GalaxyVehicleTemplates.find(it)!!.create(activity) }
+                            ?: profile.configuration)
+                    }
+                    else repository.resetCurrent(profile)
+                }
                 if (result.isFailure) { view.feedback(text(R.string.profile_save_failed), true); return@setOnClickListener }
-                state.load(result.getOrThrow())
+                state.load(result.getOrThrow(), if (profile.revision == 0) state.selected!! else result.getOrThrow(), state.sourceTemplate)
                 bind()
-                changed()
+                if (profile.revision > 0) changed()
             }
         }
         dialog.show()
     }
     private fun chooseTemplate() {
-        if (closed || templateDialog?.isShowing == true || resetDialog?.isShowing == true) return
-        val entries = GalaxyVehicleTemplates.entries
-        var pending = entries.indexOfFirst { it.id == (state.original?.template?.takeUnless { id -> id == "unconfirmed" } ?: L7AudioTemplates.model(activity).id) }
-        var applied = false
-        val dialog = L7Dialogs.builder(activity).setTitle(R.string.template_choose)
-            .setMessage(R.string.template_overwrite)
-            .setSingleChoiceItems(entries.map { text(it.title) }.toTypedArray(), pending) { dialog, index ->
-                pending = index
-                (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.template_apply, null).create()
-        templateDialog = dialog
-        dialog.setOnDismissListener { if (templateDialog === dialog) templateDialog = null }
-        dialog.setOnShowListener {
-            val apply = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            apply.isEnabled = pending >= 0
-            apply.setOnClickListener {
-                if (closed || applied || pending !in entries.indices) return@setOnClickListener
-                applied = true
-                dialog.dismiss()
-                applyTemplate(entries[pending].id)
-            }
-            L7Components.styleDialog(dialog)
+        if (closed || templateDialog?.isShowing == true || resetDialog?.isShowing == true || saveDialog?.isShowing == true) return
+        val expected = runCatching { repository.refresh() }.getOrElse {
+            view.feedback(text(R.string.profile_load_failed), true); return
         }
-        dialog.show()
+        val current = state.draft ?: return
+        val catalog = runCatching { repository.catalog() }.getOrElse {
+            view.feedback(text(R.string.profile_load_failed), true); return
+        }
+        templateDialog = GalaxyConfigurationPicker.show(activity, catalog, current, state.sourceTemplate) { choice ->
+            if (closed) false else {
+                val result = runCatching {
+                    if (choice.copy) {
+                        repository.requireCurrent(expected)
+                        repository.draft("current", current.name).copy(configuration = current.configuration,
+                            templateId = current.templateId)
+                    } else if (choice.template != null) {
+                        repository.requireCurrent(expected)
+                        repository.draft(choice.template.id, text(choice.template.title))
+                    } else repository.selectCurrent(expected, choice.profile!!.id)
+                }
+                result.onSuccess {
+                    state.load(it, if (it.revision == 0) expected else it, choice.template?.id)
+                    bind()
+                    if (it.revision > 0) changed()
+                }.onFailure { view.feedback(text(R.string.profile_save_failed), true) }
+                result.isSuccess
+            }
+        }.also { dialog -> dialog.setOnDismissListener { if (templateDialog === dialog) templateDialog = null } }
     }
-    private fun applyTemplate(model: String) {
-        val result = runCatching { repository.applyTemplate(model) }
-        if (result.isFailure) { view.feedback(text(R.string.profile_save_failed), true); return }
-        state.load(result.getOrThrow())
-        bind()
-        changed()
+    private fun importShared(expected: GalaxyProfile, value: GalaxyConfigurationShare): GalaxyProfile {
+        check(!closed && state.original == expected)
+        return if (expected.revision == 0) {
+            repository.createAndSelect(state.selected!!, expected.copy(name = value.name,
+                configuration = value.configuration, templateId = value.template))
+        } else repository.importShared(expected, value)
     }
     private fun commit() {
-        if (closed || saveDialog?.isShowing == true) return
+        if (closed || saveDialog?.isShowing == true || templateDialog?.isShowing == true || resetDialog?.isShowing == true) return
         val profile = state.draft ?: return
-        saveDialog = GalaxyConfigurationNameField.save(activity, GalaxyConfigurationNames.forSave(activity, profile)) { name ->
+        var failure = R.string.profile_save_failed
+        saveDialog = GalaxyConfigurationNameField.save(activity,
+            GalaxyConfigurationNames.forSave(activity, profile, repository.list().map { it.name }),
+            creating = profile.revision == 0, failure = { failure }) { name ->
             if (closed || state.draft != profile) false else {
-                val result = runCatching { repository.save(profile.copy(name = name)) }
-                result.onSuccess {
-                    GalaxyConfigurationNames.used(activity)
-                    state.load(it); bind(); changed()
+                val result = runCatching {
+                    val value = profile.copy(name = name)
+                    if (profile.revision == 0) repository.createAndSelect(state.selected!!, value)
+                    else repository.saveCurrent(value)
                 }
+                result.onSuccess {
+                    state.load(it); bind(); changed()
+                }.onFailure { failure = if (it is GalaxyProfileNameConflict) R.string.profile_name_conflict else R.string.profile_save_failed }
                 result.isSuccess
             }
         }.also { dialog -> dialog.setOnDismissListener { if (saveDialog === dialog) saveDialog = null } }

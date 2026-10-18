@@ -22,6 +22,36 @@ class GalaxyProfilesTest {
         GalaxyConfigurationFields.names.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() }
         L7AudioTemplates.Model.entries.forEach { AtomicFile(File(app.filesDir, GalaxyConfigurationFields.audioFile(it.id))).delete() }
     }
+    @Test fun createAndSelectKeepsTheOriginalAndRepeatedCurrentSaveDoesNotCreateOrRewrite() {
+        val original = repository.active()
+        val created = repository.createAndSelect(original, repository.draft("l7", "User file"))
+        assertNotEquals(original.id, created.id)
+        assertEquals(created, repository.active())
+        assertEquals(2, repository.list().size)
+        assertEquals(original, repository.list().single { it.id == original.id })
+        repeat(3) { assertEquals(created, repository.saveCurrent(created)) }
+        assertEquals(2, repository.list().size)
+        val changed = repository.saveCurrent(created.copy(name = "Renamed file"))
+        assertEquals(created.id, changed.id)
+        assertEquals(created.revision + 1, changed.revision)
+        assertEquals(2, repository.list().size)
+        repository.select(original.id)
+        assertTrue(runCatching { repository.saveCurrent(changed) }.isFailure)
+        assertTrue(runCatching { repository.createAndSelect(created, repository.draft("l6", "Stale file")) }.isFailure)
+        assertEquals(2, repository.list().size)
+    }
+    @Test fun failedNewFileActivationRollsBackOnlyTheNewFileAndKeepsTheOldSelection() {
+        val original = repository.active()
+        val failed = GalaxyProfiles(app) { target, text ->
+            if (target.baseFile.name == "active" && text != original.id) error("模拟切换失败")
+            GalaxyProfiles.write(target, text)
+        }
+        val draft = repository.draft("l6", "Failed new file")
+        assertTrue(runCatching { failed.createAndSelect(original, draft) }.isFailure)
+        assertEquals(original, repository.active())
+        assertEquals(listOf(original), repository.list())
+        assertFalse(File(app.filesDir, "configurations/${draft.id}.json").exists())
+    }
     @Test fun originalL7ConfigurationKeepsItsFocusUntilTemplateIsExplicitlyApplied() {
         val old = repository.active()
         val before = L7AudioTemplates.load(GalaxyConfigurationContext(app, old)).toJson()

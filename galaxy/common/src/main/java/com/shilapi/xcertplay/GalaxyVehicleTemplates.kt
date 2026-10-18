@@ -14,7 +14,7 @@ internal object GalaxyVehicleTemplates {
             GalaxyConfigurationFields.factory(it, "l7", l7AudioFocus = true)
         },
         Entry("l6", R.string.template_l6) { GalaxyConfigurationFields.factory(it, "l6") },
-        Entry("custom", R.string.template_custom) { GalaxyConfigurationFields.factory(it, "custom") }
+        Entry("custom", R.string.profile_default_custom) { GalaxyConfigurationFields.factory(it, "custom") }
     )
 
     fun find(id: String) = entries.firstOrNull { it.id == id }

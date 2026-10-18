@@ -105,9 +105,34 @@ internal class GalaxyProfiles(private val context: Context,
         require(draft.id.matches(Regex("[a-z0-9_]{1,64}")))
         initialize()
         val old = if (file(draft.id).exists()) read(draft.id) else null
-        val changed = old != null && GalaxyApplicationPreferences.vehicle(draft.configuration).json().toString() !=
-            old.configuration.json().toString()
+        val baseline = old?.configuration ?: GalaxyVehicleTemplates.find(draft.template)?.create(context)
+        val changed = baseline != null && GalaxyApplicationPreferences.vehicle(draft.configuration).json().toString() !=
+            GalaxyApplicationPreferences.vehicle(baseline).json().toString()
         write(if (changed) draft.copy(templateId = "custom") else draft)
+    }
+    /** 页面覆盖保存只能操作原先选中的用户文件；无改动不推进版本或写文件。 */
+    fun saveCurrent(draft: GalaxyProfile): GalaxyProfile = synchronized(lock) {
+        val current = requireCurrent(draft)
+        if (draft == current) current else save(draft)
+    }
+    /** 内置配置只产生内存草稿，新文件及选中状态作为一次操作提交。 */
+    fun createAndSelect(expected: GalaxyProfile, draft: GalaxyProfile): GalaxyProfile = synchronized(lock) {
+        requireCurrent(expected)
+        require(draft.revision == 0 && !file(draft.id).exists())
+        val saved = save(draft)
+        try { select(saved.id) }
+        catch (error: Exception) {
+            // 只有确认恢复旧选择后才删除新文件；存储恢复不明时保留可读文件，避免悬空引用。
+            if (runCatching { selectedId() }.getOrNull() == expected.id) AtomicFile(file(saved.id)).delete()
+            throw error
+        }
+    }
+    fun selectCurrent(expected: GalaxyProfile, id: String): GalaxyProfile = synchronized(lock) {
+        requireCurrent(expected)
+        select(id)
+    }
+    fun requireCurrent(expected: GalaxyProfile): GalaxyProfile = synchronized(lock) {
+        refresh().also { check(it.id == expected.id && it.revision == expected.revision) { "CONFIG_EDIT_CONFLICT" } }
     }
     private fun write(draft: GalaxyProfile): GalaxyProfile = synchronized(lock) {
         initialize()

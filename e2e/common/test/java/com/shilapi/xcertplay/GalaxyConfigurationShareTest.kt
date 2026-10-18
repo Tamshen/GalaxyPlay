@@ -33,8 +33,9 @@ class GalaxyConfigurationShareTest {
         assertEquals(profile.configuration, share.configuration)
         assertTrue(share.code().length <= GalaxyConfigurationQr.MAX_CODE_LENGTH)
         assertEquals(app.getString(com.shilapi.xcertplay.host.R.string.config_share_default_name, 1), GalaxyConfigurationNames.next(app))
-        GalaxyConfigurationNames.used(app)
-        assertEquals(app.getString(com.shilapi.xcertplay.host.R.string.config_share_default_name, 2), GalaxyConfigurationNames.next(app))
+        val newFile = repository.draft("l7", "Built-in")
+        assertEquals(app.getString(com.shilapi.xcertplay.host.R.string.config_share_default_name, 2),
+            GalaxyConfigurationNames.forSave(app, newFile, listOf("Profile 01", "配置03")))
     }
 
     @Test fun automaticNamesFollowTheDisplayLanguageAndCustomNamesRemainUnchanged() {
@@ -43,13 +44,15 @@ class GalaxyConfigurationShareTest {
         val chinese = localized("zh-CN")
         val english = localized("en")
         val profile = repository.applyTemplate("l7")
+        app.getSharedPreferences("galaxy_configuration_names", 0).edit().putInt("next", 987).commit()
+        assertEquals("Profile 02", GalaxyConfigurationNames.forSave(english, repository.draft("l7", "Built-in"), listOf("配置01")))
+        assertEquals("Profile 02", GalaxyConfigurationNames.forSave(english, repository.draft("l7", "Built-in"), listOf(" profile 01 ")))
         assertEquals("配置07", GalaxyConfigurationNames.display(chinese, "Profile 07"))
         assertEquals("Profile 07", GalaxyConfigurationNames.display(english, "配置07"))
         assertEquals("配置01", GalaxyConfigurationNames.display(chinese, "Existing configuration"))
         assertEquals("Profile 01", GalaxyConfigurationNames.display(english, "原有配置"))
         assertEquals("配置01", GalaxyConfigurationNames.forSave(chinese, profile.copy(name = "Existing configuration")))
-        GalaxyConfigurationNames.used(app)
-        assertEquals("Profile 02", GalaxyConfigurationNames.forSave(english, profile.copy(name = "原有配置")))
+        assertEquals("Profile 01", GalaxyConfigurationNames.forSave(english, profile.copy(name = "原有配置")))
         for (name in listOf("家用 L7", "My L7", "Profile for work")) {
             assertEquals(name, GalaxyConfigurationNames.display(chinese, name))
             assertEquals(name, GalaxyConfigurationNames.forSave(english, profile.copy(name = name)))

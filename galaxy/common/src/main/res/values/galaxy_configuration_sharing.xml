@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="config_profile_name">配置名称</string>
+    <string name="config_profile_name">配置文件名称</string>
     <string name="config_share_default_name">配置%1$02d</string>
     <string name="config_share_title">分享配置</string>
     <string name="config_share_import">粘贴导入</string>
@@ -27,8 +27,8 @@
     <string name="config_action_reset">重置</string>
     <string name="config_action_share">分享</string>
     <string name="config_action_import">导入</string>
-    <string name="config_save_title">保存配置</string>
-    <string name="config_save_name_hint">设置本次保存的配置名称，分享备注不会修改此名称。</string>
+    <string name="config_save_title">保存配置文件</string>
+    <string name="config_save_name_hint">保存到当前配置文件，可修改文件名称；不会新增文件或自动递增名称。</string>
     <string name="config_share_remark">分享备注（可选）</string>
     <string name="config_share_remark_value">分享备注：%1$s</string>
 </resources>

@@ -6,11 +6,11 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import com.shilapi.xcertplay.host.R
 
-/** 快速模板与分类固定在上方，参数独立滚动，主要操作始终可达。 */
+/** 配置文件入口与分类固定在上方，参数独立滚动，主要操作始终可达。 */
 internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> Unit,
     changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit,
     share: () -> Unit = {}, paste: () -> Unit = {}) : LinearLayout(context) {
-    val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), R.drawable.ic_l7_vehicle, click = chooseTemplate)
+    val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), R.drawable.ic_l7_save, click = chooseTemplate)
     val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_action_reset), R.drawable.ic_l7_refresh, click = resetCurrent)
     val tabs = GalaxyConfigurationTabs(context, changeGroup)
     val status = L7Typography.text(context, "", L7Typography.Role.FEEDBACK)

@@ -15,6 +15,9 @@ import java.io.Closeable
 /** 分享草稿不写车型；粘贴先预览，确认后才替换当前配置，活动会话仍用旧快照。 */
 internal class GalaxyConfigurationSharing(private val activity: ComponentActivity,
     private val original: () -> GalaxyProfile?, private val draft: () -> GalaxyProfile?,
+    private val importer: (GalaxyProfile, GalaxyConfigurationShare) -> GalaxyProfile = { before, value ->
+        GalaxyProfiles(activity).importShared(before, value)
+    },
     private val applied: (GalaxyProfile) -> Unit) : Closeable {
     private var closed = false
     private var operation = 0
@@ -73,15 +76,25 @@ internal class GalaxyConfigurationSharing(private val activity: ComponentActivit
     private fun review(value: GalaxyConfigurationShare) {
         if (closed) return
         val before = expected ?: return
+        val newName = if (before.revision == 0) input(value.name, 40).apply {
+            hint = activity.getString(R.string.profile_name); setSingleLine()
+        } else null
         dialog?.dismiss()
-        dialog = L7Dialogs.builder(activity).setTitle(R.string.config_share_preview)
-            .setMessage(summary(value) + remark(value) + "\n\n" + activity.getString(R.string.config_share_replace_hint))
-            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.config_share_apply, null).create()
+        val builder = L7Dialogs.builder(activity).setTitle(R.string.config_share_preview)
+            .setMessage(summary(value) + remark(value) + "\n\n" + activity.getString(
+                if (before.revision == 0) R.string.config_file_import_new else R.string.config_share_replace_hint))
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.config_share_apply, null)
+        if (newName != null) builder.setView(newName)
+        dialog = builder.create()
         dialog!!.setOnShowListener {
             dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 if (closed) return@setOnClickListener
-                val result = runCatching { GalaxyProfiles(activity).importShared(before, value) }
-                result.onSuccess { dialog?.dismiss(); applied(it) }.onFailure { notice(R.string.profile_save_failed) }
+                val result = runCatching {
+                    importer(before, if (newName != null) value.copy(name = newName.text.toString().trim()) else value)
+                }
+                result.onSuccess { dialog?.dismiss(); applied(it) }.onFailure {
+                    notice(if (it is GalaxyProfileNameConflict) R.string.profile_name_conflict else R.string.profile_save_failed)
+                }
             }
         }
         dialog!!.show()

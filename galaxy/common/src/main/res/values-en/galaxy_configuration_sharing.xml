@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="config_profile_name">Profile name</string>
+    <string name="config_profile_name">File name</string>
     <string name="config_share_default_name">Profile %1$02d</string>
     <string name="config_share_title">Share profile</string>
     <string name="config_share_import">Paste profile</string>
@@ -27,8 +27,8 @@
     <string name="config_action_reset">Reset</string>
     <string name="config_action_share">Share</string>
     <string name="config_action_import">Import</string>
-    <string name="config_save_title">Save profile</string>
-    <string name="config_save_name_hint">Set the name for this saved profile. Sharing notes do not change this name.</string>
+    <string name="config_save_title">Save configuration file</string>
+    <string name="config_save_name_hint">Save to the current file. You may rename it. Saving does not create another file or advance its name.</string>
     <string name="config_share_remark">Sharing note (optional)</string>
     <string name="config_share_remark_value">Sharing note: %1$s</string>
 </resources>

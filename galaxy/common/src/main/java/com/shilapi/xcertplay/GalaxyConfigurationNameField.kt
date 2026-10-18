@@ -16,13 +16,15 @@ internal object GalaxyConfigurationNameField {
             })
         }
     }
-    fun save(context: Context, name: String, commit: (String) -> Boolean): AlertDialog {
+    fun save(context: Context, name: String, creating: Boolean = false,
+             failure: () -> Int = { R.string.profile_save_failed }, commit: (String) -> Boolean): AlertDialog {
         val input = EditText(context).apply {
             L7Ui.input(this); setText(name); filters = arrayOf(InputFilter.LengthFilter(40)); setSingleLine()
         }
-        val dialog = L7Dialogs.builder(context).setTitle(R.string.config_save_title)
-            .setMessage(R.string.config_save_name_hint).setView(input)
-            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create()
+        val dialog = L7Dialogs.builder(context).setTitle(if (creating) R.string.config_file_create else R.string.config_save_title)
+            .setMessage(if (creating) R.string.config_file_new_hint else R.string.config_save_name_hint).setView(input)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(if (creating) R.string.config_file_create else R.string.save, null).create()
         var applied = false
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -30,7 +32,7 @@ internal object GalaxyConfigurationNameField {
                 val value = input.text.toString().trim()
                 if (value.isEmpty() || value.any { it.code < 32 }) input.error = context.getString(R.string.profile_invalid_value)
                 else if (commit(value)) { applied = true; dialog.dismiss() }
-                else input.error = context.getString(R.string.profile_save_failed)
+                else input.error = context.getString(failure())
             }
         }
         dialog.show()

@@ -53,6 +53,34 @@ class GalaxyConfigurationSharingTest {
         }
         assertTrue(condition())
     }
+    @Test fun importingIntoABuiltInCreatesANamedUserFileAndKeepsThePreviousFile() {
+        sharing.close()
+        val repository = GalaxyProfiles(activity)
+        val previous = original
+        val builtIn = repository.draft("l7", "Built-in")
+        sharing = GalaxyConfigurationSharing(activity, { builtIn }, { builtIn }, importer = { expected, value ->
+            repository.createAndSelect(previous, expected.copy(name = value.name,
+                configuration = value.configuration, templateId = value.template))
+        }) { original = it; changes++ }
+        val code = GalaxyConfigurationShare.from(previous).code()
+        activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("profile", code))
+        sharing.paste()
+        click(R.string.config_share_paste)
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        await { descendants().filterIsInstance<Button>().any { it.text == activity.getString(R.string.config_share_apply) } }
+        val name = descendants().filterIsInstance<EditText>().single()
+        name.setText("Imported user file")
+        assertEquals(previous, repository.active())
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val created = repository.active()
+        assertEquals("Imported user file", created.name)
+        assertNotEquals(previous.id, created.id)
+        assertEquals(previous.configuration, created.configuration)
+        assertEquals(previous, repository.list().single { it.id == previous.id })
+        assertEquals(0, builtIn.revision)
+        assertEquals(1, changes)
+    }
     @Test fun copiedCodeIsPreviewedBeforeApplyAndClosingThePageRejectsLateConfirmation() {
         val code = GalaxyConfigurationShare.from(original, "配置01").code()
         activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("profile", code))
