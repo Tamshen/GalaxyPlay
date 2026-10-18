@@ -16,7 +16,13 @@ class L7MediaCenterSessionTest {
     private class Queue : Executor {
         val tasks = java.util.ArrayDeque<Runnable>()
         override fun execute(command: Runnable) { tasks.add(command) }
-        fun drain() { while (tasks.isNotEmpty()) tasks.removeFirst().run() }
+        fun drain(limit: Int = 10_000) {
+            var count = 0
+            while (tasks.isNotEmpty()) {
+                check(count++ < limit) { "媒体回调队列未收敛" }
+                tasks.removeFirst().run()
+            }
+        }
     }
     private class Port : L7MediaCenterPort {
         lateinit var ready: (Boolean) -> Unit
@@ -131,6 +137,67 @@ class L7MediaCenterSessionTest {
 
     private fun connect() { session.start(); worker.drain(); port.ready(true); worker.drain() }
     private fun playing(elapsed: Long = 0) = CarPlayNowPlaying(title = "private-title", playing = true, playbackKnown = true, elapsedMillis = elapsed)
+
+    @Test fun thousandDuplicateReadyProgressAndFocusCallbacksKeepOneRegistrationAndCover() {
+        connect()
+        val cover = Uri.parse("content://synthetic/stable-cover")
+        val value = playing().copy(artworkTransferId = 7)
+        port.currentFocus = "own"
+        session.update(value, cover); worker.drain()
+        repeat(1000) {
+            port.ready(true)
+            port.focus("own")
+            session.update(value.copy(elapsedMillis = it.toLong() + 1), cover)
+            worker.drain()
+        }
+        assertEquals(1, port.calls.count { it == "register" })
+        assertEquals(1, port.calls.count { it == "request" })
+        assertEquals(listOf(cover), port.artworks)
+    }
+
+    @Test fun sourceSelectionEchoDuringPlayRequestDoesNotReenterOrRefreshArtwork() {
+        connect()
+        port.duringRequest = {
+            port.currentFocus = "own"
+            assertTrue(port.selected(port.source))
+        }
+        session.update(playing(), Uri.parse("content://synthetic/cover"))
+        worker.drain(100)
+        assertEquals(1, port.calls.count { it == "register" })
+        assertEquals(1, port.calls.count { it == "request" })
+        assertEquals(1, port.updates.size)
+    }
+
+    @Test fun repeatedOwnSourceSelectionsDoNotClaimAgainOrRefreshPublishedCover() {
+        connect()
+        port.currentFocus = "own"
+        session.update(playing(), Uri.parse("content://synthetic/cover")); worker.drain()
+        repeat(1000) { assertTrue(port.selected(port.source)); worker.drain() }
+        assertEquals(1, port.calls.count { it == "register" })
+        assertEquals(1, port.calls.count { it == "request" })
+        assertEquals(1, port.updates.size)
+    }
+
+    @Test fun ownPausedSourceCanResumePhoneWithoutRequestingFocusAgain() {
+        port.currentFocus = "own"
+        connect()
+        session.update(playing().copy(playing = false)); worker.drain()
+        assertTrue(port.selected(port.source)); worker.drain(); main.drain()
+        assertEquals(listOf(CarPlayMediaButton.PLAY), sent)
+        assertEquals(0, port.calls.count { it == "request" })
+        assertEquals(1, port.updates.size)
+    }
+
+    @Test fun delayedSelectionEchoDoesNotRepeatAcceptedRequestWhenFocusQueryIsUnknown() {
+        connect()
+        port.duringRequest = { main.execute { assertTrue(port.selected(port.source)) } }
+        session.update(playing()); worker.drain()
+        repeat(20) { main.drain(); worker.drain(100) }
+        assertEquals(1, port.calls.count { it == "register" })
+        assertEquals(1, port.calls.count { it == "request" })
+        assertEquals(1, port.updates.size)
+        assertTrue(main.tasks.isEmpty())
+    }
 
     @Test fun registrationExceptionRetriesWithoutDependingOnAnotherReadyCallback() {
         port.registerFailures = 2

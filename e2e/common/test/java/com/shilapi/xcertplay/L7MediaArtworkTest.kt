@@ -31,11 +31,49 @@ class L7MediaArtworkTest {
     private val published = mutableListOf<Uri?>()
     private val logs = mutableListOf<String>()
     private val covers = L7MediaArtwork(context, worker, main, logs::add, published::add)
-    private fun image() = ByteArrayOutputStream().also { output ->
+    private fun image(color: Int = android.graphics.Color.BLACK) = ByteArrayOutputStream().also { output ->
         Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888).let {
+            it.eraseColor(color)
             it.compress(Bitmap.CompressFormat.PNG, 100, output); it.recycle()
         }
     }.toByteArray()
+
+    @Test fun repeatedIdenticalArtworkKeepsTheReadableUriAndDoesNotRewriteFiles() {
+        val bytes = image()
+        covers.select(1); covers.submit(1, bytes); worker.drain(); main.drain()
+        val first = published.last()!!
+        repeat(20) { covers.submit(1, bytes.copyOf()); worker.drain(); main.drain() }
+        assertEquals(first, covers.selectedUri(1))
+        assertEquals(1, logs.count { "cache result=SAVED" in it })
+        assertTrue(context.contentResolver.openInputStream(first)!!.use { it.read() >= 0 })
+        covers.close()
+    }
+
+    @Test fun returningToCachedBytesSupersedesAnUndeliveredDifferentCover() {
+        val first = image()
+        covers.select(1); covers.submit(1, first); worker.drain(); main.drain()
+        val uri = covers.selectedUri(1)!!
+        covers.submit(1, image(android.graphics.Color.RED))
+        covers.submit(1, first.copyOf())
+        worker.drain(); main.drain()
+        assertEquals(uri, covers.selectedUri(1))
+        assertTrue(context.contentResolver.openInputStream(uri)!!.use { it.read() >= 0 })
+        covers.close()
+    }
+
+    @Test fun reusedTransferWithChangedContentStillReplacesCoverAndResetAllowsItAgain() {
+        covers.select(1); covers.submit(1, image()); worker.drain(); main.drain()
+        val first = covers.selectedUri(1)
+        val next = image(android.graphics.Color.RED)
+        covers.submit(1, next); worker.drain(); main.drain()
+        val second = covers.selectedUri(1)
+        assertNotEquals(first, second)
+        assertNotNull(second)
+        covers.reset(); covers.select(1); covers.submit(1, next); worker.drain(); main.drain()
+        assertNotNull(covers.selectedUri(1))
+        assertNotEquals(second, covers.selectedUri(1))
+        covers.close()
+    }
 
     @Test fun onlySelectedTransferPublishesAndUriCanBeReadUntilDisconnect() {
         covers.select(1); covers.submit(2, image()); worker.drain(); main.drain()

@@ -30,12 +30,15 @@ internal class CarPlayMediaSession(
     private var elapsedUpdatedAt = 0L
     private var artwork: Bitmap? = null
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
+    private data class DecodedCover(val image: Bitmap?, val fingerprint: ByteArray)
+    private val artworkFingerprints = HashMap<Int, ByteArray>()
+    private val requestedArtwork = HashMap<Int, ByteArray>()
     private val artworkQueue = NowPlayingArtworkQueue(
         worker = artworkWorker,
         main = Executor { handler.post(it) },
-        decode = NowPlayingMetadata::decodeArtwork,
+        decode = { bytes -> DecodedCover(NowPlayingMetadata.decodeArtwork(bytes), NowPlayingMetadata.artworkFingerprint(bytes)) },
         publish = ::onArtworkDecoded,
-        discard = Bitmap::recycle,
+        discard = { it.image?.recycle() },
     )
     private var artworkOwner: Any? = artworkQueue.newSession()
     @Volatile private var connected = false
@@ -85,6 +88,8 @@ internal class CarPlayMediaSession(
             nowPlaying = CarPlayNowPlaying()
             artworkOwner = artworkQueue.newSession()
             artworkCache.clear()
+            artworkFingerprints.clear()
+            requestedArtwork.clear()
             artwork = null
         } else publish()
         emit("connection active=$value")
@@ -112,6 +117,8 @@ internal class CarPlayMediaSession(
         if (update == CarPlayNowPlaying()) {
             artworkOwner = artworkQueue.newSession()
             artworkCache.clear()
+            artworkFingerprints.clear()
+            requestedArtwork.clear()
             artwork = null
         } else if (nowPlaying.artworkTransferId != update.artworkTransferId) {
             artwork = update.artworkTransferId?.let { artworkCache[it] }
@@ -129,17 +136,30 @@ internal class CarPlayMediaSession(
     }
 
     @Synchronized fun onArtworkChanged(id: Int, bytes: ByteArray) {
-        if (!closed) artworkOwner?.let { artworkQueue.submit(it, id, bytes) }
+        if (closed || id !in 0..255 || bytes.size > com.shilapi.xcertplay.transport.Iap2FileTransferReceiver.DEFAULT_MAXIMUM_ARTWORK_BYTES) return
+        val owner = artworkOwner ?: return
+        val fingerprint = NowPlayingMetadata.artworkFingerprint(bytes)
+        if (id !in requestedArtwork && artworkFingerprints[id]?.contentEquals(fingerprint) == true) return
+        requestedArtwork[id] = fingerprint
+        artworkQueue.submit(owner, id, bytes)
     }
 
-    @Synchronized private fun onArtworkDecoded(expected: Any, id: Int, decoded: Bitmap?) {
-        if (closed || artworkOwner !== expected) {
+    @Synchronized private fun onArtworkDecoded(expected: Any, id: Int, cover: DecodedCover?) {
+        if (cover == null) return
+        val decoded = cover.image
+        if (closed || artworkOwner !== expected || requestedArtwork[id]?.contentEquals(cover.fingerprint) != true) {
+            decoded?.recycle()
+            return
+        }
+        requestedArtwork.remove(id)
+        if (artworkFingerprints[id]?.contentEquals(cover.fingerprint) == true) {
             decoded?.recycle()
             return
         }
         artworkCache.remove(id)
         artworkCache[id] = decoded
-        while (artworkCache.size > 4) artworkCache.remove(artworkCache.keys.first())
+        if (decoded != null) artworkFingerprints[id] = cover.fingerprint else artworkFingerprints.remove(id)
+        while (artworkCache.size > 4) artworkCache.remove(artworkCache.keys.first().also(artworkFingerprints::remove))
         if (nowPlaying.artworkTransferId == id) {
             artwork = decoded
             session?.setMetadata(NowPlayingMetadata.androidMetadata(nowPlaying, artwork))
@@ -177,6 +197,8 @@ internal class CarPlayMediaSession(
         artworkOwner = null
         artworkQueue.clear()
         artworkCache.clear()
+        artworkFingerprints.clear()
+        requestedArtwork.clear()
         artwork = null
         session?.let { it.isActive = false; it.release() }
         session = null

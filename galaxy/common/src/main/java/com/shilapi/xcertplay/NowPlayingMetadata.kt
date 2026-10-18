@@ -7,6 +7,9 @@ import com.shilapi.xcertplay.media.CarPlayNowPlaying
 
 /** 系统媒体卡片只在歌曲信息变化时重发；封面先采样再缩放，避免大图占用车机内存。 */
 internal object NowPlayingMetadata {
+    internal fun artworkFingerprint(bytes: ByteArray): ByteArray =
+        java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+
     internal fun metadataChanged(previous: CarPlayNowPlaying, next: CarPlayNowPlaying): Boolean =
         previous.copy(elapsedMillis = null, playing = false, playbackKnown = false) !=
             next.copy(elapsedMillis = null, playing = false, playbackKnown = false)

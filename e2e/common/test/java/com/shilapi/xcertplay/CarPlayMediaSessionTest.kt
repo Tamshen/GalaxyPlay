@@ -124,6 +124,41 @@ class CarPlayMediaSessionTest {
         assertEquals(1, resumes)
     }
 
+    @Test fun identicalArtworkResendsKeepOneMetadataPublicationButChangedContentIsAccepted() {
+        val construction = mockConstruction(MediaSession::class.java)
+        fun bytes(color: Int) = java.io.ByteArrayOutputStream().also { output ->
+            android.graphics.Bitmap.createBitmap(10, 10, android.graphics.Bitmap.Config.ARGB_8888).let {
+                it.eraseColor(color)
+                it.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)
+                it.recycle()
+            }
+        }.toByteArray()
+        fun drainArtwork() {
+            ReflectionHelpers.getStaticField<java.util.concurrent.ExecutorService>(CarPlayMediaSession::class.java, "artworkWorker")
+                .submit {}.get(5, java.util.concurrent.TimeUnit.SECONDS)
+            idle()
+        }
+        try {
+            bridge.onConnected(true)
+            bridge.onNowPlayingChanged(CarPlayNowPlaying(title = "synthetic", artworkTransferId = 7))
+            idle()
+            val original = bytes(android.graphics.Color.BLACK)
+            bridge.onArtworkChanged(7, original); drainArtwork()
+            fun publications() = mockingDetails(bridge.session!!).invocations.count { it.method.name == "setMetadata" }
+            val count = publications()
+            repeat(20) { bridge.onArtworkChanged(7, original.copyOf()); drainArtwork() }
+            assertEquals(count, publications())
+            bridge.onArtworkChanged(7, bytes(android.graphics.Color.RED)); drainArtwork()
+            assertEquals(count + 1, publications())
+            bridge.onConnected(false); idle()
+            bridge.onConnected(true); idle()
+            bridge.onNowPlayingChanged(CarPlayNowPlaying(artworkTransferId = 7)); idle()
+            val afterReconnect = publications()
+            bridge.onArtworkChanged(7, original); drainArtwork()
+            assertEquals(afterReconnect + 1, publications())
+        } finally { bridge.close(); construction.close() }
+    }
+
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
     // Robolectric 未提供完整的媒体服务 Binder；读取框架 API 实际保存的状态，避免用空的 controller 回读。

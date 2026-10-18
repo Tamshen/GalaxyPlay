@@ -20,12 +20,14 @@ internal class L7MediaArtwork(context: Context,
     private val app = context.applicationContext
     private val directory = File(app.cacheDir, "l7-media-artwork/${UUID.randomUUID()}")
     private val storageLease = GalaxyTemporaryFiles.protect(directory)
-    private val cache = LinkedHashMap<Int, File>()
+    private data class Cover(val file: File?, val fingerprint: ByteArray)
+    private val cache = LinkedHashMap<Int, Cover>()
+    private val requested = HashMap<Int, ByteArray>()
     private var selected: Int? = null
     private var closed = false
     private val queue = NowPlayingArtworkQueue(
         workerExecutor, mainExecutor, ::save,
-        { owner, id, file -> accept(owner, id, file) }, ::remove,
+        { owner, id, cover -> accept(owner, id, cover) }, { cover -> cover.file?.let(::remove) },
     )
     private var owner = queue.newSession()
     private val generation = generations.incrementAndGet()
@@ -35,7 +37,7 @@ internal class L7MediaArtwork(context: Context,
         val selectedUri = synchronized(this) {
             if (closed) return
             selected = id
-            id?.let(cache::get)?.let(::uri)
+            id?.let(cache::get)?.file?.let(::uri)
         }
         val selection = id to selectedUri
         if (lastSelection != selection) {
@@ -46,50 +48,69 @@ internal class L7MediaArtwork(context: Context,
     }
 
     @Synchronized fun selectedUri(id: Int?): Uri? =
-        if (closed || selected != id) null else id?.let(cache::get)?.let(::uri)
+        if (closed || selected != id) null else id?.let(cache::get)?.file?.let(::uri)
 
     @Synchronized fun submit(id: Int, bytes: ByteArray) {
         if (closed) return
         val accepted = id in 0..255 && bytes.size <= com.shilapi.xcertplay.transport.Iap2FileTransferReceiver.DEFAULT_MAXIMUM_ARTWORK_BYTES
         event("receive transferId=$id bytes=${bytes.size} accepted=$accepted")
-        if (accepted) queue.submit(owner, id, bytes)
+        if (!accepted) return
+        val fingerprint = NowPlayingMetadata.artworkFingerprint(bytes)
+        if (id !in requested && cache[id]?.fingerprint?.contentEquals(fingerprint) == true) {
+            event("duplicate transferId=$id cached=true")
+            return
+        }
+        requested[id] = fingerprint
+        queue.submit(owner, id, bytes)
     }
 
     /** 手机清空当前媒体后，传输 ID 可复用，旧缓存和迟到解码结果不得进入下一曲。 */
     @Synchronized fun reset() {
         if (closed) return
         owner = queue.newSession()
-        cache.values.forEach(::remove)
+        cache.values.forEach { it.file?.let(::remove) }
         cache.clear()
+        requested.clear()
         selected = null
         lastSelection = null
         event("reset")
     }
 
-    private fun save(bytes: ByteArray): File? {
+    private fun save(bytes: ByteArray): Cover {
+        val fingerprint = NowPlayingMetadata.artworkFingerprint(bytes)
         val image = NowPlayingMetadata.decodeArtwork(bytes) ?: run {
             event("decode result=EMPTY_OR_INVALID bytes=${bytes.size}")
-            return null
+            return Cover(null, fingerprint)
         }
         val file = File(directory, "${UUID.randomUUID()}.jpg")
         return try {
             directory.mkdirs()
             val written = file.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
             event("cache result=${if (written) "SAVED" else "FAILED"} coverKey=${file.name.take(8)} width=${image.width} height=${image.height} bytes=${file.length()}")
-            if (written) file else { remove(file); null }
+            Cover(if (written) file else { remove(file); null }, fingerprint)
         } catch (error: Exception) {
             remove(file)
             event("cache exceptionType=${error.javaClass.simpleName}")
-            null
+            Cover(null, fingerprint)
         } finally { image.recycle() }
     }
 
-    private fun accept(expected: Any, id: Int, file: File?) {
+    private fun accept(expected: Any, id: Int, cover: Cover?) {
+        if (cover == null) return
+        val file = cover.file
         val deliver = synchronized(this) {
-            if (closed || expected !== owner) { file?.let(::remove); return }
-            cache.remove(id)?.let(::remove)
-            if (file != null) cache[id] = file
-            while (cache.size > 4) cache.remove(cache.keys.first { it != selected })?.let(::remove)
+            if (closed || expected !== owner || requested[id]?.contentEquals(cover.fingerprint) != true) {
+                file?.let(::remove)
+                return
+            }
+            requested.remove(id)
+            if (cache[id]?.fingerprint?.contentEquals(cover.fingerprint) == true) {
+                file?.let(::remove)
+                return
+            }
+            cache.remove(id)?.file?.let(::remove)
+            if (file != null) cache[id] = cover
+            while (cache.size > 4) cache.remove(cache.keys.first { it != selected })?.file?.let(::remove)
             event("accept transferId=$id coverKey=${file?.name?.take(8) ?: "none"} selected=${selected == id} available=${file != null}")
             selected == id
         }
@@ -110,8 +131,9 @@ internal class L7MediaArtwork(context: Context,
         if (closed) return
         closed = true
         queue.clear()
-        cache.values.forEach(::remove)
+        cache.values.forEach { it.file?.let(::remove) }
         cache.clear()
+        requested.clear()
         directory.delete()
         storageLease.close()
         event("close")

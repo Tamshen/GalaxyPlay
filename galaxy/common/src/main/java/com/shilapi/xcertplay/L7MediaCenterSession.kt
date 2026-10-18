@@ -38,6 +38,7 @@ internal class L7MediaCenterSession(
     @Volatile private var registration = 0L
     @Volatile private var foreignFocus = false
     private var ownFocus = false
+    @Volatile private var requestingPlay = false
     private data class Snapshot(val value: CarPlayNowPlaying, val artwork: Uri?)
     @Volatile private var snapshot = Snapshot(CarPlayNowPlaying(), null)
     private val latest get() = snapshot.value
@@ -178,7 +179,10 @@ internal class L7MediaCenterSession(
         if (!localPlayback || playRetryRevision == playRequest.revision || !playRequest.begin()) return
         val revision = playRequest.revision
         event("requestPlay attempt=${playRequest.attempts}")
-        val accepted = safely("requestPlay") { port.requestPlay() }
+        val accepted = try {
+            requestingPlay = true
+            safely("requestPlay") { port.requestPlay() }
+        } finally { requestingPlay = false }
         if (closed || !current()) return
         // 阻塞 IPC 返回时手机可能已暂停，旧申请不得继续选源或重试。
         playRequest.observe(snapshot.value)
@@ -247,12 +251,16 @@ internal class L7MediaCenterSession(
 
     private fun selected(source: Int): Boolean {
         if (!localPlayback || closed || !current() || !registered || source != port.source) return false
+        // SDK 可在 requestPlay 的同步调用栈内确认选源，不能把确认当作新的播放操作。
+        if (requestingPlay) return true
         val epoch = registration
         enqueue {
             if (!registered || epoch != registration) return@enqueue
             event("sourceSelected source=$source")
-            published = null; publishedProgress = null; pending = null
-            publishLatest(explicitPlay = true)
+            if (!ownFocus && !playRequest.accepted) {
+                published = null; publishedProgress = null; pending = null
+                publishLatest(explicitPlay = true)
+            }
             // 选源是显式播放操作；只向手机发命令，不伪造手机播放状态或焦点归属。
             if (!latest.playing) main.execute {
                 if (!closed && current() && registered && epoch == registration && !latest.playing) send(CarPlayMediaButton.PLAY, "mediacenter-source")
