@@ -10,6 +10,9 @@ internal object GalaxyVehicleTemplates {
 
     val entries = listOf(
         Entry("l7", R.string.template_l7) { GalaxyConfigurationFields.factory(it, "l7") },
+        Entry("l7_no_headrest", R.string.template_l7_no_headrest) {
+            GalaxyConfigurationFields.factory(it, "l7", l7AudioFocus = true)
+        },
         Entry("l6", R.string.template_l6) { GalaxyConfigurationFields.factory(it, "l6") },
         Entry("custom", R.string.template_custom) { GalaxyConfigurationFields.factory(it, "custom") }
     )

@@ -99,7 +99,7 @@ internal data class GalaxyProfile(val id: String, val name: String, val revision
             return GalaxyProfile(id, name, revision, data.getLong("updated_at"),
                 GalaxyConfiguration.parse(data.getJSONObject("configuration")),
                 if (data.has("template_id")) data.getString("template_id").also {
-                    require(it in setOf("l7", "l6", "custom")) } else null)
+                    require(GalaxyVehicleTemplates.find(it) != null) } else null)
         }
     }
 }

@@ -557,7 +557,15 @@
  }
 --- a/e2e/common/test/java/com/shilapi/xcertplay/HostConnectionSettingsRefreshTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/HostConnectionSettingsRefreshTest.kt
-@@ -27,18 +27,30 @@
+@@ -4,6 +4,7 @@
+ import com.shilapi.xcertplay.airplay.AirPlayIdentity
+ import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
+ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
++import com.shilapi.xcertplay.network.P2pAddressMode
+ import org.junit.Assert.assertEquals
+ import org.junit.Before
+ import org.junit.Test
+@@ -27,18 +28,30 @@
  
      @Before fun setUp() {
          app.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
@@ -575,7 +583,7 @@
 +        assertEquals(WirelessHotspotMode.MANUAL, manual.wirelessHotspotMode)
 +        assertEquals(30_000L, manual.wirelessFirstTcpTimeoutMillis)
 +        assertEquals(false, manual.wirelessStartupRefreshEnabled)
-+        assertEquals(false, manual.wifiP2pIpv4Only)
++        assertEquals(P2pAddressMode.IPV4_ONLY, manual.wifiP2pAddressMode)
 +        assertEquals(true, manual.wifiScanPauseEnabled)
 +        assertEquals(true, manual.wifiHighPerformanceEnabled)
  
@@ -589,13 +597,13 @@
  
          host.pause().resume()
  
-@@ -46,6 +58,37 @@
+@@ -46,6 +59,49 @@
          assertEquals(WirelessHotspotMode.WIFI_P2P, config.wirelessHotspotMode)
          assertEquals("New car", config.manualHotspotSsid)
          assertEquals(149, config.wifiP2pPreferredChannel)
 +        assertEquals(45_000L, config.wirelessFirstTcpTimeoutMillis)
 +        assertEquals(true, config.wirelessStartupRefreshEnabled)
-+        assertEquals(true, config.wifiP2pIpv4Only)
++        assertEquals(P2pAddressMode.IPV4_ONLY, config.wifiP2pAddressMode)
 +        assertEquals(false, config.wifiScanPauseEnabled)
 +        assertEquals(false, config.wifiHighPerformanceEnabled)
 +    }
@@ -608,22 +616,34 @@
 +        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", true)
 +        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessHotspotMode", WirelessHotspotMode.WIFI_P2P)
 +        val l7 = runtimeConfig(host)
-+        assertEquals(true, l7.wifiP2pIpv4Only)
++        assertEquals(P2pAddressMode.IPV4_ONLY, l7.wifiP2pAddressMode)
 +        assertEquals(149, l7.wifiP2pPreferredChannel)
 +        assertEquals(45_000L, l7.wirelessFirstTcpTimeoutMillis)
 +        for (model in listOf("l6", "custom")) {
 +            app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", model).commit()
 +            val other = runtimeConfig(host)
-+            assertEquals(false, other.wifiP2pIpv4Only)
++            assertEquals(P2pAddressMode.IPV4_ONLY, other.wifiP2pAddressMode)
 +            assertEquals(153, other.wifiP2pPreferredChannel)
-+            assertEquals(true, l7.wifiP2pIpv4Only)
++            assertEquals(P2pAddressMode.IPV4_ONLY, l7.wifiP2pAddressMode)
 +        }
 +        app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l7").commit()
 +        GalaxyP2pSettings.save(app, com.shilapi.xcertplay.network.GalaxyP2pRegion.OTHER_CONSERVATIVE)
 +        AirPlayPersistence.saveWifiP2pPreferredChannel(app, 6)
 +        assertEquals(6, runtimeConfig(host).wifiP2pPreferredChannel)
 +        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", false)
-+        assertEquals(false, runtimeConfig(host).wifiP2pIpv4Only)
++        assertEquals(P2pAddressMode.IPV4_ONLY, runtimeConfig(host).wifiP2pAddressMode)
++    }
++
++    @Test fun userSelectedIpModeReachesRuntimeAndLaterEditsCannotChangeTheCreatedConfig() {
++        val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
++        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", true)
++        org.robolectric.util.ReflectionHelpers.setField(host, "wirelessHotspotMode", WirelessHotspotMode.WIFI_P2P)
++        val first = runtimeConfig(host)
++        for (mode in P2pAddressMode.entries) {
++            app.getSharedPreferences("xcertplay_airplay", 0).edit().putString(GalaxyP2pAddressSettings.KEY, mode.name).commit()
++            assertEquals(mode, runtimeConfig(host).wifiP2pAddressMode)
++            assertEquals(P2pAddressMode.IPV4_ONLY, first.wifiP2pAddressMode)
++        }
      }
  
      private fun runtimeConfig(host: CarPlayHostActivity): CarPlayRuntimeConfig {
@@ -660,19 +680,32 @@
          val index = choices.indexOf(channel)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pAddressWaitTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pAddressWaitTest.kt
-@@ -37,8 +37,13 @@
+@@ -1,6 +1,7 @@
+ package com.shilapi.xcertplay
+ 
+ import com.shilapi.xcertplay.network.WifiP2pGroupManager
++import com.shilapi.xcertplay.network.P2pAddressMode
+ import java.net.Inet6Address
+ import java.net.InetAddress
+ import java.net.NetworkInterface
+@@ -37,8 +38,18 @@
          assertEquals(ipv6, waitWith(listOf(listOf(ipv6))))
      }
  
 -    private fun waitWith(snapshots: List<List<InetAddress>>): InetAddress? {
 -        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication())
 +    @Test fun fixedIpv4WaitsForDhcpAndNeverPublishesLinkLocalAtTheDeadline() {
-+        assertEquals(ipv4, waitWith(listOf(listOf(ipv6), listOf(ipv6, ipv4)), ipv4Only = true))
-+        assertNull(waitWith(listOf(listOf(ipv6)), ipv4Only = true))
++        assertEquals(ipv4, waitWith(listOf(listOf(ipv6), listOf(ipv6, ipv4)), mode = P2pAddressMode.IPV4_ONLY))
++        assertNull(waitWith(listOf(listOf(ipv6)), mode = P2pAddressMode.IPV4_ONLY))
 +    }
 +
-+    private fun waitWith(snapshots: List<List<InetAddress>>, ipv4Only: Boolean = false): InetAddress? {
-+        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication(), ipv4Only = ipv4Only)
++    @Test fun ipv6OnlyWaitsForScopedLinkLocalAndNeverReturnsIpv4() {
++        assertEquals(ipv6, waitWith(listOf(listOf(ipv4), listOf(ipv4, ipv6)), mode = P2pAddressMode.IPV6_ONLY))
++        assertNull(waitWith(listOf(listOf(ipv4)), mode = P2pAddressMode.IPV6_ONLY))
++    }
++
++    private fun waitWith(snapshots: List<List<InetAddress>>, mode: P2pAddressMode = P2pAddressMode.DUAL_STACK): InetAddress? {
++        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication(), addressMode = mode)
          val attemptClass = Class.forName(
              "com.shilapi.xcertplay.network.WifiP2pGroupManager\$StartAttempt")
          val attempt = attemptClass.getDeclaredConstructor().apply { isAccessible = true }.newInstance()

@@ -8,7 +8,8 @@ import com.shilapi.xcertplay.host.R
 
 /** 快速模板与分类固定在上方，参数独立滚动，主要操作始终可达。 */
 internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> Unit,
-    changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit) : LinearLayout(context) {
+    changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit,
+    share: () -> Unit = {}, paste: () -> Unit = {}) : LinearLayout(context) {
     val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), R.drawable.ic_l7_vehicle, click = chooseTemplate)
     val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_reset_current), R.drawable.ic_l7_refresh, click = resetCurrent)
     val tabs = GalaxyConfigurationTabs(context, changeGroup)
@@ -17,6 +18,8 @@ internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> 
     val scroll = ScrollView(context).apply { isFillViewport = false; addView(fields) }
     val resetButton = L7Components.actionButton(context, context.getString(R.string.config_page_restore), R.drawable.ic_l7_revoke, click = reset)
     val commitButton = L7Components.actionButton(context, context.getString(R.string.save), R.drawable.ic_l7_save, true, commit)
+    val shareButton = L7Components.actionButton(context, context.getString(R.string.config_share_title), R.drawable.ic_l7_share, click = share)
+    val importButton = L7Components.actionButton(context, context.getString(R.string.config_share_import), R.drawable.ic_l7_import, click = paste)
     private fun dp(value: Int) = L7Components.dp(context, value)
     init {
         orientation = VERTICAL
@@ -27,6 +30,10 @@ internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> 
         addView(vehicleButton, LayoutParams(-1, -2))
         addView(defaultsButton, LayoutParams(-1, -2).apply { topMargin = dp(8) })
         addView(status, LayoutParams(-1, -2).apply { topMargin = dp(12); bottomMargin = dp(12) })
+        addView(LinearLayout(context).apply {
+            addView(shareButton, LayoutParams(0, -2, 1f))
+            addView(importButton, LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
+        }, LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         addView(tabs, LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         addView(scroll, LayoutParams(-1, 0, 1f).apply { topMargin = dp(4); bottomMargin = dp(12) })
         addView(LinearLayout(context).apply {

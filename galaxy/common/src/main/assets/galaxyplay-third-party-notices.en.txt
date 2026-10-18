@@ -10,6 +10,9 @@ Original xcertplay source attribution and file licenses remain in the receiver s
 
 Runtime components
 
+QR Code generator 1.8.0 — MIT. io.nayuki:qrcodegen:1.8.0 generates profile sharing QR codes only; no image decoder is included. The original source license is bundled as licenses/QrCodeGen-LICENSE.txt.
+https://github.com/nayuki/QR-Code-generator
+
 Concentus 1.0.0 — BSD-3-Clause. Pure Java Opus encoder and decoder, published as com.plasmoverse:concentus:1.0.0. Software fallback for wireless audio and microphone streams when system Opus codecs cannot start; audio routing is unchanged. The original META-INF/LICENSE from the artifact is bundled as licenses/Concentus-LICENSE.txt.
 https://github.com/lostromb/concentus
 https://github.com/plasmoapp/concentus

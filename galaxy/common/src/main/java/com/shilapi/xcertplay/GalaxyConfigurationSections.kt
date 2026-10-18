@@ -14,6 +14,7 @@ internal object GalaxyConfigurationSections {
                     listOf(100, 80, 60), listOf(R.string.config_quality_clear, R.string.config_quality_balanced, R.string.config_quality_light))
                 quickChoice(context, card, "display_fps", R.string.config_smoothness,
                     listOf(30, 60), listOf(R.string.config_smoothness_standard, R.string.config_smoothness_high))
+                GalaxyProfileFieldsView.add(context, card, R.string.config_page_common)
                 quickChoice(context, card, "media_buffer_ms", R.string.config_music_stability,
                     listOf(300, 500, 1000, 0), listOf(R.string.config_music_fast, R.string.config_music_stable,
                         R.string.config_music_safest, R.string.audio_buffer_phone))

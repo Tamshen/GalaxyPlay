@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay
 
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
+import com.shilapi.xcertplay.network.P2pAddressMode
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -38,12 +39,17 @@ class WifiP2pAddressWaitTest {
     }
 
     @Test fun fixedIpv4WaitsForDhcpAndNeverPublishesLinkLocalAtTheDeadline() {
-        assertEquals(ipv4, waitWith(listOf(listOf(ipv6), listOf(ipv6, ipv4)), ipv4Only = true))
-        assertNull(waitWith(listOf(listOf(ipv6)), ipv4Only = true))
+        assertEquals(ipv4, waitWith(listOf(listOf(ipv6), listOf(ipv6, ipv4)), mode = P2pAddressMode.IPV4_ONLY))
+        assertNull(waitWith(listOf(listOf(ipv6)), mode = P2pAddressMode.IPV4_ONLY))
     }
 
-    private fun waitWith(snapshots: List<List<InetAddress>>, ipv4Only: Boolean = false): InetAddress? {
-        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication(), ipv4Only = ipv4Only)
+    @Test fun ipv6OnlyWaitsForScopedLinkLocalAndNeverReturnsIpv4() {
+        assertEquals(ipv6, waitWith(listOf(listOf(ipv4), listOf(ipv4, ipv6)), mode = P2pAddressMode.IPV6_ONLY))
+        assertNull(waitWith(listOf(listOf(ipv4)), mode = P2pAddressMode.IPV6_ONLY))
+    }
+
+    private fun waitWith(snapshots: List<List<InetAddress>>, mode: P2pAddressMode = P2pAddressMode.DUAL_STACK): InetAddress? {
+        val manager = WifiP2pGroupManager(RuntimeEnvironment.getApplication(), addressMode = mode)
         val attemptClass = Class.forName(
             "com.shilapi.xcertplay.network.WifiP2pGroupManager\$StartAttempt")
         val attempt = attemptClass.getDeclaredConstructor().apply { isAccessible = true }.newInstance()

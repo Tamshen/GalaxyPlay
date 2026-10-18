@@ -14,7 +14,13 @@
     <string name="config_page_more">More</string>
     <string name="config_page_unsaved">Unsaved changes</string>
     <string name="config_page_next_connection">Editing settings keeps the current connection running.</string>
-    <string name="template_l7">Galaxy L7</string>
+    <string name="template_l7">L7 (with headrests)</string>
+    <string name="template_l7_no_headrest">L7 (without headrests)</string>
+    <string name="galaxy_p2p_address_mode">Wi-Fi Direct IP mode</string>
+    <string name="galaxy_p2p_address_hint">IPv4 only by default. Save the vehicle profile to apply this on the next Wi-Fi Direct connection.</string>
+    <string name="galaxy_p2p_ipv4_only">IPv4 only</string>
+    <string name="galaxy_p2p_ipv6_only">IPv6 only</string>
+    <string name="galaxy_p2p_dual_stack">IPv4 + IPv6</string>
     <string name="template_l6">Galaxy L6</string>
     <string name="template_quick">Built-in quick settings</string>
     <string name="template_overwrite">Applying a template replaces current preferences and unsaved edits. You can adjust them afterward. Connection settings, app settings, authentication material and logs are kept.</string>

@@ -14,7 +14,13 @@
     <string name="config_page_more">更多</string>
     <string name="config_page_unsaved">有未保存的修改</string>
     <string name="config_page_next_connection">参数调整不会中断当前连接。</string>
-    <string name="template_l7">银河 L7</string>
+    <string name="template_l7">L7(带头枕)</string>
+    <string name="template_l7_no_headrest">L7(无头枕)</string>
+    <string name="galaxy_p2p_address_mode">Wi-Fi Direct IP 模式</string>
+    <string name="galaxy_p2p_address_hint">默认仅 IPv4。选择后保存车型配置，下次 Wi-Fi Direct 连接生效。</string>
+    <string name="galaxy_p2p_ipv4_only">仅 IPv4</string>
+    <string name="galaxy_p2p_ipv6_only">仅 IPv6</string>
+    <string name="galaxy_p2p_dual_stack">IPv4 + IPv6</string>
     <string name="template_l6">银河 L6</string>
     <string name="template_quick">内置快速设置</string>
     <string name="template_overwrite">应用模板会覆盖当前偏好及未保存修改，之后可继续调整。连接设置、应用设置、认证材料和日志保留。</string>

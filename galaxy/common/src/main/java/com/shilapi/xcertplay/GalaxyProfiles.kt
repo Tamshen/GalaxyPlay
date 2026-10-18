@@ -39,7 +39,8 @@ internal class GalaxyProfiles(private val context: Context,
             val groups = filtered.preferences.toMutableMap()
             val current = groups["xcertplay_airplay"].orEmpty()
             val additions = GalaxyConfigurationFields.fields.filter { it.key in setOf(
-                "galaxy_steering_enabled", "galaxy_media_reporting_enabled", "galaxy_navigation_reporting_enabled") }
+                "galaxy_steering_enabled", "galaxy_media_reporting_enabled", "galaxy_navigation_reporting_enabled",
+                GalaxyP2pAddressSettings.KEY) }
                 .associate { it.key to (current[it.key] ?: it.default) }
             groups["xcertplay_airplay"] = current + additions
             val vehicle = filtered.copy(preferences = groups)
@@ -66,7 +67,7 @@ internal class GalaxyProfiles(private val context: Context,
         // 首次捕获必须先完成既有音频迁移；不会确认尚未选择的车型。
         L7AudioTemplates.mode(context)
         val labels = AppLocale.wrap(context)
-        val initial = GalaxyProfile("current", labels.getString(R.string.profile_migrated), 1,
+        val initial = GalaxyProfile("current", GalaxyConfigurationNames.next(labels), 1,
             System.currentTimeMillis(), GalaxyConfigurationFields.capture(context))
         saveFile(initial)
         persist(selection, initial.id)
@@ -86,8 +87,9 @@ internal class GalaxyProfiles(private val context: Context,
         write(current.copy(configuration = template.create(context), templateId = template.id))
     }
     fun draft(model: String, name: String): GalaxyProfile = synchronized(lock) {
-        val configuration = if (model == "current") refresh().configuration else GalaxyConfigurationFields.factory(context, model)
-        GalaxyProfile(newId(), name, 0, 0, configuration)
+        val configuration = if (model == "current") refresh().configuration
+            else requireNotNull(GalaxyVehicleTemplates.find(model)).create(context)
+        GalaxyProfile(newId(), name, 0, 0, configuration, templateId = model.takeUnless { it == "current" })
     }
     /** 原设置页明确保存后同步整份文件；编辑模态框使用独立 Context，不进入此路径。 */
     fun refresh(): GalaxyProfile = synchronized(lock) {
@@ -142,6 +144,11 @@ internal class GalaxyProfiles(private val context: Context,
         next
     }
     fun restore() = synchronized(lock) { mirror(active().configuration) }
+    fun importShared(expected: GalaxyProfile, value: GalaxyConfigurationShare): GalaxyProfile = synchronized(lock) {
+        val current = refresh()
+        check(current.id == expected.id && current.revision == expected.revision) { "CONFIG_EDIT_CONFLICT" }
+        write(current.copy(name = value.name, configuration = value.configuration, templateId = value.template))
+    }
     private fun saveFile(profile: GalaxyProfile) {
         val target = file(profile.id)
         if (target.exists()) persist(AtomicFile(File(target.path + ".previous")), parse(target).json().toString())

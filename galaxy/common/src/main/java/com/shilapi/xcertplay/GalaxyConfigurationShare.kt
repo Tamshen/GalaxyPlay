@@ -1,0 +1,80 @@
+package com.shilapi.xcertplay
+
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.Deflater
+import java.util.zip.Inflater
+
+/** 文件与二维码使用同一份车型参数；不包含连接凭据、认证、配对或应用偏好。 */
+internal data class GalaxyConfigurationShare(val name: String, val configuration: GalaxyConfiguration,
+    val template: String = "custom") {
+    fun json(): String = JSONObject().put("format", FORMAT).put("version", 1).put("name", name)
+        .put("template", template).put("configuration", configuration.json()).toString()
+
+    fun code(): String {
+        val bytes = json().toByteArray(Charsets.UTF_8)
+        require(bytes.size <= GalaxyConfiguration.MAX_BYTES)
+        val compressor = Deflater(Deflater.BEST_COMPRESSION)
+        return try {
+            compressor.setInput(bytes); compressor.finish()
+            val result = ByteArrayOutputStream()
+            val buffer = ByteArray(2048)
+            while (!compressor.finished()) {
+                val count = compressor.deflate(buffer)
+                check(count > 0)
+                result.write(buffer, 0, count)
+            }
+            PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(result.toByteArray())
+        } finally { compressor.end() }
+    }
+
+    companion object {
+        const val PREFIX = "GALAXYPLAY1:"
+        const val MAX_TEXT = 96 * 1024
+        private const val FORMAT = "galaxyplay-vehicle"
+
+        fun from(profile: GalaxyProfile, name: String): GalaxyConfigurationShare {
+            val shared = GalaxyConfigurationShare(name.trim(), GalaxyApplicationPreferences.vehicle(profile.configuration), profile.template)
+            return parse(shared.json())
+        }
+
+        fun parse(text: String): GalaxyConfigurationShare {
+            require(text.length <= MAX_TEXT)
+            val input = text.trim()
+            val json = if (input.startsWith(PREFIX)) inflate(input.substring(PREFIX.length)) else input
+            require(json.toByteArray(Charsets.UTF_8).size <= GalaxyConfiguration.MAX_BYTES)
+            val data = JSONObject(json)
+            require(data.getString("format") == FORMAT && data.getInt("version") == 1)
+            val name = data.getString("name").trim()
+            require(name.isNotEmpty() && name.length <= 40 && name.none { it.code < 32 })
+            val template = data.getString("template")
+            require(GalaxyVehicleTemplates.find(template) != null)
+            val configuration = GalaxyConfiguration.parse(data.getJSONObject("configuration"))
+            configuration.preferences.forEach { (space, values) ->
+                require(values.keys.all { GalaxyConfigurationFields.vehicleAllowed(space, it) })
+            }
+            require(configuration.audioRecovery.isEmpty())
+            require(configuration.preferences["l7_audio_templates"]?.get("model") in setOf("l7", "l6", "custom"))
+            require(configuration.audio.keys.containsAll(setOf("l7", "l6", "custom")))
+            GalaxyConfigurationFields.validate(configuration)
+            return GalaxyConfigurationShare(name, configuration, template)
+        }
+
+        private fun inflate(encoded: String): String {
+            val inflater = Inflater()
+            return try {
+                inflater.setInput(Base64.getUrlDecoder().decode(encoded))
+                val result = ByteArrayOutputStream()
+                val buffer = ByteArray(2048)
+                while (!inflater.finished()) {
+                    val count = inflater.inflate(buffer)
+                    require(count > 0 && result.size() + count <= GalaxyConfiguration.MAX_BYTES)
+                    result.write(buffer, 0, count)
+                }
+                require(inflater.remaining == 0)
+                result.toString(Charsets.UTF_8.name())
+            } finally { inflater.end() }
+        }
+    }
+}

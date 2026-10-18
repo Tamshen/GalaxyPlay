@@ -17,12 +17,16 @@ jmdns = "3.6.3"
 concentus = "1.0.0"
 
 dexmaker = "2.28.6"
+zxing = "3.5.4"
+qrcodegen = "1.8.0"
 
 media3 = "1.11.1"
 
 [libraries]
 concentus = { group = "com.plasmoverse", name = "concentus", version.ref = "concentus" }
 dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
+qrcodegen = { module = "io.nayuki:qrcodegen", version.ref = "qrcodegen" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

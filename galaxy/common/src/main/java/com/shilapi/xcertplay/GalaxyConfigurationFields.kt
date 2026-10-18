@@ -12,6 +12,9 @@ internal object GalaxyConfigurationFields {
         "l7_audio_templates", "l7_authentication", "l7_remote_log", "carplay_picture")
     private const val MAIN = "xcertplay_airplay"
     val fields = listOf(
+        Field(R.string.config_page_common, MAIN, GalaxyP2pAddressSettings.KEY, R.string.galaxy_p2p_address_mode,
+            "IPV4_ONLY", listOf("IPV4_ONLY", "IPV6_ONLY", "DUAL_STACK"),
+            listOf(R.string.galaxy_p2p_ipv4_only, R.string.galaxy_p2p_ipv6_only, R.string.galaxy_p2p_dual_stack)),
         Field(R.string.l7_section_projection, MAIN, "display_scale_tenths", R.string.resolution, 10,
             listOf(10, 8, 6), listOf(R.string.resolution_native, R.string.s_80_lighter_load, R.string.s_60_lightest_load)),
         Field(R.string.l7_section_projection, MAIN, "display_fps", R.string.frame_rate, 30,
@@ -78,6 +81,7 @@ internal object GalaxyConfigurationFields {
 
     // 明确列出车型参数，新增连接或应用偏好不能意外进入模板覆盖范围。
     private val vehicleKeys = setOf(
+        GalaxyP2pAddressSettings.KEY,
         "display_scale_tenths", "display_scale_percent", "display_fps",
         "hevc_enabled", "hevc_software_decoder", "hide_top_bar", "hide_bottom_bar", "right_hand_drive",
         "safe_area_draw_outside", "adapt_pip_resolution", "display_width_physical_mm", "display_physical_size_basis",
@@ -157,7 +161,7 @@ internal object GalaxyConfigurationFields {
         return GalaxyConfiguration(groups, audio, recovery)
     }
 
-    fun factory(context: Context, model: String): GalaxyConfiguration {
+    fun factory(context: Context, model: String, l7AudioFocus: Boolean = false): GalaxyConfiguration {
         require(model in setOf("l7", "l6", "custom"))
         val groups = defaults(context).mapValues { (_, value) -> value.toMutableMap() }
         groups.getValue("l7_audio_templates")["model"] = model
@@ -165,8 +169,10 @@ internal object GalaxyConfigurationFields {
         val templates = L7AudioTemplates.Model.entries.associate { entry -> entry.id to
             context.assets.open("audio-templates/${if (entry.id == "custom") "system" else entry.id}.json")
                 .use { L7AudioTemplates.parse(it).toJson() } }
-        // 明确应用 L7 快速模板才启用已核实的原厂焦点；沿用现有自定义方案格式，旧内置配置不变。
+        // 两套 L7 预设共用原厂用途参数，只由音频焦点开关决定是否申请焦点。
         if (model == "l7") {
+            groups.getValue(MAIN).putAll(mapOf("display_fps" to 60, "display_scale_percent" to 80,
+                "audio_focus_enabled" to l7AudioFocus))
             groups.getValue("l7_audio_templates")["mode"] = "custom"
             val native = org.json.JSONObject(templates.getValue("l7"))
                 .put("focusGains", org.json.JSONObject(mapOf("media" to 1, "navigation" to 3,

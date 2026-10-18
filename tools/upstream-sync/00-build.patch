@@ -64,7 +64,7 @@
  
  dependencies {
      api(project(":shared"))
-@@ -38,12 +67,13 @@
+@@ -38,12 +67,15 @@
      implementation(libs.androidx.compose.ui.graphics)
      implementation(libs.androidx.compose.ui.tooling.preview)
      implementation(libs.androidx.core.ktx)
@@ -72,6 +72,8 @@
 +    implementation(libs.androidx.media3.ui)
 +    implementation(libs.androidx.media3.exoplayer.hls)
 +    implementation(libs.dexmaker)
++    implementation(libs.qrcodegen)
++    testImplementation(libs.zxing.core)
      implementation(libs.androidx.lifecycle.runtime.ktx)
 -    implementation(libs.androidx.media3.exoplayer)
 -    implementation(libs.androidx.media3.exoplayer.hls)
@@ -86,7 +88,7 @@
  }
 --- a/gradle/libs.versions.toml
 +++ b/gradle/libs.versions.toml
-@@ -10,15 +10,22 @@
+@@ -10,15 +10,26 @@
  appAutomotive = "1.7.0"
  app = "1.4.0"
  junit = "4.13.2"
@@ -97,12 +99,16 @@
 +concentus = "1.0.0"
 +
 +dexmaker = "2.28.6"
++zxing = "3.5.4"
++qrcodegen = "1.8.0"
 +
  media3 = "1.11.1"
  
  [libraries]
 +concentus = { group = "com.plasmoverse", name = "concentus", version.ref = "concentus" }
 +dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
++qrcodegen = { module = "io.nayuki:qrcodegen", version.ref = "qrcodegen" }
++zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
  androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
  androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
  androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -110,7 +116,7 @@
  androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
  androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
  androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-@@ -30,8 +37,12 @@
+@@ -30,8 +41,12 @@
  androidx-app-automotive = { group = "androidx.car.app", name = "app-automotive", version.ref = "appAutomotive" }
  androidx-app = { group = "androidx.car.app", name = "app", version.ref = "app" }
  junit = { group = "junit", name = "junit", version.ref = "junit" }

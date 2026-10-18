@@ -15,7 +15,11 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private var templateDialog: AlertDialog? = null
     private var resetDialog: AlertDialog? = null
     private var closed = false
-    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::resetCurrent, ::restore, ::commit)
+    private val sharing = lazy { GalaxyConfigurationSharing(activity, { state.original }, { state.draft }) {
+        state.load(it); bind(); changed()
+    } }
+    val view: GalaxyConfigurationFrame = GalaxyConfigurationFrame(activity, ::chooseTemplate, ::category, ::resetCurrent, ::restore, ::commit,
+        share = { if (!closed) sharing.value.share() }, paste = { if (!closed) sharing.value.paste() })
     val dirty get() = state.dirty
     init {
         if (state.draft == null || !state.dirty) runCatching { repository.refresh() }.onSuccess { current ->
@@ -65,6 +69,9 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val context = draft ?: return
         view.fields.removeAllViews()
         view.category(state.group)
+        if (state.group == 0) GalaxyConfigurationNameField.add(context, view.fields, context.profile.name) { name ->
+            if (!closed) { state.draft = context.profile.copy(name = name, configuration = context.configuration()); bind() }
+        }
         GalaxyConfigurationSections.add(context, view.fields, state.group)
         if (state.group == 2 && state.draft?.configuration?.audioRecovery?.isNotEmpty() == true)
             view.fields.addView(L7Components.note(activity, text(R.string.profile_audio_recovery), true))
@@ -170,6 +177,7 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     }
     fun close() {
         closed = true
+        if (sharing.isInitialized()) sharing.value.close()
         templateDialog?.dismiss()
         templateDialog = null
         resetDialog?.dismiss()

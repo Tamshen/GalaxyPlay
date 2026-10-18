@@ -19,6 +19,54 @@ import org.robolectric.shadows.ShadowAlertDialog
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class GalaxyConfigurationPageTest {
+    @Test fun configurationNameIsEditableMetadataAndDoesNotChangeVehicleParameters() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val original = repository.applyTemplate("l7")
+        val page = GalaxyConfigurationPage(activity) {}
+        descendants(page.view.fields).filterIsInstance<L7SettingRow>().single {
+            it.titleView.text == activity.getString(R.string.config_profile_name)
+        }.performClick()
+        val editor = dialog()
+        val input = descendants(editor.window!!.decorView).filterIsInstance<android.widget.EditText>().single()
+        input.setText("头枕日常配置")
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertTrue(page.dirty)
+        assertEquals(original, repository.active())
+        assertEquals(original.configuration, state(activity).draft!!.configuration)
+        page.view.commitButton.performClick()
+        assertEquals("头枕日常配置", repository.active().name)
+        assertEquals("l7", repository.active().template)
+        assertEquals(original.configuration, repository.active().configuration)
+        page.close()
+    }
+    @Test fun ipModePickerHasThreeChoicesAndOnlyCommitsTheDraftOnSave() {
+        val activity = activity()
+        val repository = GalaxyProfiles(activity)
+        val original = repository.applyTemplate("l7_no_headrest")
+        val page = GalaxyConfigurationPage(activity) {}
+        fun open(): AlertDialog {
+            descendants(page.view.fields).filterIsInstance<L7SettingRow>().single {
+                it.titleView.text == activity.getString(R.string.galaxy_p2p_address_mode)
+            }.performClick()
+            return dialog()
+        }
+        val cancelled = open()
+        assertEquals(3, cancelled.listView.adapter.count)
+        cancelled.listView.performItemClick(cancelled.listView.adapter.getView(1, null, cancelled.listView), 1, 1)
+        cancelled.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        assertFalse(page.dirty)
+        val picker = open()
+        picker.listView.performItemClick(picker.listView.adapter.getView(2, null, picker.listView), 2, 2)
+        picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertTrue(page.dirty)
+        assertEquals(original, repository.active())
+        assertEquals("DUAL_STACK", state(activity).draft!!.configuration.preferences.getValue("xcertplay_airplay")[GalaxyP2pAddressSettings.KEY])
+        page.view.commitButton.performClick()
+        assertEquals(com.shilapi.xcertplay.network.P2pAddressMode.DUAL_STACK, GalaxyP2pAddressSettings.load(activity))
+        assertEquals("l7", repository.active().model)
+        page.close()
+    }
     private fun activity() = Robolectric.buildActivity(ComponentActivity::class.java).setup().get().apply {
         setTheme(android.R.style.Theme_Material_Light_NoActionBar)
         java.io.File(filesDir, "configurations").deleteRecursively()
@@ -33,7 +81,8 @@ class GalaxyConfigurationPageTest {
             .first { it.titleView.text.toString() == activity.getString(R.string.config_smoothness) }.performClick()
         val picker = dialog()
         assertEquals(activity.getString(R.string.profile_update_draft), picker.getButton(AlertDialog.BUTTON_POSITIVE).text.toString())
-        picker.listView.performItemClick(picker.listView.adapter.getView(1, null, picker.listView), 1, 1)
+        val index = if (state(activity).draft!!.configuration.preferences["xcertplay_airplay"]?.get("display_fps") == 60) 0 else 1
+        picker.listView.performItemClick(picker.listView.adapter.getView(index, null, picker.listView), index, index.toLong())
         picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
     }
     private fun template(page: GalaxyConfigurationPage, model: String) {
@@ -99,14 +148,14 @@ class GalaxyConfigurationPageTest {
             assertEquals("custom", saved.template)
             assertEquals(model, saved.model)
             assertEquals(applied.configuration.audio, saved.configuration.audio)
-            assertEquals(60, saved.configuration.preferences.getValue("xcertplay_airplay")["display_fps"])
+            assertEquals(if (model == "l7") 30 else 60, saved.configuration.preferences.getValue("xcertplay_airplay")["display_fps"])
             assertEquals(saved, GalaxyProfile.parse(saved.json().toString()))
             assertTrue(page.view.vehicleButton.text.toString().contains(activity.getString(R.string.template_custom)))
             page.close()
             page = GalaxyConfigurationPage(activity) {}
             page.view.vehicleButton.performClick()
             val picker = dialog()
-            assertEquals(2, picker.listView.checkedItemPosition)
+            assertEquals(GalaxyVehicleTemplates.entries.indexOfFirst { it.id == "custom" }, picker.listView.checkedItemPosition)
             picker.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
             shadowOf(Looper.getMainLooper()).idle()
             page.view.defaultsButton.performClick()
@@ -352,7 +401,7 @@ class GalaxyConfigurationPageTest {
         assertEquals(original, repository.active())
         template(page, "l7") // 同车型也可重新应用默认值。
         assertFalse(page.dirty)
-        assertEquals(30, repository.active().configuration.preferences["xcertplay_airplay"]!!["display_fps"])
+        assertEquals(60, repository.active().configuration.preferences["xcertplay_airplay"]!!["display_fps"])
         page.close()
     }
     @Test fun repeatedOpeningUsesOneDialogAndClosedPageRejectsLateApply() {

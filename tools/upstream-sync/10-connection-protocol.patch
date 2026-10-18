@@ -1511,7 +1511,7 @@
      private val preferredChannel: Int = WifiP2pChannels.AUTO,
 +    private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
 +    private val channelPolicy: P2pChannelPolicy? = null,
-+    private val ipv4Only: Boolean = false,
++    private val addressMode: P2pAddressMode = P2pAddressMode.DUAL_STACK,
  ) : WirelessHotspotManager {
      init {
          require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -1537,7 +1537,7 @@
              "WifiP2pGroupManager.start must not run on the main thread"
          }
          require(timeoutMillis > 0) { "timeoutMillis must be positive" }
-+        diagnostic("Wi-Fi P2P address policy=${if (ipv4Only) "IPv4_only" else "dual_stack"}")
++        diagnostic("Wi-Fi P2P address policy=${addressMode.name}")
  
          val attempt = StartAttempt()
          synchronized(stateLock) {
@@ -1731,7 +1731,7 @@
          val info = result.get() ?: return null
          if (!info.groupFormed) return null
          return info.groupOwnerAddress?.takeUnless(InetAddress::isAnyLocalAddress)
-+            ?.takeIf { !ipv4Only || it is Inet4Address }
++            ?.takeIf(addressMode::allows)
      }
  
      private fun await(latch: CountDownLatch, timeoutNanos: Long): Boolean = try {
@@ -1742,7 +1742,7 @@
 +    private fun interfaceHostAddresses(interfaceName: String, primary: InetAddress): List<InetAddress> {
 +        val selected = networkInterface(interfaceName)
 +        val addresses = p2pHostAddresses(primary,
-+            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0, ipv4Only)
++            selected?.let { Collections.list(it.inetAddresses) }.orEmpty(), selected?.index ?: 0, addressMode)
 +        diagnostic("Wi-Fi P2P listener families=${addresses.joinToString(",") { if (it is Inet6Address) "IPv6" else "IPv4" }}")
 +        return addresses
 +    }
@@ -1751,11 +1751,21 @@
          val networkInterface = networkInterface(interfaceName) ?: return null
 -        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses))
 +        val address = HotspotAddressPolicy.select(Collections.list(networkInterface.inetAddresses)
-+            .filter { !ipv4Only || it is Inet4Address })
++            .filter(addressMode::allows))
              ?: return null
          if (address !is Inet6Address || address.scopeId == networkInterface.index) return address
          return runCatching { Inet6Address.getByAddress(null, address.address, networkInterface) }
-@@ -736,7 +776,7 @@
+@@ -710,7 +750,8 @@
+         while (true) {
+             ensureStartActive(attempt)
+             val address = interfaceAddress(interfaceName)
+-            if (address is Inet4Address) return address
++            if (address is Inet4Address || address is Inet6Address &&
++                addressMode == P2pAddressMode.IPV6_ONLY && address.scopeId > 0) return address
+             // Publish only the current interface snapshot. A link-local address seen earlier
+             // may disappear while DHCP/group configuration is still changing.
+             if (remainingNanos(addressDeadline) <= 0) return address
+@@ -736,7 +777,7 @@
          val fiveGhzSupported = runCatching { wifi?.is5GHzBandSupported }.getOrNull()
          val wifiEnabled = runCatching { wifi?.isWifiEnabled }.getOrNull()
          val locationEnabled = runCatching {
@@ -1764,7 +1774,7 @@
          }.getOrNull()
          val required = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES
              else Manifest.permission.ACCESS_FINE_LOCATION
-@@ -771,9 +811,15 @@
+@@ -771,9 +812,15 @@
              ?.joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
  
      private fun networkInterface(interfaceName: String): NetworkInterface? = try {
@@ -1781,7 +1791,7 @@
      }
  
      private fun groupSecurity(group: WifiP2pGroup): Iap2WirelessSecurity {
-@@ -843,7 +889,7 @@
+@@ -843,7 +890,7 @@
          }
          synchronized(legacyChannelLock) {
              if (failedChannel != null) releaseLegacyChannelRestriction(failedChannel)
@@ -3798,7 +3808,7 @@
 -                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
 -            }
 +                preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy,
-+                ipv4Only = config.wifiP2pIpv4Only)
++                addressMode = config.wifiP2pAddressMode)
 +            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
              WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                  appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
@@ -4065,7 +4075,7 @@
          CarPlayStatus.WirelessActiveFallback ->
 --- a/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayRuntimeConfig.kt
-@@ -66,10 +66,17 @@
+@@ -66,10 +66,18 @@
      val wirelessBluetoothDeviceAddress: String? = null,
      val locationReportingEnabled: Boolean = false,
      val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
@@ -4076,7 +4086,8 @@
 +    val wifiP2pChannelPolicy: com.shilapi.xcertplay.network.P2pChannelPolicy? = null,
 +    val wirelessFirstTcpTimeoutMillis: Long = com.shilapi.xcertplay.network.WirelessStartupPolicy.FIRST_TCP_MILLIS,
 +    val wirelessStartupRefreshEnabled: Boolean = false,
-+    val wifiP2pIpv4Only: Boolean = false,
++    val wifiP2pAddressMode: com.shilapi.xcertplay.network.P2pAddressMode =
++        com.shilapi.xcertplay.network.P2pAddressMode.DUAL_STACK,
  ) {
      init {
 +        require(wirelessFirstTcpTimeoutMillis in 1..60_000) { "Wireless first TCP timeout must be in 1..60000ms" }

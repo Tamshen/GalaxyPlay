@@ -116,11 +116,11 @@ class GalaxyProfilesTest {
         assertEquals("zh", AppLocale.preference(frozen))
         assertEquals(240, L7UiDensity.value(frozen))
         assertEquals(saved.configuration, frozen.configuration())
-        AirPlayPersistence.saveFps(app, 60)
+        AirPlayPersistence.saveFps(app, 30)
         val edited = repository.refresh()
         assertEquals("custom", edited.template)
         assertEquals("l7", edited.model)
-        assertEquals(30, AirPlayPersistence.loadFps(frozen))
+        assertEquals(60, AirPlayPersistence.loadFps(frozen))
     }
     @Test fun externalConnectionAndAuthenticationSurviveEveryTemplateResetAndVehicleSave() {
         val prefs = app.getSharedPreferences("xcertplay_airplay", 0)
@@ -230,11 +230,11 @@ class GalaxyProfilesTest {
         val first = repository.save(repository.draft("l7", "First"))
         val second = repository.save(repository.draft("l7", "Second"))
         val changed = GalaxyConfigurationContext(app, first, true)
-        changed.getSharedPreferences("xcertplay_airplay", 0).edit().putInt("display_fps", 60).commit()
+        changed.getSharedPreferences("xcertplay_airplay", 0).edit().putInt("display_fps", 30).commit()
         val next = repository.save(first.copy(configuration = changed.configuration()))
         assertEquals(2, next.revision)
         assertTrue(runCatching { repository.save(first.copy(name = "Stale")) }.isFailure)
-        assertEquals(30, repository.list().first { it.id == second.id }.configuration.preferences
+        assertEquals(60, repository.list().first { it.id == second.id }.configuration.preferences
             .getValue("xcertplay_airplay")["display_fps"])
         assertEquals(next, repository.list().first { it.id == first.id })
     }

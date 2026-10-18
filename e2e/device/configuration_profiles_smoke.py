@@ -104,7 +104,7 @@ def active():
 
 
 labels = {
-    'l7': ('银河 L7', 'Galaxy L7'), 'l6': ('银河 L6', 'Galaxy L6'),
+    'l7': ('L7(带头枕)', 'L7 (with headrests)'), 'l7_no_headrest': ('L7(无头枕)', 'L7 (without headrests)'), 'l6': ('银河 L6', 'Galaxy L6'),
     'custom_vehicle': ('自定义', 'Custom'), 'reset': ('重置当前配置', 'Reset current configuration'),
     'reset_confirm': ('确认重置', 'Reset configuration'),
     'smoothness': ('画面流畅度', 'Picture smoothness'), 'fps60': ('更流畅 · 60 fps', 'Smoother · 60 fps'),
@@ -453,6 +453,16 @@ def configuration_smoke():
     assert native['preferences']['l7_audio_templates']['mode']['value'] == 'custom', '原厂焦点未保存到现有音频方案'
     assert native['audio_templates']['l7']['focusGains']['navigation'] == 3
     assert native['audio_templates']['l7']['focusGains']['ringtone'] == 3
+    assert native['preferences']['xcertplay_airplay']['display_fps']['value'] == 60
+    assert native['preferences']['xcertplay_airplay']['display_scale_percent']['value'] == 80
+    assert native['preferences']['xcertplay_airplay']['audio_focus_enabled']['value'] is False
+    template('l7_no_headrest')
+    without = json.loads(private(path))['configuration']
+    assert without['preferences']['l7_audio_templates']['model']['value'] == 'l7'
+    assert without['preferences']['xcertplay_airplay']['audio_focus_enabled']['value'] is True
+    without['preferences']['xcertplay_airplay']['audio_focus_enabled']['value'] = False
+    assert without == native
+    template('l7')
     assert current_app_values() == independent
     # 旧版其他文件首次读取会升级并保留上一份，不能把迁移备份误判成新配置。
     allowed_backups = {name + '.previous' for name in original_files if name.endswith('.json')}

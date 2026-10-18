@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="config_profile_name">配置名称</string>
+    <string name="config_share_default_name">配置%1$02d</string>
+    <string name="config_share_title">分享配置</string>
+    <string name="config_share_import">粘贴导入</string>
+    <string name="config_share_name_hint">为本次分享备注一个名称。将分享当前页面的车型参数，未保存修改也会包含在内。</string>
+    <string name="config_share_generate">生成分享配置</string>
+    <string name="config_share_paste">粘贴文本</string>
+    <string name="config_share_paste_hint">粘贴他人分享的完整配置文本，先预览再应用。也可粘贴配置文件中的完整文本。</string>
+    <string name="config_share_preview">预览配置</string>
+    <string name="config_share_replace_hint">确认后替换当前车型配置及未保存修改。热点、认证、应用设置和日志保留；正在连接的会话不变，下次连接生效。</string>
+    <string name="config_share_apply">导入并应用</string>
+    <string name="config_share_qr">配置分享二维码</string>
+    <string name="config_share_qr_large">参数较多，无法生成单个二维码。请复制配置文本或保存配置文件分享。</string>
+    <string name="config_share_copy">复制配置文本</string>
+    <string name="config_share_file">保存配置文件</string>
+    <string name="config_share_save_qr">保存二维码</string>
+    <string name="config_share_qr_hint">可用手机拍照或保存二维码后分享。接收方在手机识别并复制文本，再到车机粘贴导入。</string>
+    <string name="config_share_summary">名称：%1$s\n车型：%2$s\n帧率：%3$d fps\n清晰度：%4$d%%\nIP 模式：%5$s\n音频焦点：%6$s</string>
+    <string name="config_share_off">关闭</string>
+    <string name="config_share_on">开启</string>
+    <string name="config_share_preparing">正在生成配置文本和二维码…</string>
+    <string name="config_share_invalid">配置无效、参数不受支持或内容不完整。请核对配置文本及车型选择。</string>
+    <string name="config_share_saved">配置分享文件已保存。</string>
+    <string name="config_share_copied">已复制配置文本。</string>
+</resources>

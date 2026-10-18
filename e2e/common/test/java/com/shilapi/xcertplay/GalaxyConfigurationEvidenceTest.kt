@@ -36,7 +36,7 @@ class GalaxyConfigurationEvidenceTest {
             assertFalse(secret, secret in value.text)
         assertFalse(JSONObject(value.text).has("template_id"))
         val data = JSONObject(value.text).getJSONObject("configuration")
-        assertEquals(30, data.getJSONObject("preferences").getJSONObject("xcertplay_airplay")
+        assertEquals(60, data.getJSONObject("preferences").getJSONObject("xcertplay_airplay")
             .getJSONObject("display_fps").getInt("value"))
         assertEquals(3, data.getJSONObject("audio_templates").length())
         assertEquals(value, GalaxyConfigurationEvidence.read(value.text))

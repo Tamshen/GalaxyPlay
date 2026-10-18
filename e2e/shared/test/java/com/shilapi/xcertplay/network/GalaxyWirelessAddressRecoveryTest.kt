@@ -60,7 +60,7 @@ class GalaxyWirelessAddressRecoveryTest {
     }
 
     @Test fun directSingleStackAndLateUnboundIpv6KeepTheOriginalEndpoint() {
-        val addresses = p2pHostAddresses(ipv4, live, 22, ipv4Only = true)
+        val addresses = p2pHostAddresses(ipv4, live, 22, addressMode = com.shilapi.xcertplay.network.P2pAddressMode.IPV4_ONLY)
         val recovery = policy(info(WirelessHotspotBackend.WIFI_P2P, addresses))!!
         val refreshed = recovery.refresh(endpoint)!!
         assertEquals(endpoint.ipAddresses, refreshed.ipAddresses)

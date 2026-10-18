@@ -71,6 +71,8 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.dexmaker)
+    implementation(libs.qrcodegen)
+    testImplementation(libs.zxing.core)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.jmdns)
     testImplementation(libs.junit)
