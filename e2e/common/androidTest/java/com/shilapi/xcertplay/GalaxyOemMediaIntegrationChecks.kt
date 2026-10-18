@@ -40,7 +40,9 @@ object GalaxyOemMediaIntegrationChecks {
             check(info === sdk.published && info.title == value.title && info.artwork == cover)
             check(info.duration == 180123L && info.playbackStatus == 1 && info.sourceType == 6)
             check(info.packageName == context.packageName && info.appIcon.startsWith("android.resource://${context.packageName}/"))
-            check(info.launchIntent != null && info.playerIntent == info.launchIntent)
+            // 应用主页与当前会话播放入口使用独立 action／请求码，不能复用同一个 PendingIntent。
+            check(info.launchIntent != null && info.playerIntent != null && info.playerIntent != info.launchIntent)
+            check(info.launchIntent.creatorPackage == context.packageName && info.playerIntent.creatorPackage == context.packageName)
             check(info.vip == 0 && info.playingMediaListType == -1)
             check(!info.isSupportCollect && !info.isSupportDownload && !info.isSupportLoopModeSwitch)
             check(info.isSupportVrCtrlPlayStatus)

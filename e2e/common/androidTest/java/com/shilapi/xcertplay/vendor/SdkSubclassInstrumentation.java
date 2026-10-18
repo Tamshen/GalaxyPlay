@@ -38,8 +38,7 @@ public class SdkSubclassInstrumentation extends Instrumentation {
             result.putString("stream", "SDK_SUBCLASS_OK OEM_MEDIA_CONTRACT_OK L6_L7_SYNTHETIC_SDK"); finish(-1, result);
         }
         catch (Throwable error) {
-            result.putString("stream", "SDK_SUBCLASS_FAILED " +
-                ((wirelessPerformance || wirelessPrepare || performance) ? android.util.Log.getStackTraceString(error) : error));
+            result.putString("stream", "SDK_SUBCLASS_FAILED " + android.util.Log.getStackTraceString(error));
             finish(0, result);
         }
     }
