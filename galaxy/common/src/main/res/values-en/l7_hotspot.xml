@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct auto-join preparation could not be confirmed. Check that the head unit’s local maintenance service is available, then reconnect. Details are recorded in the log.</string>
     <string name="galaxy_l7_direct_channel_hint">The L7 connection uses fixed 5 GHz channel 149. Changing the region applies the channel settings for that region.</string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct region of use</string>
     <string name="galaxy_p2p_region_mainland">Mainland China · vehicle use</string>

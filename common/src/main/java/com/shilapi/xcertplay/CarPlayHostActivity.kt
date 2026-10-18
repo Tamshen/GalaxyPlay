@@ -3558,6 +3558,7 @@ class CarPlayHostActivity : ComponentActivity() {
             reportStatus = createStatusReporter(controllerGeneration),
             diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
             localMediaAudioEnabled = localMusic,
+            prepareWirelessHotspot = GalaxyP2pPreparation.forSession(config),
             loadPairRecord = { key, current -> AirPlayPersistence.loadLockdownRecord(this, key, current) },
             savePairRecord = { record, current -> AirPlayPersistence.saveLockdownRecord(this, record, current) },
             clearPairRecord = { key, current -> AirPlayPersistence.clearLockdownRecord(this, key, current) },

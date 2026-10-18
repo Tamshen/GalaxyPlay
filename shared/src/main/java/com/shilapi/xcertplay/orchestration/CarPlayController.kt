@@ -173,6 +173,7 @@ class CarPlayController(
     private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
     diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
     val localMediaAudioEnabled: Boolean = true,
+    private val prepareWirelessHotspot: ((WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit)? = null,
 ) : Closeable {
     /** 重连沿用当前控制器的实际传输方式，不使用可能已被修改的设置草稿。 */
     val transport: CarPlayTransport get() = config.transport
@@ -2437,7 +2438,15 @@ class CarPlayController(
             HOTSPOT_START_TIMEOUT_MILLIS
         }
         return try {
-            manager.start(timeoutMillis)
+            val info = manager.start(timeoutMillis)
+            prepareWirelessHotspot?.let { prepare ->
+                if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot preparation cancelled")
+                manager.validateReady()
+                prepare(info, { isStaleWirelessRun(generation) }, ::debugLog)
+                if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot preparation cancelled")
+                manager.validateReady()
+            }
+            info
         } catch (failure: Exception) {
             if (hotspot === manager) hotspot = null
             closeBestEffort(hotspotMode.name) { manager.close() }

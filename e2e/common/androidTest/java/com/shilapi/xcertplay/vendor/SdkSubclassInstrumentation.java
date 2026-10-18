@@ -9,16 +9,23 @@ public class SdkSubclassInstrumentation extends Instrumentation {
     private boolean wirelessPerformance;
     private boolean wirelessPrepare;
     private boolean performance;
+    private boolean p2pAutoJoin;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         wirelessPerformance = arguments != null && "wireless-performance".equals(arguments.getString("suite"));
         wirelessPrepare = arguments != null && "wireless-prepare".equals(arguments.getString("suite"));
         performance = arguments != null && "performance-monitor".equals(arguments.getString("suite"));
+        p2pAutoJoin = arguments != null && "p2p-auto-join".equals(arguments.getString("suite"));
         start();
     }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
+            if (p2pAutoJoin) {
+                com.shilapi.xcertplay.GalaxyP2pAutoJoinAndroidCheck.run(getTargetContext());
+                result.putString("stream", "P2P_AUTO_JOIN_ANDROID11_OK COLD_RECONNECT_READBACK_REJECTED");
+                finish(-1, result); return;
+            }
             if (performance) {
                 com.shilapi.xcertplay.GalaxyPerformanceAndroidChecks.run(getTargetContext(), this);
                 result.putString("stream", "PERFORMANCE_ANDROID11_OK FOUR_IDLE_MODES TOUCH_THROUGH FRAME_COUNTERS BINDER_PARCEL CLEAN_STOP");

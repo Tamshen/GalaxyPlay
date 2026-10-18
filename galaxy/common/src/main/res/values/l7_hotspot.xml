@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct 自动加入准备未完成。请确认车机本地维护服务可用后重新连接；详细阶段已记录到日志。</string>
     <string name="galaxy_l7_direct_channel_hint">L7 专用连接固定使用 5 GHz 149 信道，修改使用地区后按对应地区配置连接。</string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct 使用地区</string>
     <string name="galaxy_p2p_region_mainland">中国大陆车载</string>

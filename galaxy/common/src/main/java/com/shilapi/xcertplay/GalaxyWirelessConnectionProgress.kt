@@ -37,6 +37,9 @@ internal class GalaxyWirelessConnectionProgress {
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT ->
                 context.getString(R.string.galaxy_wireless_protocol_timeout)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION &&
+                status.message.contains(com.shilapi.xcertplay.network.GalaxyP2pAutoJoin.FAILURE) ->
+                context.getString(R.string.galaxy_p2p_auto_join_failed)
+            status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION &&
                 status.message.startsWith("Wi-Fi Direct") && status.message.contains("vehicle region") ->
                 context.getString(R.string.galaxy_p2p_region_failure)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION &&
