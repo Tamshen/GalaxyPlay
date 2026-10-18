@@ -139,6 +139,30 @@ class RemoteLogBatchTest {
         }
     }
 
+    @Test fun retryAfterPreparationFailureKeepsTheRequestHashAndRemark() {
+        val received = CopyOnWriteArrayList<String>()
+        configure { text, _ -> received += text; 200 }
+        File(folder, "diplay.log").writeText("synthetic preparation retry\n")
+        val calls = AtomicInteger()
+        val context = object : ContextWrapper(app) {
+            override fun getApplicationContext(): Context = this
+            override fun getFilesDir(): File {
+                if (calls.getAndIncrement() == 0) throw IllegalStateException("synthetic preparation failure")
+                return app.filesDir
+            }
+        }
+        assertTrue(RemoteLogUpload.start(context, remark = "整理失败后重试"))
+        await(RemoteLogUpload.Phase.FAILED)
+        val id = RemoteLogUpload.status.id
+        assertTrue(RemoteLogUpload.status.preparationFailed)
+        assertTrue(received.isEmpty())
+        assertTrue(RemoteLogUpload.start(context, retry = true, remark = "不能覆盖"))
+        await(RemoteLogUpload.Phase.SUCCESS)
+        assertEquals(id, RemoteLogUpload.status.id)
+        assertEquals("整理失败后重试", RemoteLogUpload.status.remark)
+        assertEquals(id, JSONArray(received.single()).getJSONObject(0).getString("report_id"))
+    }
+
     @Test fun failedBatchStopsAndManualRetrySkipsConfirmedBatchesWithStableEvents() {
         val configuration = GalaxyConfigurationEvidence.capture(app)
         File(folder, "diplay.log").writeText(configuration.header + "\n" + (0..2400).joinToString("\n") {
@@ -150,7 +174,7 @@ class RemoteLogBatchTest {
             received += batch to text
             if (batch == 2 && received.count { it.first == 2 } == 1) 503 else 200
         }
-        assertTrue(RemoteLogUpload.start(app))
+        assertTrue(RemoteLogUpload.start(app, remark = "18点更新后连接失败"))
         await(RemoteLogUpload.Phase.FAILED)
         assertNull(RemoteLogHistory.last(app))
         val firstAttempt = received.toList()
@@ -165,14 +189,20 @@ class RemoteLogBatchTest {
         L7AudioTemplates.selectModel(draft, L7AudioTemplates.Model.L6)
         val saved = repository.save(draft.profile.copy(configuration = draft.configuration()))
         repository.select(saved.id)
-        assertTrue(RemoteLogUpload.start(app, retry = true))
+        assertTrue(RemoteLogUpload.start(app, retry = true, remark = "不能覆盖原备注"))
         await(RemoteLogUpload.Phase.SUCCESS)
         assertEquals(firstAttempt.single { it.first == 2 }.second, received.last { it.first == 2 }.second)
         val status = RemoteLogUpload.status
         assertEquals(reportId, status.id)
+        assertEquals("18点更新后连接失败", status.remark)
+        assertTrue(received.all { (_, body) ->
+            val rows = JSONArray(body)
+            (0 until rows.length()).all { rows.getJSONObject(it).getString("upload_remark") == status.remark }
+        })
         assertEquals(status.totalBatches, status.completedBatches)
         assertEquals(status.totalLines, status.uploadedLines)
-        assertEquals(RemoteLogHistory.Entry(status.finishedAt, status.totalLines), RemoteLogHistory.last(app))
+        assertEquals(RemoteLogHistory.Entry(status.finishedAt, status.totalLines, status.id, status.remark, status.stream),
+            RemoteLogHistory.last(app))
         assertTrue(status.finishedAt > 0)
         val alreadyConfirmed = firstAttempt.map { it.first }.filter { it != 2 }.toSet()
         assertEquals((1..status.totalBatches).filter { it !in alreadyConfirmed }.toSet(),

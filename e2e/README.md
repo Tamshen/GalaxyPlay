@@ -35,6 +35,8 @@
 
 `RemoteLogArchiveTest` 与 `RemoteLogBatchTest` 的完整上传回归检查超过 5000 条／1 MiB 时首、中、尾记录全部保留、超过旧单文件预算的完整读取、异常巨行有界处理、磁盘快照冻结／副本合并／事件排序、准备取消清理，以及本地 HTTP 接口逐批确认、失败停止派发并收齐在途确认、同快照续传和成功清理。`RemoteLogBatchSenderTest` 用门闩验证三个请求同时在途、7000 条／每批 1000 条完整发送及乱序确认；`RemoteLogArchivePerformanceTest` 检查 7000 个事件与 500 份副本的完整整理并输出本机耗时。SQLite 原生测试需使用默认 amd64 Docker；ARM64 Linux 的 Robolectric 原生 SQLite 不可用。实际 Android SQLite 和窗口操作通过 AVD 单独验证，不实发服务器日志。
 
+上传备注与报告边界由 `RemoteLogUploadRequestTest`、`RemoteLogArchiveTest`、`RemoteLogBatchTest`、`RemoteLogHistoryTest` 及 `L7DebugTasksTest` 覆盖：取消备注不发请求、新报告独立编号、备注限长与脱敏、首尾总数、每行关联、失败续传保持原号／备注和成功回执持久化。`full_log_upload_smoke.py` 只对本机接口验证实际备注确认、完整报告边界及复制回执，不向正式服务器发送合成日志。
+
 `GalaxyLogRetentionTest` 验证总日志 5 MB、持续写入／轮转、活动文件保留、旧异常大文件尾部及符号链接隔离；`GalaxyStorageUsageTest` 验证数据分类、符号链接不重复计量、上传／封面／下载保护、孤立文件清理及上传临时预算失败不删本地日志。`python3 e2e/device/storage_usage_smoke.py` 仅允许 AVD，备份日志目录后注入超额文件和闲置临时文件，验证启动自动清理、最新活动文件保留、应用设置各项占用与真实进程内存；结束恢复原日志目录，之后仍受新预算管理。`python3 e2e/device/full_log_upload_smoke.py` 仅向本机 HTTP 接口上传 6200 条合成日志，第三批失败后替换源文件，核对原快照续传／正文不变／全部接收／成功清理；结束恢复原日志及上传配置、历史。
 
 `GalaxyP2pRegionTest` 检查大陆车载排除室内频段、自动 149 候选、其他地区保守 2.4 GHz、历史信道与同射频共存、手动越界阻止请求和系统拒绝回退；地区限制不使用不固定频率的系统默认建组。`WifiP2pGroupManagerTest` 在 API 29／30 覆盖实际组回读越界后的释放及非法手动设置不干扰既有组。`GalaxyWirelessSettingsTest` 核对地区确认／取消、原频道保留、候选过滤及地区变化使旧频道窗口失效；`GalaxyConfigurationEvidenceTest` 核对地区枚举保留与敏感值继续脱敏。

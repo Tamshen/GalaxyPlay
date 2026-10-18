@@ -30,9 +30,11 @@ internal class RemoteLogBatch(
         .toString().toByteArray(Charsets.UTF_8)).also { check(it.size <= RemoteLogReport.MAX_BODY) }
 }
 
-internal data class RemoteLogMetadata(val id: String, val collected: String, val version: String, val core: String) {
+internal data class RemoteLogMetadata(val id: String, val collected: String, val version: String, val core: String,
+    val remark: String = "") {
     fun event(entry: RemoteLogEntry, batch: Int, total: Int): JSONObject = JSONObject()
         .put("report_id", id).put("event_id", "$id:${entry.index}").put("collected_at", collected)
+        .put("upload_remark", remark)
         .put("app_version", version).put("core_version", core).put("line_index", entry.index)
         .put("source", entry.source).put("batch_index", batch).put("batch_count", total).put("message", entry.message)
         .put("config_id", entry.configurationId ?: "unknown")

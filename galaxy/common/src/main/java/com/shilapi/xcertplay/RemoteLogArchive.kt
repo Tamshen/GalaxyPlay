@@ -3,12 +3,13 @@ package com.shilapi.xcertplay
 import android.content.Context
 import com.shilapi.xcertplay.host.R
 import java.io.File
-import java.time.Instant
 import java.util.UUID
 
 /** 上传保存完整的点击时快照，单批有界；不按总字节数或总条数丢弃上下文。 */
 internal object RemoteLogArchive {
-    fun collect(context: Context, progress: ((Int) -> Unit)? = null, checkpoint: () -> Unit = {}): RemoteLogReport {
+    fun collect(context: Context, progress: ((Int) -> Unit)? = null,
+                request: RemoteLogUploadRequest = RemoteLogUploadRequest.create(),
+                checkpoint: () -> Unit = {}): RemoteLogReport {
         val started = System.nanoTime()
         checkpoint()
         val root = File(context.cacheDir, "log-upload-snapshots").apply { mkdirs() }
@@ -16,8 +17,8 @@ internal object RemoteLogArchive {
         GalaxyTemporaryFiles.cleanup(context)
         val directory = File(root, "upload-${UUID.randomUUID()}")
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-        val metadata = RemoteLogMetadata(UUID.randomUUID().toString(), Instant.now().toString(), version.take(80),
-            context.getString(R.string.l7_core_source_info).take(120))
+        val metadata = RemoteLogMetadata(request.id, request.created, version.take(80),
+            context.getString(R.string.l7_core_source_info).take(120), request.remark)
         val store = RemoteLogBatchStore(directory, metadata, GalaxyTemporaryFiles.protect(directory))
         try {
             check(directory.mkdirs())
@@ -49,7 +50,7 @@ internal object RemoteLogArchive {
                     store.close()
                     return RemoteLogReport(metadata.id, emptyList(), 0, 0)
                 }
-                write(store, metadata, records(context, index, drained, memory.evicted, checkpoint,
+                write(store, metadata, records(context, index, request, drained, memory.evicted, checkpoint,
                     (indexStarted - started) / 1_000_000, (indexed - indexStarted) / 1_000_000), checkpoint)
                 return RemoteLogReport(metadata.id, store.batches, 0, 0, index.duplicateCopies, memory.evicted,
                     store, store.lineCount)
@@ -61,11 +62,15 @@ internal object RemoteLogArchive {
         }
     }
 
-    private fun records(context: Context, index: RemoteLogArchiveIndex, drained: Boolean, evicted: Long,
+    private fun records(context: Context, index: RemoteLogArchiveIndex, request: RemoteLogUploadRequest,
+                        drained: Boolean, evicted: Long,
                         checkpoint: () -> Unit, freezeMillis: Long, indexMillis: Long): Sequence<RemoteLogEntry> = sequence {
         val scanned = index.scanned
+        // 边界属于冻结报告；END 不代表所有批次已获服务端确认。
+        yield(RemoteLogEntry(-1, "upload", request.boundary(begin = true)))
         yieldAll(index.configurations(checkpoint))
-        runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()?.let { saved ->
+        val saved = runCatching { GalaxyConfigurationEvidence.capture(context) }.getOrNull()
+        saved?.let {
             yield(RemoteLogEntry(index.scanned, "configuration", "saved_configuration_at_upload", saved.id, saved, "saved_at_upload"))
         }
         yieldAll(index.entries(checkpoint))
@@ -74,6 +79,8 @@ internal object RemoteLogArchive {
             "scannedLines=$scanned omittedLines=0 shortenedSources=0 duplicateCopies=${index.duplicateCopies} " +
             "memoryEvicted=$evicted excludedPayloadLines=${index.excluded} truncatedLines=${index.truncated} " +
             "prepareFreezeMs=$freezeMillis prepareIndexMs=$indexMillis"))
+        val total = index.retained + (index.scanned - scanned) + (if (saved == null) 0 else 1) + 4
+        yield(RemoteLogEntry(index.scanned + 3, "upload", request.boundary(begin = false, records = total)))
     }
 
     private fun write(store: RemoteLogBatchStore, metadata: RemoteLogMetadata,

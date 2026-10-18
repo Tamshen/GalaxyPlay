@@ -1,11 +1,13 @@
 package com.shilapi.xcertplay
 
 import android.app.Activity
+import android.app.AlertDialog
 import com.shilapi.xcertplay.host.R
 
 /** 宿主独占一个任务窗口，页面重绘不会重新启动任务；后台/销毁停止用户正在等待的操作。 */
 internal class L7DebugTasks(private val activity: Activity, private val onResults: () -> Unit) {
     private var window: L7TaskProgressDialog? = null
+    private var uploadPrompt: AlertDialog? = null
     private val labels = L7ProbeLabels(activity)
 
     fun collect(onlyId: String? = null): Boolean {
@@ -18,15 +20,18 @@ internal class L7DebugTasks(private val activity: Activity, private val onResult
     }
 
     fun upload() {
-        if (window != null) return
+        if (window != null || uploadPrompt != null) return
         if (L7ProbeRunner.clearing) { L7Notice.show(activity, text(R.string.l7_log_clear_busy)); return }
         val phase = RemoteLogUpload.status.phase
         // 失败后再次进入仍先展示重试确认，不因打开窗口再次发送。
-        if (phase !in listOf(RemoteLogUpload.Phase.FAILED, RemoteLogUpload.Phase.UPLOADING) &&
-            !RemoteLogUpload.start(activity)) {
-            L7Notice.show(activity, text(R.string.l7_log_config_first)); return
+        if (phase in listOf(RemoteLogUpload.Phase.FAILED, RemoteLogUpload.Phase.UPLOADING)) {
+            showUpload(); return
         }
-        showUpload()
+        uploadPrompt = L7LogUploadPrompt.show(activity, { remark ->
+            if (activity.isFinishing || activity.isDestroyed) return@show
+            if (RemoteLogUpload.start(activity, remark = remark)) showUpload()
+            else L7Notice.show(activity, text(R.string.l7_log_config_first))
+        }, { uploadPrompt = null })
     }
 
     fun resume() {
@@ -37,9 +42,10 @@ internal class L7DebugTasks(private val activity: Activity, private val onResult
         }
     }
 
-    fun background() { window?.stop(); window?.pause() }
+    fun background() { uploadPrompt?.dismiss(); window?.stop(); window?.pause() }
     fun dispose(changingConfiguration: Boolean) {
         if (!changingConfiguration) window?.stop()
+        uploadPrompt?.dismiss(); uploadPrompt = null
         window?.dismiss(); window = null
     }
 

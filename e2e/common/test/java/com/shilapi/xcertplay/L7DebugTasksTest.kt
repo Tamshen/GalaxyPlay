@@ -35,6 +35,11 @@ class L7DebugTasksTest {
         return L7DebugTasks(activity) {}.also { tasks = it }
     }
     private fun tick() = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250))
+    private fun confirmUpload() {
+        tick()
+        ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        tick()
+    }
     private fun await(phase: RemoteLogUpload.Phase) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
         while (RemoteLogUpload.status.phase == RemoteLogUpload.Phase.UPLOADING && System.nanoTime() < deadline) Thread.sleep(10)
@@ -61,6 +66,8 @@ class L7DebugTasksTest {
         configure { rows -> ids += rows.getJSONObject(0).getString("report_id"); if (ids.size == 1) 503 else 200 }
         val tasks = controller()
         tasks.upload(); tasks.upload()
+        assertTrue(ids.isEmpty())
+        confirmUpload()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         await(RemoteLogUpload.Phase.FAILED)
         assertTrue(dialog.isShowing)
@@ -82,6 +89,7 @@ class L7DebugTasksTest {
         try {
             val tasks = controller()
             tasks.upload()
+            confirmUpload()
             assertTrue(entered.await(5, TimeUnit.SECONDS))
             tasks.background()
             assertEquals(RemoteLogUpload.Phase.CANCELLED, RemoteLogUpload.status.phase)
@@ -97,6 +105,7 @@ class L7DebugTasksTest {
         java.io.File(app.filesDir, "logs").deleteRecursively()
         L7DebugLog.buffer.clear()
         controller().upload()
+        confirmUpload()
         await(RemoteLogUpload.Phase.EMPTY)
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         assertTrue(dialog.isShowing)
@@ -104,6 +113,27 @@ class L7DebugTasksTest {
         val matches = ArrayList<android.view.View>()
         dialog.window!!.decorView.findViewsWithText(matches, app.getString(R.string.l7_log_empty_title), android.view.View.FIND_VIEWS_WITH_TEXT)
         assertTrue(matches.isNotEmpty())
+        assertEquals(0, received.get())
+    }
+
+    @Test fun cancellingRemarkOrLeavingThePageDoesNotSendAnything() {
+        val received = java.util.concurrent.atomic.AtomicInteger()
+        configure { received.incrementAndGet(); 200 }
+        val tasks = controller()
+        tasks.upload()
+        val cancelled = ShadowAlertDialog.getLatestAlertDialog()
+        tick()
+        cancelled.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        tick()
+        cancelled.getButton(AlertDialog.BUTTON_POSITIVE).performClick(); tick()
+        assertEquals(RemoteLogUpload.Phase.CANCELLED, RemoteLogUpload.status.phase)
+        assertEquals(0, received.get())
+        tasks.upload()
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        tasks.background()
+        assertFalse(dialog.isShowing)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick(); tick()
+        tasks.resume(); tick()
         assertEquals(0, received.get())
     }
 }

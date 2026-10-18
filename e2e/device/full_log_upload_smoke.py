@@ -14,13 +14,15 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
+parser.add_argument('--output-dir', default='build/previews/full-log-upload')
 args = parser.parse_args()
 assert re.fullmatch(r'emulator-\d+', args.serial), '只允许模拟器'
 base = [args.adb, '-s', args.serial]
 package = 'com.ecarx.carplay'
-output = Path('build/previews/full-log-upload')
+output = Path(args.output_dir)
 output.mkdir(parents=True, exist_ok=True)
-received, accepted = [], []
+received, accepted, accepted_rows, received_streams = [], [], [], []
+remark = '18:00_update_WiFiDirect_failed'
 received_lock = threading.Lock()
 
 
@@ -66,8 +68,10 @@ class Server(BaseHTTPRequestHandler):
         index = rows[0]['batch_index']
         with received_lock:
             received.append((index, body))
+            received_streams.append(self.path.split('/')[-2])
             code = 503 if index == 3 and sum(i == 3 for i, _ in received) == 1 else 200
         if code == 200:
+            accepted_rows.extend(rows)
             for row in rows:
                 match = re.search(r'full_avd_line=(\d+)', row['message'])
                 if match:
@@ -80,6 +84,7 @@ class Server(BaseHTTPRequestHandler):
         self.wfile.write(response)
 
 
+assert adb('shell', 'getprop', 'ro.kernel.qemu').strip() == b'1', '只允许真实 AVD'
 assert 'CarPlayHostActivity' not in adb('shell', 'dumpsys', 'activity', 'activities').decode()
 adb('shell', 'am', 'force-stop', package)
 backups = {}
@@ -119,6 +124,18 @@ try:
         visible = texts()
     assert f'http://127.0.0.1:{port}/api/test/' in visible, '未确认本机地址，禁止上传'
     tap('上传日志')
+    assert '开始上传' in texts(), '必须先填写备注并确认'
+    assert not received, '打开备注弹窗不能发送请求'
+    (output / 'remark.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    tap('取消')
+    assert not received, '取消备注不能发送请求'
+    tap('上传日志')
+    edit = next(n for n in nodes().iter('node') if n.get('class') == 'android.widget.EditText')
+    x1, y1, x2, y2 = map(int, re.findall(r'\d+', edit.get('bounds')))
+    adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+    adb('shell', 'input', 'text', remark)
+    adb('shell', 'input', 'keyevent', '4')
+    tap('开始上传')
     deadline = time.monotonic() + 60
     while 'HTTP 503' not in texts():
         assert time.monotonic() < deadline, '未到失败重试状态'
@@ -135,13 +152,43 @@ try:
     confirmed = {index for index, _ in first_attempt if index != 3}
     assert confirmed.isdisjoint(index for index, _ in received[len(first_attempt):]), '不能重发已确认批次'
     assert sorted(accepted) == list(range(6200)), '上下文记录必须全部收到且没有已确认批次重复'
+    ids = {row['report_id'] for row in accepted_rows}
+    assert len(ids) == 1 and re.fullmatch(r'[a-f0-9]{32}', next(iter(ids)))
+    report_id = next(iter(ids))
+    assert all(row['upload_remark'] == remark for row in accepted_rows)
+    boundaries = [row for row in accepted_rows if row['source'] == 'upload']
+    assert len(boundaries) == 2
+    begin = next(row for row in boundaries if row['message'].startswith('UPLOAD_BEGIN '))
+    end = next(row for row in boundaries if row['message'].startswith('UPLOAD_END '))
+    assert begin['line_index'] == min(row['line_index'] for row in accepted_rows)
+    assert end['line_index'] == max(row['line_index'] for row in accepted_rows)
+    assert end['message'].endswith(f'records={len(accepted_rows)}')
+    assert all(report_id in row['message'] and remark in row['message'] for row in boundaries)
     assert sum(len(body) for _, body in received) > 1024 * 1024
     assert private('ls -A cache/log-upload-snapshots').strip() == b'', '成功后仍有快照残留'
     (output / 'complete.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    history = ET.fromstring(private('cat shared_prefs/l7_log_history.xml'))
+    saved = {node.get('name'): node.text for node in history if node.tag == 'string'}
+    assert saved['report_id'] == report_id and saved['upload_remark'] == remark
+    assert set(received_streams) == {saved['stream']}, '回执必须保存实际写入流名'
+    adb('shell', 'am', 'force-stop', package)
+    adb('shell', 'am', 'start', '-W', '-n', package + '/com.shilapi.xcertplay.GalaxySettingsActivity',
+        '--es', 'page', 'settings-debug-logs')
+    visible = texts()
+    for _ in range(8):
+        if any(n.get('text') == '上传状态' for n in nodes().iter('node')):
+            break
+        adb('shell', 'input', 'swipe', '1050', '1600', '1050', '700', '200')
+        visible = texts()
+    assert report_id in visible and remark in visible, '重启后应保留完整回执'
+    tap('上传状态')
+    (output / 'receipt.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     (output / 'result.json').write_text(json.dumps({'retained_fixture_lines': len(accepted),
         'requests': len(received), 'total_request_bytes': sum(len(b) for _, b in received),
-        'batch_order': [i for i, _ in received]}, indent=2))
-    print('AVD 完整 6200 条上下文、超过 1 MiB、逐批确认／原快照续传／成功清理通过，仅发本机接口。')
+        'batch_order': [i for i, _ in received], 'report_id': report_id, 'upload_remark': remark,
+        'total_records': len(accepted_rows), 'boundaries': boundaries,
+        'persisted_receipt': saved}, indent=2))
+    print('AVD 备注确认／取消、首尾编号、完整6200条、原快照续传及重启回执通过，仅发本机接口。')
 finally:
     adb('shell', 'am', 'force-stop', package)
     if logs_moved:

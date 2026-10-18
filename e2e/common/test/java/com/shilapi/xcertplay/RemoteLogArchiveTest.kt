@@ -20,6 +20,29 @@ class RemoteLogArchiveTest {
     @Before fun setup() { RemoteLogUpload.cancel(); logs.deleteRecursively(); logs.mkdirs(); L7DebugLog.buffer.clear() }
     @After fun cleanup() { RemoteLogUpload.cancel(); snapshots.deleteRecursively() }
 
+    @Test fun markedUploadHasOnePairOfBoundariesAndSearchableIdentityOnEveryRecord() {
+        File(logs, "diplay.log").writeText((0..1200).joinToString("\n") { "sample_event=$it" })
+        val request = RemoteLogUploadRequest.create("18点 更新后失败\n再试一次")
+        RemoteLogArchive.collect(app, request = request).use { report ->
+            assertEquals(request.id, report.id)
+            val rows = report.batches.flatMap { batch ->
+                val json = org.json.JSONArray(batch.body.toString(Charsets.UTF_8))
+                (0 until json.length()).map(json::getJSONObject)
+            }
+            assertTrue(rows.first().getString("message").startsWith("UPLOAD_BEGIN "))
+            assertTrue(rows.last().getString("message").startsWith("UPLOAD_END "))
+            assertEquals(2, rows.count { it.getString("source") == "upload" })
+            assertTrue(rows.all { it.getString("report_id") == request.id &&
+                it.getString("upload_remark") == "18点 更新后失败 再试一次" })
+            assertTrue(rows.first().getInt("line_index") < rows.drop(1).minOf { it.getInt("line_index") })
+            assertEquals(rows.size, rows.map { it.getString("event_id") }.distinct().size)
+            assertEquals(1201, rows.count { it.getString("source") == "diplay.log" })
+            assertTrue(rows.first().getString("message").contains(request.id))
+            assertTrue(rows.last().getString("message").contains(request.remark))
+            assertTrue(rows.last().getString("message").endsWith("records=${rows.size}"))
+        }
+    }
+
     @Test fun fullHistoryBeyondFiveThousandLinesAndOneMiBKeepsBeginningMiddleAndEnd() {
         val text = (0 until 6500).joinToString("\n") { "evidence_index=$it codec=H264 " + "counter ".repeat(15) }
         File(logs, "previous-7.log").writeText(text)

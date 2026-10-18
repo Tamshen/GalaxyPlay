@@ -6,7 +6,15 @@
     <string name="l7_log_remote">远程日志</string>
     <string name="l7_log_server">OpenObserve 日志服务器</string>
     <string name="l7_log_server_hint">应用内配置优先；内置服务器地址隐藏显示</string>
-    <string name="l7_log_manual_hint">点击后分批上传最近日志，总请求内容最多 1 MiB，每批最多 256 KiB；超出范围保留较新记录并提示。不会自动上传；手动重试跳过已确认批次，未确认批次可能重复。</string>
+    <string name="l7_log_manual_hint">填写可选备注后上传全部现存日志，每次生成独立报告编号。不会自动上传；手动重试沿用原报告并跳过已确认批次。</string>
+    <string name="l7_log_upload_remark">上传备注（选填，最多200字）</string>
+    <string name="l7_log_upload_remark_hint">例如“18点更新后 Wi-Fi Direct 连接失败”。本次日志的开头、结尾及每条记录都会携带相同的报告编号和备注。</string>
+    <string name="l7_log_start_upload">开始上传</string>
+    <string name="l7_log_report_hash">报告编号：%1$s</string>
+    <string name="l7_log_remark_value">上传备注：%1$s</string>
+    <string name="l7_log_receipt_stream">日志名称：%1$s</string>
+    <string name="l7_log_receipt_hint">点击复制上次成功上传的时间、报告编号和备注</string>
+    <string name="l7_log_receipt_copied">上传记录已复制</string>
     <string name="l7_log_upload">上传日志</string>
     <string name="l7_log_view_short">查看日志</string>
     <string name="l7_log_quick_hint">点击上传后发送最近日志及已收集的环境与权限结果。</string>

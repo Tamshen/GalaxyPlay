@@ -24,7 +24,14 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
     private val server = L7Components.actionRow(context, context.getString(R.string.l7_log_server),
         context.getString(R.string.l7_log_server_hint)) { configure() }
     private val upload = L7Components.actionRow(context, context.getString(R.string.l7_log_upload), click = onUpload)
-    private val state = L7SettingRow(context, context.getString(R.string.l7_log_state), "")
+    private val state = L7Components.actionRow(context, context.getString(R.string.l7_log_state),
+        context.getString(R.string.l7_log_receipt_hint)) {
+        if (RemoteLogHistory.last(context) != null) {
+            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                ClipData.newPlainText(context.getString(R.string.l7_log_state), RemoteLogHistory.summary(context)))
+            Toast.makeText(context, R.string.l7_log_receipt_copied, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     init {
         L7SettingsSection.add(parent, context.getString(R.string.l7_log_remote),
@@ -47,6 +54,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
         upload.isEnabled = config.valid()
         upload.setFeedback(if (config.valid()) "" else context.getString(R.string.l7_log_config_first))
         state.setValue(RemoteLogHistory.summary(context))
+        state.isEnabled = RemoteLogHistory.last(context) != null
     }
 
     companion object {
@@ -56,7 +64,7 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 RemoteLogUpload.Phase.IDLE -> context.getString(R.string.l7_log_idle)
                 RemoteLogUpload.Phase.UPLOADING -> if (status.preparing)
                     context.getString(R.string.l7_log_preparing, status.scannedLines) else context.getString(R.string.l7_log_uploading)
-                RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, logName, status.id.take(8))
+                RemoteLogUpload.Phase.SUCCESS -> context.getString(R.string.l7_log_success, status.stream.ifEmpty { logName }, status.id)
                 RemoteLogUpload.Phase.CANCELLED -> context.getString(R.string.l7_log_cancelled)
                 RemoteLogUpload.Phase.EMPTY -> context.getString(R.string.l7_log_empty_hint)
                 RemoteLogUpload.Phase.FAILED -> if (status.preparationFailed) context.getString(R.string.l7_log_preparation_failed)
@@ -74,7 +82,9 @@ internal class L7RemoteLogSettings(private val context: Context, parent: LinearL
                 context.getString(R.string.l7_log_duplicate_copies, status.duplicateCopies) else ""
             val memory = if (status.memoryEvicted > 0) "\n" +
                 context.getString(R.string.l7_log_memory_evicted, status.memoryEvicted) else ""
-            return message + progress + limit + copies + memory
+            val identity = RemoteLogHistory.identification(context,
+                if (status.phase == RemoteLogUpload.Phase.SUCCESS) "" else status.id, status.remark)
+            return message + identity + progress + limit + copies + memory
         }
     }
 
