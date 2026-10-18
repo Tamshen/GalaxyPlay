@@ -107,7 +107,7 @@ def set_text(value):
     adb('shell','input','text',value)
 
 
-wait_text('分享配置')
+wait_text('分享')
 choose('L7(带头枕)')
 with_headrest = current()['configuration']
 main = with_headrest['preferences']['xcertplay_airplay']
@@ -140,13 +140,13 @@ set_text('Demo147')
 click('确定')
 click('保存')
 assert current()['profile_name'] == 'Demo147'
-click('分享配置')
+click('分享')
 click('生成分享配置')
 wait_text('复制配置文本', 20)
 screenshot('share-qr')
 click('复制配置文本')
 click('关闭')
-click('粘贴导入')
+click('导入')
 click('粘贴文本')
 root = tree()
 code = next(n.get('text','') for n in root.iter('node') if n.get('class') == 'android.widget.EditText')
@@ -159,7 +159,7 @@ click('取消')
 assert current() == before
 choose('L7(带头枕)')
 assert current()['configuration']['preferences']['xcertplay_airplay']['audio_focus_enabled']['value'] is False
-click('粘贴导入')
+click('导入')
 click('粘贴文本')
 click('预览配置')
 wait_text('导入并应用')
@@ -173,13 +173,13 @@ screenshot('imported-profile')
 for name in ['Demo147.galaxyplay.json', 'Demo147.png']:
     adb('shell', 'rm', '-f', '/sdcard/Download/' + name)
 for action, name in [('保存配置文件', 'Demo147.galaxyplay.json'), ('保存二维码', 'Demo147.png')]:
-    click('分享配置')
+    click('分享')
     click('生成分享配置')
     wait_text(action, 20)
     click(action)
     wait_text('SAVE')
     click('SAVE')
-    wait_text('分享配置', 20)
+    wait_text('分享', 20)
     adb('pull', '/sdcard/Download/' + name, str(a.output_dir / name))
 exported = json.loads((a.output_dir / 'Demo147.galaxyplay.json').read_text())
 assert exported['name'] == 'Demo147' and exported['format'] == 'galaxyplay-vehicle'

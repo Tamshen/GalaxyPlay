@@ -105,7 +105,7 @@ def active():
 
 labels = {
     'l7': ('L7(带头枕)', 'L7 (with headrests)'), 'l7_no_headrest': ('L7(无头枕)', 'L7 (without headrests)'), 'l6': ('银河 L6', 'Galaxy L6'),
-    'custom_vehicle': ('自定义', 'Custom'), 'reset': ('重置当前配置', 'Reset current configuration'),
+    'custom_vehicle': ('自定义', 'Custom'), 'reset': ('重置', 'Reset'),
     'reset_confirm': ('确认重置', 'Reset configuration'),
     'smoothness': ('画面流畅度', 'Picture smoothness'), 'fps60': ('更流畅 · 60 fps', 'Smoother · 60 fps'),
     'vehicle': ('车型 · ', 'Vehicle · '), 'template_apply': ('应用模板', 'Apply template'),

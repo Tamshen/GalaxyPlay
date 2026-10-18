@@ -24,4 +24,7 @@
     <string name="config_share_invalid">The profile is invalid, incomplete, or contains unsupported settings. Check the profile text and vehicle selection.</string>
     <string name="config_share_saved">Profile sharing file saved.</string>
     <string name="config_share_copied">Profile text copied.</string>
+    <string name="config_action_reset">Reset</string>
+    <string name="config_action_share">Share</string>
+    <string name="config_action_import">Import</string>
 </resources>

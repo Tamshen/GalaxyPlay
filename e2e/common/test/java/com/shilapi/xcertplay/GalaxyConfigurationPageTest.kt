@@ -177,7 +177,7 @@ class GalaxyConfigurationPageTest {
         page.view.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(1600, View.MeasureSpec.EXACTLY))
         page.view.layout(0, 0, 1000, 1600)
-        assertTrue(page.view.defaultsButton.top >= page.view.vehicleButton.bottom)
+        assertTrue((page.view.defaultsButton.parent as View).top >= page.view.vehicleButton.bottom)
         for (model in listOf("l7", "l6", "custom")) {
             template(page, model)
             modify(page, activity)

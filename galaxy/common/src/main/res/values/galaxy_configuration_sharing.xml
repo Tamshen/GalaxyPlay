@@ -24,4 +24,7 @@
     <string name="config_share_invalid">配置无效、参数不受支持或内容不完整。请核对配置文本及车型选择。</string>
     <string name="config_share_saved">配置分享文件已保存。</string>
     <string name="config_share_copied">已复制配置文本。</string>
+    <string name="config_action_reset">重置</string>
+    <string name="config_action_share">分享</string>
+    <string name="config_action_import">导入</string>
 </resources>

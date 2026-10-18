@@ -11,15 +11,15 @@ internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> 
     changeGroup: (Int) -> Unit, resetCurrent: () -> Unit, reset: () -> Unit, commit: () -> Unit,
     share: () -> Unit = {}, paste: () -> Unit = {}) : LinearLayout(context) {
     val vehicleButton = L7Components.actionButton(context, context.getString(R.string.template_choose), R.drawable.ic_l7_vehicle, click = chooseTemplate)
-    val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_reset_current), R.drawable.ic_l7_refresh, click = resetCurrent)
+    val defaultsButton = L7Components.actionButton(context, context.getString(R.string.config_action_reset), R.drawable.ic_l7_refresh, click = resetCurrent)
     val tabs = GalaxyConfigurationTabs(context, changeGroup)
     val status = L7Typography.text(context, "", L7Typography.Role.FEEDBACK)
     val fields = LinearLayout(context).apply { orientation = VERTICAL }
     val scroll = ScrollView(context).apply { isFillViewport = false; addView(fields) }
     val resetButton = L7Components.actionButton(context, context.getString(R.string.config_page_restore), R.drawable.ic_l7_revoke, click = reset)
     val commitButton = L7Components.actionButton(context, context.getString(R.string.save), R.drawable.ic_l7_save, true, commit)
-    val shareButton = L7Components.actionButton(context, context.getString(R.string.config_share_title), R.drawable.ic_l7_share, click = share)
-    val importButton = L7Components.actionButton(context, context.getString(R.string.config_share_import), R.drawable.ic_l7_import, click = paste)
+    val shareButton = L7Components.actionButton(context, context.getString(R.string.config_action_share), R.drawable.ic_l7_share, click = share)
+    val importButton = L7Components.actionButton(context, context.getString(R.string.config_action_import), R.drawable.ic_l7_import, click = paste)
     private fun dp(value: Int) = L7Components.dp(context, value)
     init {
         orientation = VERTICAL
@@ -28,10 +28,10 @@ internal class GalaxyConfigurationFrame(context: Context, chooseTemplate: () -> 
         addView(L7Typography.text(context, context.getString(R.string.template_hint), L7Typography.Role.DESCRIPTION),
             LayoutParams(-1, -2).apply { topMargin = dp(4); bottomMargin = dp(12) })
         addView(vehicleButton, LayoutParams(-1, -2))
-        addView(defaultsButton, LayoutParams(-1, -2).apply { topMargin = dp(8) })
         addView(status, LayoutParams(-1, -2).apply { topMargin = dp(12); bottomMargin = dp(12) })
         addView(LinearLayout(context).apply {
-            addView(shareButton, LayoutParams(0, -2, 1f))
+            addView(defaultsButton, LayoutParams(0, -2, 1f))
+            addView(shareButton, LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
             addView(importButton, LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
         }, LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         addView(tabs, LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
