@@ -172,7 +172,7 @@ internal object GalaxyConfigurationFields {
         // 两套 L7 预设共用原厂用途参数，只由音频焦点开关决定是否申请焦点。
         if (model == "l7") {
             groups.getValue(MAIN).putAll(mapOf("display_fps" to 60, "display_scale_percent" to 80,
-                "audio_focus_enabled" to l7AudioFocus))
+                "audio_focus_enabled" to l7AudioFocus, "galaxy_video_decoder_l7" to "C2"))
             groups.getValue("l7_audio_templates")["mode"] = "custom"
             val native = org.json.JSONObject(templates.getValue("l7"))
                 .put("focusGains", org.json.JSONObject(mapOf("media" to 1, "navigation" to 3,

@@ -57,6 +57,65 @@ class GalaxyConfigurationShareTest {
         assertEquals(profile, repository.active())
     }
 
+    private fun legacyCode(value: GalaxyConfigurationShare): String {
+        val packed = java.io.ByteArrayOutputStream()
+        java.util.zip.DeflaterOutputStream(packed).use { it.write(value.json().toByteArray(Charsets.UTF_8)) }
+        return GalaxyConfigurationShare.LEGACY_PREFIX + java.util.Base64.getUrlEncoder()
+            .withoutPadding().encodeToString(packed.toByteArray())
+    }
+
+    @Test fun standardPresetsOmitUnchangedParametersAndAudioWhileRestoringTheFullSnapshot() {
+        for (id in GalaxyConfigurationShareBase.ids) {
+            val profile = repository.applyTemplate(id)
+            val value = GalaxyConfigurationShare.from(profile, "配置01")
+            // 固定基线不得随今后默认值修改；新默认值应作为差异传输。
+            assertEquals(value.configuration, GalaxyConfigurationShareBase.configuration(id))
+            val compact = JSONObject(GalaxyConfigurationShareCompact.encode(value))
+            assertEquals(0, compact.getJSONArray("changes").length())
+            assertFalse(compact.has("configuration"))
+            assertFalse(compact.toString().contains("audio_templates"))
+            assertTrue(value.code().length < 260)
+            assertTrue(value.code().length * 3 < legacyCode(value).length)
+            assertEquals(value, GalaxyConfigurationShare.parse(value.code()))
+        }
+    }
+
+    @Test fun modifiedSettingsUnsetValuesMissingGroupsAndCustomAudioSurviveCompactRoundTrip() {
+        val original = repository.applyTemplate("l7_no_headrest")
+        val groups = original.configuration.preferences.toMutableMap()
+        groups.remove("carplay_picture")
+        groups["xcertplay_airplay"] = groups.getValue("xcertplay_airplay") - "main_buffered_audio" + mapOf(
+            "display_scale_percent" to 73, "display_fps" to 30, "audio_focus_enabled" to null,
+            "galaxy_video_decoder_l7" to "OMX", "galaxy_p2p_address_mode" to "IPV6_ONLY")
+        val routing = com.shilapi.xcertplay.media.AudioRoutingTemplate.parse(original.configuration.audio.getValue("l6"))
+            .withChoice(com.shilapi.xcertplay.media.AudioOutputRole.MEDIA, 102).toJson()
+        val value = GalaxyConfigurationShare.from(original.copy(configuration = original.configuration.copy(
+            preferences = groups, audio = original.configuration.audio + ("l6" to routing)), templateId = "custom"), "我的配置")
+        assertEquals(value, GalaxyConfigurationShare.parse(value.code()))
+        assertEquals(value.configuration, GalaxyConfigurationShare.parse(value.json()).configuration)
+    }
+
+    @Test fun oldQrCodesAndFullJsonFilesRemainImportable() {
+        val value = GalaxyConfigurationShare.from(repository.applyTemplate("l7"), "旧版配置")
+        assertEquals(1, JSONObject(value.json()).getInt("version"))
+        assertEquals(value, GalaxyConfigurationShare.parse(legacyCode(value)))
+        assertEquals(value, GalaxyConfigurationShare.parse(value.json()))
+    }
+
+    @Test fun unknownBaselinesAndInjectedPreferencePathsAreRejectedWithoutChangingTheVehicle() {
+        val profile = repository.applyTemplate("l7")
+        val value = GalaxyConfigurationShare.from(profile, "配置01")
+        val encoded = GalaxyConfigurationShareCompact.encode(value)
+        val badBase = JSONObject(encoded).put("baseline", 99)
+        val injected = JSONObject(encoded).put("changes", org.json.JSONArray().put(org.json.JSONArray()
+            .put(org.json.JSONArray(listOf("preferences", "xcertplay_airplay", "remote_mfi_token")))
+            .put(JSONObject().put("type", "string").put("value", "synthetic-token"))))
+        for (data in listOf(badBase, injected)) {
+            assertTrue(runCatching { GalaxyConfigurationShare.parse(data.toString()) }.isFailure)
+            assertEquals(profile, repository.active())
+        }
+    }
+
     @Test fun sharingCannotIncludeConnectionOrAuthenticationMaterial() {
         val profile = repository.applyTemplate("l7")
         val groups = profile.configuration.preferences.toMutableMap()
@@ -75,7 +134,7 @@ class GalaxyConfigurationShareTest {
         val current = repository.applyTemplate("l7")
         val share = GalaxyConfigurationShare.from(current, "配置01")
         for (text in listOf("garbage", share.code().dropLast(8),
-            JSONObject(share.json()).put("version", 2).toString(), "x".repeat(GalaxyConfigurationShare.MAX_TEXT + 1))) {
+            JSONObject(share.json()).put("version", 99).toString(), "x".repeat(GalaxyConfigurationShare.MAX_TEXT + 1))) {
             assertTrue(runCatching { GalaxyConfigurationShare.parse(text) }.isFailure)
             assertEquals(current, repository.active())
         }

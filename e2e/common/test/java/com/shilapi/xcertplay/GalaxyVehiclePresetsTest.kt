@@ -37,6 +37,7 @@ class GalaxyVehiclePresetsTest {
         assertEquals(with.audio, without.audio)
         for (configuration in listOf(with, without)) {
             assertEquals("l7", configuration.preferences.getValue("l7_audio_templates")["model"])
+            assertEquals("C2", configuration.preferences.getValue("xcertplay_airplay")["galaxy_video_decoder_l7"])
         }
     }
 

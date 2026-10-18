@@ -21,7 +21,7 @@
 
 `GalaxyVehiclePresetsTest` 验证两套 L7 预设均为 60 fps／80%／默认 IPv4，只有音频焦点不同，实际车型标识仍为 L7，预设标识随文件与日志往返。`P2pHostAddressesTest`、`P2pAddressWiringTest`、`WifiP2pAddressWaitTest`、`HostConnectionSettingsRefreshTest` 覆盖用户选择 IPv4／IPv6／双栈、接口地址先后、单栈不跨族补位、真实管理器地址快照与运行参数冻结。配置页回归覆盖名称和 IP 草稿、取消与保存。
 
-`GalaxyConfigurationShareTest` 和 `GalaxyConfigurationSharingTest` 检查专用文件／压缩文本的完整往返、备注与默认顺序名称、二维码经测试专用解码器识别后与复制文本一致、车型白名单／凭据隔离、大小与展开预算、损坏版本拒绝、粘贴预览和确认、取消／关闭／版本冲突不覆盖文件。产品 APK 只生成二维码，ZXing 解码器只在 testImplementation。
+`GalaxyConfigurationShareTest` 和 `GalaxyConfigurationSharingTest` 检查专用文件／压缩文本的完整往返、备注与默认顺序名称、二维码经测试专用解码器识别后与复制文本一致、车型白名单／凭据隔离、大小与展开预算、损坏版本拒绝、粘贴预览和确认、取消／关闭／版本冲突不覆盖文件。产品 APK 只生成二维码，ZXing 解码器只在 testImplementation。精简格式额外覆盖固定基线、预设省略重复项、自定义参数／音频／空值／删除项的完整还原、旧码导入及未知基线／非法字段拒绝；两份 L7 预设均核对默认 C2。
 
 `configuration_sharing_smoke.py --adb /path/to/adb --apk /path/to/apk --output-dir /path/to/output` 只接受独立 Android 11 `configuration147` AVD（默认 emulator-5570），安装包并写入临时自动化协议及中文／关闭自动连接夹具；不操作日常 AVD 或真实车辆。检查两预设差异、三种 IP 模式、配置名称、二维码展示／复制、文字粘贴预览／取消／应用及系统 JSON／PNG 导出。屏幕截图与合成配置结果放在忽略目录；该设备测试不代表真实手机连接、拍照识别或实车音频通过。
 
