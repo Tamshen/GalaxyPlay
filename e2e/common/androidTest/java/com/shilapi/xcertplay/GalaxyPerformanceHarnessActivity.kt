@@ -12,6 +12,7 @@ class GalaxyPerformanceHarnessActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(android.R.style.Theme_Material_NoActionBar)
         super.onCreate(savedInstanceState)
+        GalaxyUiFrameMonitor.install(application)
         content = FrameLayout(this).apply { setBackgroundColor(Color.DKGRAY) }
         content.addView(TextView(this).apply { text = "Android performance checks"; setTextColor(Color.WHITE) })
         setContentView(content)

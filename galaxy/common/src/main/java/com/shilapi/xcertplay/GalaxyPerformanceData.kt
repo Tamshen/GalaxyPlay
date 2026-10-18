@@ -9,6 +9,7 @@ internal data class GalaxyPerformanceInput(
     val pssKiB: Long?, val rssKiB: Long?, val memoryAgeMs: Long?, val gcCount: Long?, val gcTimeMs: Long?,
     val owner: Any?, val video: List<GalaxyVideoPerformance>, val audio: List<GalaxyAudioPerformance>,
     val threads: Map<Int, Long>? = null,
+    val uiFrames: GalaxyUiFrames? = null, val carPlayConnected: Boolean = false,
 )
 
 internal data class GalaxyVideoRate(
@@ -19,6 +20,7 @@ internal data class GalaxyPerformanceSample(
     val input: GalaxyPerformanceInput, val cpuCorePercent: Double?, val video: List<GalaxyVideoRate>,
     val session: Long, val deep: Boolean, val sampleNs: Long, val sampleCpuNs: Long?,
     val displayNs: Long, val threadCpu: List<Pair<Int, Double>>, val failed: Boolean,
+    val uiFps: Double? = null, val uiState: GalaxyUiFpsState = GalaxyUiFpsState.WAITING,
 ) {
     val main get() = video.firstOrNull { it.value.stream == 110 }
     val overBudget get() = sampleNs > 20_000_000 || displayNs > 8_000_000
@@ -54,8 +56,21 @@ internal class GalaxyPerformanceRates {
             }.sortedByDescending { it.second }.take(10)
         }.orEmpty()
         if (!deep) threadPrevious = null
+        val ui = input.uiFrames
+        val beforeUi = old?.uiFrames?.takeIf { it.epoch == ui?.epoch }
+        val uiFps = ui?.takeIf { it.foreground && it.available &&
+            beforeUi != null && beforeUi.missingReports == it.missingReports }?.let { rate(it.frames, beforeUi?.frames) }
+        val uiState = when {
+            ui == null || !ui.available -> GalaxyUiFpsState.UNAVAILABLE
+            !ui.foreground -> GalaxyUiFpsState.BACKGROUND
+            beforeUi != null && ui.missingReports > beforeUi.missingReports -> GalaxyUiFpsState.INCOMPLETE
+            uiFps == null -> GalaxyUiFpsState.WAITING
+            uiFps == 0.0 -> GalaxyUiFpsState.STATIC
+            else -> GalaxyUiFpsState.ACTIVE
+        }
         previous = input
         // 历史只保存匿名数值，不能通过采样快照延长手机会话与媒体缓冲的生命期。
-        return GalaxyPerformanceSample(input.copy(owner = null), cpu, videos, session, deep, costNs, cpuNs, displayNs, threads, failed)
+        return GalaxyPerformanceSample(input.copy(owner = null, carPlayConnected = input.carPlayConnected || input.owner != null),
+            cpu, videos, session, deep, costNs, cpuNs, displayNs, threads, failed, uiFps, uiState)
     }
 }

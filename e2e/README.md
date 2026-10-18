@@ -393,4 +393,6 @@ AVD 界面回归：`python3 e2e/device/native_hotspot_log_smoke.py` 检查中英
 ../tools/scripts/adb.sh -s emulator-5556 shell am instrument -w -e suite performance-monitor com.shilapi.xcertplay.host.test/com.shilapi.xcertplay.vendor.SdkSubclassInstrumentation
 ```
 
-检查关闭／基础／悬浮／深度四种空闲模式、窗口安全区位置稳定（防止 Insets 反馈振荡）、实际窗口边界的背景和中心触控透传、不抢焦点、深度到期及线程释放；另用固定 H.264 样本走真实 MediaCodec／Surface／呈现计数，并以自有 Binder 检查 Parcel 和旧 owner 失效。结果保存在测试包 cache/performance-android-checks.json，结束恢复测试包原悬浮权限。空闲对照是测试包环境，不是手机投屏工作负载、OEM HardKey 服务或实车改善。产品 GUI 另以交付 APK 安装检查，未投屏时必须显示 FPS 未知。
+检查关闭／基础／悬浮／深度四种空闲模式、窗口安全区位置稳定（防止 Insets 反馈振荡）、实际窗口边界的背景和中心触控透传、不抢焦点、深度到期及线程释放；另用固定 H.264 样本走真实 MediaCodec／Surface／呈现计数，并以自有 Binder 检查 Parcel 和旧 owner 失效。结果保存在测试包 cache/performance-android-checks.json，结束恢复测试包原悬浮权限。空闲对照是测试包环境，不是手机投屏工作负载、OEM HardKey 服务或实车改善。产品 GUI 另以本地验证 APK 安装检查，未投屏时 CFPS 明确显示未投屏，UFPS 独立统计应用主窗口完成帧。
+
+UFPS／CFPS 分开验收：`GalaxyUiFramesTest` 覆盖未启用、静止零帧、纯应用动画、窗口代次／后台、停止迟到回调和丢报告恢复；`GalaxyUiFrameMonitorTest` 在 API 29／30 检查手动订阅幂等、旧窗口与停止后的回调拒绝及注销。`GalaxyPerformanceFpsLabelsTest` 核对未投屏、等待视频帧、应用静止和两行 UFPS／CFPS 标识。`performance-monitor` Android VM 检查另运行有限真实 UI 动画，确认 UFPS 非零而 CFPS 仍未投屏、静止与后台／返回状态正确；最后继续真实合成视频 CFPS 检查并核对两类采样线程实际退出。不在产品代码制造动画或持续请求 VSync。

@@ -57,6 +57,7 @@ class GalaxyPerformanceService : Service() {
                 GalaxyPerformanceState.overlayPermission = false
                 L7DebugLog.performanceMonitored = true
                 com.shilapi.xcertplay.media.GalaxyPerformanceObservation.active = true
+                GalaxyUiFrameMonitor.start()
                 GalaxyPerformanceState.running = owner.start()
                 if (!GalaxyPerformanceState.running) stopSelf()
             } catch (_: Exception) { GalaxyPerformanceState.displayFailed = true; stopSelf() }
@@ -89,6 +90,7 @@ class GalaxyPerformanceService : Service() {
     override fun onDestroy() {
         val old = synchronized(publishLock) { monitor.also { monitor = null } }
         old?.close()
+        GalaxyUiFrameMonitor.stop()
         L7DebugLog.performanceMonitored = false
         com.shilapi.xcertplay.media.GalaxyPerformanceObservation.active = false
         main.removeCallbacksAndMessages(null)

@@ -57,7 +57,7 @@ internal class GalaxyPerformanceOverlay(private val base: Context,
             try { manager.addView(view, layout) } catch (_: Exception) { text = null; return false }
             view.requestApplyInsets()
         }
-        val value = panelText(sample)
+        val value = panelText(sample, ui)
         if (text?.text?.toString() != value) text?.text = value
         return true
     }
@@ -97,13 +97,16 @@ internal class GalaxyPerformanceOverlay(private val base: Context,
         else L7DebugLog.record("PERFORMANCE WINDOW release=UNKNOWN")
     }
     companion object {
-        fun panelText(sample: GalaxyPerformanceSample): String {
+        fun panelText(sample: GalaxyPerformanceSample, context: Context): String {
             fun number(value: Double?, width: Int, fraction: Boolean = false): String =
                 (value?.let { String.format(Locale.US, if (fraction) "%.1f" else "%.0f", it) } ?: "--").padStart(width)
             val p = sample.input
             val memory = p.pssKiB?.let { "PSS ${number(it / 1024.0, 5)} MiB" }
                 ?: "J ${number(p.javaBytes?.div(1048576.0), 4)}M  N ${number(p.nativeBytes?.div(1048576.0), 4)}M"
-            return "FPS ${number(sample.main?.presentedFps, 5, true)} CPU ${number(sample.cpuCorePercent, 4)}%\n$memory"
+            fun slot(value: String) = " ".repeat((6 - value.sumOf { if (it.code < 128) 1 else 2 }).coerceAtLeast(0)) + value
+            val ufps = slot(GalaxyPerformanceFpsLabels.ui(context, sample, true))
+            val cfps = slot(GalaxyPerformanceFpsLabels.carPlay(context, sample, true))
+            return "UFPS $ufps CFPS $cfps\nCPU ${number(sample.cpuCorePercent, 3)}% $memory"
         }
     }
 }

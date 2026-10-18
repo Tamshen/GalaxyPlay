@@ -66,7 +66,7 @@ internal class GalaxyPerformanceMonitor(
         }
         if (run !== active) return
         if (value.owner != null && currentOwner() !== value.owner)
-            value = value.copy(owner = null, video = emptyList(), audio = emptyList())
+            value = value.copy(owner = null, video = emptyList(), audio = emptyList(), carPlayConnected = false)
         val cpuEnd = runCatching(cpuNs).getOrNull()
         val usedCpu = cpuEnd?.takeIf { cpuStart != null && it >= cpuStart }?.let { it - cpuStart!! }
         val sample = active.rates.sample(value, deep, clockNs() - start,
@@ -96,7 +96,8 @@ internal class GalaxyPerformanceMonitor(
         return "SAMPLE atMs=${p.wallMs} session=${s.session} mode=${if (s.deep) "DEEP" else "BASIC"} " +
             "cpuCorePercent=${number(s.cpuCorePercent)} javaBytes=${p.javaBytes ?: "unknown"} nativeBytes=${p.nativeBytes ?: "unknown"} " +
             "pssKiB=${p.pssKiB ?: "unknown"} rssKiB=${p.rssKiB ?: "unknown"} memoryAgeMs=${p.memoryAgeMs ?: "unknown"} " +
-            "gcCount=${p.gcCount ?: "unknown"} gcTimeMs=${p.gcTimeMs ?: "unknown"} video=$video audio=$audio " +
+            "ufps=${number(s.uiFps)} ufpsState=${s.uiState} uiReportsLost=${p.uiFrames?.missingReports ?: "unknown"} " +
+            "cfps=${number(s.main?.presentedFps)} carPlayConnected=${p.carPlayConnected} gcCount=${p.gcCount ?: "unknown"} gcTimeMs=${p.gcTimeMs ?: "unknown"} video=$video audio=$audio " +
             "queryNs=${s.sampleNs} queryCpuNs=${s.sampleCpuNs ?: "unknown"} displayNs=${s.displayNs} overBudget=${s.overBudget} threads=$threads"
     }
     override fun close() {

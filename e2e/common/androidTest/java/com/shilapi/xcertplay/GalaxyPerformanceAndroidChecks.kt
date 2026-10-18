@@ -35,13 +35,15 @@ object GalaxyPerformanceAndroidChecks {
             test.runOnMainSync { GalaxyPerformanceService.stop(context) }
             waitFor { !GalaxyPerformanceState.running && workers() == 0 }
             results.put(measure("OFF", 15_000))
-            check(workers() == 0)
+            check(workers() == 0); check(GalaxyUiFrameMonitor.read() == null)
             status("BASIC")
             test.runOnMainSync { GalaxyPerformanceService.overlay(context, false); GalaxyPerformanceService.start(context).getOrThrow() }
             waitFor { GalaxyPerformanceState.running && GalaxyPerformanceState.latest != null }
             check(!GalaxyPerformanceState.overlayVisible)
             results.put(measure("BASIC", 15_000))
             check(GalaxyPerformanceState.latest!!.cpuCorePercent != null)
+            status("UFPS")
+            val uiFrames = GalaxyUiFramesAndroidCheck.run(test, activity)
             status("OVERLAY")
             test.runOnMainSync { GalaxyPerformanceService.overlay(context, true) }
             waitFor { GalaxyPerformanceState.overlayVisible && GalaxyPerformanceState.overlayBounds != null }
@@ -64,7 +66,7 @@ object GalaxyPerformanceAndroidChecks {
             GalaxyHardKeyAndroidCheck.run(context, test)
             File(context.cacheDir, "performance-android-checks.json").writeText(JSONObject()
                 .put("workload", "ANDROID11_AVD_IDLE_HARNESS")
-                .put("modes", results).put("video", video)
+                .put("modes", results).put("video", video).put("ui", uiFrames)
                 .put("touchThrough", true).put("noFocusSteal", true).put("workerReleased", workers() == 0)
                 .put("binderParcel", true).toString(2))
             status("COMPLETE")
@@ -91,7 +93,7 @@ object GalaxyPerformanceAndroidChecks {
         }
         return result
     }
-    private fun workers() = Thread.getAllStackTraces().keys.count { it.isAlive && it.name == "galaxy-performance" }
+    private fun workers() = Thread.getAllStackTraces().keys.count { it.isAlive && it.name in setOf("galaxy-performance", "galaxy-ui-frames") }
     private fun waitFor(timeout: Long = 5000, condition: () -> Boolean) {
         val deadline = SystemClock.elapsedRealtime() + timeout
         while (!condition() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(25)

@@ -16,6 +16,7 @@ internal class GalaxyPerformancePage(private val activity: Activity, parent: Lin
     private val deep: L7SettingRow
     private val cpu: L7SettingRow
     private val memory: L7SettingRow
+    private val uiFrames: L7SettingRow
     private val video: L7SettingRow
     private val costs: L7SettingRow
     private val extras: L7SettingRow
@@ -45,16 +46,17 @@ internal class GalaxyPerformancePage(private val activity: Activity, parent: Lin
             }.also(card::addView)
         }
         toggle = start; overlay = show; state = status; deep = depth
-        lateinit var c: L7SettingRow; lateinit var m: L7SettingRow; lateinit var v: L7SettingRow
+        lateinit var c: L7SettingRow; lateinit var m: L7SettingRow; lateinit var v: L7SettingRow; lateinit var u: L7SettingRow
         lateinit var cost: L7SettingRow; lateinit var extra: L7SettingRow
         L7SettingsSection.add(parent, text(R.string.performance_details), footer = text(R.string.performance_measurement_hint)) { card ->
             c = L7SettingRow(activity, "CPU", text(R.string.performance_cpu_hint)).also(card::addView)
             m = L7SettingRow(activity, text(R.string.performance_memory), text(R.string.performance_memory_hint)).also(card::addView)
+            u = L7SettingRow(activity, text(R.string.performance_ufps), text(R.string.performance_ufps_hint)).also(card::addView)
             v = L7SettingRow(activity, text(R.string.performance_fps), text(R.string.performance_fps_hint)).also(card::addView)
             cost = L7SettingRow(activity, text(R.string.performance_cost)).also(card::addView)
             extra = L7SettingRow(activity, text(R.string.performance_extra)).also(card::addView)
         }
-        cpu = c; memory = m; video = v; costs = cost; extras = extra
+        cpu = c; memory = m; uiFrames = u; video = v; costs = cost; extras = extra
         update()
     }
     fun update() {
@@ -82,10 +84,11 @@ internal class GalaxyPerformancePage(private val activity: Activity, parent: Lin
         cpu.setValue("${number(sample?.cpuCorePercent)} %")
         memory.setValue("Java ${bytes(input?.javaBytes)} MiB · Native ${bytes(input?.nativeBytes)} MiB\n" +
             "PSS ${number(input?.pssKiB?.div(1024.0))} MiB · RSS ${number(input?.rssKiB?.div(1024.0))} MiB")
-        video.setValue(sample?.video?.joinToString("\n") {
-            "${it.value.stream}: RX ${number(it.receivedFps)} · FPS ${number(it.presentedFps)} · ${it.value.codec ?: "—"} · " +
+        uiFrames.setValue(GalaxyPerformanceFpsLabels.ui(activity, sample))
+        video.setValue(GalaxyPerformanceFpsLabels.carPlay(activity, sample) + (sample?.video?.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = "\n") {
+            "${it.value.stream}: RX ${number(it.receivedFps)} · CFPS ${number(it.presentedFps)} · ${it.value.codec ?: "—"} · " +
                 (if (it.value.outputWidth > 0 && it.value.outputHeight > 0) "${it.value.outputWidth}×${it.value.outputHeight}" else "—")
-        }?.ifEmpty { text(R.string.performance_no_stream) } ?: text(R.string.performance_no_stream))
+        } ?: ""))
         costs.setValue(activity.getString(R.string.performance_cost_value,
             number(sample?.sampleNs?.div(1_000_000.0)), number(sample?.displayNs?.div(1_000_000.0))))
         costs.setFeedback(if (sample?.overBudget == true) text(R.string.performance_budget) else "", sample?.overBudget == true)

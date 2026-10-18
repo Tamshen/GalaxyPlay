@@ -44,7 +44,7 @@ internal class GalaxyPerformanceReader {
         val audio = if (owner != null) connection.sink.audioPerformance().filter { at - it.atMs in 0..10_000 } else emptyList()
         val current = owner != null && connection?.controller?.activeMediaSessionOwner() === owner
         return GalaxyPerformanceInput(at, cpu, heap, native, pss, rss, at - memoryAt, gc, gcMs,
-            if (current) owner else null, if (current) video else emptyList(), if (current) audio else emptyList(), thread)
+            if (current) owner else null, if (current) video else emptyList(), if (current) audio else emptyList(), thread, GalaxyUiFrameMonitor.read(), current)
     }
 
     private fun threadTimes(): Map<Int, Long>? = runCatching {

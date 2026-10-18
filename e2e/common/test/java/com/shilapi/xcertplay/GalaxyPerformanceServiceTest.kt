@@ -20,6 +20,7 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [29, 30])
 class GalaxyPerformanceServiceTest {
     @After fun reset() {
+        GalaxyUiFrameMonitor.stop()
         GalaxyPerformanceState.running = false; GalaxyPerformanceState.overlayVisible = false
         GalaxyPerformanceState.overlayWanted = true; GalaxyPerformanceState.displayFailed = false
         GalaxyPerformanceState.overlayPermission = false
@@ -84,8 +85,9 @@ class GalaxyPerformanceServiceTest {
     @Test fun unknownPresentationAndSeparateHeapsAreVisibleWithoutFabricatedFpsOrMemoryTotal() {
         val input = GalaxyPerformanceInput(0, 0, 10 * 1048576, 3 * 1048576, null, null, null, null, null, null, emptyList(), emptyList())
         val sample = GalaxyPerformanceSample(input, 150.0, emptyList(), 0, false, 0, 0, 0, emptyList(), false)
-        val text = GalaxyPerformanceOverlay.panelText(sample)
-        assertTrue(text.contains("--")); assertTrue(text.contains("150%")); assertTrue(text.contains("J   10M"))
+        val text = GalaxyPerformanceOverlay.panelText(sample, RuntimeEnvironment.getApplication())
+        assertTrue(text.contains("UFPS")); assertTrue(text.contains("CFPS"));
+        assertTrue(text.contains("No CP") || text.contains("未投屏")); assertTrue(text.contains("150%")); assertTrue(text.contains("J   10M"))
         assertTrue(text.contains("N    3M")); assertFalse(text.contains("13M"))
         assertEquals(2, text.lines().size)
     }
