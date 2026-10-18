@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.content.Context
 
 /** SDK 实现在已安装车机组件中；所有初始化仍传本应用 Context，UID 不发生变化。 */
-internal class L7VendorSdk(private val context: Context) {
+internal class L7VendorSdk(private val context: Context, private val diagnostics: GalaxySteeringSetupLog? = null) {
     data class Loaded(val loader: ClassLoader, val source: String)
 
     fun load(name: String, preferredPackages: List<String> = if (name.startsWith("com.ecarx.eas.sdk.mediacenter."))
@@ -15,18 +15,29 @@ internal class L7VendorSdk(private val context: Context) {
         var mismatch: Exception? = null
         var unavailable: Throwable? = null
         for (packageName in candidates) try {
+            diagnostics?.step(GalaxySteeringSetupLog.Stage.SDK_CANDIDATE,
+                mapOf("provider" to GalaxySteeringSetupLog.provider(packageName)))
             // 只加载 SDK 类型，不运行原厂 Application，也不拿其 Context 调用系统或媒体服务。
             val loader = if (packageName == "APP_OR_FRAMEWORK") context.classLoader else
                 context.createPackageContext(packageName, Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY).classLoader
+            diagnostics?.step(GalaxySteeringSetupLog.Stage.SDK_CLASS, mapOf("target" to GalaxySteeringSetupLog.target(name)))
             Class.forName(name, false, loader)
             verify(loader)
+            diagnostics?.step(GalaxySteeringSetupLog.Stage.SDK_SELECTED,
+                mapOf("provider" to GalaxySteeringSetupLog.provider(packageName)))
             return Loaded(loader, packageName)
         } catch (error: Exception) {
+            diagnostics?.step(GalaxySteeringSetupLog.Stage.SDK_REJECTED,
+                mapOf("provider" to GalaxySteeringSetupLog.provider(packageName)), error)
             unavailable = error
             if (error is NoSuchMethodException || error is NoSuchFieldException ||
                 error is IllegalArgumentException || error is IllegalStateException)
                 mismatch = error
-        } catch (error: LinkageError) { unavailable = error }
+        } catch (error: LinkageError) {
+            diagnostics?.step(GalaxySteeringSetupLog.Stage.SDK_REJECTED,
+                mapOf("provider" to GalaxySteeringSetupLog.provider(packageName)), error)
+            unavailable = error
+        }
         mismatch?.let { throw it }
         throw ClassNotFoundException(name, unavailable)
     }

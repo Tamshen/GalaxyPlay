@@ -111,7 +111,7 @@ class GalaxyHardKeyBridgeTest {
         app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, remote)
         worker.drain(); remote.input(1, 200087)
         assertTrue(events.isEmpty()); assertEquals(listOf(1, 2), remote.codes)
-        assertTrue(logs.any { "TIMEOUT" in it }); assertFalse(logs.any { "REGISTERED" in it })
+        assertTrue(logs.any { "TIMEOUT" in it }); assertFalse(logs.any { "result=REGISTERED " in it })
     }
     @Test fun disconnectAndLateConnectionCannotRestartClosedAttempt() = scenario { app, worker, bridge, events, _, _ ->
         bridge.start(); val remote = Remote()
@@ -143,5 +143,38 @@ class GalaxyHardKeyBridgeTest {
             remote.input(1, 200087); replacement.input(1, 200088)
             assertEquals(listOf(1 to 200088), events); assertEquals(listOf(1, 2), remote.codes)
         } finally { next.close(); nextWorker.drain() }
+    }
+
+    @Test fun diagnosticsDistinguishReceivingStaleInputAndCompletedRelease() = scenario { app, worker, bridge, events, logs, stale ->
+        bridge.start(); val remote = Remote()
+        app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, remote); worker.drain()
+        remote.input(1, 200087)
+        stale(); remote.input(2, 200087)
+        assertEquals(listOf(1 to 200087), events)
+        assertTrue(logs.any { "result=INPUT " in it && "event=1" in it && "code=200087" in it })
+        assertTrue(logs.any { "result=INPUT_DROPPED " in it && "current=0" in it })
+        bridge.close()
+        assertFalse(logs.any { "result=RELEASED " in it })
+        worker.drain()
+        assertTrue(logs.any { "result=UNREGISTERED " in it })
+        assertTrue(logs.last().contains("result=RELEASED "))
+        val size = logs.size
+        remote.input(1, 200087)
+        assertEquals(size, logs.size)
+        assertEquals(1, logs.mapNotNull { Regex("attempt=(\\d+)").find(it)?.groupValues?.get(1) }.distinct().size)
+    }
+
+    @Test fun diagnosticSinkFailureDoesNotBlockRegistrationOrDelivery() {
+        val app = Boundary(); val worker = Worker(); var inputs = 0
+        val bridge = GalaxyHardKeyBridge(app, { true }, { _, _ -> inputs++ }, {},
+            { throw IllegalStateException("日志消费失败") }, worker)
+        try {
+            bridge.start(); val remote = Remote()
+            app.connection!!.onServiceConnected(GalaxyHardKeyBridge.COMPONENT, remote); worker.drain()
+            remote.input(1, 200087)
+            assertEquals(1, inputs)
+            bridge.close(); worker.drain()
+            assertEquals(listOf(1, 2), remote.codes)
+        } finally { bridge.close(); worker.drain() }
     }
 }

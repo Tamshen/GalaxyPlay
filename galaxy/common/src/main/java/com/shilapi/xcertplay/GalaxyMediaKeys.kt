@@ -147,22 +147,44 @@ internal object GalaxyMediaKeys {
     private fun startNativeWheel(context: Context, next: CarPlayController,
                                  commands: L7MediaCommandDispatcher) {
         val selected = context.getSharedPreferences("l7_audio_templates", 0).getString("model", null)
-        if (selected !in setOf("l7", "l6") || !GalaxyVehiclePreferences.steering(context)) return
-        val owner = next.activeMediaSessionOwner() ?: return
+        val enabled = GalaxyVehiclePreferences.steering(context)
+        val owner = next.activeMediaSessionOwner()
+        GalaxySteeringSetupLog(L7DebugLog.logger(context)).use { diagnostics ->
+            diagnostics.step(GalaxySteeringSetupLog.Stage.ROUTES, mapOf(
+                "generation" to L7SteeringDiagnostics.store.snapshot().generation,
+                "controlEnabled" to if (enabled) 1L else 0L,
+                "modelSupported" to if (selected in setOf("l7", "l6")) 1L else 0L,
+                "sessionActive" to if (owner != null) 1L else 0L,
+                "standardMedia" to if (bridge != null) 1L else 0L,
+                "mediaReporting" to if (GalaxyVehiclePreferences.mediaReporting(context)) 1L else 0L))
+            val reason = when { !enabled -> 0L; selected !in setOf("l7", "l6") -> 1L; owner == null -> 2L; else -> null }
+            if (reason != null) diagnostics.step(GalaxySteeringSetupLog.Stage.SKIPPED, mapOf("reason" to reason))
+        }
+        if (!enabled || selected !in setOf("l7", "l6") || owner == null) return
         nativeOwner = owner
         val gate = commandGate
         val media = bridge
+        val log = L7DebugLog.logger(context)
+        val setup = GalaxySteeringSetupLog(log)
         nativeWheel = GalaxyHardKeyBridge(context,
             { controller === next && next.activeMediaSessionOwner() === owner && GalaxyVehiclePreferences.steering(context) },
             { event, key ->
-                val trace = L7SteeringDiagnostics.begin("native-key", -1, "event=$event code=$key")
+                val trace = L7SteeringDiagnostics.begin("native-key", -1,
+                    "event=$event code=$key subscription=${setup.id}")
                 gate.nativeEvent(event, key)?.let { index ->
                     val source = "native-key:$key"
                     val mapped = media?.mapCommand(index) ?: index
-                    trace.step("MAPPED", "index=$mapped")
+                    trace.step("MAPPED", "rawIndex=$index index=$mapped")
                     commands.dispatch(mapped, source, trace, owner)
-                } ?: trace.step("FILTER", if (key == 200231) "VOICE_SEMANTICS_UNVERIFIED" else "RELEASE_REPEAT_OR_UNSUPPORTED")
-            }, gate::clearNative).also { it.start() }
+                } ?: trace.step("FILTER", when {
+                    key == 200231 -> "VOICE_SEMANTICS_UNVERIFIED"
+                    key !in setOf(200085, 200087, 200088) -> "UNSUPPORTED_KEY"
+                    event == 1 -> "REPEAT_DOWN"
+                    event == 2 -> "KEY_UP"
+                    event == 3 -> "KEY_CANCEL"
+                    else -> "UNSUPPORTED_EVENT"
+                })
+            }, gate::clearNative, report = log, diagnostics = setup).also { it.start() }
     }
 
     private fun startNavigation(context: Context, next: CarPlayController) {

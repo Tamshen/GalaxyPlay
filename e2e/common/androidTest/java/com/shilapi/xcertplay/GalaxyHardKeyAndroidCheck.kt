@@ -42,7 +42,7 @@ internal object GalaxyHardKeyAndroidCheck {
         val sent = CopyOnWriteArrayList<Int>()
         val bridge = GalaxyHardKeyBridge(boundary, current::get, { event, key ->
             gate.nativeEvent(event, key)?.let { if (gate.accept(it, "native-key:$key")) sent.add(it) }
-        }, gate::clearNative, { if (it == "HARDKEY result=REGISTERED") registered.countDown() })
+        }, gate::clearNative, { if ("result=REGISTERED " in it) registered.countDown() })
         fun input(event: Int) {
             val data = Parcel.obtain(); val reply = Parcel.obtain()
             try {

@@ -74,4 +74,22 @@ class L7VendorSdkTest {
         assertTrue(requested.isEmpty())
         assertFalse(GalaxyMediaReportingChannel.Mode.LOCAL.sdkPackages.contains("com.flyme.auto.medialink"))
     }
+
+    @Test fun diagnosticsIdentifyRejectedCandidateAndVerifiedFallbackWithoutExceptionPayload() {
+        val logs = mutableListOf<String>()
+        val bad = loader(true); val good = loader(true)
+        providers["com.netease.cloudmusic.iot"] = bad
+        providers["com.geely.linkhmi"] = good
+        GalaxySteeringSetupLog(logs::add).use { diagnostics ->
+            val selected = L7VendorSdk(context(loader(false)), diagnostics).load(name,
+                GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT.sdkPackages) {
+                if (it === bad) throw ClassNotFoundException("private-payload-and-device-name")
+            }
+            assertSame(good, selected.loader)
+        }
+        assertTrue(logs.any { "result=SDK_REJECTED" in it && "provider=com.netease.cloudmusic.iot" in it && "exceptionType=ClassNotFoundException" in it })
+        assertTrue(logs.any { "result=SDK_REJECTED" in it && "provider=com.flyme.auto.music" in it && "exceptionType=NameNotFoundException" in it })
+        assertTrue(logs.last().contains("result=SDK_SELECTED provider=com.geely.linkhmi"))
+        assertFalse(logs.any { "private-payload" in it })
+    }
 }
