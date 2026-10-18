@@ -53,6 +53,8 @@ android {
         getByName("main").assets.directories.add(layout.buildDirectory.dir("generated/galaxyplay-license-assets").get().asFile.path)
         getByName("test").setRoot(rootProject.file("e2e/common/test").path)
         getByName("androidTest").setRoot(rootProject.file("e2e/common/androidTest").path)
+        getByName("test").java.srcDir(rootProject.file("e2e/common/fixtures/java"))
+        getByName("androidTest").java.srcDir(rootProject.file("e2e/common/fixtures/java"))
     }
 }
 

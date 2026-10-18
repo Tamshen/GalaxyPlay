@@ -39,6 +39,11 @@ class GalaxyMediaReportingChannelTest {
         assertEquals(4, picker.listView.adapter.count)
         picker.listView.performItemClick(picker.listView.adapter.getView(mode.ordinal, null, picker.listView), mode.ordinal, mode.ordinal.toLong())
     }
+    private fun save(page: GalaxyConfigurationPage) {
+        page.view.commitButton.performClick()
+        dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 
     @Test fun absentOrUnrecognizedPreferenceKeepsCurrentModeWithoutMigratingOldKeys() {
         val context = activity()
@@ -54,7 +59,7 @@ class GalaxyMediaReportingChannelTest {
     @Test fun cancellationDoesNotChangeDraftAndConfirmationRequiresPageSave() {
         val context = activity()
         val page = GalaxyConfigurationPage(context) {}
-        page.view.tabs.buttons[4].performClick()
+        page.view.tabs.buttons.first { it.text == context.getString(R.string.config_page_reporting) }.performClick()
         choose(page, GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT)
         dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
         assertFalse(page.dirty)
@@ -63,17 +68,17 @@ class GalaxyMediaReportingChannelTest {
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertTrue(page.dirty)
         assertEquals(GalaxyMediaReportingChannel.Mode.CURRENT, GalaxyMediaReportingChannel.load(context))
-        page.view.commitButton.performClick()
+        save(page)
         assertFalse(page.dirty)
         assertEquals(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.load(context))
         choose(page, GalaxyMediaReportingChannel.Mode.QQ_COMPAT)
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         assertEquals(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.load(context))
-        page.view.commitButton.performClick()
+        save(page)
         assertEquals(GalaxyMediaReportingChannel.Mode.QQ_COMPAT, GalaxyMediaReportingChannel.load(context))
         choose(page, GalaxyMediaReportingChannel.Mode.LOCAL)
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        page.view.commitButton.performClick()
+        save(page)
         assertEquals(GalaxyMediaReportingChannel.Mode.LOCAL, GalaxyMediaReportingChannel.load(context))
         page.close()
     }

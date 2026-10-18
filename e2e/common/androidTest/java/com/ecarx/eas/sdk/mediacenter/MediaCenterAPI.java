@@ -5,6 +5,8 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.IInterface;
 import com.ecarx.eas.sdk.ECarXApiClient;
+import ecarx.xsf.mediacenter.session.AppSourceInfo;
+import ecarx.xsf.mediacenter.session.EasMediaController;
 
 /** 合成 SDK 端口用于真实 VM 契约回归，绝不随正式 APK 构建。 */
 public class MediaCenterAPI {
@@ -20,10 +22,17 @@ public class MediaCenterAPI {
     public int unregistrations;
     public int releases;
     public boolean invalidToken;
+    public boolean unavailableCatalog;
+    public final EasMediaController sourceController = new EasMediaController();
     private Object token;
+    public MediaCenterAPI() {
+        sourceController.configuration.add(new AppSourceInfo.Builder().packageName("synthetic.foreign")
+            .appName("synthetic").iconPath("synthetic.icon").sourceTypeList(new int[]{6}).build());
+    }
     public static MediaCenterAPI get(Context context) { return instance; }
     public static MediaCenterAPI reset() { instance = new MediaCenterAPI(); return instance; }
     public void init(Context context, ECarXApiClient.Callback callback) { sdkContext = context; callback.onAPIReady(true); }
+    public EasMediaController getEasMediaController() { return unavailableCatalog ? null : sourceController; }
     public Object registerMusic(Runnable client) { throw new AssertionError("PLACEHOLDER_OVERLOAD"); }
     public Object registerMusic(String name, MusicClient client) { throw new AssertionError("SESSION_LINK_REQUIRED"); }
     public Object registerMusic(String name, MusicClient client, String session) {

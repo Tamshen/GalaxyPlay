@@ -27,6 +27,12 @@ object GalaxyOemMediaIntegrationChecks {
             val cover = Uri.parse("content://${base.packageName}.synthetic/first")
             port.prepare(value, cover)
             check(port.register())
+            check(sdk.sourceController.writes == 1)
+            val catalog = sdk.sourceController.configuration
+            check(catalog.first().packageName == "synthetic.foreign")
+            check(catalog.last().packageName == context.packageName)
+            check(catalog.last().appName == context.getString(com.shilapi.xcertplay.host.R.string.app_name))
+            check(catalog.last().sourceTypeList.contentEquals(intArrayOf(6, 13)))
             check(sdk.packageName == context.packageName && sdk.mediaSessionPackage == context.packageName)
             check(port.sources(intArrayOf(port.source)))
             port.currentSource()
@@ -59,6 +65,7 @@ object GalaxyOemMediaIntegrationChecks {
             check(!first.onNext() && first.musicPlaybackInfo == null)
             port.prepare(value, cover)
             check(port.register())
+            check(sdk.sourceController.writes == 1 && sdk.sourceController.configuration.size == 2)
             check(sdk.client !== first && !first.onPlay() && sdk.client.onPlay())
             port.invalidate()
             check(!sdk.client.onPlay() && sdk.client.musicPlaybackInfo == null)
@@ -68,6 +75,7 @@ object GalaxyOemMediaIntegrationChecks {
             check(commands.size == 5)
         }
         invalidTokenIsRejected(base)
+        unavailableCatalogKeepsMusicClient(base)
     }
 
     private fun invalidTokenIsRejected(context: Context) {
@@ -77,7 +85,27 @@ object GalaxyOemMediaIntegrationChecks {
         }, serviceEvidence = { 1 })
         port.initialize({}, { error("INVALID_TOKEN_CONTROL") }, {}, { false })
         check(!port.register())
+        check(sdk.sourceController.writes == 0 && sdk.sourceController.reads == 0)
         check(!sdk.client.onPlay())
         port.close()
+    }
+
+    private fun unavailableCatalogKeepsMusicClient(context: Context) {
+        for (missing in listOf(true, false)) {
+            val sdk = MediaCenterAPI.reset().apply {
+                unavailableCatalog = missing
+                sourceController.rejectWrite = !missing
+            }
+            val port = L7ReflectiveMediaCenter(context, sdkLoader = {
+                L7VendorSdk.Loaded(MediaCenterAPI::class.java.classLoader!!, "SYNTHETIC_SDK")
+            }, serviceEvidence = { 1 })
+            port.initialize({}, { true }, {}, { true })
+            port.prepare(CarPlayNowPlaying(title = "synthetic", playing = true, playbackKnown = true), null)
+            check(port.register() && port.sources(intArrayOf(6)))
+            check(port.update(CarPlayNowPlaying(), null))
+            check(sdk.published.title == "synthetic")
+            check(port.unregister())
+            port.close()
+        }
     }
 }

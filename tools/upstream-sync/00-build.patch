@@ -31,7 +31,7 @@
      }
  
      compileOptions {
-@@ -21,13 +36,27 @@
+@@ -21,13 +36,29 @@
      buildFeatures {
          compose = true
      }
@@ -57,6 +57,8 @@
 +        getByName("main").assets.directories.add(layout.buildDirectory.dir("generated/galaxyplay-license-assets").get().asFile.path)
 +        getByName("test").setRoot(rootProject.file("e2e/common/test").path)
 +        getByName("androidTest").setRoot(rootProject.file("e2e/common/androidTest").path)
++        getByName("test").java.srcDir(rootProject.file("e2e/common/fixtures/java"))
++        getByName("androidTest").java.srcDir(rootProject.file("e2e/common/fixtures/java"))
      }
  }
 +
@@ -64,7 +66,7 @@
  
  dependencies {
      api(project(":shared"))
-@@ -38,12 +67,15 @@
+@@ -38,12 +69,15 @@
      implementation(libs.androidx.compose.ui.graphics)
      implementation(libs.androidx.compose.ui.tooling.preview)
      implementation(libs.androidx.core.ktx)

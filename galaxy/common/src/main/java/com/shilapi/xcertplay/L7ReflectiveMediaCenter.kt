@@ -91,6 +91,11 @@ internal class L7ReflectiveMediaCenter(
         tokenBinder = binder
         tokenDeath = death
         binder.linkToDeath(death, 0)
+        val catalog = GalaxyOemSourceRegistration.ensure(app, requireNotNull(api), requireNotNull(apiType), source) {
+            valid && registration == epoch && binder.isBinderAlive
+        }
+        L7DebugLog.record("MediaCenter: sourceCatalog=$catalog channel=${channel.name} source=$source")
+        if (!valid || registration != epoch || !binder.isBinderAlive) return false
         L7DebugLog.record("MediaCenter: registration mediaSessionLinked=${verified.linkedSession} source=$source tokenValid=true")
         return true
     }

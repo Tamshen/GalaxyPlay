@@ -205,6 +205,8 @@ USB 重枚举与启动断开专项：`IphoneUsbReenumerationTest` 检查旧描�
 
 ## Docker 运行
 
+`GalaxyOemSourceCatalogTest` 检查目录追加／自身条目更新、写前重读、其他应用对象与字段保留、空／歧义目录、错误身份或来源、会话失效和写后回读不符。`GalaxyOemSourceRegistrationTest` 在 API 29／30 调用公开 SDK 契约夹具，核对自身名称／图标、来源 6／13／0 合并、优先级／多开保留、目录缺失／拒绝、Bitmap 条目跳过与去重。`e2e/common/fixtures` 只映射到 JVM／Android VM 测试源集，不进入产品 APK；`GalaxyOemMediaIntegrationChecks` 在真实 Android VM 验证有效 token 后登记、重复注册无重复项、无效 token 不读写目录，以及目录接口缺失／拒绝时仍能更新歌曲。它们验证公开契约与失败边界，不代表原厂服务或车机显示验收。
+
 [AppLocaleTest](common/test/java/com/shilapi/xcertplay/AppLocaleTest.kt) 覆盖中英文选择、系统语言迁移、已移除语言回退与长期 Context 的昼夜更新。`python3 e2e/checks/check_english_resources.py` 检查中文默认文案的英文覆盖、选项数组和格式占位符。设备上核对语言选择器仅有跟随系统、English、简体中文；英文逐页检查首页、设置、模态框和协议，并验证关于页的版本与离线许可弹窗。
 
 `python3 e2e/device/english_ui_smoke.py --adb ../tools/scripts/adb.sh` 仅操作 AVD，需先完成协议确认且无活动会话。脚本切到 English 并保留，检查 15 个页面、设置选择器、协议、离线许可模态框和 USB 等待取消；USB Host 不可用时检查未就绪提示并明确跳过等待场景，支持时取消前收起悬浮菜单，并等待未连接首页出现。不修改认证或音频配置。原始日志、用户输入和第三方许可原文保留原语言，语言选择器的“简体中文”保留自称。截图位于忽略目录 `build/previews/english-ui/`。
