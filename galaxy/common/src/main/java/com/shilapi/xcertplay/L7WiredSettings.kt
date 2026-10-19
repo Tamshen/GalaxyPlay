@@ -45,6 +45,7 @@ internal class L7WiredSettings(
     val disconnectButton: Button
 
     init {
+        GalaxyUsbVerificationSettings.add(activity, parent)
         L7SettingsSection.add(parent, text(R.string.l7_usb_steps), text(R.string.l7_connection_usb_hint)) { card ->
             card.addView(device)
             card.addView(permission)

@@ -145,7 +145,8 @@ sealed class CarPlayStatus {
     data class Failed(val message: String, val wifiResetRequired: Boolean = false,
         val startupFailure: WirelessStartupFailure? = null,
         val usbModeSwitchFailed: Boolean = false,
-        val p2pResetReason: com.shilapi.xcertplay.network.P2pResetReason? = null) : CarPlayStatus()
+        val p2pResetReason: com.shilapi.xcertplay.network.P2pResetReason? = null,
+        val usbVerificationReason: com.shilapi.xcertplay.transport.GalaxyUsbVerificationFailure.Reason? = null) : CarPlayStatus()
 }
 
 internal fun isWirelessHandoffInProgress(
@@ -1913,6 +1914,22 @@ class CarPlayController(
         phase = Phase.IPHONE
         reenumerationAttempts = 0
         onStatus(CarPlayStatus.DiscoveringIphone, iphoneGeneration.get())
+        if (com.shilapi.xcertplay.transport.GalaxyUsbVerificationSession.needsRecovery(appContext)) {
+            val generation = iphoneGeneration.get()
+            phase = Phase.DATAPATHS
+            executor.execute {
+                try {
+                    com.shilapi.xcertplay.transport.GalaxyUsbVerificationSession.recover(appContext, ::connectionDiagnostic)
+                    mainHandler.post {
+                        if (!closed && generation == iphoneGeneration.get()) {
+                            phase = Phase.IPHONE
+                            checkIphoneAvailability()
+                        }
+                    }
+                } catch (error: Exception) { fail(error, generation) }
+            }
+            return
+        }
         checkIphoneAvailability()
     }
 
@@ -2004,6 +2021,10 @@ class CarPlayController(
                         return
                     }
                     connectionDiagnostic("USB permission result=GRANTED")
+                    if (config.usbVerificationEnabled) {
+                        startUsbVerification(device, generation)
+                        return
+                    }
                     val configuration = IphoneCarPlayConfiguration.find(device)
                     connectionDiagnostic(
                         "USB configuration ready=${configuration != null} " +
@@ -2179,6 +2200,33 @@ class CarPlayController(
         }) { name, error ->
             closeFailures.incrementAndGet()
             debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=$run component=WIRED_RESOURCE closeFailed=$name exceptionType=${error.javaClass.simpleName}")
+        }
+    }
+
+    private fun startUsbVerification(device: UsbDevice, generation: Int) {
+        phase = Phase.DATAPATHS // 角色切换的预期 detach 不再触发普通重枚举／授权流程。
+        val resources = wiredResources
+        val run = diagnosticRun.get()
+        val report: (String) -> Unit = { body ->
+            debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=$run monoMs=${android.os.SystemClock.elapsedRealtime()} $body")
+        }
+        report("USB_VERIFY stage=START backend=OEM_INIT experimental=true")
+        executor.execute {
+            if (!isCurrentWired(resources, generation)) return@execute
+            val service = awaitVpnService()
+            val mfi = mfiSession?.client
+            if (service == null || mfi == null) {
+                fail(com.shilapi.xcertplay.transport.GalaxyUsbVerificationFailure(
+                    com.shilapi.xcertplay.transport.GalaxyUsbVerificationFailure.Reason.SESSION_FAILED), generation)
+                return@execute
+            }
+            GalaxyUsbVerificationControlRunner(config, resources, { isCurrentWired(resources, generation) }, report).run(
+                appContext, requireUsbManager(), device, service, airPlayConfig, identity, pairings, mfi,
+                media, wiredSessionListener(resources, generation), { activeSession != null },
+                { onStatus(it, generation) }, { fail(it, generation) },
+                { session -> withCurrentWired(resources, generation) { csm = session }; Unit },
+                routeFrameHandler(), artworkTransferHandler(), locationProvider, vehicleStatusProvider,
+            )
         }
     }
 
@@ -2932,7 +2980,8 @@ class CarPlayController(
                 causes.any { it is com.shilapi.xcertplay.network.P2pResetRequiredException },
                 causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason,
                 !wireless && causes.any { it is IphoneUsbException.ModeSwitchFailed },
-                causes.filterIsInstance<com.shilapi.xcertplay.network.P2pResetRequiredException>().firstOrNull()?.reason),
+                causes.filterIsInstance<com.shilapi.xcertplay.network.P2pResetRequiredException>().firstOrNull()?.reason,
+                causes.filterIsInstance<com.shilapi.xcertplay.transport.GalaxyUsbVerificationFailure>().firstOrNull()?.reason),
                 generation ?: currentStatusGeneration())
         }
     }

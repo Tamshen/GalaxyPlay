@@ -25,6 +25,11 @@ class DiagnosticRedactorTest {
 
     @Test fun usbModeMetadataSurvivesRedactionAndDiskWithoutIdentity() {
         val lines = listOf(
+            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 USB_VERIFY stage=PHONE_CAPABILITY_REPLY request=0x53 returned=4 supported=true",
+            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 USB_VERIFY stage=PHONE_ROLE_REPLY returned=0 expected=0 request=0x51",
+            "USB_VERIFY stage=DEPENDENCIES backend=OEM_INIT apvp=NOT_USED exactGadgetRule=true controllerIdle=true originalConfig=adb ruleBytes=120 nodePresent=true",
+            "USB_VERIFY stage=FAILED reason=GADGET_NOT_CONFIGURED",
+            "USB_VERIFY stage=NODE_CLOSE reads=2 writes=3 rxBytes=32 txBytes=48",
             "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",
             "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 phase=REENUMERATION USB mode query result=short returned=3 mode=3:3:3 elapsedMs=1",
             "USB mode query result=unavailable reason=permission elapsedMs=0",

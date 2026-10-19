@@ -185,6 +185,7 @@ class CarPlayHostActivity : ComponentActivity() {
         hostMac = DiPlayBootstrap.deviceId(airPlayIdentity).split(":").map { it.toInt(16).toByte() }.toByteArray(),
         wirelessBluetoothDeviceAddress = DiPlayPreferences.phoneAddress(this),
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
+        usbVerificationEnabled = !wirelessEnabled && usbVerificationEnabled,
         // USB 有线连接不依赖未填写的无线热点参数。
         wirelessHotspotMode = if (wirelessEnabled) wirelessHotspotMode else WirelessHotspotMode.WIFI_P2P,
         wifiP2pPreferredChannel = GalaxyP2pSettings.effectiveChannel(this),
@@ -367,6 +368,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var microphoneAvailable = false
     private var microphonePermissionResolved = false
     private var wirelessEnabled = false
+    private var usbVerificationEnabled = false
     private var mfiTarget = MfiTarget.USB_CH341
     private var mfiI2cPath = AirPlayPersistence.DEFAULT_MFI_I2C_PATH
     private var remoteMfiServer = ""
@@ -563,6 +565,7 @@ class CarPlayHostActivity : ComponentActivity() {
         locationReportingEnabled = AirPlayPersistence.loadLocationReportingEnabled(this)
         locationPermissionAvailable = hasFineLocationPermission()
         wirelessEnabled = AirPlayPersistence.loadWirelessEnabled(this)
+        usbVerificationEnabled = GalaxyUsbVerificationSettings.enabled(this)
         mfiTarget = AirPlayPersistence.loadMfiTarget(this)
         mfiI2cPath = AirPlayPersistence.loadMfiI2cPath(this)
         remoteMfiServer = AirPlayPersistence.loadRemoteMfiServer(this)
@@ -606,6 +609,12 @@ class CarPlayHostActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     private fun requestVpnConsent() {
+        if (usbVerificationEnabled) {
+            vpnReady = true
+            L7WiredDiagnostics.event(this, wiredAttempt, "VPN", "NOT_REQUIRED_USB_GADGET")
+            maybeStartCarPlay()
+            return
+        }
         vpnGate.request()
     }
 
@@ -3417,12 +3426,13 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             setConnectionStageText(description, formatted || status is CarPlayStatus.Failed && status.wifiResetRequired)
             when (status) {
-                is CarPlayStatus.Failed -> if (!wirelessEnabled && status.usbModeSwitchFailed) {
+                is CarPlayStatus.Failed -> if (!wirelessEnabled && (status.usbModeSwitchFailed || status.usbVerificationReason != null)) {
                     startupRecovery.stop()
                     reconnectScheduled = false
                     wifiRecoveryButton?.visibility = View.GONE
                     (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
-                    appendLog("USB recovery stopped reason=mode-switch-failed action=manual-retry")
+                    (connectionPanel as? L7ConnectionPanel)?.setRecoveryStopped(true)
+                    appendLog("USB recovery stopped reason=${status.usbVerificationReason?.name ?: "mode-switch-failed"} action=manual-retry")
                 } else if (status.wifiResetRequired) {
                     startupRecovery.stop()
                     reconnectScheduled = false

@@ -75,6 +75,7 @@ class CarPlayRuntimeConfig(
     val wirelessStartupRefreshEnabled: Boolean = false,
     val wifiP2pAddressMode: com.shilapi.xcertplay.network.P2pAddressMode =
         com.shilapi.xcertplay.network.P2pAddressMode.DUAL_STACK,
+    val usbVerificationEnabled: Boolean = false,
 ) {
     init {
         require(wirelessFirstTcpTimeoutMillis in 1..60_000) { "Wireless first TCP timeout must be in 1..60000ms" }

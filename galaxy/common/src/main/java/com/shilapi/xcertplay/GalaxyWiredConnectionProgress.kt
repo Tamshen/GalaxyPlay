@@ -7,6 +7,9 @@ import com.shilapi.xcertplay.orchestration.CarPlayStatus
 /** 根据控制器实际阶段提示手机侧操作；不能从 USB 返回值推断锁屏或旧配对状态。 */
 internal object GalaxyWiredConnectionProgress {
     fun describe(context: Context, status: CarPlayStatus, detail: String): String {
+        if (status is CarPlayStatus.Failed) status.usbVerificationReason?.let {
+            return GalaxyUsbVerificationSettings.failure(context, it)
+        }
         val resource = when (status) {
             CarPlayStatus.DiscoveringIphone, CarPlayStatus.WaitingForIphone -> R.string.galaxy_usb_stage_find
             CarPlayStatus.RequestingIphonePermission -> R.string.galaxy_usb_stage_permission

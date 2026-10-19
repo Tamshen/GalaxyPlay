@@ -167,6 +167,38 @@ class CarPlayVpnService : VpnService() {
         }
     }
 
+    /** 系统 gadget 已建立网络时仅监听其带 scope 地址，不创建 VPN 或接管现有会话。 */
+    @Synchronized
+    fun attachGadget(
+        bindAddress: Inet6Address,
+        config: AirPlayConfig,
+        identity: AirPlayIdentity,
+        pairings: PairingStore,
+        mfi: MfiAuthenticator?,
+        listener: AirPlaySessionListener,
+        media: AirPlayMediaHandler,
+        owner: Any,
+        isCurrent: () -> Boolean,
+        onTcpAccepted: () -> Unit,
+    ): AttachResult {
+        if (!isCurrent()) return AttachResult.Failed("USB_VERIFY_CANCELLED")
+        if (active.get()) return AttachResult.AlreadyStarted
+        if (!bindAddress.isLinkLocalAddress || bindAddress.scopeId <= 0)
+            return AttachResult.Failed("USB_VERIFY_INVALID_NETWORK")
+        active.set(true)
+        wiredOwner = owner
+        val generation = ++attachGeneration
+        return try {
+            startAirPlayServer(generation, AirPlayAttachment(bindAddress, config, identity, pairings,
+                mfi, listener, media, onTcpAccepted = onTcpAccepted))
+            if (!isCurrent()) throw IOException("USB_VERIFY_CANCELLED")
+            AttachResult.Started
+        } catch (_: Exception) {
+            releaseLocked()
+            AttachResult.Failed("USB_VERIFY_LISTENER_FAILED")
+        }
+    }
+
     /** Releases the active AirPlay listener and whichever VPN/NCM transport resources are active. */
     @Synchronized
     fun detach() {

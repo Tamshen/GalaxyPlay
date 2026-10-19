@@ -157,6 +157,34 @@ class CarPlayVpnScopeTest {
         org.mockito.Mockito.verifyNoMoreInteractions(primary, extra, bridge, tun)
     }
 
+    @Test fun gadgetCannotReplaceExistingListenerOrCreateVpn() = withService { service ->
+        assertEquals(CarPlayVpnService.AttachResult.Started, attachWireless(service))
+        val server = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
+        assertEquals(CarPlayVpnService.AttachResult.AlreadyStarted, attachGadget(service, true, 1))
+        assertFalse(server.isClosed)
+        assertTrue(VpnScopeBoundary.calls.isEmpty())
+    }
+
+    @Test fun cancelledAndUnscopedGadgetDoNotOpenListeners() = withService { service ->
+        assertEquals(CarPlayVpnService.AttachResult.Failed("USB_VERIFY_CANCELLED"), attachGadget(service, false, 1))
+        assertEquals(CarPlayVpnService.AttachResult.Failed("USB_VERIFY_INVALID_NETWORK"), attachGadget(service, true, 0))
+        assertReleased(service)
+        assertTrue(VpnScopeBoundary.calls.isEmpty())
+    }
+
+    @Test fun gadgetBindFailureReleasesOwnerWithoutCreatingVpn() = withService { service ->
+        // JVM 主机没有这个 link-local 地址，真实 socket 绑定应失败并释放所有权。
+        assertEquals(CarPlayVpnService.AttachResult.Failed("USB_VERIFY_LISTENER_FAILED"), attachGadget(service, true, 99999))
+        assertReleased(service)
+        assertNull(ReflectionHelpers.getField<Any?>(service, "wiredOwner"))
+        assertTrue(VpnScopeBoundary.calls.isEmpty())
+    }
+
+    private fun attachGadget(service: CarPlayVpnService, current: Boolean, scope: Int): CarPlayVpnService.AttachResult =
+        service.attachGadget(java.net.Inet6Address.getByAddress(null, InetAddress.getByName("fe80::1234").address, scope),
+            config, identity, PairingStore(), null, object : AirPlaySessionListener {}, object : AirPlayMediaHandler {},
+            Any(), { current }, {})
+
     private fun attachWired(service: CarPlayVpnService, isCurrent: () -> Boolean = { true }): CarPlayVpnService.AttachResult =
         service.attach(ncm(), "fe80::1234", ByteArray(6), config, identity, PairingStore(), null,
             object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, isCurrent = isCurrent)

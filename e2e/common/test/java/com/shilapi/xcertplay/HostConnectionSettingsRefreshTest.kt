@@ -104,6 +104,22 @@ class HostConnectionSettingsRefreshTest {
         }
     }
 
+    @Test fun usbSelectionReloadsOnReturnAndNeverChangesWirelessTransport() {
+        AirPlayPersistence.saveWirelessEnabled(app, false)
+        AirPlayPersistence.saveManualHotspotSsid(app, "Test car")
+        L7Agreement.accept(app)
+        val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).setup()
+        try {
+            assertEquals(false, runtimeConfig(host.get()).usbVerificationEnabled)
+            app.getSharedPreferences("xcertplay_airplay", 0).edit().putBoolean("galaxy_usb_verification_enabled", true).commit()
+            host.pause().resume()
+            assertEquals(true, runtimeConfig(host.get()).usbVerificationEnabled)
+            AirPlayPersistence.saveWirelessEnabled(app, true)
+            host.pause().resume()
+            assertEquals(false, runtimeConfig(host.get()).usbVerificationEnabled)
+        } finally { host.pause().stop().destroy() }
+    }
+
     private fun runtimeConfig(host: CarPlayHostActivity): CarPlayRuntimeConfig {
         CarPlayHostActivity::class.java.getDeclaredField("airPlayIdentity").apply { isAccessible = true }
             .set(host, AirPlayPersistence.loadIdentity(host))
