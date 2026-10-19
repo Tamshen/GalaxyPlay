@@ -136,6 +136,40 @@ class WirelessStartupRecoveryTest {
         assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
     }
 
+    @Test fun p2pBusyStopsQueuedRetryAndShowsCauseWithoutDebugLogs() = assertP2pRecovery(false)
+
+    @Test fun p2pBusyKeepsGuidanceWithDebugSteps() = assertP2pRecovery(true)
+
+    private fun assertP2pRecovery(debug: Boolean) {
+        ReflectionHelpers.setField(activity, "l7DebugLogs\$delegate", lazy { debug })
+        val stage = TextView(activity)
+        val recovery = Button(activity)
+        ReflectionHelpers.setField(activity, "stageStatusView", stage)
+        ReflectionHelpers.setField(activity, "wifiRecoveryButton", recovery)
+        report()
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        val status = CarPlayStatus.Failed("raw reset error", wifiResetRequired = true,
+            p2pResetReason = com.shilapi.xcertplay.network.P2pResetReason.SYSTEM_BUSY)
+        report(1, status)
+        assertFalse(budget().stopped)
+        report(status = status)
+        assertTrue(budget().stopped)
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        assertEquals(View.VISIBLE, recovery.visibility)
+        assertEquals(View.VISIBLE, retry.visibility)
+        val panel = ReflectionHelpers.getField<L7ConnectionPanel>(activity, "connectionPanel")
+        assertEquals(View.GONE, ReflectionHelpers.getField<android.widget.ProgressBar>(panel, "progress").visibility)
+        val text = stage.text.toString()
+        assertTrue(text.contains("service is busy"))
+        assertTrue(text.contains("Turn vehicle Wi-Fi off and on"))
+        assertFalse(text.contains("raw reset error"))
+        report(status = CarPlayStatus.StartingHotspot)
+        report(status = CarPlayStatus.Failed("late cleanup error"))
+        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
+        assertEquals(text, stage.text.toString())
+        assertEquals(0, ReflectionHelpers.getField<Int>(activity, "restartGeneration"))
+    }
+
     @Test fun lateTransportErrorCannotReplaceExhaustedFeedbackWithGenericReconnectingText() {
         val stage = TextView(activity)
         ReflectionHelpers.setField(activity, "stageStatusView", stage)

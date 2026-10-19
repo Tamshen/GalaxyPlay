@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="galaxy_connection_release_pending">上次连接的资源尚未确认释放，请退出后重试。</string>
+    <string name="galaxy_p2p_reset_busy">车机 Wi-Fi Direct 忙，系统拒绝清理上一次连接，无法建立 CarPlay 网络。</string>
+    <string name="galaxy_p2p_reset_rejected">车机拒绝清理旧的 Wi-Fi Direct 连接，无法建立 CarPlay 网络。</string>
+    <string name="galaxy_p2p_reset_timeout">车机未在等待时间内回应 Wi-Fi Direct 清理请求，暂时无法建立 CarPlay 网络。</string>
+    <string name="galaxy_p2p_reset_remaining">车机已接受清理请求，但旧的 Wi-Fi Direct 连接仍未释放。</string>
+    <string name="galaxy_p2p_reset_existing">检测到已有 Wi-Fi Direct 连接，需要先结束该连接才能建立 CarPlay 网络。</string>
+    <string name="galaxy_p2p_reset_guidance">%1$s\n已停止自动重试。\n若有其他投屏正在运行，请先结束。关闭再开启车机 Wi-Fi 后点“重新连接”；仍失败可重启车机后再试。</string>
 </resources>

@@ -53,6 +53,18 @@ class WirelessStartupControllerTest {
         } finally { controller.close(); controller.awaitClosed(2_000) }
     }
 
+    @Test fun wrappedP2pResetFailurePreservesReasonForTheHost() {
+        val controller = controller()
+        try {
+            fail(controller, 0, IOException("Could not establish hotspot",
+                P2pResetRequiredException(P2pResetReason.SYSTEM_BUSY)))
+            shadowOf(Looper.getMainLooper()).idle()
+            val status = statuses.single() as CarPlayStatus.Failed
+            assertTrue(status.wifiResetRequired)
+            assertEquals(P2pResetReason.SYSTEM_BUSY, status.p2pResetReason)
+        } finally { controller.close(); controller.awaitClosed(2_000) }
+    }
+
     @Test fun queuedOldFailureAndOldCleanupDoNotAffectNewGeneration() {
         val controller = controller()
         var closed = 0

@@ -742,7 +742,15 @@
          val attempt = attemptClass.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WifiP2pGroupManagerTest.kt
-@@ -42,6 +42,50 @@
+@@ -9,6 +9,7 @@
+ import android.net.wifi.p2p.WifiP2pInfo
+ import android.net.wifi.p2p.WifiP2pManager
+ import com.shilapi.xcertplay.network.P2pResetRequiredException
++import com.shilapi.xcertplay.network.P2pResetReason
+ import com.shilapi.xcertplay.network.WifiP2pGroupManager
+ import org.junit.Assert.*
+ import org.junit.Before
+@@ -42,6 +43,50 @@
          shadowOf(wifi.connectionInfo).setSupplicantState(SupplicantState.COMPLETED)
      }
  
@@ -793,7 +801,7 @@
      @Test fun disconnectedStationCannotPinNewGroupToStaleTwoGhzChannel() {
          val info = context.getSystemService(WifiManager::class.java).connectionInfo
          shadowOf(info).setFrequency(2462)
-@@ -70,48 +114,6 @@
+@@ -70,48 +115,6 @@
          val encoded = "$kind|$requested|2437|$station|00000000-0000-0000-0000-000000000001"
          memory.edit().putString("confirmed", encoded).commit()
          return encoded
@@ -842,10 +850,58 @@
      }
  
      @Test fun hotspotCreationAloneAndLateConfirmationAfterCloseAreNeverLearned() {
-@@ -330,18 +332,6 @@
-         assertTrue(logs.any { it.contains("cleanup skipped=another_app_owns_group") })
+@@ -309,6 +312,45 @@
+         }
      }
  
++    @Test @Config(sdk = [29, 30]) fun retainedGroupBusyStopsBeforeCreatingAndKeepsCause() {
++        radio.removeFailure = WifiP2pManager.BUSY
++        assertRetainedResetFailure(P2pResetReason.SYSTEM_BUSY)
++    }
++
++    @Test fun retainedGroupRejectionIsDistinctFromTimeout() {
++        radio.removeFailure = WifiP2pManager.ERROR
++        assertRetainedResetFailure(P2pResetReason.REMOVE_REJECTED)
++    }
++
++    @Test fun retainedGroupMissingCallbackDoesNotStartAnotherGroup() {
++        radio.noRemoveReply = true
++        assertRetainedResetFailure(P2pResetReason.REMOVE_TIMEOUT)
++    }
++
++    @Test fun acceptedRemovalMustActuallyReleaseTheGroup() {
++        radio.keepRemovedGroup = true
++        assertRetainedResetFailure(P2pResetReason.GROUP_REMAINED)
++    }
++
++    private fun assertRetainedResetFailure(reason: P2pResetReason) {
++        radio.group = radio.makeGroup(null)
++        val existing = radio.group!!
++        context.getSharedPreferences("carplay_wifi_p2p", Context.MODE_PRIVATE).edit()
++            .putString("owned_ssid", existing.networkName).commit()
++        val logs = mutableListOf<String>()
++        WifiP2pGroupManager(context, logs::add).use { manager ->
++            val error = failure { manager.start(5000) }
++            assertTrue(error is P2pResetRequiredException)
++            assertEquals(reason, (error as P2pResetRequiredException).reason)
++        }
++        assertTrue(radio.requests.isEmpty())
++        assertEquals(1, radio.removals)
++        assertSame(existing, radio.group)
++        assertTrue(context.getSystemService(WifiManager::class.java).isWifiEnabled)
++        assertFalse(logs.any { it.contains(existing.networkName) || it.contains(existing.passphrase) })
++        if (reason == P2pResetReason.SYSTEM_BUSY) assertTrue(logs.any { it.contains("remove rejected code=2") })
++    }
++
+     @Test fun unknownExistingGroupIsNeverRemovedOrReplaced() {
+         radio.group = radio.makeGroup(null)
+         WifiP2pGroupManager(context).use { manager ->
+@@ -328,18 +370,6 @@
+         assertSame(replacement, radio.group)
+         assertEquals(0, radio.removals)
+         assertTrue(logs.any { it.contains("cleanup skipped=another_app_owns_group") })
+-    }
+-
 -    @Test fun connectionSnapshotDoesNotInterpretAnEmptyP2pListAsFailedIphoneAssociation() {
 -        val manager = WifiP2pGroupManager(context)
 -        background { manager.start(5000) }
@@ -856,12 +912,16 @@
 -        assertEquals("p2pGroup=absent association=unknown", background { manager.connectionDiagnosticSnapshot() })
 -        background { manager.close() }
 -        assertEquals("p2pGroup=unavailable association=unknown", manager.connectionDiagnosticSnapshot())
--    }
--
+     }
+ 
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
-         val old = WifiP2pGroupManager(context)
-         val previous = background { old.start(5000) }
-@@ -422,6 +412,7 @@
+@@ -419,9 +449,13 @@
+         val requests = mutableListOf<WifiP2pConfig?>()
+         var group: WifiP2pGroup? = null
+         var removals = 0
++        var removeFailure: Int? = null
++        var noRemoveReply = false
++        var keepRemovedGroup = false
          var rejectCustom = false
          var competingGroup = false
          var missingCredentials = false
@@ -869,7 +929,16 @@
          var noCreateReply = false
          var fixed24Only = false
          var allowed24 = setOf(2412, 2437, 2462)
-@@ -463,10 +454,18 @@
+@@ -457,16 +491,26 @@
+ 
+         @Implementation override fun removeGroup(channel: WifiP2pManager.Channel, listener: WifiP2pManager.ActionListener) {
+             removals++
+-            group = null
++            if (noRemoveReply) return
++            removeFailure?.let { listener.onFailure(it); return }
++            if (!keepRemovedGroup) group = null
+             listener.onSuccess()
+         }
  
          fun makeGroup(config: WifiP2pConfig?) = WifiP2pGroup().apply {
              shadowOf(this).setIsGroupOwner(true)
@@ -891,6 +960,27 @@
          }
      }
  }
+--- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupControllerTest.kt
++++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupControllerTest.kt
+@@ -53,6 +53,18 @@
+         } finally { controller.close(); controller.awaitClosed(2_000) }
+     }
+ 
++    @Test fun wrappedP2pResetFailurePreservesReasonForTheHost() {
++        val controller = controller()
++        try {
++            fail(controller, 0, IOException("Could not establish hotspot",
++                P2pResetRequiredException(P2pResetReason.SYSTEM_BUSY)))
++            shadowOf(Looper.getMainLooper()).idle()
++            val status = statuses.single() as CarPlayStatus.Failed
++            assertTrue(status.wifiResetRequired)
++            assertEquals(P2pResetReason.SYSTEM_BUSY, status.p2pResetReason)
++        } finally { controller.close(); controller.awaitClosed(2_000) }
++    }
++
+     @Test fun queuedOldFailureAndOldCleanupDoNotAffectNewGeneration() {
+         val controller = controller()
+         var closed = 0
 --- a/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/WirelessStartupRecoveryTest.kt
 @@ -4,6 +4,7 @@
@@ -923,10 +1013,12 @@
  
      @Test fun duplicateFailureAndCleanupErrorScheduleOnlyOneRetry() {
          report()
-@@ -55,6 +58,23 @@
+@@ -53,6 +56,23 @@
+         report(status = CarPlayStatus.Failed("Bluetooth socket closed"))
+         assertEquals(1, budget().retries)
          assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
-     }
- 
++    }
++
 +    @Test fun waitingPageShowsNetworkRefreshAndFailureStepWithNextAttempt() {
 +        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
 +        // common 库默认未启用产品 UI；与 mobile 的资源覆盖保持一致。
@@ -942,11 +1034,9 @@
 +        assertTrue(stage.text.toString().contains("4/5"))
 +        assertTrue(stage.text.toString().contains("attempt 2"))
 +        assertTrue(stage.text.toString().contains("1 s"))
-+    }
-+
+     }
+ 
      @Test fun exhaustedBudgetStopsAutomaticRecoveryAndExposesRetry() {
-         repeat(6) { generation ->
-             ReflectionHelpers.setField(activity, "restartGeneration", generation)
 @@ -62,7 +82,7 @@
              report(generation)
          }
@@ -956,12 +1046,10 @@
          assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
          assertEquals(View.VISIBLE, retry.visibility)
          report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
-@@ -74,6 +94,68 @@
-         assertEquals(0, budget().retries)
-         assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+@@ -76,6 +96,102 @@
          assertEquals(View.VISIBLE, retry.visibility)
-+    }
-+
+     }
+ 
 +    @Test fun repeatedUnclassifiedBluetoothFailureAlsoExhaustsTheBudget() {
 +        repeat(6) { generation ->
 +            ReflectionHelpers.setField(activity, "restartGeneration", generation)
@@ -1002,6 +1090,40 @@
 +        assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
 +    }
 +
++    @Test fun p2pBusyStopsQueuedRetryAndShowsCauseWithoutDebugLogs() = assertP2pRecovery(false)
++
++    @Test fun p2pBusyKeepsGuidanceWithDebugSteps() = assertP2pRecovery(true)
++
++    private fun assertP2pRecovery(debug: Boolean) {
++        ReflectionHelpers.setField(activity, "l7DebugLogs\$delegate", lazy { debug })
++        val stage = TextView(activity)
++        val recovery = Button(activity)
++        ReflectionHelpers.setField(activity, "stageStatusView", stage)
++        ReflectionHelpers.setField(activity, "wifiRecoveryButton", recovery)
++        report()
++        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
++        val status = CarPlayStatus.Failed("raw reset error", wifiResetRequired = true,
++            p2pResetReason = com.shilapi.xcertplay.network.P2pResetReason.SYSTEM_BUSY)
++        report(1, status)
++        assertFalse(budget().stopped)
++        report(status = status)
++        assertTrue(budget().stopped)
++        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
++        assertEquals(View.VISIBLE, recovery.visibility)
++        assertEquals(View.VISIBLE, retry.visibility)
++        val panel = ReflectionHelpers.getField<L7ConnectionPanel>(activity, "connectionPanel")
++        assertEquals(View.GONE, ReflectionHelpers.getField<android.widget.ProgressBar>(panel, "progress").visibility)
++        val text = stage.text.toString()
++        assertTrue(text.contains("service is busy"))
++        assertTrue(text.contains("Turn vehicle Wi-Fi off and on"))
++        assertFalse(text.contains("raw reset error"))
++        report(status = CarPlayStatus.StartingHotspot)
++        report(status = CarPlayStatus.Failed("late cleanup error"))
++        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
++        assertEquals(text, stage.text.toString())
++        assertEquals(0, ReflectionHelpers.getField<Int>(activity, "restartGeneration"))
++    }
++
 +    @Test fun lateTransportErrorCannotReplaceExhaustedFeedbackWithGenericReconnectingText() {
 +        val stage = TextView(activity)
 +        ReflectionHelpers.setField(activity, "stageStatusView", stage)
@@ -1022,9 +1144,11 @@
 +        assertEquals(stoppedText, stage.text.toString())
 +        assertEquals(View.VISIBLE, retry.visibility)
 +        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
-     }
- 
++    }
++
      @Test fun staleGenerationUserDisconnectMenuAndDifferentOwnerCannotSchedule() {
+         report(1)
+         assertEquals(0, budget().retries)
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/adb/LocalAdbApprovalTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/adb/LocalAdbApprovalTest.kt
 @@ -2,6 +2,7 @@

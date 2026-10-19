@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="galaxy_connection_release_pending">Resources from the previous connection have not finished closing. Exit and try again.</string>
+    <string name="galaxy_p2p_reset_busy">The vehicle Wi-Fi Direct service is busy and refused to clear the previous connection. CarPlay cannot start its network.</string>
+    <string name="galaxy_p2p_reset_rejected">The vehicle refused to clear the previous Wi-Fi Direct connection. CarPlay cannot start its network.</string>
+    <string name="galaxy_p2p_reset_timeout">The vehicle did not respond to the Wi-Fi Direct cleanup request in time. CarPlay cannot start its network yet.</string>
+    <string name="galaxy_p2p_reset_remaining">The vehicle accepted the cleanup request, but the previous Wi-Fi Direct connection is still present.</string>
+    <string name="galaxy_p2p_reset_existing">An existing Wi-Fi Direct connection must end before CarPlay can start its network.</string>
+    <string name="galaxy_p2p_reset_guidance">%1$s\nAutomatic retries have stopped.\nEnd any other active projection session. Turn vehicle Wi-Fi off and on, then tap Retry connection. If it still fails, restart the vehicle display and try again.</string>
 </resources>

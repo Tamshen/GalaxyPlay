@@ -176,10 +176,16 @@ class WifiP2pGroupManager(
                     throw P2pResetRequiredException()
                 }
                 diagnostic("Wi-Fi P2P reclaiming retained owned group")
-                removeGroupBlocking(p2pChannel, existing.networkName)
+                val resetFailure = removeGroupBlocking(p2pChannel, existing.networkName)
+                if (Thread.currentThread().isInterrupted) throw IOException("Interrupted while resetting Wi-Fi P2P")
+                ensureStartActive(attempt)
+                if (resetFailure != null) {
+                    diagnostic("Wi-Fi P2P reset stopped reason=${resetFailure.name} action=manual-recovery")
+                    throw P2pResetRequiredException(resetFailure)
+                }
                 val removalDeadline = minOf(deadlineNanos, deadlineAfter(REMOVE_GROUP_TIMEOUT_MILLIS))
                 while (requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true) != null) {
-                    if (remainingNanos(removalDeadline) == 0L) throw IOException("Wi-Fi Direct reset did not finish")
+                    if (remainingNanos(removalDeadline) == 0L) throw P2pResetRequiredException(P2pResetReason.GROUP_REMAINED)
                     synchronized(stateLock) { waitNanos(TimeUnit.MILLISECONDS.toNanos(100)) }
                 }
             }
@@ -895,48 +901,54 @@ class WifiP2pGroupManager(
         failedThread?.quitSafely()
     }
 
-    private fun removeGroupBlocking(channel: WifiP2pManager.Channel, expectedName: String? = observedCreatedName ?: requestedName) {
+    private fun removeGroupBlocking(channel: WifiP2pManager.Channel,
+        expectedName: String? = observedCreatedName ?: requestedName): P2pResetReason? =
         removeGroup(channel, waitForCallback = true, expectedName = expectedName)
-    }
 
     private fun removeGroup(channel: WifiP2pManager.Channel, waitForCallback: Boolean,
-        expectedName: String? = observedCreatedName ?: requestedName) {
+        expectedName: String? = observedCreatedName ?: requestedName): P2pResetReason? {
         val latch = CountDownLatch(1)
+        val result = AtomicReference<P2pResetReason?>(P2pResetReason.REMOVE_TIMEOUT)
+        fun complete(reason: P2pResetReason?) {
+            result.set(reason)
+            latch.countDown()
+        }
         try {
             p2pManager.requestGroupInfo(channel) { current ->
                 if (current == null) {
-                    latch.countDown()
+                    complete(null)
                     return@requestGroupInfo
                 }
-                // Cleanup needs this attempt's exact identity. The reinstall namespace used at
-                // startup is broader and could also match a newer DiPlay session.
+                // 清理仅匹配本次连接的确切身份，不能移除后来建立的其他连接。
                 val ours = current.isGroupOwner && !expectedName.isNullOrBlank() &&
                     current.networkName == expectedName
                 if (!ours) {
                     diagnostic("Wi-Fi P2P cleanup skipped=another_app_owns_group")
-                    latch.countDown()
+                    complete(P2pResetReason.EXISTING_GROUP)
                     return@requestGroupInfo
                 }
                 p2pManager.removeGroup(channel, object : WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        latch.countDown()
-                    }
+                    override fun onSuccess() = complete(null)
 
                     override fun onFailure(reason: Int) {
                         diagnostic("Wi-Fi P2P remove rejected code=$reason reason=${failureReason(reason)}")
-                        latch.countDown()
+                        complete(if (reason == WifiP2pManager.BUSY) P2pResetReason.SYSTEM_BUSY
+                            else P2pResetReason.REMOVE_REJECTED)
                     }
                 })
             }
         } catch (failure: RuntimeException) {
-            Log.w(TAG, "Wi-Fi P2P removeGroup could not be issued", failure)
-            latch.countDown()
+            diagnostic("Wi-Fi P2P remove could not be issued type=${failure.javaClass.simpleName}")
+            complete(P2pResetReason.REMOVE_REJECTED)
         }
-        if (!waitForCallback) return
-        try {
-            latch.await(REMOVE_GROUP_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        if (!waitForCallback) return null
+        return try {
+            if (latch.await(REMOVE_GROUP_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) result.get()
+            else P2pResetReason.REMOVE_TIMEOUT
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
+            // 退出清理必须继续关闭 channel，不能因中断跳过资源释放。
+            P2pResetReason.REMOVE_TIMEOUT
         }
     }
 

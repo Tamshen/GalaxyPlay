@@ -1044,6 +1044,7 @@ class CarPlayHostActivity : ComponentActivity() {
         panel.retryButton.setOnClickListener {
             if (shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return@setOnClickListener
             startupRecovery.manualRetry()
+            panel.setRecoveryStopped(false)
             if (!wirelessEnabled) appendLog("USB guide action=MANUAL_RETRY phoneLock=unknown carplayPairing=unknown")
             panel.retryButton.visibility = View.GONE
             restartCarPlay(if (wirelessEnabled) "Manual wireless retry" else "Manual USB retry")
@@ -3414,7 +3415,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 formatted -> wirelessProgress.describe(this, status, detail)
                 else -> detail
             }
-            setConnectionStageText(description, formatted)
+            setConnectionStageText(description, formatted || status is CarPlayStatus.Failed && status.wifiResetRequired)
             when (status) {
                 is CarPlayStatus.Failed -> if (!wirelessEnabled && status.usbModeSwitchFailed) {
                     startupRecovery.stop()
@@ -3423,7 +3424,12 @@ class CarPlayHostActivity : ComponentActivity() {
                     (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
                     appendLog("USB recovery stopped reason=mode-switch-failed action=manual-retry")
                 } else if (status.wifiResetRequired) {
+                    startupRecovery.stop()
+                    reconnectScheduled = false
                     wifiRecoveryButton?.visibility = View.VISIBLE
+                    (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
+                    (connectionPanel as? L7ConnectionPanel)?.setRecoveryStopped(true)
+                    appendLog("Wi-Fi P2P recovery stopped reason=${status.p2pResetReason ?: "EXISTING_GROUP"} action=manual-recovery")
                 } else {
                     wifiRecoveryButton?.visibility = View.GONE
                     reconnectAfterLoss(description, status.startupFailure)
@@ -4317,6 +4323,7 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.RunningControl -> getString(R.string.carplay_control_running)
         CarPlayStatus.ControlEnded -> getString(R.string.carplay_control_window_ended)
         is CarPlayStatus.Failed -> if (usbModeSwitchFailed) getString(R.string.galaxy_usb_mode_switch_failed)
+            else if (wifiResetRequired) GalaxyP2pRecoveryFeedback.describe(this@CarPlayHostActivity, p2pResetReason)
             else getString(R.string.status_failed, message)
     }
 

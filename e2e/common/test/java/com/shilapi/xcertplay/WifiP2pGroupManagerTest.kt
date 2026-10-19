@@ -9,6 +9,7 @@ import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import com.shilapi.xcertplay.network.P2pResetRequiredException
+import com.shilapi.xcertplay.network.P2pResetReason
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import org.junit.Assert.*
 import org.junit.Before
@@ -311,6 +312,45 @@ class WifiP2pGroupManagerTest {
         }
     }
 
+    @Test @Config(sdk = [29, 30]) fun retainedGroupBusyStopsBeforeCreatingAndKeepsCause() {
+        radio.removeFailure = WifiP2pManager.BUSY
+        assertRetainedResetFailure(P2pResetReason.SYSTEM_BUSY)
+    }
+
+    @Test fun retainedGroupRejectionIsDistinctFromTimeout() {
+        radio.removeFailure = WifiP2pManager.ERROR
+        assertRetainedResetFailure(P2pResetReason.REMOVE_REJECTED)
+    }
+
+    @Test fun retainedGroupMissingCallbackDoesNotStartAnotherGroup() {
+        radio.noRemoveReply = true
+        assertRetainedResetFailure(P2pResetReason.REMOVE_TIMEOUT)
+    }
+
+    @Test fun acceptedRemovalMustActuallyReleaseTheGroup() {
+        radio.keepRemovedGroup = true
+        assertRetainedResetFailure(P2pResetReason.GROUP_REMAINED)
+    }
+
+    private fun assertRetainedResetFailure(reason: P2pResetReason) {
+        radio.group = radio.makeGroup(null)
+        val existing = radio.group!!
+        context.getSharedPreferences("carplay_wifi_p2p", Context.MODE_PRIVATE).edit()
+            .putString("owned_ssid", existing.networkName).commit()
+        val logs = mutableListOf<String>()
+        WifiP2pGroupManager(context, logs::add).use { manager ->
+            val error = failure { manager.start(5000) }
+            assertTrue(error is P2pResetRequiredException)
+            assertEquals(reason, (error as P2pResetRequiredException).reason)
+        }
+        assertTrue(radio.requests.isEmpty())
+        assertEquals(1, radio.removals)
+        assertSame(existing, radio.group)
+        assertTrue(context.getSystemService(WifiManager::class.java).isWifiEnabled)
+        assertFalse(logs.any { it.contains(existing.networkName) || it.contains(existing.passphrase) })
+        if (reason == P2pResetReason.SYSTEM_BUSY) assertTrue(logs.any { it.contains("remove rejected code=2") })
+    }
+
     @Test fun unknownExistingGroupIsNeverRemovedOrReplaced() {
         radio.group = radio.makeGroup(null)
         WifiP2pGroupManager(context).use { manager ->
@@ -409,6 +449,9 @@ class WifiP2pGroupManagerTest {
         val requests = mutableListOf<WifiP2pConfig?>()
         var group: WifiP2pGroup? = null
         var removals = 0
+        var removeFailure: Int? = null
+        var noRemoveReply = false
+        var keepRemovedGroup = false
         var rejectCustom = false
         var competingGroup = false
         var missingCredentials = false
@@ -448,7 +491,9 @@ class WifiP2pGroupManagerTest {
 
         @Implementation override fun removeGroup(channel: WifiP2pManager.Channel, listener: WifiP2pManager.ActionListener) {
             removals++
-            group = null
+            if (noRemoveReply) return
+            removeFailure?.let { listener.onFailure(it); return }
+            if (!keepRemovedGroup) group = null
             listener.onSuccess()
         }
 

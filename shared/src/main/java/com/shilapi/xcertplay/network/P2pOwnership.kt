@@ -17,4 +17,7 @@ internal object P2pOwnership {
                 ssid.removePrefix(prefix).matches(Regex("[A-Za-z0-9]{4}"))))
 }
 
-class P2pResetRequiredException : IOException("An existing Wi-Fi Direct connection needs a reset")
+enum class P2pResetReason { EXISTING_GROUP, SYSTEM_BUSY, REMOVE_REJECTED, REMOVE_TIMEOUT, GROUP_REMAINED }
+
+class P2pResetRequiredException(val reason: P2pResetReason = P2pResetReason.EXISTING_GROUP) :
+    IOException("Wi-Fi Direct reset required: ${reason.name}")

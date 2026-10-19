@@ -21,6 +21,7 @@ internal class L7ConnectionPanel(
     private val onDiagnostic: (String) -> Unit = {},
 ) : ScrollView(context) {
     private fun dp(value: Int) = L7Components.dp(context, value)
+    private val progress = ProgressBar(context)
     private var guide: android.app.AlertDialog? = null
     val usbGuideButton = L7Components.actionButton(context, context.getString(R.string.galaxy_usb_help_title)) {
         showUsbGuide()
@@ -63,7 +64,7 @@ internal class L7ConnectionPanel(
         card.addView(L7Components.text(context, context.getString(
             if (wireless) R.string.l7_start_wireless else R.string.connect_with_usb
         )).apply { textSize = 24f; gravity = Gravity.CENTER }, row(top = 16))
-        card.addView(ProgressBar(context).apply {
+        card.addView(progress.apply {
             isIndeterminate = true
             L7Ui.bind(this) { indeterminateTintList = ColorStateList.valueOf(context.getColor(R.color.product_ui_accent)) }
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -83,6 +84,10 @@ internal class L7ConnectionPanel(
             secondary = true).apply { gravity = Gravity.CENTER }, row(top = 20))
         content.addView(card, LinearLayout.LayoutParams(-1, -2))
         addView(content)
+    }
+
+    fun setRecoveryStopped(stopped: Boolean) {
+        progress.visibility = if (stopped) View.GONE else View.VISIBLE
     }
 
     private fun row(top: Int = 0) = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) }
