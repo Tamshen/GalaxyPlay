@@ -28,6 +28,11 @@ internal class L7ReportingProbe(
             facts["permission.${item.name}"] = permissionFields.joinToString(";") { "$it=${item.facts[it] ?: "unknown"}" } +
                 ";reason=${item.reason}"
         }
+        if (id == "REPORT-HUD") {
+            facts["permissionRequirement"] = "NO_VENDOR_SDK_AMAP_BROADCAST"
+            facts["navigationContract"] = "AMAP_STANDARD_BROADCAST"
+            facts["navigationMapping"] = "10001_GUIDANCE_10019_START8_STOP9_RECEPTION_UNVERIFIED"
+        }
         if (id == "REPORT-QNX") facts["qnxProtocol"] = "UNCONFIRMED_MEDIACENTER_DOWNSTREAM"
         return L7ProbeItem(id, id, "REPORTING", L7ProbeOutcome.UNKNOWN, "REPORTING_UNVERIFIED", facts)
     }
@@ -42,8 +47,7 @@ internal class L7ReportingProbe(
         private val mediaClasses = listOf("com.ecarx.eas.sdk.mediacenter.MediaCenterAPI", "com.ecarx.eas.sdk.mediacenter.MusicClient")
         private val specs = linkedMapOf(
             "REPORT-MEDIA" to Spec(mediaPermissions, mediaClasses),
-            "REPORT-HUD" to Spec(listOf("ecarx.openapi.permission.NAVI_SERVICE"), listOf(
-                "com.ecarx.xui.adaptapi.diminteraction.NaviInteraction", "ecarx.fw.api.diminteraction.EcarxNaviInteraction")),
+            "REPORT-HUD" to Spec(emptyList(), emptyList()),
             "REPORT-QNX" to Spec(mediaPermissions, mediaClasses),
         )
         val ids = specs.keys.toList()

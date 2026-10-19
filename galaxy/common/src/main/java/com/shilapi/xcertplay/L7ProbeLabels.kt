@@ -12,6 +12,8 @@ internal class L7ProbeLabels(private val context: Context) {
         context.resources.configuration.locales[0]).format(Date(value))
     fun name(item: L7ProbeItem): String = environmentNames[item.id]?.let(::text) ?: item.name.substringAfterLast('.')
     fun reason(item: L7ProbeItem): String {
+        if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
+            return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.reason == "REPORTING_UNVERIFIED") return context.getString(R.string.l7_probe_reporting_details,
             item.facts["permissionCount"].orEmpty(), item.facts["declaredCount"].orEmpty(),
             item.facts["grantedCount"].orEmpty(), item.facts["definitionVisibleCount"].orEmpty(),
@@ -46,6 +48,8 @@ internal class L7ProbeLabels(private val context: Context) {
         })
     }
     fun compactReason(item: L7ProbeItem): String {
+        if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
+            return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.domain == "HOTSPOT") return reason(item)
         if (item.reason == "REPORTING_UNVERIFIED") return context.getString(R.string.l7_probe_reporting_short,
             item.facts["grantedCount"].orEmpty(), item.facts["permissionCount"].orEmpty(),

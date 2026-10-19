@@ -47,12 +47,13 @@ class L7ManualReportingTest {
     }
     private class Navigation : L7NavigationPort {
         val calls = mutableListOf<String>()
-        var alive = true
         var failStop = false
         override fun initialize() { calls.add("initialize") }
-        override fun ready() = alive
         override fun start() { calls.add("start") }
-        override fun road(value: String) { calls.add("road:$value") }
+        val values = mutableListOf<com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot>()
+        override fun guidance(value: com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot) {
+            calls.add("guidance:${value.road}"); values.add(value)
+        }
         override fun stop() { calls.add("stop"); if (failStop) throw SecurityException("secret") }
         override fun invalidate() { calls.add("invalidate") }
         override fun close() { calls.add("unregister") }
@@ -100,21 +101,20 @@ class L7ManualReportingTest {
         assertTrue(logs.any { it.contains("exceptionType=ClassNotFoundException") })
         assertFalse(logs.any { it.contains("secret") })
     }
-    @Test fun navigationWaitsForBinderThenStartsUpdatesAndStopsBeforeUnregister() {
-        val port = Navigation().apply { alive = false }
+    @Test fun navigationPublishesCompleteAmapSamplesAndStopsBeforeRelease() {
+        val port = Navigation()
         val test = L7ManualNavigationReport(app, logs::add, { releases++ }, { current }, port, direct)
         test.start()
-        assertEquals(listOf("initialize"), port.calls)
-        assertTrue(logs.any { it.contains("WAITING_BINDER") })
-        port.alive = true
+        assertEquals(listOf("initialize", "start"), port.calls.take(2))
+        assertEquals(1, port.values.last().maneuverType)
+        assertEquals(300L, port.values.last().segmentRemainingMeters)
+        val roadA = port.values.last().road
         test.action(L7ReportingAction.REFRESH)
-        assertEquals("start", port.calls[1])
-        val roadA = port.calls.last()
-        test.action(L7ReportingAction.REFRESH)
-        assertEquals(2, port.calls.count { it == roadA })
-        assertEquals(1, port.calls.count { it == "start" })
+        assertEquals(2, port.calls.count { it == "start" })
         test.action(L7ReportingAction.ROAD)
-        assertNotEquals(roadA, port.calls.last())
+        assertNotEquals(roadA, port.values.last().road)
+        assertEquals(2, port.values.last().maneuverType)
+        assertEquals(500L, port.values.last().segmentRemainingMeters)
         val count = port.calls.size
         current = false; test.action(L7ReportingAction.ROAD)
         assertEquals(count, port.calls.size)

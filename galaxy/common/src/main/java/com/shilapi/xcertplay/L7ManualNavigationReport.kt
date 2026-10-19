@@ -5,13 +5,13 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.util.concurrent.Executor
 
-/** 只发送样本确认的导航启停和路名，不猜测转向编号、距离、ETA 或 HUD 目标。 */
+/** 与真实导航共用高德广播；合成样例供核对路名、转向、距离与剩余时间。 */
 internal class L7ManualNavigationReport(
     context: Context,
     private val log: (String) -> Unit,
     released: () -> Unit,
     private val current: () -> Boolean,
-    port: L7NavigationPort = L7ReflectiveNavigation(context),
+    port: L7NavigationPort = GalaxyAmapNavigation(context),
     worker: Executor? = null,
 ) : L7ReportingSession {
     private val roads = listOf(context.getString(R.string.l7_report_road_a), context.getString(R.string.l7_report_road_b))
@@ -19,10 +19,10 @@ internal class L7ManualNavigationReport(
     private var closed = false
     private val observed = object : L7NavigationPort by port {
         override fun close() {
-            try { port.close(); log("stage=callbackCleanup result=RETURNED remoteClear=NOT_VERIFIED") }
+            try { port.close(); log("stage=broadcastCleanup result=RETURNED remoteClear=NOT_VERIFIED") }
             catch (error: Throwable) {
                 if (error !is Exception && error !is LinkageError) throw error
-                log("stage=callbackCleanup exceptionType=${error.javaClass.simpleName}")
+                log("stage=broadcastCleanup exceptionType=${error.javaClass.simpleName}")
             } finally { released() }
         }
     }
@@ -44,7 +44,9 @@ internal class L7ManualNavigationReport(
     private fun publish() {
         if (closed || !current()) return
         log("stage=fixture road=${if (road == 0) "A" else "B"} active=true display=NOT_VERIFIED")
-        session.update(CarPlayNavigationSnapshot(active = true, road = roads[road]))
+        session.update(CarPlayNavigationSnapshot(active = true, road = roads[road],
+            maneuverType = if (road == 0) 1 else 2, segmentRemainingMeters = if (road == 0) 300 else 500,
+            routeRemainingMeters = 5_000, routeRemainingSeconds = 600))
     }
     override fun close() {
         if (closed) return

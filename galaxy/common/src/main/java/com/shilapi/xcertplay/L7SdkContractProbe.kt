@@ -32,19 +32,9 @@ internal object L7SdkContractProbe {
                 else -> "CARPLAY_REFERENCE_13_ACCEPTANCE_UNTESTED"
             }
         }
-        check(context, L7ReflectiveNavigation.API, "navigation", result) { type, loader ->
-            Class.forName("ecarx.fw.api.ECarXAPI", false, loader).getMethod("creator", Class::class.java)
-            Class.forName("ecarx.fw.api.ICreator", false, loader).getMethod("create", Context::class.java)
-            val callback = type.methods.single { it.name == "registerNavigationInteractionCallback" && it.parameterCount == 1 }.parameterTypes.single()
-            type.getMethod("unregisterNavigationInteractionCallback", callback)
-            type.getMethod("notifyTurnByTurnStarted")
-            type.getMethod("notifyTurnByTurnStopped")
-            type.getMethod("updateNextGuidancePointName", String::class.java)
-            val instance = Class.forName("com.autolink.adaptersrv.diminteraction.EcarxNaviInstance", false, loader)
-            instance.getMethod("getInstance", Context::class.java)
-            instance.getMethod("getService")
-            result["navigationMapping"] = "START_STOP_ROAD_ONLY_OTHER_UNITS_UNCONFIRMED"
-        }
+        result["navigationSdkSource"] = "ANDROID_CONTEXT"
+        result["navigationContract"] = "AMAP_STANDARD_BROADCAST"
+        result["navigationMapping"] = "10001_GUIDANCE_10019_START8_STOP9_RECEPTION_UNVERIFIED"
         return result
     }
     private fun check(context: Context, name: String, key: String, result: MutableMap<String, String?>,

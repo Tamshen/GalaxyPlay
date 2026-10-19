@@ -188,7 +188,7 @@ internal object GalaxyMediaKeys {
     }
 
     private fun startNavigation(context: Context, next: CarPlayController) {
-        navigation = L7NavigationSession(L7ReflectiveNavigation(context), {
+        navigation = L7NavigationSession(GalaxyAmapNavigation(context), {
             synchronized(this) { controller === next && next.hasActiveSession() }
         })
         navigationTick = object : Runnable {

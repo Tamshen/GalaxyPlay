@@ -524,7 +524,7 @@
     <string name="l7_listen_upload_hint">停止监听后，到日志页手动上传本次记录。</string>
     <string name="l7_listen_no_input_saved">已记录：本次按键没有收到输入</string>
     <string name="l7_report_expected_media">%1$s\n状态：%2$s · 进度：%3$d 秒\n封面：%4$s</string>
-    <string name="l7_report_expected_road">本次测试路名：%1$s\n请查看 HUD 或仪表是否显示这一条路名。</string>
+    <string name="l7_report_expected_road">本次测试路名：%1$s\n样例 A：左转 300 米；样例 B：右转 500 米。全程剩余 5 公里、10 分钟。\n请查看 HUD 或仪表是否与当前样例一致。</string>
     <string name="l7_report_playing">播放</string>
     <string name="l7_report_paused">暂停</string>
     <string name="l7_report_green">绿色测试封面</string>

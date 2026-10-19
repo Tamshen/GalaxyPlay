@@ -3,35 +3,31 @@ package com.shilapi.xcertplay
 import android.os.SystemClock
 import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.io.Closeable
-import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 已确认的启停与路名接口按变化发布；不猜测距离、ETA 或图标编号，不抢原车导航焦点。 */
+/** 单线程发布高德导航广播；保留最新快照、有限失败预算及会话结束清理。 */
 internal class L7NavigationSession(
     private val port: L7NavigationPort,
     private val current: () -> Boolean,
     private val worker: Executor = workers,
     private val log: (String) -> Unit = L7DebugLog::record,
+    private val now: () -> Long = SystemClock::elapsedRealtime,
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val sequence = java.util.concurrent.atomic.AtomicLong()
-    private val operations = com.shilapi.xcertplay.diagnostics.SampledDiagnosticOperation(
-        { event(it) }, setOf("serviceReady"))
-    private fun event(body: String) {
-        runCatching { log("Navigation: generation=$generation event=${sequence.incrementAndGet()} monoMs=${SystemClock.elapsedRealtime()} $body") }
-    }
+    private val operations = com.shilapi.xcertplay.diagnostics.SampledDiagnosticOperation({ event(it) }, emptySet())
     private val scheduled = AtomicBoolean()
     @Volatile private var latest = CarPlayNavigationSnapshot()
     @Volatile private var closed = false
-    private var initialized = false
     private var attempted = false
+    private var initialized = false
     private var started = false
-    private var publishedRoad: String? = null
-    private var connectionToken: Any? = null
+    private var startConfirmed = false
+    private var published: CarPlayNavigationSnapshot? = null
+    private var pending: CarPlayNavigationSnapshot? = null
+    private var publishedAt = 0L
     private var failures = 0
-    private var reportedAvailability: Boolean? = null
-    private var pendingRoad: String? = null
 
     fun update(value: CarPlayNavigationSnapshot) {
         if (closed || !current()) return
@@ -41,14 +37,15 @@ internal class L7NavigationSession(
             if (!closed && current()) publish()
         }
     }
-    /** 仅显式调试动作使用；重新核对服务并重发已确认的当前字段，不创建自动重试循环。 */
+    /** 显式刷新重发开始状态与整份样例，供接收端重启后的手动复查。 */
     fun refresh() {
         if (closed || !current()) return
         enqueue {
             if (closed || !current()) return@enqueue
-            publishedRoad = null
-            pendingRoad = null
+            published = null
+            pending = null
             failures = 0
+            if (latest.active) startConfirmed = false
             publish()
         }
     }
@@ -60,65 +57,39 @@ internal class L7NavigationSession(
             initialized = call("initialize") { port.initialize() }
         }
         if (!initialized || closed || !current()) return
-        if (!refreshConnection(value.active)) return
-        if (!value.active) {
-            if (failures < 3) stop()
-            if (!started) { pendingRoad = null; failures = 0 }
-            return
-        }
-        val road = value.road.orEmpty().take(256)
-        if (pendingRoad != road) { pendingRoad = road; failures = 0 }
+        if (pending != value) { pending = value; failures = 0 }
         if (failures >= 3) return
-        if (!started) {
-            // 即使开始调用在远端执行后抛错，退出也要尝试清理。
+        if (!value.active) { stop(); return }
+        if (!startConfirmed) {
+            // 开始广播可能已经发出后才抛错，退出仍须尝试发送结束状态。
             started = true
-            if (!call("start") { port.start() }) { stop(); failures++; return }
+            if (!call("start") { port.start() }) { failures++; return }
+            startConfirmed = true
         }
         if (closed || !current()) return
-        if (publishedRoad != road) {
-            if (call("road") { port.road(road) }) { publishedRoad = road; failures = 0 }
-            else failures++
+        if (published != value || now() - publishedAt >= 5_000) {
+            if (call("guidance") { port.guidance(value) }) {
+                published = value
+                publishedAt = now()
+                failures = 0
+            } else failures++
         }
-    }
-    private fun refreshConnection(active: Boolean): Boolean {
-        val token = try { operations.run("serviceReady") { port.connectionToken() } } catch (error: Throwable) {
-            if (error !is Exception && error !is LinkageError) throw error
-            val cause = if (error is InvocationTargetException) error.targetException else error
-            event("stage=serviceReady exceptionType=${cause.javaClass.simpleName}"); null
-        }
-        if (closed || !current()) return false
-        val available = token != null
-        if (reportedAvailability != available) {
-            reportedAvailability = available
-            event("stage=serviceReady result=${if (available) "BINDER_ALIVE" else "WAITING_BINDER"} display=NOT_VERIFIED")
-        }
-        if (!available) {
-            if (connectionToken != null) publishedRoad = null
-            connectionToken = null
-            return false
-        }
-        if (connectionToken != token) {
-            val result = if (connectionToken == null) "CONNECTED" else "REPLACED"
-            publishedRoad = null
-            if (active) started = false
-            failures = 0
-            event("stage=serviceConnection result=$result replayLatest=$active display=NOT_VERIFIED")
-        }
-        connectionToken = token
-        return true
     }
     private fun stop() {
-        if (call("stop") { port.stop() }) started = false else failures++
-        publishedRoad = null
+        startConfirmed = false
+        if (call("stop") { port.stop() }) { started = false; startConfirmed = false; failures = 0 } else failures++
+        published = null
+    }
+    private fun event(body: String) {
+        runCatching { log("Navigation: transport=AMAP_BROADCAST generation=$generation event=${sequence.incrementAndGet()} monoMs=${now()} $body") }
     }
     private fun call(stage: String, action: () -> Unit): Boolean = try {
         operations.run(stage, action)
-        event("stage=$stage result=RETURNED display=NOT_VERIFIED")
+        event("stage=$stage result=RETURNED reception=NOT_VERIFIED display=NOT_VERIFIED")
         true
     } catch (error: Throwable) {
         if (error !is Exception && error !is LinkageError) throw error
-        val cause = if (error is InvocationTargetException) error.targetException else error
-        event("stage=$stage exceptionType=${cause.javaClass.simpleName}")
+        event("stage=$stage exceptionType=${error.javaClass.simpleName}")
         false
     }
     @Synchronized override fun close() {
@@ -126,7 +97,11 @@ internal class L7NavigationSession(
         closed = true
         port.invalidate()
         latest = CarPlayNavigationSnapshot()
-        enqueue { operations.flush(); if (started) stop(); call("unregister") { port.close() } }
+        enqueue {
+            operations.flush()
+            if (started) stop()
+            call("release") { port.close() }
+        }
     }
     private fun enqueue(action: () -> Unit) {
         try { worker.execute(action) }

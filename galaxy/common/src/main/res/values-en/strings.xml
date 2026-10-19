@@ -69,7 +69,7 @@
     <string name="l7_listen_upload_hint">Stop listening, then upload the records manually from Logs.</string>
     <string name="l7_listen_no_input_saved">Recorded: no input arrived for this press</string>
     <string name="l7_report_expected_media">%1$s\nState: %2$s · Progress: %3$d seconds\nArtwork: %4$s</string>
-    <string name="l7_report_expected_road">Test road: %1$s\nCheck whether the HUD or cluster shows this road.</string>
+    <string name="l7_report_expected_road">Test road: %1$s\nSample A: left in 300 m; sample B: right in 500 m. Route remaining: 5 km, 10 min.\nCheck whether the HUD or cluster matches the current sample.</string>
     <string name="l7_report_playing">Playing</string>
     <string name="l7_report_paused">Paused</string>
     <string name="l7_report_green">Green test artwork</string>

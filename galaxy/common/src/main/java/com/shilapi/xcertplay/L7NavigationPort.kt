@@ -1,81 +1,58 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
-import com.shilapi.xcertplay.vendor.SdkSubclass
+import android.content.Intent
+import com.shilapi.xcertplay.hud.AmapNavigationProtocol
+import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.io.Closeable
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Proxy
 
 internal interface L7NavigationPort : Closeable {
     fun initialize()
-    fun ready(): Boolean = true
-    /** 存活服务的身份；服务更换可能发生在两次检查之间，不能只检测布尔就绪状态。 */
-    fun connectionToken(): Any? = if (ready()) this else null
     fun start()
-    fun road(value: String)
+    fun guidance(value: CarPlayNavigationSnapshot)
     fun stop()
     fun invalidate() {}
 }
 
-/** 直接使用地图样本引用的框架 API，不初始化地图 Application 或操作车辆信号。 */
-internal class L7ReflectiveNavigation(context: Context) : L7NavigationPort {
+/** 按高德车机标准广播发布；发送返回不代表系统接收或 HUD 显示成功。 */
+internal class GalaxyAmapNavigation(context: Context) : L7NavigationPort {
     private val app = context.applicationContext
-    private var api: Any? = null
-    private var apiType: Class<*>? = null
     @Volatile private var valid = true
-    private var callback: Any? = null
-    private var callbackType: Class<*>? = null
-    private var serviceInstance: Any? = null
-    private var serviceGetter: java.lang.reflect.Method? = null
 
-    override fun initialize() {
-        if (!valid) return
-        val sdk = L7VendorSdk(app).load(API)
-        val type = Class.forName(API, false, sdk.loader)
-        apiType = type
-        val factory = Class.forName("ecarx.fw.api.ECarXAPI", true, sdk.loader)
-            .getMethod("creator", Class::class.java).invoke(null, type)
-        if (!valid) return
-        api = Class.forName("ecarx.fw.api.ICreator", false, sdk.loader)
-            .getMethod("create", Context::class.java).invoke(factory, app)
-            ?: throw IllegalStateException("SDK_API_EMPTY")
-        val instance = Class.forName("com.autolink.adaptersrv.diminteraction.EcarxNaviInstance", false, sdk.loader)
-        serviceInstance = instance.getMethod("getInstance", Context::class.java).invoke(null, app)
-        serviceGetter = instance.getMethod("getService")
-        val register = type.methods.single { it.name == "registerNavigationInteractionCallback" && it.parameterCount == 1 }
-        val callbackClass = register.parameterTypes.single()
-        val handler = InvocationHandler { proxy, method, args ->
-            when (method.name) {
-                "equals" -> proxy === args?.firstOrNull()
-                "hashCode" -> System.identityHashCode(proxy)
-                "toString" -> "L7NavigationCallback"
-                else -> { if (valid) L7DebugLog.record("Navigation: callback method=${method.name}"); null }
+    override fun initialize() = Unit
+    override fun start() = synchronized(owners) {
+        if (!valid) return@synchronized
+        owner = this
+        send(AmapNavigationProtocol.state(AmapNavigationProtocol.STARTED))
+    }
+    override fun guidance(value: CarPlayNavigationSnapshot) = synchronized(owners) {
+        if (valid && owner === this && value.active) send(AmapNavigationProtocol.guidance(value))
+    }
+    override fun stop() = synchronized(owners) {
+        // 新会话已开始后，旧会话的迟到清理不能结束新导航。
+        if (owner === this) {
+            send(AmapNavigationProtocol.state(AmapNavigationProtocol.STOPPED))
+            owner = null
+        }
+    }
+    override fun invalidate() { valid = false }
+    override fun close() = synchronized(owners) {
+        invalidate()
+        if (owner === this) owner = null
+    }
+    private fun send(fields: Map<String, Any>) {
+        val intent = Intent(AmapNavigationProtocol.ACTION)
+        fields.forEach { (key, value) ->
+            when (value) {
+                is Int -> intent.putExtra(key, value)
+                is String -> intent.putExtra(key, value)
+                else -> error("AMAP_FIELD_TYPE")
             }
         }
-        callback = if (callbackClass.isInterface) Proxy.newProxyInstance(sdk.loader, arrayOf(callbackClass), handler)
-            else SdkSubclass.create(callbackClass, callbackClass.methods.filter {
-                it.name in setOf("onDoInteractionAction", "onSearchAddress")
-            }.toTypedArray(), handler)
-        callbackType = callbackClass
-        if (valid) register.invoke(api, callback)
-        L7DebugLog.record("Navigation: sdk source=${sdk.source} callbackRegistration=RETURNED_NO_ACK serviceReady=${ready()} authorization=UNCONFIRMED target=UNKNOWN")
+        app.sendBroadcast(intent)
     }
-    override fun connectionToken(): Any? {
-        val service = serviceGetter?.invoke(serviceInstance) as? android.os.IInterface ?: return null
-        return service.asBinder().takeIf { it.isBinderAlive }
+    private companion object {
+        val owners = Any()
+        var owner: GalaxyAmapNavigation? = null
     }
-    override fun ready(): Boolean = connectionToken() != null
-    private fun requireReady() { check(ready()) { "SDK_SERVICE_NOT_READY" } }
-    override fun start() { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("notifyTurnByTurnStarted").invoke(api) }
-    override fun road(value: String) { if (!valid) return; requireReady(); requireNotNull(apiType).getMethod("updateNextGuidancePointName", String::class.java).invoke(api, value) }
-    override fun stop() { requireReady(); requireNotNull(apiType).getMethod("notifyTurnByTurnStopped").invoke(api) }
-    override fun invalidate() { valid = false }
-    override fun close() {
-        invalidate()
-        val target = api
-        try {
-            callbackType?.let { if (target != null) apiType?.getMethod("unregisterNavigationInteractionCallback", it)?.invoke(target, callback) }
-        } finally { callback = null; callbackType = null; api = null; serviceInstance = null; serviceGetter = null }
-    }
-    companion object { const val API = "ecarx.fw.api.diminteraction.EcarxNaviInteraction" }
 }

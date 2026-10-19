@@ -15,15 +15,14 @@ class L7ReportingProbeTest {
         L7ProbeItem("PERM:$name", name, "PERMISSION", L7ProbeOutcome.UNKNOWN, "DEFINITION_NOT_VISIBLE",
             mapOf("declared" to declared, "granted" to granted, "definitionVisible" to visible, "appOpMode" to mode))
 
-    @Test fun missingDefinitionsAndDeclarationsRemainSeparateFromUnsupported() {
-        val item = L7ReportingProbe({ permission(it, "false", "false", null) }, { "NOT_VISIBLE" }).inspect("REPORT-HUD")
+    @Test fun navigationBroadcastDoesNotRequireVendorPermissionsOrClassesAndRemainsUnverified() {
+        val item = L7ReportingProbe({ error("导航不查询厂商权限") }, { error("导航不加载厂商类") }).inspect("REPORT-HUD")
         assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(item))
-        assertEquals("0", item.facts["declaredCount"])
-        assertEquals("0", item.facts["definitionVisibleCount"])
-        assertEquals("0", item.facts["sdkVisibleCount"])
-        val detail = item.facts.getValue("permission.ecarx.openapi.permission.NAVI_SERVICE")!!
-        assertTrue(detail.contains("declared=false;granted=false;definitionVisible=unknown"))
-        assertTrue(detail.contains("reason=DEFINITION_NOT_VISIBLE"))
+        assertEquals("0", item.facts["permissionCount"])
+        assertEquals("0", item.facts["sdkCount"])
+        assertEquals("AMAP_STANDARD_BROADCAST", item.facts["navigationContract"])
+        assertEquals("NOT_RUN", item.facts["effectiveCall"])
+        assertEquals("UNKNOWN", item.facts["reportingSupported"])
     }
 
     @Test fun grantsAndSdkVisibilityNeverProveServiceAuthorizationOrQnxReception() {

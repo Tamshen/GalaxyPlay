@@ -104,12 +104,12 @@ paths = ('shared_prefs/diplay.xml', 'shared_prefs/l7_agreement.xml')
 original = {p: read(p) for p in paths}
 night = adb('shell', 'cmd', 'uimode', 'night').decode().strip().split()[-1]
 labels = {
-    'zh': ('媒体上报测试', 'HUD 导航上报测试', '开始上报测试', '结束上报并注销', '取消',
+    'zh': ('媒体上报测试', 'HUD 导航上报测试', '开始上报测试', '结束上报并清理', '取消',
            '切换测试曲目 A／B', '切换播放／暂停', '测试进度增加 15 秒', '切换封面 A／B／无封面',
-           '切换测试路名 A／B', '重新检查服务并发布当前路名', '未显示或与样例不符', 'GalaxyPlay 测试曲目 B', '返回调试'),
-    'en': ('Media reporting test', 'HUD navigation reporting test', 'Start reporting test', 'End reporting and unregister', 'Cancel',
+           '切换导航样例 A／B', '重新发布当前导航样例', '未显示或与样例不符', 'GalaxyPlay 测试曲目 B', '返回调试'),
+    'en': ('Media reporting test', 'HUD navigation reporting test', 'Start reporting test', 'End reporting and clean up', 'Cancel',
            'Switch test track A / B', 'Toggle play / pause', 'Advance test progress by 15 seconds', 'Switch artwork A / B / none',
-           'Switch test road A / B', 'Recheck service and publish current road', 'No display or a sample mismatch', 'GalaxyPlay test track B', 'Back to Debug'),
+           'Switch navigation sample A / B', 'Republish the current navigation sample', 'No display or a sample mismatch', 'GalaxyPlay test track B', 'Back to Debug'),
 }
 
 try:
