@@ -53,6 +53,32 @@ class GalaxyP2pAutoJoinE2eTest {
         assertTrue(logs.last().contains("changed=false"))
     }
 
+    @Test fun scanPauseHelperUsesFramedMaintenanceShellAndParsesOnlyExecutedResult() {
+        val commands = mutableListOf<String>()
+        Peer { line ->
+            commands += line
+            // 只替换 Android 助手，保留真实 shell 的引用、分隔和回执执行。
+            val command = line.replace(Regex("CLASSPATH=.*?WifiScanPauseMain (pause|restore)")) {
+                "printf 'DIPLAY_WIFI_SCAN_V1|DONE\\n'"
+            }
+            val process = ProcessBuilder("sh", "-c", command).redirectErrorStream(true).start()
+            process.inputStream.bufferedReader().readText().also {
+                check(process.waitFor(2, TimeUnit.SECONDS) && process.exitValue() == 0)
+            }
+        }.use { peer ->
+            for (enabled in listOf(false, true)) {
+                assertEquals(WifiScanSwitchResult.DONE, GalaxyWifiScanShell.run(
+                    WifiScanPause.command("/data/app/synthetic/base.apk", enabled), 30, peer::connect))
+            }
+        }
+        assertTrue(commands[0].contains("WifiScanPauseMain pause"))
+        assertTrue(commands[1].contains("WifiScanPauseMain restore"))
+        Peer { line -> "$line\nDIPLAY_WIFI_SCAN_V1|DONE\n" }.use { peer ->
+            assertEquals(WifiScanSwitchResult.UNKNOWN, GalaxyWifiScanShell.run(
+                WifiScanPause.command("/data/app/synthetic/base.apk", false), 30, peer::connect))
+        }
+    }
+
     @Test fun echoedCommandAndFakeOkWithoutExecutedMarkersAreRejected() {
         Peer { line -> "$line\nOK\n" }.use { peer ->
             assertThrows(WirelessStartupException::class.java) {

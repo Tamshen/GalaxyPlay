@@ -38,19 +38,19 @@ class GalaxyP2pStartupIntegrationTest {
         app.getSystemService(WifiManager::class.java).isWifiEnabled = true
     }
 
-    private fun controller(prepare: (WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit): CarPlayController {
+    private fun controller(control: WifiScanPauseControl? = null, prepare: (WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit): CarPlayController {
         val context = object : ContextWrapper(app) {
             override fun getApplicationContext(): Context = this
             override fun bindService(service: Intent, conn: ServiceConnection, flags: Int) = false
         }
         return CarPlayController(context, CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL,
             transport = CarPlayTransport.WIRELESS, wirelessHotspotMode = WirelessHotspotMode.WIFI_P2P,
-            wifiP2pPreferredChannel = 149,
+            wifiP2pPreferredChannel = 149, wifiScanPauseEnabled = control != null,
             identification = Iap2IdentificationConfig("test", "test", "test", "test", "1", "1", 3)),
             AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480)),
             AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
             object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {},
-            prepareWirelessHotspot = prepare).also { controller ->
+            prepareWirelessHotspot = prepare, wifiScanPauseControl = control).also { controller ->
             val phase = controller.javaClass.declaredClasses.first { it.simpleName == "Phase" }
                 .enumConstants.first { (it as Enum<*>).name == "WIRELESS" }
             ReflectionHelpers.setField(controller, "phase", phase)
@@ -68,6 +68,31 @@ class GalaxyP2pStartupIntegrationTest {
             val cause = error.cause!!
             throw if (cause is InvocationTargetException) cause.targetException else cause
         } finally { worker.shutdownNow() }
+    }
+
+    @Test fun controllerUsesInjectedScanOwnerForStartupPauseAndFinalRelease() {
+        var recoveries = 0
+        var acquiredOwner: Any? = null
+        var released: Any? = null
+        var ownerCurrent: (() -> Boolean)? = null
+        val control = object : WifiScanPauseControl {
+            override fun recover(app: Context) { recoveries++ }
+            override fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {
+                acquiredOwner = owner; ownerCurrent = current
+                log("Wi-Fi connectivity scans paused=true reason=done transport=host-shell")
+            }
+            override fun release(app: Context, owner: Any, log: (String) -> Unit) { released = owner }
+        }
+        val controller = controller(control) { _, _, _ -> }
+        try {
+            assertEquals(1, recoveries)
+            val info = start(controller)
+            controller.javaClass.getDeclaredMethod("pauseWifiScans", WirelessHotspotBackend::class.java)
+                .apply { isAccessible = true }.invoke(controller, info.backend)
+            assertNotNull(acquiredOwner); assertTrue(ownerCurrent!!())
+        } finally { controller.close(); assertTrue(controller.awaitClosed(2000)) }
+        assertSame(acquiredOwner, released)
+        assertFalse(ownerCurrent!!())
     }
 
     @Test fun preparationRunsAfterLiveGroupCreationBeforeReadyIsReturned() {

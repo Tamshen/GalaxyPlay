@@ -25,13 +25,15 @@ import java.util.concurrent.TimeUnit
  * process-wide worker owns controller leases and restores the search only after the last lease
  * ends. A durable marker precedes every disable; failed restores retry and recover when the app
  * next opens, and the framework resets the setting itself when the car restarts. Nothing happens
- * without adb approval, and this never asks for it.
+ * without an available privileged shell; the default adb path never asks for approval.
+ * Galaxy hosts may supply an existing local maintenance transport through the same lease controller.
  */
 internal class WifiScanPause(
     context: Context,
     private val log: (String) -> Unit,
-    private val control: WifiScanPauseControl = ProcessWifiScanPause,
+    control: WifiScanPauseControl? = null,
 ) {
+    private val control = control ?: defaultScanPauseControl
     private val app = context.applicationContext
     private val owner = Any()
     @Volatile private var closed = false
@@ -74,7 +76,8 @@ internal class WifiScanPause(
         fun eligible(backend: WirelessHotspotBackend, sdk: Int = Build.VERSION.SDK_INT): Boolean =
             backend == WirelessHotspotBackend.WIFI_P2P && sdk >= Build.VERSION_CODES.N_MR1
 
-        fun restoreIfNeeded(context: Context) = ProcessWifiScanPause.recover(context.applicationContext)
+        fun restoreIfNeeded(context: Context, control: WifiScanPauseControl? = null) =
+            (control ?: defaultScanPauseControl).recover(context.applicationContext)
 
         fun command(apk: String, enabled: Boolean): String {
             val quoted = "'" + apk.replace("'", "'\"'\"'") + "'"
@@ -102,15 +105,22 @@ internal class WifiScanPause(
     }
 }
 
-internal interface WifiScanPauseControl {
+/** 宿主选择固定的进程级控制器；关闭、重连和恢复共用同一资源所有者。 */
+interface WifiScanPauseControl {
+    fun recover(app: Context) {}
     fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit)
     fun release(app: Context, owner: Any, log: (String) -> Unit)
 }
 
 /** The single writer is shared across full controller rebuilds, including delayed restore retries. */
-private object ProcessWifiScanPause : WifiScanPauseControl {
-    private const val PREFS = "diplay_wifi_scan_pause"
-    private const val JOURNAL = "restore_pending"
+private val defaultScanPauseControl: WifiScanPauseControl = ProcessWifiScanPause()
+
+internal class ProcessWifiScanPause(
+    private val fallback: ((Context, String) -> WifiScanSwitchResult?)? = null,
+) : WifiScanPauseControl {
+    private val transport = WifiScanPauseTransport()
+    private val PREFS = "diplay_wifi_scan_pause"
+    private val JOURNAL = "restore_pending"
     private val worker: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor {
         Thread(it, WifiScanPause.TAG).apply { isDaemon = true }
     }
@@ -125,7 +135,7 @@ private object ProcessWifiScanPause : WifiScanPauseControl {
             val outcome = state.acquire(owner, current)
             val now = android.os.SystemClock.elapsedRealtime()
             log("Wi-Fi connectivity scans paused=${outcome.paused} reason=${outcome.reason} api=${Build.VERSION.SDK_INT} " +
-                "monoMs=$now elapsedMs=${(now - started).coerceAtLeast(0)} evidence=autojoin_control")
+                "monoMs=$now elapsedMs=${(now - started).coerceAtLeast(0)} evidence=autojoin_control transport=${transport.lastTransport}")
         }
     }
 
@@ -133,7 +143,7 @@ private object ProcessWifiScanPause : WifiScanPauseControl {
         enqueue(app) { state -> log("Wi-Fi scan pause lease released; cleanup ok=${state.release(owner)}") }
     }
 
-    fun recover(app: Context) {
+    override fun recover(app: Context) {
         enqueue(app) { state ->
             if (state.recoveryPending()) Log.i(WifiScanPause.TAG, "Wi-Fi scan recovery restored=${state.recover()}")
         }
@@ -172,7 +182,13 @@ private object ProcessWifiScanPause : WifiScanPauseControl {
     }
 
     private fun switch(app: Context, enabled: Boolean): WifiScanSwitchResult {
-        val output = adb.run(app, WifiScanPause.command(app.packageCodePath, enabled), WifiScanPause.HELPER_TIMEOUT_MS)
-        return if (output == null) WifiScanPause.unanswered(adb.lastAccess) else WifiScanPause.parse(output)
+        val command = WifiScanPause.command(app.packageCodePath, enabled)
+        return transport.switch(
+            primary = {
+                val output = adb.run(app, command, WifiScanPause.HELPER_TIMEOUT_MS)
+                if (output == null) WifiScanPause.unanswered(adb.lastAccess) else WifiScanPause.parse(output)
+            },
+            fallback = { fallback?.invoke(app, command) },
+        )
     }
 }

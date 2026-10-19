@@ -30,10 +30,13 @@ internal class AudioFocusCoordinator(
     private var mediaSuppressed = false
     private var closed = false
     private var communicationActive = false
+    private val handler = Handler(Looper.getMainLooper())
+    private var mediaRecovery: Runnable? = null
 
     private fun onFocusChanged(generation: Int, change: Int) {
         synchronized(this) {
             if (closed || generation != requestGeneration) return
+            cancelMediaRecovery()
             runCatching { report("Audio: focus change=$change activeTracks=${active.size}") }
             when (change) {
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> focusVolume = DUCKED_VOLUME
@@ -63,6 +66,7 @@ internal class AudioFocusCoordinator(
 
     @Synchronized
     fun onMediaPlaying(playing: Boolean) {
+        if (!playing) cancelMediaRecovery()
         if (!playing || closed) return
         mediaSuppressed = false
         refreshRequest()
@@ -74,12 +78,14 @@ internal class AudioFocusCoordinator(
     @Synchronized fun communicationStarted() {
         if (closed) return
         communicationActive = true
+        cancelMediaRecovery()
         refreshRequest()
     }
 
     @Synchronized fun communicationEnded() {
         if (closed) return
         communicationActive = false
+        cancelMediaRecovery()
         requestGeneration++
         request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
         request = null
@@ -98,6 +104,7 @@ internal class AudioFocusCoordinator(
     @Synchronized
     override fun close() {
         closed = true
+        cancelMediaRecovery()
         requestGeneration++
         active.keys.forEach { runCatching { it.setVolume(0f) } }
         active.clear()
@@ -112,6 +119,7 @@ internal class AudioFocusCoordinator(
         val primary = active.values.filter { !communicationActive || it.channel != AudioChannel.MEDIA }.maxByOrNull { it.channel.focusPriority() }
             ?: mediaAttributes?.takeIf { !mediaSuppressed && !communicationActive }?.let { Entry(AudioChannel.MEDIA, it) }
         if (primary == null) {
+            cancelMediaRecovery()
             requestGeneration++
             request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
             request = null
@@ -122,6 +130,9 @@ internal class AudioFocusCoordinator(
             return
         }
         if (request != null && requestedChannel == primary.channel) { applyVolumes(); return }
+        val restoreAfterNavigation = factoryRouting && requestedChannel == AudioChannel.NAVIGATION &&
+            primary.channel == AudioChannel.MEDIA
+        cancelMediaRecovery()
         val generation = ++requestGeneration
         request?.let { runCatching { manager?.abandonAudioFocusRequest(it) } }
         val gain = (if (factoryRouting) template?.focusGain(primary.channel) else null) ?: when (primary.channel) {
@@ -133,7 +144,8 @@ internal class AudioFocusCoordinator(
         }
         val next = AudioFocusRequest.Builder(gain)
             .setAudioAttributes(primary.attributes)
-            .setOnAudioFocusChangeListener({ change -> onFocusChanged(generation, change) }, Handler(Looper.getMainLooper()))
+            .setAcceptsDelayedFocusGain(factoryRouting && primary.channel == AudioChannel.MEDIA)
+            .setOnAudioFocusChangeListener({ change -> onFocusChanged(generation, change) }, handler)
             .build()
         request = next
         requestedChannel = primary.channel
@@ -146,6 +158,29 @@ internal class AudioFocusCoordinator(
         val line = "Audio: focus requested channel=${primary.channel} gain=$gain granted=$result activeTracks=${active.size}"
         Log.i(TAG, line)
         runCatching { report(line) }
+        if (restoreAfterNavigation && result == AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+            scheduleMediaRecovery(generation)
+    }
+
+    /** 导航释放与原车策略更新可能异步完成，仅补一次请求，系统失焦或新会话会取消。 */
+    private fun scheduleMediaRecovery(generation: Int) {
+        val task = Runnable {
+            synchronized(this) {
+                if (closed || generation != requestGeneration || communicationActive || mediaSuppressed ||
+                    focusHeld || requestedChannel != AudioChannel.MEDIA || active.values.none { it.channel == AudioChannel.MEDIA })
+                    return@synchronized
+                mediaRecovery = null
+                val result = requestCurrentFocus()
+                runCatching { report("Audio: media focus recovery reason=navigation-release attempt=1 granted=$result") }
+            }
+        }
+        mediaRecovery = task
+        handler.postDelayed(task, 250)
+    }
+
+    private fun cancelMediaRecovery() {
+        mediaRecovery?.let(handler::removeCallbacks)
+        mediaRecovery = null
     }
 
     private fun requestCurrentFocus(): Int? {

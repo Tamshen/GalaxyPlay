@@ -121,7 +121,7 @@
     <string name="audio_buffer_300">300 ms</string>
     <string name="audio_buffer_500">500 ms</string>
     <string name="galaxy_wifi_scan_pause">Pause background scans during Direct</string>
-    <string name="galaxy_wifi_scan_pause_hint">Reduce interruptions caused by background network searches. Requires approved local ADB; restores after disconnecting. Applies next connection.</string>
+    <string name="galaxy_wifi_scan_pause_hint">Try to pause background network searches during a connection to reduce interruptions; restore after disconnecting. If system control is unavailable, the reason is logged. Applies next connection.</string>
     <string name="galaxy_wifi_performance_lock">Optimize wireless performance</string>
     <string name="galaxy_wifi_performance_lock_hint">Keep Wi-Fi in high-performance and low-latency modes during projection, then release on disconnect. Applies next connection.</string>
 </resources>

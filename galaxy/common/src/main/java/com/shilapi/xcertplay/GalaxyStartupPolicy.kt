@@ -6,7 +6,10 @@ import android.content.Context
 internal object GalaxyStartupPolicy {
     private val authentication = GalaxyAuthenticationBootstrap()
 
-    fun ensure(context: Context) = authentication.ensure(context)
+    fun ensure(context: Context) {
+        com.shilapi.xcertplay.network.GalaxyWifiScanPause.recover(context.applicationContext)
+        authentication.ensure(context)
+    }
     fun reload(context: Context) = authentication.reload(context)
     fun saveAutoConnect(context: Context, enabled: Boolean) = L7StartupGuard.setEnabled(context, enabled)
 }

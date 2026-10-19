@@ -51,6 +51,7 @@ import com.shilapi.xcertplay.network.ManualHotspotManager
 import com.shilapi.xcertplay.network.ExistingWifiManager
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import com.shilapi.xcertplay.network.WifiScanPause
+import com.shilapi.xcertplay.network.WifiScanPauseControl
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessPerformanceLock
@@ -175,6 +176,7 @@ class CarPlayController(
     diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
     val localMediaAudioEnabled: Boolean = true,
     private val prepareWirelessHotspot: ((WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit)? = null,
+    private val wifiScanPauseControl: WifiScanPauseControl? = null,
 ) : Closeable {
     /** 重连沿用当前控制器的实际传输方式，不使用可能已被修改的设置草稿。 */
     val transport: CarPlayTransport get() = config.transport
@@ -183,7 +185,7 @@ class CarPlayController(
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
         }
-        WifiScanPause.restoreIfNeeded(context.applicationContext)
+        WifiScanPause.restoreIfNeeded(context.applicationContext, wifiScanPauseControl)
         BydNavigationOutputs.start(context.applicationContext)
         BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
     }
@@ -2474,7 +2476,7 @@ class CarPlayController(
     private fun pauseWifiScans(backend: WirelessHotspotBackend) = synchronized(this) {
         if (closed || !WifiScanPause.eligible(backend)) return@synchronized
         if (!config.wifiScanPauseEnabled) return
-        (wifiScanPause ?: WifiScanPause(appContext, ::debugLog).also { wifiScanPause = it }).pause()
+        (wifiScanPause ?: WifiScanPause(appContext, ::debugLog, wifiScanPauseControl).also { wifiScanPause = it }).pause()
     }
 
     private fun selectWirelessBluetoothDevice(adapter: BluetoothAdapter): BluetoothDevice {

@@ -205,6 +205,69 @@ class AudioFocusCoordinatorTest {
         } finally { focus.close(); media.release() }
     }
 
+    @Test fun navigationReleaseRetriesFailedMediaFocusOnceAndRestoresActualVolume() {
+        val media = track(); val navigation = track()
+        val logs = mutableListOf<String>()
+        val focus = AudioFocusCoordinator(context, true, logs::add, factoryRouting = true)
+        try {
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            focus.acquire(media, AudioChannel.MEDIA, attributes())
+            assertTrue(shadow.lastAudioFocusRequest.audioFocusRequest.acceptsDelayedFocusGain())
+            focus.acquire(navigation, AudioChannel.NAVIGATION, attributes(12))
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+            focus.release(navigation)
+            assertEquals(0f, volume(media), 0f)
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+            assertEquals(1f, volume(media), 0f)
+            assertEquals(1, logs.count { "media focus recovery" in it })
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+            assertEquals(1, logs.count { "media focus recovery" in it })
+        } finally { focus.close(); media.release(); navigation.release() }
+    }
+
+    @Test fun navigationRecoveryDoesNotLoopOrRunAfterPauseLossNewNavigationOrClose() {
+        for (action in listOf("failed", "pause", "loss", "navigation", "close")) {
+            val media = track(); val navigation = track()
+            val logs = mutableListOf<String>()
+            val focus = AudioFocusCoordinator(context, true, logs::add, factoryRouting = true)
+            try {
+                shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+                focus.acquire(media, AudioChannel.MEDIA, attributes())
+                focus.acquire(navigation, AudioChannel.NAVIGATION, attributes(12))
+                shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+                focus.release(navigation)
+                when (action) {
+                    "pause" -> focus.onMediaPlaying(false)
+                    "loss" -> shadow.lastAudioFocusRequest.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+                    "navigation" -> focus.acquire(navigation, AudioChannel.NAVIGATION, attributes(12))
+                    "close" -> focus.close()
+                }
+                shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+                assertEquals(action, if (action == "failed") 1 else 0, logs.count { "media focus recovery" in it })
+                assertEquals(0f, volume(media), 0f)
+            } finally { focus.close(); media.release(); navigation.release() }
+        }
+    }
+
+    @Test fun delayedMediaFocusWaitsForGainWithoutRetrying() {
+        val media = track(); val navigation = track()
+        val logs = mutableListOf<String>()
+        val focus = AudioFocusCoordinator(context, true, logs::add, factoryRouting = true)
+        try {
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            focus.acquire(media, AudioChannel.MEDIA, attributes())
+            focus.acquire(navigation, AudioChannel.NAVIGATION, attributes(12))
+            shadow.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_DELAYED)
+            focus.release(navigation)
+            assertEquals(0f, volume(media), 0f)
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+            assertTrue(logs.none { "media focus recovery" in it })
+            shadow.lastAudioFocusRequest.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+            assertEquals(1f, volume(media), 0f)
+        } finally { focus.close(); media.release(); navigation.release() }
+    }
+
     private fun volume(track: AudioTrack) = Shadow.extract<VolumeTrack>(track).outputVolume
 
     // 观察实际传给 AudioTrack 的音量，避免只验证焦点日志而漏掉静音回归。
