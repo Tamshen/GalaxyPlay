@@ -5,7 +5,7 @@ import android.net.Uri
 import org.junit.Assert.*
 import org.junit.Test
 
-/** 公开签名替身只用于验证重载选择，不包含或运行反编译 SDK。 */
+/** 接口替身只用于验证重载选择，不包含或运行厂商 SDK 实现。 */
 class GalaxyOemMediaContractTest {
     open class Info {
         open fun getTitle(): String? = null
@@ -72,17 +72,6 @@ class GalaxyOemMediaContractTest {
         assertFalse(contract.linkedSession)
         assertSame(client, contract.register(api, "synthetic.own", client))
         assertEquals("synthetic.own", api.packageName)
-    }
-    @Test fun compatibilityChannelsUseDirectMusicClientInsteadOfLinkedMediaSessionOverload() {
-        for (channel in GalaxyMediaReportingChannel.Mode.entries.filter { it != GalaxyMediaReportingChannel.Mode.CURRENT }) {
-            val contract = GalaxyOemMediaContract(Modern::class.java, Client::class.java, Info::class.java, channel.linkMediaSession)
-            val api = Modern(); val client = Client()
-            assertFalse(contract.linkedSession)
-            assertSame(client, contract.register(api, "synthetic.own", client))
-            assertEquals("synthetic.own", api.packageName)
-            assertNull(api.sessionPackage)
-            assertSame(client, api.callback)
-        }
     }
     @Test fun incompatibleRuntimeClientFailsBeforeRegistration() {
         // 该类型不能匹配注册重载，不能退回无包名的占位方法。

@@ -36,7 +36,11 @@ internal object GalaxyProfileFieldsView {
             fun value(): Any? = prefs.all[field.key] ?: field.default
             val title = context.getString(field.title)
             if (field.default is Boolean) {
-                val detail = if (field.key == "adapt_pip_resolution") context.getString(R.string.profile_pip_description) else ""
+                val detail = when (field.key) {
+                    "adapt_pip_resolution" -> context.getString(R.string.profile_pip_description)
+                    "galaxy_media_reporting_enabled" -> context.getString(R.string.galaxy_media_reporting_hint)
+                    else -> ""
+                }
                 parent.addView(L7Components.switchRow(context, title, detail, value() as Boolean) { selected ->
                     prefs.edit().putBoolean(field.key, selected).commit()
                 })
@@ -50,7 +54,6 @@ internal object GalaxyProfileFieldsView {
                         current.toString().ifEmpty { context.getString(R.string.profile_unset) }
                 }
                 val detail = when (field.key) {
-                    GalaxyMediaReportingChannel.KEY -> context.getString(R.string.galaxy_media_channel_hint)
                     GalaxyP2pAddressSettings.KEY -> context.getString(R.string.galaxy_p2p_address_hint)
                     else -> ""
                 }

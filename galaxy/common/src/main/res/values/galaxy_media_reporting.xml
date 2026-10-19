@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="galaxy_media_channel_title">音乐上报渠道</string>
-    <string name="galaxy_media_channel_current">当前模式（Flyme Auto）</string>
-    <string name="galaxy_media_channel_netease">网易云音乐兼容</string>
-    <string name="galaxy_media_channel_qq">QQ 音乐兼容</string>
-    <string name="galaxy_media_channel_local">本地音乐</string>
-    <string name="galaxy_media_channel_hint">上报失败时可尝试切换，保存后重新连接生效。</string>
+    <string name="galaxy_media_reporting_hint">默认开启，以 Galaxy Play 身份注册原车媒体服务。关闭后不注册；保存并重新连接生效。</string>
 </resources>

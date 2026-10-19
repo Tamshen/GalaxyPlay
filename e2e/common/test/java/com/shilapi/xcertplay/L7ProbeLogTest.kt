@@ -15,15 +15,15 @@ class L7ProbeLogTest {
     private fun report(items: List<L7ProbeItem>) = L7ProbeReport(UUID.randomUUID().toString(), "generation", "test", 1,
         L7ProbePhase.COMPLETED, items, items.size, 2)
 
-    @Test fun savedChannelsAndActualSdkProviderRemainAvailableInSanitizedDiagnostics() {
-        for (mode in GalaxyMediaReportingChannel.Mode.entries) {
+    @Test fun registrationSwitchAndActualSdkProviderRemainAvailableInSanitizedDiagnostics() {
+        for (enabled in listOf(false, true)) {
             val text = L7ProbeLog.lines(report(listOf(L7ProbeItem("ENV-SDK-CONTRACT", "SDK", "ENVIRONMENT",
                 L7ProbeOutcome.UNKNOWN, "SDK_CONTRACT_CHECKED", mapOf(
-                    "mediaReportingChannel" to mode.name, "mediaSdkSource" to "com.netease.cloudmusic.iot",
+                    "mediaReportingEnabled" to enabled.toString(), "mediaSdkSource" to "com.geely.linkhmi",
                     "mediaRegistration" to "OWN_PACKAGE_ONLY", "mediaSourceEvidence" to "L6_L7_ONLINE_6_DISPLAY_UNTESTED",
                     "serial" to "private-number"))))).joinToString("\n")
-            assertTrue(text.contains("mediaReportingChannel=${mode.name}"))
-            assertTrue(text.contains("mediaSdkSource=com.netease.cloudmusic.iot"))
+            assertTrue(text.contains("mediaReportingEnabled=$enabled"))
+            assertTrue(text.contains("mediaSdkSource=com.geely.linkhmi"))
             assertTrue(text.contains("mediaRegistration=OWN_PACKAGE_ONLY"))
             assertFalse(text.contains("private-number"))
         }

@@ -6,12 +6,10 @@ import android.content.Context
 internal class L7VendorSdk(private val context: Context, private val diagnostics: GalaxySteeringSetupLog? = null) {
     data class Loaded(val loader: ClassLoader, val source: String)
 
-    fun load(name: String, preferredPackages: List<String> = if (name.startsWith("com.ecarx.eas.sdk.mediacenter."))
-        GalaxyMediaReportingChannel.load(context).sdkPackages else emptyList(),
-        verify: (ClassLoader) -> Unit = {}): Loaded {
+    fun load(name: String, verify: (ClassLoader) -> Unit = {}): Loaded {
         val packages = if (name.startsWith("ecarx.fw.api.")) listOf("com.flyme.auto.map", "com.geely.linkhmi")
             else listOf("com.geely.linkhmi")
-        val candidates = (preferredPackages + "APP_OR_FRAMEWORK" + packages).distinct()
+        val candidates = listOf("APP_OR_FRAMEWORK") + packages
         var mismatch: Exception? = null
         var unavailable: Throwable? = null
         for (packageName in candidates) try {

@@ -31,64 +31,48 @@ class L7VendorSdkTest {
             return object : ContextWrapper(this) { override fun getClassLoader() = candidate }
         }
     }
-    @Test fun selectedMusicSdkWinsOverVisibleFrameworkSdkWithoutChangingCallerContext() {
-        for (mode in listOf(GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT, GalaxyMediaReportingChannel.Mode.QQ_COMPAT)) {
-            val preferred = mode.sdkPackages.first()
-            providers.clear(); requested.clear()
-            val sdk = loader(true)
-            providers[preferred] = sdk
-            val selected = L7VendorSdk(context(loader(true))).load(name, mode.sdkPackages)
-            assertEquals(preferred, selected.source)
-            assertSame(sdk, selected.loader)
-            assertEquals(listOf(preferred), requested)
-        }
+    @Test fun visibleFrameworkSdkHasPriorityAndDoesNotLoadMusicApplications() {
+        val framework = loader(true)
+        val selected = L7VendorSdk(context(framework)).load(name)
+        assertEquals("APP_OR_FRAMEWORK", selected.source)
+        assertSame(framework, selected.loader)
+        assertTrue(requested.isEmpty())
     }
-    @Test fun unavailableOrIncompleteSelectedSdkFallsBackToVerifiedHandCarSdk() {
-        val bad = loader(true)
-        val good = loader(true)
-        providers["com.netease.cloudmusic.iot"] = bad
+
+    @Test fun incompleteFrameworkSdkFallsBackToVerifiedHandCarSdk() {
+        val bad = loader(true); val good = loader(true)
         providers["com.geely.linkhmi"] = good
         val checked = mutableListOf<ClassLoader>()
-        val selected = L7VendorSdk(context(loader(false))).load(name, GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT.sdkPackages) {
+        val selected = L7VendorSdk(context(bad)).load(name) {
             checked.add(it)
             if (it === bad) throw NoSuchMethodException("不兼容音乐回调")
         }
         assertEquals("com.geely.linkhmi", selected.source)
         assertEquals(listOf(bad, good), checked)
-        assertEquals(listOf("com.netease.cloudmusic.iot", "com.flyme.auto.music", "com.geely.linkhmi"), requested)
+        assertEquals(listOf("com.geely.linkhmi"), requested)
     }
+
     @Test fun allIncompatibleSdksReportContractMismatchInsteadOfUsingPartialClient() {
-        providers["com.flyme.auto.music"] = loader(true)
+        providers["com.geely.linkhmi"] = loader(true)
         val failure = runCatching {
-            L7VendorSdk(context(loader(false))).load(name, GalaxyMediaReportingChannel.Mode.QQ_COMPAT.sdkPackages) {
+            L7VendorSdk(context(loader(false))).load(name) {
                 throw IllegalArgumentException("SDK_METHOD_SIGNATURE_MISMATCH")
             }
         }.exceptionOrNull()
         assertTrue(failure is IllegalArgumentException)
     }
-    @Test fun currentModeKeepsFrameworkPriorityAndLocalModeNeverUsesLinkMusicSource12() {
-        val framework = loader(true)
-        val selected = L7VendorSdk(context(framework)).load(name, GalaxyMediaReportingChannel.Mode.CURRENT.sdkPackages)
-        assertEquals("APP_OR_FRAMEWORK", selected.source)
-        assertSame(framework, selected.loader)
-        assertTrue(requested.isEmpty())
-        assertFalse(GalaxyMediaReportingChannel.Mode.LOCAL.sdkPackages.contains("com.flyme.auto.medialink"))
-    }
 
     @Test fun diagnosticsIdentifyRejectedCandidateAndVerifiedFallbackWithoutExceptionPayload() {
         val logs = mutableListOf<String>()
         val bad = loader(true); val good = loader(true)
-        providers["com.netease.cloudmusic.iot"] = bad
         providers["com.geely.linkhmi"] = good
         GalaxySteeringSetupLog(logs::add).use { diagnostics ->
-            val selected = L7VendorSdk(context(loader(false)), diagnostics).load(name,
-                GalaxyMediaReportingChannel.Mode.NETEASE_COMPAT.sdkPackages) {
+            val selected = L7VendorSdk(context(bad), diagnostics).load(name) {
                 if (it === bad) throw ClassNotFoundException("private-payload-and-device-name")
             }
             assertSame(good, selected.loader)
         }
-        assertTrue(logs.any { "result=SDK_REJECTED" in it && "provider=com.netease.cloudmusic.iot" in it && "exceptionType=ClassNotFoundException" in it })
-        assertTrue(logs.any { "result=SDK_REJECTED" in it && "provider=com.flyme.auto.music" in it && "exceptionType=NameNotFoundException" in it })
+        assertTrue(logs.any { "result=SDK_REJECTED" in it && "provider=APP_OR_FRAMEWORK" in it && "exceptionType=ClassNotFoundException" in it })
         assertTrue(logs.last().contains("result=SDK_SELECTED provider=com.geely.linkhmi"))
         assertFalse(logs.any { "private-payload" in it })
     }

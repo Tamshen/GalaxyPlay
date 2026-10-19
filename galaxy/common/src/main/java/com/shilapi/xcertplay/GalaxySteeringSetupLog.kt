@@ -42,8 +42,7 @@ internal class GalaxySteeringSetupLog(private val report: (String) -> Unit) : Cl
         private val serial = AtomicLong()
         private val run = System.nanoTime()
         private val REASONS = listOf("CONTROL_DISABLED", "MODEL_UNSUPPORTED", "NO_SESSION")
-        private val PROVIDERS = listOf("APP_OR_FRAMEWORK", "com.geely.linkhmi", "com.flyme.auto.music",
-            "com.netease.cloudmusic.iot", "com.flyme.auto.map")
+        private val PROVIDERS = listOf("APP_OR_FRAMEWORK", "com.geely.linkhmi", "com.flyme.auto.map")
         private val TARGETS = listOf("com.ecarx.eas.sdk.mediacenter.MediaCenterAPI",
             "com.ecarx.eas.sdk.mediacenter.MusicClient", "com.ecarx.eas.sdk.mediacenter.MusicPlaybackInfo",
             "com.ecarx.eas.sdk.ECarXApiClient\$Callback")

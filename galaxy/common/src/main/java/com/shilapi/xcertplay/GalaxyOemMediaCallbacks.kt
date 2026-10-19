@@ -4,9 +4,8 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import java.lang.reflect.InvocationHandler
 
-/** 原厂渠道确认来源通知；通知不能再次播放，旧客户端不能确认或向手机发命令。 */
+/** 来源通知只观察；不能再次播放，旧客户端不能控制或读取当前会话。 */
 internal class GalaxyOemMediaCallbacks(
-    private val channel: GalaxyMediaReportingChannel.Mode,
     private val source: Int,
     private val active: () -> Boolean,
     private val snapshot: () -> CarPlayNowPlaying,
@@ -26,8 +25,8 @@ internal class GalaxyOemMediaCallbacks(
             "onMediaCenterFocusChanged" -> { if (current) focus(args?.firstOrNull() as? String); null }
             "onSourceSelected" -> current && selected(args?.firstOrNull() as? Int ?: -1)
             "onSourceChanged" -> {
-                if (current) L7DebugLog.record("MediaCenter: sourceChanged source=${args?.firstOrNull() as? Int ?: -1} channel=${channel.name}")
-                current && channel.acknowledgeSourceChange
+                if (current) L7DebugLog.record("MediaCenter: sourceChanged source=${args?.firstOrNull() as? Int ?: -1}")
+                false
             }
             "getCurrentSourceType" -> if (current) source else -1
             "getMediaSourceTypeList" -> if (current) intArrayOf(source) else intArrayOf()
