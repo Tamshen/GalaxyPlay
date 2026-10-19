@@ -85,6 +85,11 @@ internal object L7StartupGuard {
     }
 
     fun enterHost(activity: Activity): Boolean {
+        if (L7ProbeRunner.carPlayEnvironmentActive) {
+            L7DebugLog.record("USB_ENV event=HOST_START_SUPPRESSED reason=read-only-observation")
+            activity.finish()
+            return false
+        }
         val state = state(activity)
         if (!state.arm(System.currentTimeMillis(), Process.myPid())) writeFailed = true
         if ((state.blocked || writeFailed) && !hostAuthorized) {

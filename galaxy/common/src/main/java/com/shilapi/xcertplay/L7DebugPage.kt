@@ -34,6 +34,8 @@ internal class L7DebugPage(
         when (page) {
             "settings-debug-results" -> results = L7ProbeResultsView(activity, parent, state, exporter, tasks, onNavigate)
             "settings-debug-history" -> history()
+            "settings-debug-environment" -> environment()
+            "settings-debug-carplay" -> carPlayEnvironment()
             else -> home()
         }
         update()
@@ -48,6 +50,10 @@ internal class L7DebugPage(
         L7SettingsSection.add(parent) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.performance_title),
                 labels.text(R.string.performance_hint)) { onNavigate("settings-debug-performance") })
+        }
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.carplay_environment_category),
+                labels.text(R.string.carplay_environment_hint)) { onNavigate("settings-debug-environment") })
         }
         val advanced = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         L7SettingsSection.add(parent) { card ->
@@ -69,7 +75,14 @@ internal class L7DebugPage(
                 card.addView(L7Components.actionRow(activity, labels.text(title), labels.text(hint)) { onNavigate(page) })
             }
         }
-        L7SettingsSection.add(advanced, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
+    }
+
+    private fun environment() {
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.carplay_environment_title),
+                labels.text(R.string.carplay_environment_hint)) { onNavigate("settings-debug-carplay") })
+        }
+        L7SettingsSection.add(parent, labels.text(R.string.l7_probe_environment), footer = labels.text(R.string.l7_probe_intro)) { card ->
             summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
             start = L7Components.actionRow(activity, labels.text(R.string.l7_probe_start)) {
                 if (tasks.collect()) {
@@ -82,8 +95,24 @@ internal class L7DebugPage(
                 onNavigate("settings-debug-results")
             }.also(card::addView)
         }
-        L7SettingsSection.add(advanced) { card ->
+        L7SettingsSection.add(parent) { card ->
             card.addView(L7Components.actionRow(activity, labels.text(R.string.l7_probe_history)) { onNavigate("settings-debug-history") })
+        }
+    }
+
+    private fun carPlayEnvironment() {
+        L7SettingsSection.add(parent, labels.text(R.string.carplay_environment_title),
+            description = labels.text(R.string.carplay_environment_intro)) { card ->
+            summary = L7SettingRow(activity, labels.text(R.string.l7_probe_idle)).also(card::addView)
+            start = L7Components.actionRow(activity, labels.text(R.string.carplay_environment_start)) {
+                if (tasks.collect(GalaxyUsbEnvironmentProbe.GROUP)) { state.showCurrent(); update() }
+            }.also(card::addView)
+            view = L7Components.actionRow(activity, labels.text(R.string.l7_probe_results)) {
+                state.showCurrent(); onNavigate("settings-debug-results")
+            }.also(card::addView)
+        }
+        L7SettingsSection.add(parent) { card ->
+            card.addView(L7Components.actionRow(activity, labels.text(R.string.full_debug_logs)) { onNavigate("settings-logs") })
         }
     }
 
@@ -111,7 +140,7 @@ internal class L7DebugPage(
         }
         start?.isEnabled = !L7ProbeRunner.busy
         start?.titleView?.let { title ->
-            val text = labels.text(if (latest == null) R.string.l7_probe_start else R.string.l7_probe_recollect)
+            val text = if (page == "settings-debug-carplay") labels.text(R.string.carplay_environment_start) else labels.text(if (latest == null) R.string.l7_probe_start else R.string.l7_probe_recollect)
             if (title.text.toString() != text) title.text = text
         }
         view?.isEnabled = latest != null

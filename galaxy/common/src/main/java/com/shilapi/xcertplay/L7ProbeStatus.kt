@@ -6,6 +6,8 @@ import com.shilapi.xcertplay.host.R
 internal enum class L7ProbeStatus(val label: Int, val color: Int, val icon: Int) {
     SUPPORTED(R.string.l7_probe_supported, R.color.l7_probe_green, R.drawable.ic_l7_check),
     GRANTED(R.string.l7_probe_granted, R.color.l7_probe_green, R.drawable.ic_l7_check),
+    OBSERVED(R.string.carplay_environment_observed, R.color.product_ui_muted, R.drawable.ic_l7_check),
+    NOT_SEEN(R.string.carplay_environment_not_seen, R.color.product_ui_muted, R.drawable.ic_l7_probe_minus),
     NO_PERMISSION(R.string.l7_probe_no_permission, R.color.product_ui_muted, R.drawable.ic_l7_probe_minus),
     ERROR(R.string.l7_probe_error, R.color.l7_probe_yellow, R.drawable.ic_l7_warning),
     UNSUPPORTED(R.string.l7_probe_unsupported, R.color.product_ui_danger, R.drawable.ic_l7_close),
@@ -18,7 +20,7 @@ internal enum class L7ProbeStatus(val label: Int, val color: Int, val icon: Int)
         2 -> this == NO_PERMISSION
         3 -> this == ERROR
         4 -> this == UNSUPPORTED
-        5 -> this == PENDING || this == NOT_APPLICABLE
+        5 -> this == PENDING || this == NOT_APPLICABLE || this == OBSERVED || this == NOT_SEEN
         6 -> this == NOT_RUN
         else -> true
     }
@@ -27,6 +29,8 @@ internal enum class L7ProbeStatus(val label: Int, val color: Int, val icon: Int)
         fun of(item: L7ProbeItem): L7ProbeStatus = when {
             item.reason == "NOT_RUN" -> NOT_RUN
             item.result == L7ProbeOutcome.DENIED -> NO_PERMISSION
+            item.domain == "CARPLAY_ENV" && item.result == L7ProbeOutcome.NOT_OBSERVED -> NOT_SEEN
+            item.domain == "CARPLAY_ENV" && item.result == L7ProbeOutcome.OBSERVED -> OBSERVED
             item.id in setOf("ENV-OVERLAY", "ENV-WRITE-SETTINGS") && item.facts["allowed"] == "false" -> NO_PERMISSION
             item.reason == "FEATURE_NOT_SUPPORTED" || item.id == "ENV-USB" && item.facts["usbHostFeature"] == "false" -> UNSUPPORTED
             item.result == L7ProbeOutcome.FAILED || item.reason == "QUERY_FAILED" -> ERROR

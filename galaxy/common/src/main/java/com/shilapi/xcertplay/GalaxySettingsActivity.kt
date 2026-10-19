@@ -425,7 +425,7 @@ class GalaxySettingsActivity : ComponentActivity() {
             "settings-debug-media", "settings-debug-navigation" -> reportingTestPage = L7ReportingTestPage(this, content,
                 if (page == "settings-debug-media") L7ReportingKind.MEDIA else L7ReportingKind.NAVIGATION) { page = "settings-logs"; render() }
             "settings-logs" -> diagnostics(content)
-            "settings-debug", "settings-debug-results", "settings-debug-history" -> {
+            "settings-debug", "settings-debug-environment", "settings-debug-carplay", "settings-debug-results", "settings-debug-history" -> {
                 debugPage = L7DebugPage(this, content, page, probeState, probeExporter, debugTasks) { destination ->
                     pendingFullDebugStart = destination == "settings-debug-full"
                     page = destination; render()
@@ -518,6 +518,8 @@ class GalaxySettingsActivity : ComponentActivity() {
         "settings-permissions" -> R.string.permissions_and_connection_help
         "settings" -> R.string.settings
         "settings-debug" -> R.string.l7_probe_title
+        "settings-debug-environment" -> R.string.carplay_environment_category
+        "settings-debug-carplay" -> R.string.carplay_environment_title
         "settings-debug-results" -> R.string.l7_probe_environment
         "settings-debug-history" -> R.string.l7_probe_history
         "settings-debug-scenario" -> R.string.debug_guide_scenario

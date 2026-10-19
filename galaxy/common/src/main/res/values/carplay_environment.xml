@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_environment_category">环境检测</string>
+    <string name="carplay_environment_title">CarPlay 环境测试</string>
+    <string name="carplay_environment_hint">一次采集 USB连接验证测试 接入所需条件、可疑依赖和插拔变化，保存报告与日志。</string>
+    <string name="carplay_environment_intro">停车并结束当前投屏后测试。先拔下 iPhone 数据线，点击开始；进入观察阶段后，在 20 秒内插入并保持手机解锁，等待约 5 秒，再拔下并重新插入一次。请保持本页在前台。\n\n一次检查 USB 角色与配置、设备节点与权限、原厂库与 APVP 服务线索、内核与启动配置、网络及插拔变化。仅连接本机服务端口检查可达性，不发送控制内容，不申请 USB 权限、不切换模式、不自动连接手机或上传。\n\n未发现不代表不支持；权限不足会单列。采集完成不代表 USB验证 能连接 CarPlay。完成后从日志主动上传，并备注是否按步骤插拔及手机型号、iOS 版本。</string>
+    <string name="carplay_environment_start">开始完整环境测试</string>
+    <string name="carplay_environment_monitor">先采集静态环境；出现“插拔观察”时开始 20 秒观察：插入手机，约 5 秒后拔下并重新插入。保持页面前台，结束后上传日志。</string>
+    <string name="carplay_environment_item">环境证据 · %1$s</string>
+    <string name="carplay_environment_sample">插拔观察 · %1$s</string>
+    <string name="carplay_environment_evidence">仅为环境证据；点开查看来源、可见性、访问条件与未验证项。</string>
+    <string name="carplay_environment_observed">已采证</string>
+    <string name="carplay_environment_not_seen">未发现</string>
+</resources>

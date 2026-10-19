@@ -10,8 +10,11 @@ internal class L7ProbeLabels(private val context: Context) {
     fun text(id: Int) = context.getString(id)
     fun time(value: Long) = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM,
         context.resources.configuration.locales[0]).format(Date(value))
-    fun name(item: L7ProbeItem): String = environmentNames[item.id]?.let(::text) ?: item.name.substringAfterLast('.')
+    fun name(item: L7ProbeItem): String = if (item.domain == "CARPLAY_ENV") context.getString(
+        if (item.id.startsWith("USB-OBSERVE-")) R.string.carplay_environment_sample else R.string.carplay_environment_item,
+        item.id.removePrefix("USB-")) else environmentNames[item.id]?.let(::text) ?: item.name.substringAfterLast('.')
     fun reason(item: L7ProbeItem): String {
+        if (item.domain == "CARPLAY_ENV" && item.reason != "NOT_RUN") return text(R.string.carplay_environment_evidence)
         if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
             return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.reason == "REPORTING_UNVERIFIED") return context.getString(R.string.l7_probe_reporting_details,
@@ -48,6 +51,7 @@ internal class L7ProbeLabels(private val context: Context) {
         })
     }
     fun compactReason(item: L7ProbeItem): String {
+        if (item.domain == "CARPLAY_ENV" && item.reason != "NOT_RUN") return text(R.string.carplay_environment_evidence)
         if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
             return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.domain == "HOTSPOT") return reason(item)

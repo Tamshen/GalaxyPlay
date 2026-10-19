@@ -69,6 +69,7 @@ internal class L7DebugTasks(private val activity: Activity, private val onResult
             else -> labels.phase(report)
         }
         val detail = buildList {
+            if (running && report.items.any { it.domain == "CARPLAY_ENV" }) add(text(R.string.carplay_environment_monitor))
             if (running) report.items.firstOrNull { it.reason == "NOT_RUN" }?.let {
                 add(activity.getString(R.string.l7_task_current, labels.name(it)))
             } else if (busy && report.phase != L7ProbePhase.COMPLETED) add(text(R.string.l7_task_stopping_collect))

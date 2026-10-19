@@ -4,7 +4,7 @@ package com.shilapi.xcertplay
 internal object L7Routes {
     val settings = setOf("settings", "settings-vehicle", "settings-auth", "settings-connection", "settings-display",
         "settings-audio", "settings-general", "settings-permissions",
-        "settings-about", "settings-debug", "settings-debug-full", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-scenario", "settings-debug-steering", "settings-debug-voice", "settings-debug-codec", "settings-debug-media", "settings-debug-navigation",
+        "settings-about", "settings-debug", "settings-debug-environment", "settings-debug-carplay", "settings-debug-full", "settings-debug-results", "settings-debug-history", "settings-logs", "settings-debug-scenario", "settings-debug-steering", "settings-debug-voice", "settings-debug-codec", "settings-debug-media", "settings-debug-navigation",
         "settings-connection-wireless", "settings-connection-usb", "settings-debug-performance")
     private val aliases = mapOf("connection" to "settings-connection", "diagnostics" to "settings-debug",
         "settings-diagnostics" to "settings-debug", "settings-debug-logs" to "settings-logs", "about" to "settings-about")
@@ -16,6 +16,7 @@ internal object L7Routes {
         when {
             it.startsWith("settings-connection-") -> "settings-connection"
             it == "settings-debug" -> "settings"
+            it == "settings-debug-carplay" -> "settings-debug-environment"
             isDebug(it) -> "settings-debug"
             it in settings && it != "settings" -> "settings"
             else -> "home"

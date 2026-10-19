@@ -54,7 +54,8 @@ internal class L7ProbeResultsView(
             }.apply { contentDescription = labels.text(R.string.l7_probe_filter) }, slot())
             addView(control(labels.text(R.string.l7_probe_search_short)) { search() }, slot())
             addView(control(labels.text(R.string.l7_probe_again)) {
-                if (tasks.collect()) { state.showCurrent(); update(true) }
+                val group = GalaxyUsbEnvironmentProbe.GROUP.takeIf { report.items.any { it.domain == "CARPLAY_ENV" } }
+                if (tasks.collect(group)) { state.showCurrent(); update(true) }
             }.apply { isEnabled = !L7ProbeRunner.busy }, slot())
             addView(control(labels.text(R.string.l7_probe_report_actions)) { actions(report) }, slot())
         })

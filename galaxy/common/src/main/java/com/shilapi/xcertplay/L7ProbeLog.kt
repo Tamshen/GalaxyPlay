@@ -30,7 +30,7 @@ internal object L7ProbeLog {
         "mediaCallbackKind", "mediaSourceEvidence", "mediaRegistration", "mediaReportingEnabled", "navigationMapping",
         "method", "apState", "hotspotEnabled", "ssidPresent", "passwordPresent", "security",
         "configValid", "passwordMasked", "exceptionType", "serviceAuthorization", "reportingSupported", "qnxProtocol",
-    ) + L7ReportingProbe.permissionFactKeys + L7VendorServiceProbe.factKeys
+    ) + L7ReportingProbe.permissionFactKeys + L7VendorServiceProbe.factKeys + GalaxyUsbEnvironmentProbe.factKeys
 
     fun batch(report: L7ProbeReport) = report.id.replace("-", "").take(12)
 

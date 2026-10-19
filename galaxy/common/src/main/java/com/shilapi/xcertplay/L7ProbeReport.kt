@@ -46,7 +46,7 @@ internal data class L7ProbeReport(
     val configuration: String? = null,
 ) {
     fun json() = JSONObject().put("schemaVersion", 1).put("probeVersion", probeVersion).put("runId", id)
-        .put("caseId", "BASIC").put("executorContext", "L7_APP").put("environmentGeneration", environment)
+        .put("caseId", if (items.any { it.domain == "CARPLAY_ENV" }) "CARPLAY_ENVIRONMENT" else "BASIC").put("executorContext", "L7_APP").put("environmentGeneration", environment)
         .put("appVersion", version).put("startedAt", started).put("finishedAt", finished ?: JSONObject.NULL)
         .put("executionState", phase.name).put("expectedItems", expected).put("truncated", truncated)
         .put("items", JSONArray(items.map { it.json() })).put("configuration", configuration ?: JSONObject.NULL)

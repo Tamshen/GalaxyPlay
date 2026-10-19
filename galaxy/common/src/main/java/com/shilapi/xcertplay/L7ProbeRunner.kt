@@ -28,6 +28,8 @@ internal object L7ProbeRunner {
     @Volatile var revision = 0L
         private set
     private var initialized = false
+    val carPlayEnvironmentActive: Boolean
+        get() = busy && current?.let { it.phase == L7ProbePhase.RUNNING && it.items.any { item -> item.domain == "CARPLAY_ENV" } } == true
 
     @Synchronized fun load(context: Context) {
         if (initialized || busy) return
@@ -43,19 +45,26 @@ internal object L7ProbeRunner {
 
     @Synchronized fun start(context: Context, window: Map<String, String?>, onlyId: String? = null): Boolean {
         if (busy || !L7Agreement.accepted(context) || L7AppExit.exiting) return false
+        if (GalaxyUsbEnvironmentProbe.selected(onlyId) && CarPlayBackgroundSession.hasSession()) return false
         val app = context.applicationContext
         val id = UUID.randomUUID().toString()
         busy = true
         storageFailed = false
         logFailed = false
         current = L7ProbeReport(id, "pending", "pending", System.currentTimeMillis(), L7ProbePhase.RUNNING,
+            items = if (GalaxyUsbEnvironmentProbe.selected(onlyId)) listOf(L7ProbeItem("USB-PREPARING", "USB-PREPARING",
+                "CARPLAY_ENV", L7ProbeOutcome.SKIPPED, "NOT_RUN")) else emptyList(),
             configuration = runCatching { GalaxyConfigurationEvidence.capture(app).text }.getOrNull())
         revision++
         val timeout = Runnable { if (current?.id == id) stop(L7ProbePhase.TIMED_OUT) }
-        main.postDelayed(timeout, 15_000)
+        main.postDelayed(timeout, if (GalaxyUsbEnvironmentProbe.selected(onlyId)) 45_000 else 15_000)
         worker.execute {
             try {
                 persist(app)
+                if (GalaxyUsbEnvironmentProbe.selected(onlyId)) {
+                    collectCarPlay(app, id, onlyId!!)
+                    return@execute
+                }
                 val permissions = L7PermissionProbe(app)
                 val reporting = L7ReportingProbe(permissions::inspect) { try { L7ReportingProbe.sdkVisibility(it, L7VendorSdk(app).load(it).loader) }
                     catch (_: ClassNotFoundException) { "NOT_VISIBLE" }
@@ -130,6 +139,34 @@ internal object L7ProbeRunner {
             }
         }
         return true
+    }
+
+    private fun collectCarPlay(app: Context, id: String, selected: String) {
+        val probe = GalaxyUsbEnvironmentProbe(app)
+        val queries = probe.queries().filter { selected == GalaxyUsbEnvironmentProbe.GROUP || it.id == selected }
+        val monitor = selected == GalaxyUsbEnvironmentProbe.GROUP || selected.startsWith("USB-OBSERVE-")
+        val ids = queries.map { it.id } + if (monitor) (0..20).map { "USB-OBSERVE-$it" } else emptyList()
+        val generation = L7ProbeEnvironment.generation(app)
+        val version = app.packageManager.getPackageInfo(app.packageName, 0).versionName.orEmpty()
+        synchronized(this) {
+            if (!accepts(id)) return
+            current = current!!.copy(environment = generation, version = version, expected = ids.size, probeVersion = 6,
+                items = ids.map { L7ProbeItem(it, it, "CARPLAY_ENV", L7ProbeOutcome.SKIPPED, "NOT_RUN") })
+            environment = generation
+        }
+        persist(app)
+        for (query in queries) {
+            if (!accepts(id)) break
+            publish(id, probe.inspect(query))
+        }
+        persist(app)
+        if (monitor && accepts(id)) probe.observe({ accepts(id) }, publish = { item ->
+            publish(id, item)
+            if (item.id.substringAfterLast('-').toIntOrNull()?.rem(5) == 0) persist(app)
+        })
+        synchronized(this) {
+            if (accepts(id)) current = current!!.copy(phase = L7ProbePhase.COMPLETED, finished = System.currentTimeMillis())
+        }
     }
 
     @Synchronized fun refreshEnvironment(context: Context) {
