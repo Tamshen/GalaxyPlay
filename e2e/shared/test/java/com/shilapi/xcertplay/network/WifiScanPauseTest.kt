@@ -13,6 +13,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class WifiScanPauseTest {
+    @Test fun periodicSnapshotKeepsTheActualFailureAndLateResultsCannotOverwriteAClosedOwner() {
+        var callback: ((String) -> Unit)? = null
+        val control = object : WifiScanPauseControl {
+            override fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) { callback = log }
+            override fun release(app: Context, owner: Any, log: (String) -> Unit) {}
+        }
+        val logs = mutableListOf<String>()
+        val pause = WifiScanPause(context, logs::add, control)
+        pause.pause()
+        assertTrue(pause.diagnosticSnapshot().contains("scanPauseResult=pending"))
+        callback!!("Wi-Fi connectivity scans paused=false reason=adb-off")
+        assertTrue(pause.diagnosticSnapshot().contains("paused=false reason=adb-off"))
+        pause.close()
+        callback!!("Wi-Fi connectivity scans paused=true reason=done")
+        assertEquals(1, logs.size)
+        assertTrue(pause.diagnosticSnapshot().contains("scanPauseClosed=true"))
+        assertTrue(pause.diagnosticSnapshot().contains("paused=false reason=adb-off"))
+    }
     private val context get() = RuntimeEnvironment.getApplication()
 
     @Test

@@ -3,6 +3,8 @@ package com.shilapi.xcertplay.orchestration
 import android.net.wifi.WifiManager
 import com.shilapi.xcertplay.airplay.AirPlaySession
 import com.shilapi.xcertplay.airplay.AirPlaySessionListener
+import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
+import com.shilapi.xcertplay.network.WirelessStartupDiagnostics
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import org.junit.Assert.*
 import org.junit.Test
@@ -17,6 +19,33 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [29, 30], manifest = Config.NONE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class WirelessPerformanceLifecycleTest {
+    @Test fun successfulWirelessSessionKeepsObservationUntilControllerTeardown() {
+        withController { controller, _ ->
+            ReflectionHelpers.setField(controller, "config", config(CarPlayTransport.WIRELESS, true))
+            setPhase(controller, "WIRELESS")
+            val closed = java.util.concurrent.atomic.AtomicInteger()
+            val diagnostics = WirelessStartupDiagnostics({ "" }, {}, onClose = { closed.incrementAndGet() })
+            ReflectionHelpers.setField(controller, "wirelessDiagnostics", diagnostics)
+            val watchdog = FirstTcpWatchdog(AirPlayListenerIdentity(0), { _, _ -> {} }, {})
+            val listener = CarPlayController::class.java.getDeclaredMethod("wirelessSessionListener",
+                Int::class.javaPrimitiveType, FirstTcpWatchdog::class.java).apply { isAccessible = true }
+                .invoke(controller, 0, watchdog) as AirPlaySessionListener
+            val session = mock(AirPlaySession::class.java)
+            listener.onSessionActive(session)
+            assertEquals(0, closed.get())
+            assertTrue(diagnostics.summary().contains("observationPhase=STREAMING"))
+            listener.onSessionEnded(mock(AirPlaySession::class.java))
+            assertTrue(diagnostics.summary().contains("observationPhase=STREAMING"))
+            listener.onSessionEnded(session)
+            assertTrue(diagnostics.summary().contains("sessionActive=false"))
+            assertTrue(diagnostics.summary().contains("waitingFor=session_recovery"))
+            assertTrue(diagnostics.summary().contains("observationPhase=IDLE"))
+            assertEquals(0, closed.get())
+            controller.close()
+            assertTrue(controller.awaitClosed(4000))
+            assertEquals(1, closed.get())
+        }
+    }
     private fun held(controller: CarPlayController): WifiManager.WifiLock? {
         val owner: Any = ReflectionHelpers.getField(controller, "wirelessPerformanceLock")
         return ReflectionHelpers.getField(owner, "highPerformance")

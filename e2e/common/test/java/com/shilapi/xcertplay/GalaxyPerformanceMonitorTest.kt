@@ -6,6 +6,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GalaxyPerformanceMonitorTest {
+    @Test fun realSamplesKeepCpuAfterTheSameRedactionUsedByUploadAndDisk() {
+        var time = 0L
+        val worker = Schedule()
+        val logs = mutableListOf<String>()
+        val monitor = GalaxyPerformanceMonitor({ input(time) }, { _, _ -> }, { null },
+            { DiagnosticRedactor.redact(it)?.let(logs::add) }, { worker }, { time }, { time * 1_000_000 }, { 0 })
+        try {
+            monitor.start()
+            worker.task!!.run()
+            time = 5000; worker.task!!.run()
+            val sample = logs.single { " SAMPLE " in it }
+            assertTrue(sample.contains("mode=BASIC cpuCorePercent=50.0"))
+            assertEquals(sample, DiagnosticRedactor.redact(sample))
+        } finally { monitor.close() }
+    }
     private class Schedule : GalaxyPerformanceSchedule {
         var task: Runnable? = null
         var closed = false

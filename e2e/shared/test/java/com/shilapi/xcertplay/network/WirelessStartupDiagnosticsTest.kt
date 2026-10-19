@@ -8,6 +8,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WirelessStartupDiagnosticsTest {
+    @Test fun streamingKeepsSamplingRuntimeLinesAndCloseRetiresTheListenerOnce() {
+        val streaming = CountDownLatch(2)
+        val closed = java.util.concurrent.atomic.AtomicInteger()
+        val logs = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val diagnostics = WirelessStartupDiagnostics(
+            sample = { "interfaceState=up\nreceiveCounters ifaceRx=sampled\nreceiveCounters udp4=sampled\n" +
+                "receiveCounters udp6=sampled\nwirelessRuntime scanEvents=1\nscanPauseResult=pending" },
+            log = { logs.add(it); if ("observationPhase=STREAMING" in it) streaming.countDown() },
+            intervalMillis = 10, monoMs = { 5000 }, onClose = { closed.incrementAndGet() },
+        )
+        try {
+            diagnostics.sessionActive(); diagnostics.start()
+            assertTrue(streaming.await(2, TimeUnit.SECONDS))
+            assertTrue(logs.any { "wirelessRuntime scanEvents=1" in it })
+            assertTrue(logs.any { "scanPauseResult=pending" in it })
+            diagnostics.close(); diagnostics.close()
+            assertEquals(1, closed.get())
+            assertTrue(logs.any { "cached=true monoMs=5000 sampleAgeMs=0" in it })
+        } finally { diagnostics.close() }
+    }
     @Test fun observerExportsSummaryAndAllFourSnapshotLinesSeparately() {
         val sampled = CountDownLatch(4)
         val logs = java.util.concurrent.CopyOnWriteArrayList<String>()

@@ -84,7 +84,7 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
     private fun run(sock: Socket) {
         runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }
         var failure: Throwable? = null
-        val stats = StreamReceiveStats("video", onDiagnostic)
+        val stats = StreamReceiveStats("video", onDiagnostic, monoMs = android.os.SystemClock::elapsedRealtime)
         try {
             val input = sock.getInputStream()
             while (!closed.get()) {

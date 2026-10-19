@@ -1794,7 +1794,7 @@
      private var fadeApplied = false
      private var droppedPacketsLogged = false
      private var firstAacPayloadLogged = false
-@@ -1326,6 +1097,8 @@
+@@ -1326,20 +1097,56 @@
      private var lastPlaybackHeadFrames: Long? = null
      private var maxWriteMs = 0L
      private var statsWindowStartNs = 0L
@@ -1803,7 +1803,11 @@
      private var statsLastUnderruns = 0
      private var bytesPerSecond = 0
      private val bufferProgress = AudioBufferProgress(if (format.channels >= 2) 4 else 2)
-@@ -1336,10 +1109,43 @@
+     private var underrunsAtPlaybackStart = 0
+     private var lastPcmWriteNs = 0L
+     private var rebufferCount = 0
++    private var rebufferStartedNs = 0L
+     private var diagnosticStage = "starting"
      private var lastDecoderOutputMetadata: String? = null
      private var decoderOutputReports = 0
      private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
@@ -1847,7 +1851,7 @@
          thread.start()
      }
  
-@@ -1348,9 +1154,21 @@
+@@ -1348,9 +1155,21 @@
              packetsReceived.incrementAndGet()
              val now = System.nanoTime()
              val previous = lastArrivalNs.getAndSet(now)
@@ -1872,7 +1876,7 @@
              if (started) packetsDropped.incrementAndGet()
              if (started && !droppedPacketsLogged) {
                  droppedPacketsLogged = true
-@@ -1361,29 +1179,32 @@
+@@ -1361,29 +1180,32 @@
      }
  
      override fun close() {
@@ -1909,7 +1913,7 @@
                  diagnosticStage = "decoder-output"
                  codec?.let(::drainCodec)
                  diagnosticStage = "buffer-maintenance"
-@@ -1392,20 +1213,38 @@
+@@ -1392,20 +1214,38 @@
                  logStatsIfDue()
              }
          } catch (_: InterruptedException) {
@@ -1952,7 +1956,7 @@
      }
  
      private fun configureCodec(mime: String) {
-@@ -1432,13 +1271,20 @@
+@@ -1432,13 +1272,20 @@
              )
          }
          codec = try {
@@ -1977,7 +1981,7 @@
                  runCatching {
                      val name = it.name
                      Log.i(TAG, "audio decoder configured mime=$mime name=$name")
-@@ -1446,6 +1292,16 @@
+@@ -1446,6 +1293,16 @@
                  }
              }
          } catch (error: Exception) {
@@ -1994,7 +1998,7 @@
              Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
              reportFailure(error)
              null
-@@ -1460,9 +1316,8 @@
+@@ -1460,9 +1317,8 @@
          val minBuffer = AudioTrack.getMinBufferSize(format.sampleRate, channelMask, encoding)
          if (minBuffer <= 0) {
              Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}")
@@ -2006,7 +2010,7 @@
              return
          }
          val selection = mappedSelection()
-@@ -1470,15 +1325,15 @@
+@@ -1470,15 +1326,15 @@
          val streamOverride = channelOverride(selection.channel)
          var attributes = audioAttributesFor(selection, streamOverride)
          trackAttributes = attributes
@@ -2027,7 +2031,7 @@
              built = AudioTrack.Builder()
                  .setAudioAttributes(attributes)
                  .setAudioFormat(pcmFormat(encoding, channelMask))
-@@ -1512,19 +1367,20 @@
+@@ -1512,19 +1368,20 @@
          track = built
          diagnosticStage = "track-attributes"
          trackAttributes = audioTrackAttributesForFocus(built, attributes)
@@ -2055,7 +2059,7 @@
          Log.i(
              TAG,
              "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
-@@ -1537,19 +1393,21 @@
+@@ -1537,19 +1394,21 @@
              TAG,
              "audio route type=${format.payloadType} audioType=${format.audioType} " +
                  "mode=${if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE} " +
@@ -2082,7 +2086,7 @@
  
      private fun audioAttributesFor(
          selection: AudioChannelSelection,
-@@ -1565,13 +1423,17 @@
+@@ -1565,13 +1424,17 @@
                  Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
              }
          }
@@ -2101,7 +2105,7 @@
          val mode = if (advancedAudioChannelMapping) {
              AudioChannelMappingMode.AUTOMOTIVE_BUS
          } else {
-@@ -1585,20 +1447,17 @@
+@@ -1585,20 +1448,17 @@
      }
  
      private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
@@ -2126,7 +2130,7 @@
              return
          }
          track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
-@@ -1639,12 +1498,8 @@
+@@ -1639,12 +1499,8 @@
      private fun usageFor(channel: AudioChannel): Int = when (channel) {
          AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
          AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
@@ -2141,7 +2145,7 @@
          AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
      }
  
-@@ -1714,9 +1569,26 @@
+@@ -1714,9 +1570,26 @@
                      }
                      return
                  }
@@ -2171,7 +2175,7 @@
      }
  
      private fun sampleTimestampUs(sample: Int): Long =
-@@ -1725,7 +1597,10 @@
+@@ -1725,7 +1598,10 @@
      private fun feedCodec(payload: ByteArray, presentationTimeUs: Long) {
          val codec = codec ?: run { decoderUnavailablePackets++; return }
          diagnosticStage = "decoder-input"
@@ -2183,7 +2187,7 @@
          if (index < 0) {
              inputDropped++
              if (inputDropped == 1) {
-@@ -1759,14 +1634,14 @@
+@@ -1759,14 +1635,14 @@
  
      private fun drainCodec(codec: MediaCodec) {
          diagnosticStage = "decoder-output"
@@ -2200,7 +2204,7 @@
                      if (decoderOutputReports < 4) runCatching {
                          val outputFormat = codec.outputFormat
                          val metadata = "rate=${outputFormat.intOrNull(MediaFormat.KEY_SAMPLE_RATE)} " +
-@@ -1820,21 +1695,22 @@
+@@ -1820,21 +1696,22 @@
                  "audio first PCM type=${format.payloadType} bytes=$length",
              )
          }
@@ -2226,7 +2230,7 @@
              maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
              if (count < 0) {
                  writeErrorsThisWindow++
-@@ -1843,6 +1719,7 @@
+@@ -1843,6 +1720,7 @@
              }
              if (count == 0) {
                  zeroWritesThisWindow++
@@ -2234,7 +2238,7 @@
                  break
              }
              if (count < writeLength) partialWritesThisWindow++
-@@ -1859,14 +1736,6 @@
+@@ -1859,14 +1737,6 @@
                      Log.i(TAG, "audio playback started type=${format.payloadType}")
                  }
              }
@@ -2249,7 +2253,17 @@
          }
      }
  
-@@ -1879,15 +1748,22 @@
+@@ -1875,23 +1745,41 @@
+         underrunsAtPlaybackStart = track.underrunCount
+         track.play()
+         playbackStarted = true
++        if (rebufferStartedNs != 0L) {
++            runCatching { report("Audio: rebuffer stage=RESUME monoMs=${android.os.SystemClock.elapsedRealtime()} " +
++                "channel=$mappedChannel rebuffers=$rebufferCount " +
++                "pausedMs=${(System.nanoTime() - rebufferStartedNs).coerceAtLeast(0) / 1_000_000} queue=${queue.size}") }
++            rebufferStartedNs = 0L
++        }
+     }
  
      private fun maintainPlaybackBuffer() {
          val track = track ?: return
@@ -2278,7 +2292,16 @@
              prebufferBytes = bufferProgress.queuedBytes(track.playbackHeadPosition)
                  .coerceAtMost(startThresholdBytes.toLong()).toInt()
              lastPcmWriteNs = System.nanoTime()
-@@ -1905,7 +1781,11 @@
+             rebufferCount++
++            rebufferStartedNs = System.nanoTime()
++            runCatching { report("Audio: rebuffer stage=BEGIN monoMs=${android.os.SystemClock.elapsedRealtime()} " +
++                "channel=$mappedChannel rebuffers=$rebufferCount underruns=${track.underrunCount} " +
++                "queue=${queue.size} queuedBytes=$prebufferBytes targetBytes=$startThresholdBytes " +
++                "sinceRxMs=${lastArrivalNs.get().takeIf { it > 0 }?.let { (rebufferStartedNs - it).coerceAtLeast(0) / 1_000_000 } ?: "unknown"}") }
+         }
+         // A short final burst may never reach the start threshold. Play it after a bounded wait.
+         if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
+@@ -1905,7 +1793,11 @@
          val now = System.nanoTime()
          if (statsWindowStartNs == 0L) statsWindowStartNs = now
          if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
@@ -2290,7 +2313,7 @@
          val lastRx = lastArrivalNs.get()
          val currentTrack = track
          val playbackHeadFrames = currentTrack?.playbackHeadPosition
-@@ -1919,7 +1799,7 @@
+@@ -1919,7 +1811,7 @@
          val line = "audio stats audioType=${format.audioType} channel=$mappedChannel " +
              "routeType=${currentTrack?.routedDevice?.type ?: -1} codec=${format.codec} " +
              "trackState=${currentTrack?.state ?: -1} playState=${currentTrack?.playState ?: -1} " +
@@ -2299,7 +2322,7 @@
              "trackBufferFrames=${currentTrack?.bufferSizeInFrames ?: -1} " +
              "rx=${packetsReceived.getAndSet(0)} " +
              "dropped=${packetsDropped.getAndSet(0)} underruns=+${underruns - statsLastUnderruns} queue=${queue.size} " +
-@@ -1930,11 +1810,18 @@
+@@ -1930,11 +1822,18 @@
              "estimatedQueuedFrames=${queuedFrames ?: -1} writeErrors=$writeErrorsThisWindow " +
              "lastWriteError=${lastWriteErrorCode ?: "none"} zeroWrites=$zeroWritesThisWindow " +
              "partialWrites=$partialWritesThisWindow " +
@@ -2320,7 +2343,7 @@
              val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                  "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                  "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
-@@ -1981,7 +1868,10 @@
+@@ -1981,7 +1880,10 @@
  
      @Synchronized
      private fun release() {
@@ -2332,7 +2355,7 @@
          val codec = codec
          this.codec = null
          if (codec != null) {
-@@ -2015,12 +1905,13 @@
+@@ -2015,12 +1917,13 @@
                  // Best effort.
              }
          }

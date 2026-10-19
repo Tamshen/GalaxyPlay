@@ -1105,6 +1105,7 @@ private class AudioRenderer(
     private var underrunsAtPlaybackStart = 0
     private var lastPcmWriteNs = 0L
     private var rebufferCount = 0
+    private var rebufferStartedNs = 0L
     private var diagnosticStage = "starting"
     private var lastDecoderOutputMetadata: String? = null
     private var decoderOutputReports = 0
@@ -1744,6 +1745,12 @@ private class AudioRenderer(
         underrunsAtPlaybackStart = track.underrunCount
         track.play()
         playbackStarted = true
+        if (rebufferStartedNs != 0L) {
+            runCatching { report("Audio: rebuffer stage=RESUME monoMs=${android.os.SystemClock.elapsedRealtime()} " +
+                "channel=$mappedChannel rebuffers=$rebufferCount " +
+                "pausedMs=${(System.nanoTime() - rebufferStartedNs).coerceAtLeast(0) / 1_000_000} queue=${queue.size}") }
+            rebufferStartedNs = 0L
+        }
     }
 
     private fun maintainPlaybackBuffer() {
@@ -1768,6 +1775,11 @@ private class AudioRenderer(
                 .coerceAtMost(startThresholdBytes.toLong()).toInt()
             lastPcmWriteNs = System.nanoTime()
             rebufferCount++
+            rebufferStartedNs = System.nanoTime()
+            runCatching { report("Audio: rebuffer stage=BEGIN monoMs=${android.os.SystemClock.elapsedRealtime()} " +
+                "channel=$mappedChannel rebuffers=$rebufferCount underruns=${track.underrunCount} " +
+                "queue=${queue.size} queuedBytes=$prebufferBytes targetBytes=$startThresholdBytes " +
+                "sinceRxMs=${lastArrivalNs.get().takeIf { it > 0 }?.let { (rebufferStartedNs - it).coerceAtLeast(0) / 1_000_000 } ?: "unknown"}") }
         }
         // A short final burst may never reach the start threshold. Play it after a bounded wait.
         if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&

@@ -57,6 +57,7 @@ import com.shilapi.xcertplay.network.WirelessPerformanceLock
 import com.shilapi.xcertplay.network.WirelessHotspotManager
 import com.shilapi.xcertplay.network.WirelessInterfaceDiagnostics
 import com.shilapi.xcertplay.network.WirelessReceiveDiagnostics
+import com.shilapi.xcertplay.network.GalaxyWirelessRuntimeDiagnostics
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
 import com.shilapi.xcertplay.network.WirelessStartupException
 import com.shilapi.xcertplay.network.WirelessStartupFailure
@@ -1354,14 +1355,22 @@ class CarPlayController(
             )
             var startedBonjour: CarPlayBonjour? = null
             val receiveDiagnostics = WirelessReceiveDiagnostics(hotspotInfo.interfaceName)
+            val runtimeDiagnostics = GalaxyWirelessRuntimeDiagnostics(appContext,
+                { message -> if (!isStaleWirelessRun(generation)) debugLog(message) })
             val diagnostics = WirelessStartupDiagnostics(
                 sample = {
+                    runtimeDiagnostics.start()
                     "${WirelessInterfaceDiagnostics.snapshot(hotspotInfo.interfaceName)} " +
                         "${startedHotspot?.connectionDiagnosticSnapshot() ?: "association=unknown"} " +
                         (startedBonjour?.diagnosticSnapshot() ?: "bonjour=not_started") + "\n" +
-                        receiveDiagnostics.snapshot()
+                        receiveDiagnostics.snapshot() + "\n" + runtimeDiagnostics.snapshot() + "\n" +
+                        "scanPauseEnabled=${config.wifiScanPauseEnabled} " +
+                        (wifiScanPause?.diagnosticSnapshot() ?: "scanPauseResult=not_created") + "\n" +
+                        "wifiLockEnabled=${config.wifiHighPerformanceEnabled} ${wirelessPerformanceLock.diagnosticSnapshot()}"
                 },
                 log = { message -> if (!isStaleWirelessRun(generation)) debugLog(message) },
+                monoMs = android.os.SystemClock::elapsedRealtime,
+                onClose = runtimeDiagnostics::close,
             )
             wirelessDiagnostics = diagnostics
             onStatus(
@@ -1720,10 +1729,8 @@ class CarPlayController(
                         wirelessAirPlayEndpoint = hotspotAddressRecovery?.forSession(endpoint, session.localAddress) ?: endpoint
                     }
                 }
-                wirelessDiagnostics?.let {
-                    it.sessionActive()
-                    it.close()
-                }
+                // 播放期间继续低频观察，才能把音频缺口与扫描、接口及内核计数对齐。
+                wirelessDiagnostics?.sessionActive()
                 wirelessConnectionProof.activate(generation, session)
                 onStatus(CarPlayStatus.PreparingWirelessVideo, generation)
                 // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
@@ -1733,6 +1740,7 @@ class CarPlayController(
 
             override fun onSessionEnded(session: AirPlaySession) {
                 if (isStaleWirelessRun(generation)) return
+                if (activeSession === session) wirelessDiagnostics?.sessionEnded()
                 wirelessConnectionProof.end(generation, session)
                 sessionListener.onSessionEnded(session)
             }

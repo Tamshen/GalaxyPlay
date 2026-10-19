@@ -8,12 +8,14 @@ import java.net.NetworkInterface
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 仅观察启动过程，不改变连接期限、地址选择或重试行为。 */
+/** 持续观察启动与播放；不改变连接期限、地址选择或重试行为。 */
 internal class WirelessStartupDiagnostics(
     private val sample: () -> String,
     private val log: (String) -> Unit,
     private val intervalMillis: Long = 10_000,
     private val nowNs: () -> Long = System::nanoTime,
+    private val monoMs: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val onClose: () -> Unit = {},
 ) : Closeable {
     private val closed = AtomicBoolean(false)
     private val startedNanos = nowNs()
@@ -22,9 +24,12 @@ internal class WirelessStartupDiagnostics(
     private var startRequests = 0
     private var tcpAccepted = 0
     private var sessionActive = false
+    private var sessionWasActive = false
     private var firstStartRequestNs: Long? = null
     private var firstTcpAfterStartMs: Long? = null
     @Volatile private var lastSnapshot = ""
+    @Volatile private var lastSnapshotAtMs: Long? = null
+    @Volatile private var sampleDurationMs = 0L
     private val worker = Thread(::observe, "diplay-wireless-diagnostics").apply { isDaemon = true }
 
     init { require(intervalMillis > 0) }
@@ -51,11 +56,13 @@ internal class WirelessStartupDiagnostics(
             firstStartRequestNs?.let { firstTcpAfterStartMs = elapsedMillis(it) }
         }
     }
-    @Synchronized fun sessionActive() { sessionActive = true }
+    @Synchronized fun sessionActive() { sessionActive = true; sessionWasActive = true }
+    @Synchronized fun sessionEnded() { sessionActive = false }
 
     @Synchronized fun summary(): String {
         val waitingFor = when {
             sessionActive -> "none"
+            sessionWasActive -> "session_recovery"
             tcpAccepted > 0 -> "AirPlay_protocol"
             startRequests > 0 -> "WiFi_discovery_or_AirPlay_TCP"
             authenticated -> "WiFi_configuration_or_start_request"
@@ -65,7 +72,8 @@ internal class WirelessStartupDiagnostics(
             "authenticated=$authenticated wifiConfigs=$wifiConfigs startRequests=$startRequests " +
             "tcpAccepted=$tcpAccepted sessionActive=$sessionActive waitingFor=$waitingFor " +
             "startRequestAgeMs=${firstStartRequestNs?.let(::elapsedMillis) ?: "none"} " +
-            "firstTcpAfterStartMs=${firstTcpAfterStartMs ?: "none"}"
+            "firstTcpAfterStartMs=${firstTcpAfterStartMs ?: "none"} " +
+            "observationPhase=${if (sessionActive) "STREAMING" else if (sessionWasActive) "IDLE" else "STARTUP"} monoMs=${monoMs()}"
     }
 
     private fun elapsedMillis(since: Long): Long = (nowNs() - since).coerceAtLeast(0) / 1_000_000
@@ -73,11 +81,14 @@ internal class WirelessStartupDiagnostics(
     private fun observe() {
         try {
             while (!closed.get()) {
+                val sampleStartNs = nowNs()
                 val snapshot = try { sample() } catch (error: Exception) {
                     "sampling=unavailable failureClass=${error.javaClass.simpleName}"
                 }
                 if (closed.get()) return
                 lastSnapshot = snapshot
+                lastSnapshotAtMs = monoMs()
+                sampleDurationMs = (nowNs() - sampleStartNs).coerceAtLeast(0) / 1_000_000
                 emit(summary())
                 emitSnapshot(snapshot)
                 Thread.sleep(intervalMillis)
@@ -90,14 +101,17 @@ internal class WirelessStartupDiagnostics(
     @Synchronized override fun close() {
         if (!closed.compareAndSet(false, true)) return
         worker.interrupt()
+        runCatching(onClose)
         emit("${summary()} observation=ended")
         emitSnapshot(lastSnapshot, cached = true)
     }
 
     private fun emitSnapshot(snapshot: String, cached: Boolean = false) {
-        // 日志脱敏器每行最多保留 700 字符，内核计数独立成行，避免被前面的状态挤掉。
-        snapshot.lineSequence().filter { it.isNotBlank() }.take(4).forEach { line ->
-            emit("wireless snapshot${if (cached) " cached=true" else ""} $line")
+        // 接口、三组计数和运行状态独立成行；缓存必须标明采样年龄。
+        val at = monoMs()
+        snapshot.lineSequence().filter { it.isNotBlank() }.take(8).forEach { line ->
+            emit("wireless snapshot${if (cached) " cached=true" else ""} monoMs=$at " +
+                "sampleAgeMs=${lastSnapshotAtMs?.let { (at - it).coerceAtLeast(0) } ?: "unknown"} sampleDurationMs=$sampleDurationMs $line")
         }
     }
 

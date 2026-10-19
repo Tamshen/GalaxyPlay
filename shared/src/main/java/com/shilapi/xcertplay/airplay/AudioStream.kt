@@ -6,6 +6,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -97,7 +98,8 @@ class AudioStream(
 
     private fun runData(socket: DatagramSocket, listener: Listener) {
         runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
-        val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic)
+        val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic,
+            monoMs = android.os.SystemClock::elapsedRealtime)
         val buffer = ByteArray(DATAGRAM_BYTES)
         try {
             while (!closed.get()) {
@@ -105,8 +107,16 @@ class AudioStream(
                 try {
                     stats.reading()
                     socket.receive(packet)
-                } catch (_: Exception) {
-                    if (closed.get()) return else continue
+                } catch (_: SocketTimeoutException) {
+                    if (closed.get()) return
+                    stats.readTimedOut()
+                    stats.flush()
+                    continue
+                } catch (error: Exception) {
+                    if (closed.get()) return
+                    stats.readFailed(error.javaClass.simpleName)
+                    stats.flush()
+                    continue
                 }
                 // 关闭后到达的数据不能再次启动旧轨道或触发旧流回调。
                 if (closed.get()) return
@@ -144,7 +154,7 @@ class AudioStream(
                 val sample = readU32Be(wire, 4)
 
                 val payload = try {
-                    AirPlayCrypto.chachaOpen(key, nonce, sealed, aad)
+                    stats.measure(StreamReceiveStats.Stage.DECRYPT) { AirPlayCrypto.chachaOpen(key, nonce, sealed, aad) }
                 } catch (error: Exception) {
                     val failureNumber = authenticationFailures.incrementAndGet()
                     if (failureNumber == 1) {
@@ -176,12 +186,14 @@ class AudioStream(
                             "authFailures=${authenticationFailures.get()}",
                     )
                 }
-                listener.onPacket(wire, rtp, sample, null)
-                if (!started) {
-                    started = true
-                    listener.onStarted(sample)
+                stats.measure(StreamReceiveStats.Stage.DISPATCH) {
+                    listener.onPacket(wire, rtp, sample, null)
+                    if (!started) {
+                        started = true
+                        listener.onStarted(sample)
+                    }
+                    listener.onRtp(rtp, sample)
                 }
-                listener.onRtp(rtp, sample)
                 stats.processed()
             }
         } finally {

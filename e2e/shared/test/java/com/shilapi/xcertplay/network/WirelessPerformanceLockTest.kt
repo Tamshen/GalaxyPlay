@@ -22,12 +22,15 @@ class WirelessPerformanceLockTest {
         val high = held(owner, "highPerformance")!!
         val low = held(owner, "lowLatency")!!
         assertTrue(high.isHeld && low.isHeld)
+        assertTrue(owner.diagnosticSnapshot().contains("wifiLockHighHeld=true wifiLockLowHeld=true"))
+        assertTrue(owner.diagnosticSnapshot().contains("wifiLockEvidence=request_only"))
         owner.acquire()
         assertSame(high, held(owner, "highPerformance"))
         assertEquals(2, events.size)
         owner.release()
         owner.release()
         assertFalse(high.isHeld || low.isHeld)
+        assertTrue(owner.diagnosticSnapshot().contains("wifiLockHighHeld=false wifiLockLowHeld=false"))
         owner.acquire()
         assertTrue(held(owner, "highPerformance")!!.isHeld)
         owner.close()

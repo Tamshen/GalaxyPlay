@@ -5577,7 +5577,7 @@
          val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
 --- a/common/src/main/java/com/shilapi/xcertplay/DiagnosticRedactor.kt
 +++ b/common/src/main/java/com/shilapi/xcertplay/DiagnosticRedactor.kt
-@@ -1,17 +1,81 @@
+@@ -1,17 +1,83 @@
  package com.shilapi.xcertplay
  
 -/** Diagnostics describe state transitions; protocol payloads and credentials are never exported. */
@@ -5595,7 +5595,8 @@
      private val ipv6 = Regex("(?i)(?:[0-9a-f]{1,4}:)*[0-9a-f]{0,4}::[0-9a-f:]*(?:%[a-z0-9_.-]+)?|(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}")
 +    private val url = Regex("""(?i)https?://[^\s<>"']+""")
 +    private val path = Regex("""(?:/Users/|/storage/|/data/).*?(?=\s+[A-Za-z_][\w.-]*\s*[:=]|["'<>]|$)""")
-+    private val bearer = Regex("""(?i)\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_.=-]+""")
++    // 性能模式与数值优先整体匹配，避免把 BASIC 后面的 CPU 字段误当成认证材料。
++    private val bearer = Regex("""(?i)(\bmode=BASIC\s+cpuCorePercent=(?:unknown|[0-9]+(?:\.[0-9]+)?)(?=\s|$))|\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_.=-]+""")
 +    private val versionField = Regex("""(?i)(?:[\w.]*version|firmware|build)\s*[:=]\s*["']?$""")
 +
      fun redact(line: String): String? {
@@ -5605,7 +5606,8 @@
 -            .replace(address, "[ip]").replace(ipv6, "[ip]").take(700)
 +        if (rawDump.containsMatchIn(line) || line.any { it.code < 32 && it != '\t' || it.code == 127 }) return null
 +        var safe = fields(line).replace(url, "[url]").replace(path, "[path]")
-+            .replace(bearer, "[authorization]").replace(mac, "[address]").replace(identifier, "[identifier]")
++            .replace(bearer) { if (it.groups[1] != null) it.value else "[authorization]" }
++            .replace(mac, "[address]").replace(identifier, "[identifier]")
 +        val beforeAddresses = safe
 +        safe = address.replace(safe) { match ->
 +            // 四段版本号不是网络地址，版本上下文中的数字完整保留。

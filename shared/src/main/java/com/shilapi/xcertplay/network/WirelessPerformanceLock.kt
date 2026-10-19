@@ -15,6 +15,11 @@ internal class WirelessPerformanceLock(
     private var lowLatency: WifiManager.WifiLock? = null
     private var closed = false
 
+    @Synchronized fun diagnosticSnapshot(): String =
+        "wifiLockHighHeld=${runCatching { highPerformance?.isHeld == true }.getOrDefault(false)} " +
+            "wifiLockLowHeld=${runCatching { lowLatency?.isHeld == true }.getOrDefault(false)} " +
+            "wifiLockClosed=$closed wifiLockEvidence=request_only"
+
     @Synchronized fun acquire() {
         if (closed) return
         val manager = app.getSystemService(WifiManager::class.java) ?: return

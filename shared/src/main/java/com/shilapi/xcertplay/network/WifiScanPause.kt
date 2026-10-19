@@ -35,12 +35,25 @@ internal class WifiScanPause(
     private val app = context.applicationContext
     private val owner = Any()
     @Volatile private var closed = false
+    @Volatile private var lastReport = "scanPauseResult=not_requested"
+    @Volatile private var lastReportAtMs = 0L
+
+    fun diagnosticSnapshot(): String = "scanPauseClosed=$closed " +
+        "scanPauseResultAgeMs=${if (lastReportAtMs == 0L) "unknown" else (android.os.SystemClock.elapsedRealtime() - lastReportAtMs).coerceAtLeast(0)} $lastReport"
 
     /** Asynchronously stops the periodic scans; repeated calls are harmless. */
     @Synchronized
     fun pause() {
         if (closed) return
-        control.acquire(app, owner, { !closed }, log)
+        lastReport = "scanPauseResult=pending"
+        lastReportAtMs = android.os.SystemClock.elapsedRealtime()
+        control.acquire(app, owner, { !closed }) { message ->
+            if (!closed) {
+                lastReport = message
+                lastReportAtMs = android.os.SystemClock.elapsedRealtime()
+                log(message)
+            }
+        }
     }
 
     /** Ends this lease; shared recovery remains alive after this controller has closed. */
@@ -107,8 +120,12 @@ private object ProcessWifiScanPause : WifiScanPauseControl {
 
     override fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {
         enqueue(app) { state ->
+            val started = android.os.SystemClock.elapsedRealtime()
+            log("Wi-Fi scan pause stage=BEGIN monoMs=$started")
             val outcome = state.acquire(owner, current)
-            log("Wi-Fi connectivity scans paused=${outcome.paused} reason=${outcome.reason} api=${Build.VERSION.SDK_INT}")
+            val now = android.os.SystemClock.elapsedRealtime()
+            log("Wi-Fi connectivity scans paused=${outcome.paused} reason=${outcome.reason} api=${Build.VERSION.SDK_INT} " +
+                "monoMs=$now elapsedMs=${(now - started).coerceAtLeast(0)} evidence=autojoin_control")
         }
     }
 

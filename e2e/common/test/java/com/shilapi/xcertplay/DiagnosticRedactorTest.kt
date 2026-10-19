@@ -5,6 +5,21 @@ import org.junit.Test
 import java.nio.file.Files
 
 class DiagnosticRedactorTest {
+    @Test fun performanceBasicModeKeepsCpuWhileRealAuthorizationRemainsHidden() {
+        for (cpu in listOf("unknown", "0.0", "153.7", "100")) {
+            val line = "PERFORMANCE SAMPLE atMs=123 mode=BASIC cpuCorePercent=$cpu javaBytes=1234"
+            assertEquals(line, DiagnosticRedactor.redact(line))
+            assertEquals(line, DiagnosticRedactor.redact(DiagnosticRedactor.redact(line)!!))
+        }
+        val line = "mode=BASIC cpuCorePercent=83.5 authorization=Basic c2VjcmV0 Bearer another-secret"
+        val safe = DiagnosticRedactor.redact(line)!!
+        assertTrue(safe.contains("mode=BASIC cpuCorePercent=83.5"))
+        assertFalse(safe.contains("c2VjcmV0") || safe.contains("another-secret"))
+        for (scheme in listOf("Basic", "Bearer")) {
+            assertEquals("response [authorization] status=401",
+                DiagnosticRedactor.redact("response $scheme c2VjcmV0 status=401"))
+        }
+    }
     @Test fun savedDriveReportKeepsMediaPerformanceCounters() {
         val folder = Files.createTempDirectory("diplay-media-report").toFile()
         try {
