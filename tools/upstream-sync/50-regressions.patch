@@ -601,7 +601,7 @@
          assertEquals(WirelessHotspotMode.WIFI_P2P, config.wirelessHotspotMode)
          assertEquals("New car", config.manualHotspotSsid)
          assertEquals(149, config.wifiP2pPreferredChannel)
-+        assertEquals(45_000L, config.wirelessFirstTcpTimeoutMillis)
++        assertEquals(30_000L, config.wirelessFirstTcpTimeoutMillis)
 +        assertEquals(true, config.wirelessStartupRefreshEnabled)
 +        assertEquals(P2pAddressMode.IPV4_ONLY, config.wifiP2pAddressMode)
 +        assertEquals(false, config.wifiScanPauseEnabled)
@@ -618,7 +618,7 @@
 +        val l7 = runtimeConfig(host)
 +        assertEquals(P2pAddressMode.IPV4_ONLY, l7.wifiP2pAddressMode)
 +        assertEquals(149, l7.wifiP2pPreferredChannel)
-+        assertEquals(45_000L, l7.wirelessFirstTcpTimeoutMillis)
++        assertEquals(30_000L, l7.wirelessFirstTcpTimeoutMillis)
 +        for (model in listOf("l6", "custom")) {
 +            app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", model).commit()
 +            val other = runtimeConfig(host)
@@ -3930,22 +3930,31 @@
          diagnostics.connectionAccepted()
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/orchestration/FirstTcpWatchdogTest.kt
-@@ -23,11 +23,100 @@
+@@ -2,6 +2,7 @@
+ 
+ import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
+ import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
++import com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning
+ import org.junit.Assert.*
+ import org.junit.Test
+ import java.util.concurrent.CountDownLatch
+@@ -23,11 +24,103 @@
      private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
          AirPlayTcpAccepted(owner, internal, now * 1_000_000)
  
-+    @Test fun slowDirectScanCanConnectAfterThirtySecondsWithoutRefreshExtendingItsDeadline() {
++    @Test fun directTcpBeforeThirtySecondsKeepsIndependentProtocolDeadline() {
 +        val watch = FirstTcpWatchdog(identity, { delay, action ->
 +            deadline = now + delay; timer = action
 +            val cancel: () -> Unit = { deadline = null }; cancel
-+        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = 45_000, protocolTimeoutMillis = 30_000)
++        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = GalaxyWirelessStartupTuning.firstTcpMillis(
++            true, WirelessHotspotMode.WIFI_P2P), protocolTimeoutMillis = 30_000)
 +        watch.startSessionSent(0)
 +        val scanTimer = timer!!
 +        now = 5_000; watch.startSessionSent(now * 1_000_000)
-+        assertEquals(45_000L, deadline)
-+        now = 39_000
++        assertEquals(30_000L, deadline)
++        now = 29_000
 +        assertTrue(watch.accepted(event()))
-+        assertEquals(69_000L, deadline)
++        assertEquals(59_000L, deadline)
 +        scanTimer()
 +        assertEquals(0, failures)
 +        assertTrue(watch.sessionEstablished())
@@ -3953,15 +3962,17 @@
 +        assertEquals(0, failures)
 +    }
 +
-+    @Test fun directScanStillExpiresAtFortyFiveSecondsAndRejectsLateTcp() {
++    @Test fun directScanExpiresAtThirtySecondsAndRejectsLateTcp() {
 +        val watch = FirstTcpWatchdog(identity, { delay, action ->
 +            deadline = now + delay; timer = action; {}
-+        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = 45_000)
++        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = GalaxyWirelessStartupTuning.firstTcpMillis(
++            true, WirelessHotspotMode.WIFI_P2P))
 +        watch.startSessionSent(0)
-+        now = 40_000; watch.startSessionSent(now * 1_000_000)
-+        assertEquals(45_000L, deadline)
-+        now = 45_000; timer!!()
++        now = 25_000; watch.startSessionSent(now * 1_000_000)
++        assertEquals(30_000L, deadline)
++        now = 30_000; timer!!()
 +        assertEquals(1, failures)
++        now = 31_000
 +        assertFalse(watch.accepted(event()))
 +        assertFalse(watch.waitingForFirstTcp())
 +    }

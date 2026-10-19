@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.orchestration
 
 import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
 import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
+import com.shilapi.xcertplay.network.GalaxyWirelessStartupTuning
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -23,18 +24,19 @@ class FirstTcpWatchdogTest {
     private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
         AirPlayTcpAccepted(owner, internal, now * 1_000_000)
 
-    @Test fun slowDirectScanCanConnectAfterThirtySecondsWithoutRefreshExtendingItsDeadline() {
+    @Test fun directTcpBeforeThirtySecondsKeepsIndependentProtocolDeadline() {
         val watch = FirstTcpWatchdog(identity, { delay, action ->
             deadline = now + delay; timer = action
             val cancel: () -> Unit = { deadline = null }; cancel
-        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = 45_000, protocolTimeoutMillis = 30_000)
+        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = GalaxyWirelessStartupTuning.firstTcpMillis(
+            true, WirelessHotspotMode.WIFI_P2P), protocolTimeoutMillis = 30_000)
         watch.startSessionSent(0)
         val scanTimer = timer!!
         now = 5_000; watch.startSessionSent(now * 1_000_000)
-        assertEquals(45_000L, deadline)
-        now = 39_000
+        assertEquals(30_000L, deadline)
+        now = 29_000
         assertTrue(watch.accepted(event()))
-        assertEquals(69_000L, deadline)
+        assertEquals(59_000L, deadline)
         scanTimer()
         assertEquals(0, failures)
         assertTrue(watch.sessionEstablished())
@@ -42,15 +44,17 @@ class FirstTcpWatchdogTest {
         assertEquals(0, failures)
     }
 
-    @Test fun directScanStillExpiresAtFortyFiveSecondsAndRejectsLateTcp() {
+    @Test fun directScanExpiresAtThirtySecondsAndRejectsLateTcp() {
         val watch = FirstTcpWatchdog(identity, { delay, action ->
             deadline = now + delay; timer = action; {}
-        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = 45_000)
+        }, { failures++ }, { now * 1_000_000 }, timeoutMillis = GalaxyWirelessStartupTuning.firstTcpMillis(
+            true, WirelessHotspotMode.WIFI_P2P))
         watch.startSessionSent(0)
-        now = 40_000; watch.startSessionSent(now * 1_000_000)
-        assertEquals(45_000L, deadline)
-        now = 45_000; timer!!()
+        now = 25_000; watch.startSessionSent(now * 1_000_000)
+        assertEquals(30_000L, deadline)
+        now = 30_000; timer!!()
         assertEquals(1, failures)
+        now = 31_000
         assertFalse(watch.accepted(event()))
         assertFalse(watch.waitingForFirstTcp())
     }

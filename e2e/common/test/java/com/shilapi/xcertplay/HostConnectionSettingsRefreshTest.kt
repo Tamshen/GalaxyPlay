@@ -59,7 +59,7 @@ class HostConnectionSettingsRefreshTest {
         assertEquals(WirelessHotspotMode.WIFI_P2P, config.wirelessHotspotMode)
         assertEquals("New car", config.manualHotspotSsid)
         assertEquals(149, config.wifiP2pPreferredChannel)
-        assertEquals(45_000L, config.wirelessFirstTcpTimeoutMillis)
+        assertEquals(30_000L, config.wirelessFirstTcpTimeoutMillis)
         assertEquals(true, config.wirelessStartupRefreshEnabled)
         assertEquals(P2pAddressMode.IPV4_ONLY, config.wifiP2pAddressMode)
         assertEquals(false, config.wifiScanPauseEnabled)
@@ -76,7 +76,7 @@ class HostConnectionSettingsRefreshTest {
         val l7 = runtimeConfig(host)
         assertEquals(P2pAddressMode.IPV4_ONLY, l7.wifiP2pAddressMode)
         assertEquals(149, l7.wifiP2pPreferredChannel)
-        assertEquals(45_000L, l7.wirelessFirstTcpTimeoutMillis)
+        assertEquals(30_000L, l7.wirelessFirstTcpTimeoutMillis)
         for (model in listOf("l6", "custom")) {
             app.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", model).commit()
             val other = runtimeConfig(host)

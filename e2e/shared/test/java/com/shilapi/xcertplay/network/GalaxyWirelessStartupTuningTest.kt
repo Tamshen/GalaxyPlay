@@ -15,10 +15,9 @@ class GalaxyWirelessStartupTuningTest {
         wirelessFirstTcpTimeoutMillis = timeout,
     )
 
-    @Test fun directKeepsScanningWindowWithoutEnablingRefreshOnUnrelatedBackends() {
+    @Test fun directUsesThirtySecondsWithoutEnablingRefreshOnUnrelatedBackends() {
         for (mode in WirelessHotspotMode.entries) {
-            assertEquals(if (mode == WirelessHotspotMode.WIFI_P2P) 45_000L else 30_000L,
-                GalaxyWirelessStartupTuning.firstTcpMillis(true, mode))
+            assertEquals(30_000L, GalaxyWirelessStartupTuning.firstTcpMillis(true, mode))
             assertEquals(mode == WirelessHotspotMode.WIFI_P2P, GalaxyWirelessStartupTuning.refreshEnabled(true, mode))
             assertEquals(30_000L, GalaxyWirelessStartupTuning.firstTcpMillis(false, mode))
             assertFalse(GalaxyWirelessStartupTuning.refreshEnabled(false, mode))
