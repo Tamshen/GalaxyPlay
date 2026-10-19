@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_usb_mode_switch_failed">无法切换到 CarPlay USB 模式，已停止自动重试。点“USB 连接排查”检查解锁状态和旧 CarPlay 记录，完成后点“重新连接”。</string>
     <string name="l7_connection_choose">选择连接方式</string>
     <string name="l7_connection_choose_hint">无线与有线分别检查、分别引导。先选择本次使用的方式。</string>
     <string name="l7_connection_wireless_hint">选择原生热点或 Wi-Fi Direct，配对并连接 iPhone。</string>
@@ -45,7 +46,7 @@
     <string name="l7_usb_found">已识别 %1$d 个 Apple USB 设备；仍需授权与 CarPlay 握手。</string>
     <string name="l7_usb_permission_wait">待授权：开始连接后请允许 Android 的 USB 访问提示；手机重新识别时可能需要再次授权。</string>
     <string name="l7_usb_permission_ok">当前设备已获 USB 访问权限；这不代表 CarPlay 已连接。</string>
-    <string name="l7_usb_phone_hint">保持 iPhone 解锁，按手机提示允许 CarPlay。这里不检查热点或蓝牙；无画面时先换数据线与数据口再重试。</string>
+    <string name="l7_usb_phone_hint">整个连接过程保持 iPhone 解锁，按手机提示允许信任或 CarPlay。若模式切换失败，在连接等待页打开“USB 连接排查”，按顺序检查旧车辆记录并上传单次测试日志。</string>
     <string name="l7_usb_check_failed">检查异常：无法读取 USB 状态，请重试或到调试与日志收集检查结果。</string>
     <string name="l7_usb_not_ready">USB 尚未就绪</string>
     <string name="l7_usb_wait_connect">开始等待 USB 连接</string>
@@ -71,4 +72,13 @@
     <string name="wifi_direct_channel_title">Wi-Fi Direct 首选频道</string>
     <string name="wifi_direct_channel_choice">频道 %1$d · %2$s</string>
     <string name="wifi_direct_channel_description">自动按所选车载地区选择候选频道；手动频道也须由系统支持。大陆车载优先高 5 GHz，其他地区使用保守 2.4 GHz。修改后下次连接生效。</string>
+    <string name="galaxy_usb_help_title">USB 连接排查</string>
+    <string name="galaxy_usb_help_body">1 · 保持解锁\n取消本次连接，拔线，解锁 iPhone 并保持亮屏，再插回车机数据口。车机提示访问 iPhone 时点允许；手机如有信任或 CarPlay 提示，也请确认。\n\n2 · 检查旧 CarPlay 记录\n若仍失败，打开 iPhone 的“设置 → 通用 → CarPlay”。仅对本车机对应的旧记录选择“忽略这辆车”，然后保持解锁重新连接。此操作需要重新配对；没有对应记录就跳过。\n\n3 · 保存本次结果\n每次只改变一个条件。失败后进入日志，主动上传并备注 iPhone 型号、iOS 版本、是否全程解锁、是否删除旧记录及是否手动拔插。应用无法自动确认手机锁屏或配对状态。</string>
+    <string name="galaxy_usb_waiting_hint">请在整个连接过程中保持 iPhone 解锁。车机允许 USB 访问后，还需按手机提示允许信任或 CarPlay。失败时可打开“USB 连接排查”。</string>
+    <string name="galaxy_usb_stage_find">正在查找 iPhone，请保持手机解锁并接入车机 USB 数据口。</string>
+    <string name="galaxy_usb_stage_permission">请在车机弹窗中允许 GalaxyPlay 访问 iPhone，手机继续保持解锁。</string>
+    <string name="galaxy_usb_stage_switch">USB 已授权，正在切换 CarPlay 模式。请保持 iPhone 解锁，暂勿拔线。</string>
+    <string name="galaxy_usb_stage_reenumeration">正在等待 iPhone 重新识别。请保持连接；若车机再次弹出 USB 授权，请允许。</string>
+    <string name="galaxy_usb_stage_pairing">正在建立手机连接。若 iPhone 出现信任或 CarPlay 提示，请确认。</string>
+    <string name="galaxy_usb_stage_session">正在建立 CarPlay 会话并等待画面，请保持 iPhone 解锁。</string>
 </resources>

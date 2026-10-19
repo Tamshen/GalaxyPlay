@@ -1038,13 +1038,15 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun createL7Waiting() = galaxyChrome.waiting(wirelessEnabled,
         home = { showDiPlayHome() },
         cancel = ::cancelConnection,
-        recovery = { showDiPlayHome("wireless-recovery") }).also { panel ->
+        recovery = { showDiPlayHome("wireless-recovery") },
+        logs = { showDiPlayHome("settings-logs") }, diagnostic = ::appendLog).also { panel ->
         panel.retryButton.visibility = if (startupRecovery.stopped) View.VISIBLE else View.GONE
         panel.retryButton.setOnClickListener {
             if (shuttingDown.get() || !CarPlayBackgroundSession.isOwner(this)) return@setOnClickListener
             startupRecovery.manualRetry()
+            if (!wirelessEnabled) appendLog("USB guide action=MANUAL_RETRY phoneLock=unknown carplayPairing=unknown")
             panel.retryButton.visibility = View.GONE
-            restartCarPlay("Manual wireless retry")
+            restartCarPlay(if (wirelessEnabled) "Manual wireless retry" else "Manual USB retry")
         }
     }
 
@@ -3406,12 +3408,21 @@ class CarPlayHostActivity : ComponentActivity() {
             !startupRecovery.stopped && !shuttingDown.get()) {
             updateHotspotStatus(status)
             val detail = status.describe()
-            val formatted = wirelessEnabled && l7DebugLogs
-            val description = if (formatted)
-                wirelessProgress.describe(this, status, detail) else detail
+            val formatted = !wirelessEnabled || l7DebugLogs
+            val description = when {
+                !wirelessEnabled -> GalaxyWiredConnectionProgress.describe(this, status, detail)
+                formatted -> wirelessProgress.describe(this, status, detail)
+                else -> detail
+            }
             setConnectionStageText(description, formatted)
             when (status) {
-                is CarPlayStatus.Failed -> if (status.wifiResetRequired) {
+                is CarPlayStatus.Failed -> if (!wirelessEnabled && status.usbModeSwitchFailed) {
+                    startupRecovery.stop()
+                    reconnectScheduled = false
+                    wifiRecoveryButton?.visibility = View.GONE
+                    (connectionPanel as? L7ConnectionPanel)?.retryButton?.visibility = View.VISIBLE
+                    appendLog("USB recovery stopped reason=mode-switch-failed action=manual-retry")
+                } else if (status.wifiResetRequired) {
                     wifiRecoveryButton?.visibility = View.VISIBLE
                 } else {
                     wifiRecoveryButton?.visibility = View.GONE
@@ -4305,7 +4316,8 @@ class CarPlayHostActivity : ComponentActivity() {
             if (wirelessEnabled) getString(R.string.starting_airplay_service) else getString(R.string.status_attaching_ncm)
         CarPlayStatus.RunningControl -> getString(R.string.carplay_control_running)
         CarPlayStatus.ControlEnded -> getString(R.string.carplay_control_window_ended)
-        is CarPlayStatus.Failed -> getString(R.string.status_failed, message)
+        is CarPlayStatus.Failed -> if (usbModeSwitchFailed) getString(R.string.galaxy_usb_mode_switch_failed)
+            else getString(R.string.status_failed, message)
     }
 
     private companion object {

@@ -7,8 +7,10 @@ import androidx.activity.ComponentActivity
 internal class GalaxyHostChrome(private val activity: ComponentActivity) {
     private val context get() = L7UiDensity.wrap(activity)
 
-    fun waiting(wireless: Boolean, home: () -> Unit, cancel: () -> Unit, recovery: () -> Unit) =
-        L7ConnectionPanel(context, wireless, onReturn = home, onCancel = cancel, onRecovery = recovery)
+    fun waiting(wireless: Boolean, home: () -> Unit, cancel: () -> Unit, recovery: () -> Unit,
+        logs: () -> Unit = home, diagnostic: (String) -> Unit = {}) =
+        L7ConnectionPanel(context, wireless, onReturn = home, onCancel = cancel, onRecovery = recovery,
+            onLogs = logs, onDiagnostic = diagnostic)
 
     fun navigation(releaseTouches: () -> Unit, settings: (String) -> Unit) =
         L7ProjectionNavigation(context, releaseTouches, projection = true, returnHome = { settings("home") }) { destination ->

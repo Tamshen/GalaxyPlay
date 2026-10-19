@@ -354,7 +354,7 @@
      @Test fun deniedWriteRemovesOnlyTheNewPendingEntry() {
 --- a/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
-@@ -5,54 +5,41 @@
+@@ -5,54 +5,47 @@
  import java.nio.file.Files
  
  class DiagnosticRedactorTest {
@@ -370,6 +370,12 @@
 +            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",
 +            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 phase=REENUMERATION USB mode query result=short returned=3 mode=3:3:3 elapsedMs=1",
 +            "USB mode query result=unavailable reason=permission elapsedMs=0",
++            "USB mode switch event=BEGIN request=0x52 index=4 expected=1 timeoutMs=1000 phoneLock=unknown carplayPairing=unknown",
++            "USB mode switch event=RESULT returned=-1 expected=1 elapsedMs=18",
++            "USB capability query result=complete returned=4 capability=1:0:255:0 elapsedMs=2",
++            "USB permission delivery source=broadcast granted=true",
++            "USB device event=DETACHED modeFailure=true",
++            "USB guide action=GUIDE_OPENED",
          )
 -        val folder = Files.createTempDirectory("diplay-troubleshooting-report").toFile()
 +        val folder = Files.createTempDirectory("usb-mode-report").toFile()
@@ -435,7 +441,7 @@
      }
      @Test fun savedDriveReportKeepsMediaPerformanceCounters() {
          val folder = Files.createTempDirectory("diplay-media-report").toFile()
-@@ -69,15 +56,52 @@
+@@ -69,15 +62,52 @@
              assertTrue(report.contains(video))
          } finally { folder.deleteRecursively() }
      }
@@ -491,7 +497,7 @@
      }
      @Test fun logRotationIsBoundedAndRedactionHappensBeforeDisk() {
          val folder = Files.createTempDirectory("diplay-log-test").toFile()
-@@ -104,7 +128,9 @@
+@@ -104,7 +134,9 @@
                      it.append("password=secret")
                  }
              }
@@ -502,7 +508,7 @@
              assertEquals(8, folder.listFiles()!!.size)
              assertTrue(history.first().contains("session=2"))
              assertTrue(history.last().contains("session=9"))
-@@ -124,20 +150,4 @@
+@@ -124,20 +156,4 @@
          for (line in lines) assertNotNull(line, DiagnosticRedactor.redact(line))
          assertFalse(DiagnosticRedactor.redact(lines.last())!!.contains("192.168.49.1"))
      }
@@ -950,7 +956,7 @@
          assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
          assertEquals(View.VISIBLE, retry.visibility)
          report(5, CarPlayStatus.Failed("Bluetooth socket closed"))
-@@ -74,6 +94,47 @@
+@@ -74,6 +94,68 @@
          assertEquals(0, budget().retries)
          assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
          assertEquals(View.VISIBLE, retry.visibility)
@@ -973,6 +979,27 @@
 +        report(status = CarPlayStatus.Failed("USB transport error"))
 +        assertEquals(0, budget().retries)
 +        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
++    }
++
++    @Test fun wiredModeFailureStopsQueuedRetryAndKeepsActionableFeedback() {
++        ReflectionHelpers.setField(activity, "wirelessEnabled", false)
++        val stage = TextView(activity)
++        ReflectionHelpers.setField(activity, "stageStatusView", stage)
++        report(status = CarPlayStatus.Failed("earlier USB error"))
++        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
++        report(status = CarPlayStatus.Failed("CarPlay configuration request transferred -1 of 1 bytes",
++            usbModeSwitchFailed = true))
++        assertTrue(budget().stopped)
++        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
++        assertEquals(View.VISIBLE, retry.visibility)
++        val stoppedText = stage.text.toString()
++        assertTrue(stoppedText.contains("USB connection help"))
++        report(status = CarPlayStatus.DiscoveringIphone)
++        report(status = CarPlayStatus.Failed("late transport error"))
++        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
++        assertEquals(stoppedText, stage.text.toString())
++        assertEquals(0, ReflectionHelpers.getField<Int>(activity, "restartGeneration"))
++        assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
 +    }
 +
 +    @Test fun lateTransportErrorCannotReplaceExhaustedFeedbackWithGenericReconnectingText() {

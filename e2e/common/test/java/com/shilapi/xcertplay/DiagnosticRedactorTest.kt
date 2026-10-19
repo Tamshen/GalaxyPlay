@@ -10,6 +10,12 @@ class DiagnosticRedactorTest {
             "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",
             "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 phase=REENUMERATION USB mode query result=short returned=3 mode=3:3:3 elapsedMs=1",
             "USB mode query result=unavailable reason=permission elapsedMs=0",
+            "USB mode switch event=BEGIN request=0x52 index=4 expected=1 timeoutMs=1000 phoneLock=unknown carplayPairing=unknown",
+            "USB mode switch event=RESULT returned=-1 expected=1 elapsedMs=18",
+            "USB capability query result=complete returned=4 capability=1:0:255:0 elapsedMs=2",
+            "USB permission delivery source=broadcast granted=true",
+            "USB device event=DETACHED modeFailure=true",
+            "USB guide action=GUIDE_OPENED",
         )
         val folder = Files.createTempDirectory("usb-mode-report").toFile()
         try {

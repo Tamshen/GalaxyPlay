@@ -115,6 +115,27 @@ class WirelessStartupRecoveryTest {
         assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
     }
 
+    @Test fun wiredModeFailureStopsQueuedRetryAndKeepsActionableFeedback() {
+        ReflectionHelpers.setField(activity, "wirelessEnabled", false)
+        val stage = TextView(activity)
+        ReflectionHelpers.setField(activity, "stageStatusView", stage)
+        report(status = CarPlayStatus.Failed("earlier USB error"))
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        report(status = CarPlayStatus.Failed("CarPlay configuration request transferred -1 of 1 bytes",
+            usbModeSwitchFailed = true))
+        assertTrue(budget().stopped)
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        assertEquals(View.VISIBLE, retry.visibility)
+        val stoppedText = stage.text.toString()
+        assertTrue(stoppedText.contains("USB connection help"))
+        report(status = CarPlayStatus.DiscoveringIphone)
+        report(status = CarPlayStatus.Failed("late transport error"))
+        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
+        assertEquals(stoppedText, stage.text.toString())
+        assertEquals(0, ReflectionHelpers.getField<Int>(activity, "restartGeneration"))
+        assertEquals(1, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
+    }
+
     @Test fun lateTransportErrorCannotReplaceExhaustedFeedbackWithGenericReconnectingText() {
         val stage = TextView(activity)
         ReflectionHelpers.setField(activity, "stageStatusView", stage)

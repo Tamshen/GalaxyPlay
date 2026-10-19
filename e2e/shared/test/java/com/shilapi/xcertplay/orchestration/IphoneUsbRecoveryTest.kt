@@ -72,9 +72,27 @@ class IphoneUsbRecoveryTest {
         idle()
         assertTrue(usb().requested.isEmpty())
         assertTrue(statuses.last() is CarPlayStatus.Failed)
+        assertTrue((statuses.last() as CarPlayStatus.Failed).usbModeSwitchFailed)
+        assertEquals("USB_MODE_FAILED", phase(controller))
         assertTrue(usb().connections.single().closed)
         assertEquals(1, usb().connections.single().modeQueries)
+        assertEquals(1, usb().connections.single().capabilityQueries)
         assertFalse(reenumeration(controller).isActive())
+
+        // 复现模式失败后设备重新出现：不再触发第二轮授权，也不改写失败状态。
+        val failure = statuses.last()
+        event(controller, "onIphoneDetached", old)
+        event(controller, "onIphoneAttached", device("new"))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(40))
+        assertTrue(usb().requested.isEmpty())
+        assertEquals(failure, statuses.last())
+        assertEquals(1, usb().connections.size)
+
+        // 显式重试进入的同一发现入口能恢复；停止状态不永久封禁设备。
+        invoke(controller, "startIphone")
+        idle()
+        assertEquals(listOf("new"), usb().requested)
+        assertEquals(CarPlayStatus.RequestingIphonePermission, statuses.last())
     }
 
     @Test fun transitionCallbackQueuedBeforeCloseCannotStartPolling() = withController { controller, statuses ->
@@ -380,18 +398,24 @@ class TransitionUsbConnection : ShadowUsbDeviceConnection() {
     var failed = false
     var closed = false
     var modeQueries = 0
+    var capabilityQueries = 0
     @Implementation public override fun controlTransfer(requestType: Int, request: Int, value: Int, index: Int,
         buffer: ByteArray, length: Int, timeout: Int): Int {
         assertEquals(0xc0, requestType)
         assertEquals(0, value)
         assertEquals(1000, timeout)
-        if (request == 0x45) {
+        if (request == 0x45 || request == 0x53) {
             assertTrue(failed)
             assertEquals(0, index)
             assertEquals(4, length)
             assertEquals(4, buffer.size)
-            modeQueries += 1
-            assertEquals(1, modeQueries)
+            if (request == 0x45) {
+                modeQueries += 1
+                assertEquals(1, modeQueries)
+            } else {
+                capabilityQueries += 1
+                assertEquals(1, capabilityQueries)
+            }
             return -1
         }
         assertEquals(0x52, request)

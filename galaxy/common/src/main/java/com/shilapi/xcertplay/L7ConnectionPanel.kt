@@ -17,8 +17,14 @@ internal class L7ConnectionPanel(
     onReturn: () -> Unit,
     onCancel: () -> Unit,
     onRecovery: () -> Unit,
+    private val onLogs: () -> Unit = onReturn,
+    private val onDiagnostic: (String) -> Unit = {},
 ) : ScrollView(context) {
     private fun dp(value: Int) = L7Components.dp(context, value)
+    private var guide: android.app.AlertDialog? = null
+    val usbGuideButton = L7Components.actionButton(context, context.getString(R.string.galaxy_usb_help_title)) {
+        showUsbGuide()
+    }.apply { visibility = if (wireless) View.GONE else View.VISIBLE }
 
     val stage = L7Components.text(context, context.getString(R.string.getting_carplay_ready)).apply {
         textSize = 20f
@@ -65,10 +71,11 @@ internal class L7ConnectionPanel(
         card.addView(stage, row())
         card.addView(L7Components.text(context, context.getString(
             if (wireless) R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow
-            else R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an
+            else R.string.galaxy_usb_waiting_hint
         ), secondary = true).apply { textSize = 18f; gravity = Gravity.CENTER }, row(top = 16))
         card.addView(retryButton, row(top = 24))
         card.addView(recoveryButton, row(top = 24))
+        card.addView(usbGuideButton, row(top = 12))
         card.addView(L7Components.actionButton(context, context.getString(R.string.back_to_diplay),
             primary = true, click = onReturn), row(top = 24))
         card.addView(cancelButton, row(top = 12))
@@ -79,6 +86,26 @@ internal class L7ConnectionPanel(
     }
 
     private fun row(top: Int = 0) = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) }
+
+    private fun showUsbGuide() {
+        guide?.dismiss()
+        record("GUIDE_OPENED")
+        guide = L7Dialogs.builder(context).setTitle(R.string.galaxy_usb_help_title)
+            .setMessage(R.string.galaxy_usb_help_body)
+            .setNegativeButton(R.string.close, null)
+            .setPositiveButton(R.string.l7_logs_title) { _, _ -> record("OPEN_LOGS"); onLogs() }
+            .show()
+    }
+
+    private fun record(action: String) {
+        // 用户打开引导不等于已解锁或清理配对；只记录明确点击，不记录手机身份。
+        try { onDiagnostic("USB guide action=$action") } catch (_: Exception) { }
+    }
+
+    override fun onDetachedFromWindow() {
+        guide?.dismiss(); guide = null
+        super.onDetachedFromWindow()
+    }
 
     private fun cancelConnection(onCancel: () -> Unit) {
         // 先禁用并由统一组件刷新反馈，防止异步关闭期间重复取消。

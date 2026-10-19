@@ -165,7 +165,7 @@ class IphoneUsbHost(
         executor.execute {
             callback(runTransition(device) { connection ->
                 val response = ByteArray(VENDOR_RESPONSE_LENGTH)
-                val transferred = connection.controlTransfer(
+                val transferred = UsbModeDiagnostics.traceSwitch(onDiagnostic) { connection.controlTransfer(
                     USB_VENDOR_DEVICE_IN,
                     CARPLAY_CONFIGURATION_REQUEST,
                     0,
@@ -173,10 +173,10 @@ class IphoneUsbHost(
                     response,
                     response.size,
                     CONTROL_TRANSFER_TIMEOUT_MILLIS,
-                )
+                ) }
                 if (transferred != response.size) {
                     UsbModeDiagnostics.recordRejection(device, connection, transferred, onDiagnostic)
-                    throw IphoneUsbException.Protocol(
+                    throw IphoneUsbException.ModeSwitchFailed(
                         "CarPlay configuration request transferred $transferred of ${response.size} bytes",
                     )
                 }
@@ -501,6 +501,8 @@ internal fun describeUsbEndpoint(endpoint: UsbEndpoint): String =
 
 /** USB bring-up failures that precede iAP2 and are distinct from MFi I2C failures. */
 sealed class IphoneUsbException(message: String, cause: Throwable? = null) : IOException(message, cause) {
+    /** 相同模式请求不自动重发；保留原始传输结果供诊断，等待用户处理手机后重试。 */
+    class ModeSwitchFailed(message: String) : IphoneUsbException(message)
     class PermissionDenied(message: String, cause: Throwable? = null) : IphoneUsbException(message, cause)
     class DeviceUnavailable(message: String, cause: Throwable? = null) : IphoneUsbException(message, cause)
     class TimedOut(message: String, cause: Throwable? = null) : IphoneUsbException(message, cause)

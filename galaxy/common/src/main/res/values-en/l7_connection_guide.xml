@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_usb_mode_switch_failed">Could not switch to CarPlay USB mode. Automatic retries have stopped. Open USB connection help to check the unlock state and old CarPlay entry, then tap Retry connection.</string>
     <string name="l7_connection_choose">Choose a connection method</string>
     <string name="l7_connection_choose_hint">Wireless and USB have separate checks and guides. Choose how to connect.</string>
     <string name="l7_connection_wireless_hint">Choose native hotspot or Wi-Fi Direct, then pair and connect iPhone.</string>
@@ -45,7 +46,7 @@
     <string name="l7_usb_found">Detected %1$d Apple USB device(s). USB permission and the CarPlay handshake are still required.</string>
     <string name="l7_usb_permission_wait">Permission needed: tap Connect and allow the Android USB prompt. Reconnection may request permission again.</string>
     <string name="l7_usb_permission_ok">USB access granted for the detected devices. This alone does not confirm a CarPlay connection.</string>
-    <string name="l7_usb_phone_hint">Keep iPhone unlocked and allow CarPlay when prompted. This guide does not check hotspot or Bluetooth settings. If no picture appears, try another data cable and data port.</string>
+    <string name="l7_usb_phone_hint">Keep your iPhone unlocked throughout setup and confirm any Trust or CarPlay prompt. If the mode switch fails, open USB connection help on the waiting screen to check old car entries and upload the log from one attempt.</string>
     <string name="l7_usb_check_failed">Check failed: USB status could not be read. Retry or collect a report in Debug &amp; logs.</string>
     <string name="l7_usb_not_ready">USB is not ready</string>
     <string name="l7_usb_wait_connect">Wait for a USB connection</string>
@@ -71,4 +72,13 @@
     <string name="wifi_direct_channel_title">Preferred Wi-Fi Direct channel</string>
     <string name="wifi_direct_channel_choice">Channel %1$d · %2$s</string>
     <string name="wifi_direct_channel_description">Auto follows the selected vehicle region. Manual channels also require system support. Mainland China prefers upper 5 GHz; other regions use conservative 2.4 GHz. Changes apply to the next connection.</string>
+    <string name="galaxy_usb_help_title">USB connection help</string>
+    <string name="galaxy_usb_help_body">1 · Keep the iPhone unlocked\nCancel this attempt, unplug the cable, unlock your iPhone and keep its screen on. Reconnect to the car USB data port. Allow USB access on the head unit and confirm any Trust or CarPlay prompt on the phone.\n\n2 · Check the old CarPlay entry\nIf it still fails, open Settings → General → CarPlay on your iPhone. Use Forget This Car only for the old entry for this head unit, then reconnect while unlocked. You will need to pair again. Skip this step if no matching entry exists.\n\n3 · Save the result\nChange one condition at a time. After failure, open Logs and upload manually. Include the iPhone model, iOS version, whether it stayed unlocked, whether you removed the old entry, and whether you unplugged it yourself. The app cannot verify the phone lock or pairing state.</string>
+    <string name="galaxy_usb_waiting_hint">Keep your iPhone unlocked throughout setup. After allowing USB access on the head unit, confirm any Trust or CarPlay prompt on the phone. If setup fails, open USB connection help.</string>
+    <string name="galaxy_usb_stage_find">Looking for your iPhone. Keep it unlocked and connect it to the car USB data port.</string>
+    <string name="galaxy_usb_stage_permission">Allow GalaxyPlay to access your iPhone in the head unit prompt. Keep the phone unlocked.</string>
+    <string name="galaxy_usb_stage_switch">USB access granted. Switching to CarPlay mode. Keep the iPhone unlocked and the cable connected.</string>
+    <string name="galaxy_usb_stage_reenumeration">Waiting for the iPhone to reappear. Keep it connected and allow USB access if prompted again.</string>
+    <string name="galaxy_usb_stage_pairing">Connecting to the iPhone. Confirm any Trust or CarPlay prompt on the phone.</string>
+    <string name="galaxy_usb_stage_session">Starting the CarPlay session and waiting for the display. Keep the iPhone unlocked.</string>
 </resources>

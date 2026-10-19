@@ -143,7 +143,8 @@ sealed class CarPlayStatus {
     data object RunningControl : CarPlayStatus()
     data object ControlEnded : CarPlayStatus()
     data class Failed(val message: String, val wifiResetRequired: Boolean = false,
-        val startupFailure: WirelessStartupFailure? = null) : CarPlayStatus()
+        val startupFailure: WirelessStartupFailure? = null,
+        val usbModeSwitchFailed: Boolean = false) : CarPlayStatus()
 }
 
 internal fun isWirelessHandoffInProgress(
@@ -190,7 +191,7 @@ class CarPlayController(
         BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
     }
 
-    private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
+    private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, USB_MODE_FAILED, DATAPATHS, CONTROL }
 
     private val appContext = context.applicationContext
     private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
@@ -1960,7 +1961,7 @@ class CarPlayController(
             when (val request = iphoneHost.requestPermission(device, ticket.id)) {
                 is IphoneUsbHost.PermissionRequest.AlreadyGranted -> {
                     connectionDiagnostic("USB permission result=ALREADY_GRANTED")
-                    onIphonePermission(IphoneUsbHost.PermissionResult.Granted(request.device, ticket.id))
+                    consumeIphonePermission(IphoneUsbHost.PermissionResult.Granted(request.device, ticket.id), "existing")
                 }
                 is IphoneUsbHost.PermissionRequest.Requested -> {
                     if (!iphonePermission.isPending(ticket)) return
@@ -1974,13 +1975,16 @@ class CarPlayController(
         }
     }
 
-    private fun onIphonePermission(result: IphoneUsbHost.PermissionResult) {
+    private fun onIphonePermission(result: IphoneUsbHost.PermissionResult) = consumeIphonePermission(result, "broadcast")
+
+    private fun consumeIphonePermission(result: IphoneUsbHost.PermissionResult, source: String) {
         val generation = iphoneGeneration.get()
         val (device, requestId) = when (result) {
             is IphoneUsbHost.PermissionResult.Granted -> result.device to result.requestId
             is IphoneUsbHost.PermissionResult.Denied -> result.device to result.requestId
         }
         if (!waitingForIphonePermission() || !iphonePermission.complete(device.deviceName, requestId)) return
+        connectionDiagnostic("USB permission delivery source=$source granted=${result is IphoneUsbHost.PermissionResult.Granted}")
         when (result) {
             is IphoneUsbHost.PermissionResult.Granted -> {
                 try {
@@ -2028,7 +2032,7 @@ class CarPlayController(
                         if (!iphonePermission.isPending(ticket)) return
                     }
                     if (requireUsbManager().hasPermission(device)) {
-                        onIphonePermission(IphoneUsbHost.PermissionResult.Granted(device, ticket.id))
+                        consumeIphonePermission(IphoneUsbHost.PermissionResult.Granted(device, ticket.id), "poll")
                         return
                     }
                     if (System.nanoTime() >= deadlineNanos) {
@@ -2067,7 +2071,14 @@ class CarPlayController(
                     }
                     is IphoneUsbHost.TransitionResult.Failed -> {
                         iphoneReenumeration.clear()
-                        fail(transition.error, generation)
+                        if (transition.error is IphoneUsbException.ModeSwitchFailed) {
+                            // 阻断失败后的插拔恢复和旧授权回调，显式重试才重新进入发现阶段。
+                            invalidateIphonePermission()
+                            availabilityPollGeneration.incrementAndGet()
+                            phase = Phase.USB_MODE_FAILED
+                            connectionDiagnostic("USB mode recovery action=wait-manual-retry")
+                            fail(transition.error, iphoneGeneration.get())
+                        } else fail(transition.error, generation)
                     }
                 }
             }
@@ -2100,6 +2111,7 @@ class CarPlayController(
 
     private fun onIphoneAttached(device: UsbDevice) {
         if (closed) return
+        connectionDiagnostic("USB device event=ATTACHED modeFailure=${phase == Phase.USB_MODE_FAILED}")
         when (phase) {
             Phase.IPHONE -> {
                 availabilityPollGeneration.incrementAndGet()
@@ -2115,6 +2127,7 @@ class CarPlayController(
     }
 
     private fun onIphoneDetached(device: UsbDevice) {
+        if (!closed) connectionDiagnostic("USB device event=DETACHED modeFailure=${phase == Phase.USB_MODE_FAILED}")
         if (closed || phase !in setOf(Phase.IPHONE, Phase.REENUMERATION)) return
         if (currentIphoneDevice != device.deviceName && !iphoneReenumeration.isSource(device.deviceName)) return
         try {
@@ -2906,8 +2919,9 @@ class CarPlayController(
             val causes = generateSequence(error) { it.cause }.toList()
             onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName,
                 causes.any { it is com.shilapi.xcertplay.network.P2pResetRequiredException },
-                causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason),
-                if (wireless) wirelessGeneration.get() else null)
+                causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason,
+                !wireless && causes.any { it is IphoneUsbException.ModeSwitchFailed }),
+                generation ?: currentStatusGeneration())
         }
     }
 
