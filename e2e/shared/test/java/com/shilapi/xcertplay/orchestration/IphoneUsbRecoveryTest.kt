@@ -73,6 +73,7 @@ class IphoneUsbRecoveryTest {
         assertTrue(usb().requested.isEmpty())
         assertTrue(statuses.last() is CarPlayStatus.Failed)
         assertTrue(usb().connections.single().closed)
+        assertEquals(1, usb().connections.single().modeQueries)
         assertFalse(reenumeration(controller).isActive())
     }
 
@@ -373,19 +374,29 @@ class PermissionUsbManager : ShadowUsbManager() {
     }
 }
 
-/** 只覆盖配置切换控制传输与关闭，不提供 USBMUX、NCM 或认证成功替身。 */
+/** 覆盖配置切换、失败后的只读模式查询与关闭，不模拟 USBMUX、NCM 或认证成功。 */
 @Implements(UsbDeviceConnection::class)
 class TransitionUsbConnection : ShadowUsbDeviceConnection() {
     var failed = false
     var closed = false
+    var modeQueries = 0
     @Implementation public override fun controlTransfer(requestType: Int, request: Int, value: Int, index: Int,
         buffer: ByteArray, length: Int, timeout: Int): Int {
         assertEquals(0xc0, requestType)
-        assertEquals(0x52, request)
         assertEquals(0, value)
+        assertEquals(1000, timeout)
+        if (request == 0x45) {
+            assertTrue(failed)
+            assertEquals(0, index)
+            assertEquals(4, length)
+            assertEquals(4, buffer.size)
+            modeQueries += 1
+            assertEquals(1, modeQueries)
+            return -1
+        }
+        assertEquals(0x52, request)
         assertEquals(4, index)
         assertEquals(1, length)
-        assertEquals(1000, timeout)
         return if (failed) -1 else length
     }
     @Implementation fun close() { closed = true }

@@ -175,6 +175,7 @@ class IphoneUsbHost(
                     CONTROL_TRANSFER_TIMEOUT_MILLIS,
                 )
                 if (transferred != response.size) {
+                    UsbModeDiagnostics.recordRejection(device, connection, transferred, onDiagnostic)
                     throw IphoneUsbException.Protocol(
                         "CarPlay configuration request transferred $transferred of ${response.size} bytes",
                     )

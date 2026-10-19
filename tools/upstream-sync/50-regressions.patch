@@ -354,37 +354,49 @@
      @Test fun deniedWriteRemovesOnlyTheNewPendingEntry() {
 --- a/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/DiagnosticRedactorTest.kt
-@@ -5,54 +5,20 @@
+@@ -5,54 +5,41 @@
  import java.nio.file.Files
  
  class DiagnosticRedactorTest {
 -    @Test fun additionalTroubleshootingMetadataSurvivesSavedReportWithoutPayloads() {
--        val lines = listOf(
++    @Test fun usbModeMetadataSurvivesRedactionAndDiskWithoutIdentity() {
+         val lines = listOf(
 -            "wireless startup elapsedMs=10000 authenticated=true wifiConfigs=2 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=WiFi_discovery_or_AirPlay_TCP startRequestAgeMs=9000 firstTcpAfterStartMs=none",
 -            "receiveCounters windowMs=10000 udpScope=device ifaceRx=sampled ifaceRxPacketsDelta=400 ifaceRxBytesDelta=8000 ifaceRxDroppedDelta=2 ifaceRxErrorsDelta=0 ifaceRxMissedErrorsDelta=1 udp4=sampled udp4InDatagramsDelta=390 udp4InErrorsDelta=2 udp4RcvbufErrorsDelta=1 udp4InCsumErrorsDelta=1 udp6=unavailable failureClass=FileNotFoundException",
 -            "Audio: renderer failed api=30 audioType=default codec=OPUS stage=decoder-configure error=IllegalArgumentException causes=IllegalArgumentException at=android.media.MediaCodec.configure:100",
 -            "Audio: decoder stats audioType=default codec=OPUS inputQueuedTotal=20 inputDroppedTotal=0 shortOpusPacketsTotal=2 decoderUnavailablePacketsTotal=0 outputBuffersTotal=19 ended=true",
 -            "THEME_DIAGNOSTIC sample source=poll uiMode=0x13 nightMask=0x10 reported=light applied=light sessionActive=true pollsSinceSample=30 callbacksSinceSample=0",
 -            "Process exit index=0 ageMs=5000 reason=native_crash reasonCode=5 status=11 importance=100 pssKiB=2048 rssKiB=4096",
--        )
++            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",
++            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 phase=REENUMERATION USB mode query result=short returned=3 mode=3:3:3 elapsedMs=1",
++            "USB mode query result=unavailable reason=permission elapsedMs=0",
+         )
 -        val folder = Files.createTempDirectory("diplay-troubleshooting-report").toFile()
--        try {
++        val folder = Files.createTempDirectory("usb-mode-report").toFile()
+         try {
 -            val file = folder.resolve("diplay.log")
 -            SessionLogFile(file).use { log ->
--                log.reset("started")
++            SessionLogFile(folder.resolve("diplay.log")).use { log ->
+                 log.reset("started")
 -                for (line in lines) {
 -                    assertTrue("New fields must fit the export cap", line.length < 700)
 -                    assertEquals(line, DiagnosticRedactor.redact(line))
 -                    log.append(line)
--                }
++                lines.forEach {
++                    assertEquals(it, DiagnosticRedactor.redact(it))
++                    assertEquals(it, DiagnosticRedactor.redact(DiagnosticRedactor.redact(it)!!))
++                    log.append(it)
+                 }
 -                log.append("Audio: payload=private-recording")
--            }
+             }
 -            val report = file.readText()
 -            lines.forEach { assertTrue(report.contains(it)) }
 -            assertFalse(report.contains("private-recording"))
--        } finally { folder.deleteRecursively() }
--    }
--
++            val saved = folder.resolve("diplay.log").readText()
++            lines.forEach { assertTrue(saved.contains(it)) }
+         } finally { folder.deleteRecursively() }
+     }
+ 
 -    @Test fun boundedMicrophoneStartFailureAndCaptureCountersSurviveRedaction() {
 -        val lines = listOf(
 -            "Microphone: start type=telephony source=VOICE_COMMUNICATION codec=OPUS rate=48000 channels=1 frameMs=20 routedDeviceType=15",
@@ -423,7 +435,7 @@
      }
      @Test fun savedDriveReportKeepsMediaPerformanceCounters() {
          val folder = Files.createTempDirectory("diplay-media-report").toFile()
-@@ -69,15 +35,52 @@
+@@ -69,15 +56,52 @@
              assertTrue(report.contains(video))
          } finally { folder.deleteRecursively() }
      }
@@ -479,7 +491,7 @@
      }
      @Test fun logRotationIsBoundedAndRedactionHappensBeforeDisk() {
          val folder = Files.createTempDirectory("diplay-log-test").toFile()
-@@ -104,7 +107,9 @@
+@@ -104,7 +128,9 @@
                      it.append("password=secret")
                  }
              }
@@ -490,7 +502,7 @@
              assertEquals(8, folder.listFiles()!!.size)
              assertTrue(history.first().contains("session=2"))
              assertTrue(history.last().contains("session=9"))
-@@ -124,20 +129,4 @@
+@@ -124,20 +150,4 @@
          for (line in lines) assertNotNull(line, DiagnosticRedactor.redact(line))
          assertFalse(DiagnosticRedactor.redact(lines.last())!!.contains("192.168.49.1"))
      }

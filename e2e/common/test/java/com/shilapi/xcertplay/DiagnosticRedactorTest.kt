@@ -5,6 +5,27 @@ import org.junit.Test
 import java.nio.file.Files
 
 class DiagnosticRedactorTest {
+    @Test fun usbModeMetadataSurvivesRedactionAndDiskWithoutIdentity() {
+        val lines = listOf(
+            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",
+            "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=124 phase=REENUMERATION USB mode query result=short returned=3 mode=3:3:3 elapsedMs=1",
+            "USB mode query result=unavailable reason=permission elapsedMs=0",
+        )
+        val folder = Files.createTempDirectory("usb-mode-report").toFile()
+        try {
+            SessionLogFile(folder.resolve("diplay.log")).use { log ->
+                log.reset("started")
+                lines.forEach {
+                    assertEquals(it, DiagnosticRedactor.redact(it))
+                    assertEquals(it, DiagnosticRedactor.redact(DiagnosticRedactor.redact(it)!!))
+                    log.append(it)
+                }
+            }
+            val saved = folder.resolve("diplay.log").readText()
+            lines.forEach { assertTrue(saved.contains(it)) }
+        } finally { folder.deleteRecursively() }
+    }
+
     @Test fun performanceBasicModeKeepsCpuWhileRealAuthorizationRemainsHidden() {
         for (cpu in listOf("unknown", "0.0", "153.7", "100")) {
             val line = "PERFORMANCE SAMPLE atMs=123 mode=BASIC cpuCorePercent=$cpu javaBytes=1234"
