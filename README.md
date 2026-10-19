@@ -42,6 +42,9 @@ Android 11 AVD 实际截图（v0.1.153，1440×1920）。
 项目采用 **Docker 构建环境**，Android 编译、单元测试、lint 和 APK 打包均在容器中完成。宿主机准备 Git、Python 3 和 Docker，在仓库根目录执行：
 
 ```bash
+# 在 .env 配置 DIPLAY_AUTH_ASSETS_DIR 后，自动读取证书并打包
+bash scripts/build-galaxyplay-host.sh
+
 # 构建不含预置认证身份的源码验证包
 bash scripts/build-android-docker.sh --source-only
 ```

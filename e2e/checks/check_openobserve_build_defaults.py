@@ -11,7 +11,7 @@ root = Path(__file__).resolve().parents[2]
 path = root / '.env'
 backup = path.read_bytes() if path.exists() else None
 env = dict(os.environ)
-for key in ('L7_LOG_SERVER_URL', 'L7_LOG_AUTHORIZATION'): env.pop(key, None)
+for key in ('GALAXY_PLAY_LOG_SERVER_URL', 'GALAXY_PLAY_LOG_AUTHORIZATION'): env.pop(key, None)
 env['DIPLAY_AUTH_ASSETS_DIR'] = env.get('DIPLAY_AUTH_ASSETS_DIR', str(root / '.private/auth-assets'))
 auth = 'Basic ' + base64.b64encode(('test:' + str(uuid.uuid4())).encode()).decode()
 url = 'https://logs.example/api/test/{HeadUnit}-{DeviceID}/_json'
@@ -27,12 +27,12 @@ def generate(environment):
     return {v.get('name'): (v.text or '').strip('"') for v in values}
 
 try:
-    path.write_text(f'L7_LOG_SERVER_URL="{url}"\nL7_LOG_AUTHORIZATION="{auth}"\n')
+    path.write_text(f'GALAXY_PLAY_LOG_SERVER_URL="{url}"\nGALAXY_PLAY_LOG_AUTHORIZATION="{auth}"\n')
     values = generate(env)
     assert values['l7_log_default_url'] == url
     assert values['l7_log_default_authorization'] == auth
     override = 'https://override.example/api/test/other/_json'
-    values = generate(dict(env, L7_LOG_SERVER_URL=override))
+    values = generate(dict(env, GALAXY_PLAY_LOG_SERVER_URL=override))
     assert values['l7_log_default_url'] == override
     assert values['l7_log_default_authorization'] == auth
     values = generate(env)

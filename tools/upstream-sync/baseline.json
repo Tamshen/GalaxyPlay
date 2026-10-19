@@ -1260,7 +1260,7 @@
     "e2e/upstream-reference/shared/test/java/com/shilapi/xcertplay/transport/Android7UsbReadTest.kt": "5019920a024255db99a144fedebe98c12cf652175d6fb1025dfc6f69e9af93a5",
     "e2e/upstream-reference/shared/test/java/com/shilapi/xcertplay/transport/UsbCompletionReaperTest.kt": "701c7e0d767f4940e065037269d8062fcfabee3a18d49e48d5ca4058fb01a394",
     "gradle/libs.versions.toml": "d36737bf5f1fee666673928d0e68f9c8e43ebf174fa7fc3f13619543d3b5fd35",
-    "mobile/build.gradle.kts": "dc15827f5c173a4775782bc935c09e439d353580e4e96ae895fa2a550d79fae5",
+    "mobile/build.gradle.kts": "ddb97e81622cda2c9d6e717e2f8b79392081137a082012931b1cc899beb539ee",
     "mobile/src/main/AndroidManifest.xml": "58e2c73dac15811e1c6c9406a103517810b0930a7ff711fa5be38b663ba81e2c",
     "mobile/src/main/keepRules/rules.keep": "cd9f36ade2d8604e1b7cf24eff5b171f9c0816c0aa013ba7eb55be4fe2e1dac7",
     "mobile/src/main/res/values/config.xml": "7bd7cf82017df67b0f218c6df21bd6419120150d053a9c0e9ad0bcfafd181398",

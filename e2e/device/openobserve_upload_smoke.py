@@ -27,11 +27,11 @@ out.mkdir(parents=True, exist_ok=True)
 base = [args.adb, '-s', args.serial]
 config = {}
 for line in (root / '.env').read_text().splitlines():
-    if line.startswith('L7_LOG_') and '=' in line:
+    if line.startswith('GALAXY_PLAY_LOG_') and '=' in line:
         key, value = line.split('=', 1)
         config[key] = value.strip().strip('\"\'')
-endpoint = config['L7_LOG_SERVER_URL']
-authorization = config['L7_LOG_AUTHORIZATION']
+endpoint = config['GALAXY_PLAY_LOG_SERVER_URL']
+authorization = config['GALAXY_PLAY_LOG_AUTHORIZATION']
 url = urllib.parse.urlsplit(endpoint)
 prefix, organization, example_stream, suffix = url.path.rsplit('/', 3)
 assert suffix == '_json' and prefix.endswith('/api')

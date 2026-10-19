@@ -161,8 +161,8 @@
 +        val raw = line.substringAfter('=').trim()
 +        key to if (raw.length >= 2 && raw.first() == raw.last() && raw.first() in "\"'") raw.substring(1, raw.length - 1) else raw
 +    }
-+val logServerUrl = providers.environmentVariable("L7_LOG_SERVER_URL").getOrElse(logDefaults["L7_LOG_SERVER_URL"].orEmpty())
-+val logAuthorization = providers.environmentVariable("L7_LOG_AUTHORIZATION").getOrElse(logDefaults["L7_LOG_AUTHORIZATION"].orEmpty())
++val logServerUrl = providers.environmentVariable("GALAXY_PLAY_LOG_SERVER_URL").getOrElse(logDefaults["GALAXY_PLAY_LOG_SERVER_URL"].orEmpty())
++val logAuthorization = providers.environmentVariable("GALAXY_PLAY_LOG_AUTHORIZATION").getOrElse(logDefaults["GALAXY_PLAY_LOG_AUTHORIZATION"].orEmpty())
 +check(logServerUrl.isEmpty() || runCatching {
 +    val slot = logServerUrl.substringBeforeLast('/').substringAfterLast('/')
 +    val prefix = logServerUrl.substringBeforeLast('/').substringBeforeLast('/')
@@ -174,13 +174,13 @@
 +        uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
 +        (uri.port == -1 || uri.port in 1..65535) &&
 +        Regex("(?:/[^/]+)*/api/[^/]+/[^/]+/_json").matches(uri.path)
-+}.getOrDefault(false)) { "L7_LOG_SERVER_URL 格式无效" }
++}.getOrDefault(false)) { "GALAXY_PLAY_LOG_SERVER_URL 格式无效" }
 +check(logAuthorization.isEmpty() || runCatching {
 +    check(logAuthorization.length <= 4096 && logAuthorization.matches(Regex("Basic [A-Za-z0-9+/]+={0,2}")))
 +    val decoded = Base64.getDecoder().decode(logAuthorization.removePrefix("Basic ")).toString(Charsets.UTF_8)
 +    val colon = decoded.indexOf(':')
 +    colon > 0 && colon < decoded.lastIndex && decoded.none { it.code < 32 || it.code == 127 }
-+}.getOrDefault(false)) { "L7_LOG_AUTHORIZATION 格式无效" }
++}.getOrDefault(false)) { "GALAXY_PLAY_LOG_AUTHORIZATION 格式无效" }
 +fun logResource(value: String): String = "\"" + value.replace("&", "&amp;").replace("<", "&lt;")
 +    .replace(">", "&gt;").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 +

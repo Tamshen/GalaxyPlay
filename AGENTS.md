@@ -106,7 +106,7 @@ Galaxy Play 是面向吉利银河（Geely Galaxy）车机、基于 DiPlay 的开
 ## 凭据与文档
 
 - 密钥、密码、令牌、配对内容、认证和 Android 签名材料不入库、不进日志；规则见[安全与隐私](docs/安全与隐私.md)。
-- 认证默认从 .private/auth-assets/offline-mfi 外部输入，可用 DIPLAY_AUTH_ASSETS_DIR 覆盖；不得覆盖用户显式选择的 USB 或远程来源。
+- 认证根目录由环境变量或 .env 的 DIPLAY_AUTH_ASSETS_DIR 指定，未设置时使用 .private/auth-assets/；相对路径从仓库根目录计算，打包只读挂载 offline-mfi/ 下配套材料，源码包不含身份。日志打包变量统一为 GALAXY_PLAY_LOG_SERVER_URL／GALAXY_PLAY_LOG_AUTHORIZATION；不得覆盖用户显式选择的 USB 或远程认证来源。
 - 文字导入先验证 P-256 私钥与证书匹配再替换；失败保留旧材料，输入不参与界面状态备份。
 - --source-only 不含内置身份，不能作为内置认证验收包；--release 使用外部 keystore，不自动替换成调试签名。
 - 报告由用户主动导出；远程日志仅允许用户点击后上传到配置的 OpenObserve，不自动发送或自动重试。不维护自建日志服务；原始语音、协议载荷、测试凭据不得进入正式 APK。

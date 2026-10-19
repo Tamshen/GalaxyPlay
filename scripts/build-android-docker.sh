@@ -21,7 +21,7 @@ usage() {
 用法：bash scripts/build-android-docker.sh [选项]
   无参数          使用本地认证材料构建内置 MFi 的实车测试 APK，自动压缩并检查 DEX
   --check         运行单元测试、mobile lint 和内置 MFi APK 构建
-  --standalone    同默认打包；DIPLAY_AUTH_ASSETS_DIR 可覆盖本地材料路径
+  --standalone    同默认打包；自动读取 .env 的 DIPLAY_AUTH_ASSETS_DIR，环境变量优先
   --release       使用外部 Android keystore 构建带内置 MFi 的发布包
   --source-only   构建不含认证身份的源码验证 APK
   --image-only    仅准备 Docker 构建镜像
@@ -30,7 +30,7 @@ usage() {
   --warm          旧参数兼容；不再保留运行容器，统一在结束后自动删除
   --help          显示帮助
 基础镜像：mobiledevops/android-sdk-image:latest；默认 linux/amd64，--arm64 为混合构建。
-默认认证目录：仓库内 .private/auth-assets/，不得提交到 Git。
+认证目录：环境变量 > 根目录 .env > .private/auth-assets/；相对路径从仓库根目录计算。
 EOF
 }
 
@@ -72,7 +72,9 @@ elif [[ "$build_mode" == "custom" ]]; then
     # 显式外部输入或自定义 standalone 任务也使用相同的只读挂载。
     if [[ -n "${DIPLAY_AUTH_ASSETS_DIR:-}" ]]; then needs_auth=true; fi
     for task in "${gradle_tasks[@]}"; do
-        if [[ "$task" == ':mobile:assembleStandaloneDebug' || "$task" == ':mobile:assembleStandaloneRelease' ]]; then needs_auth=true; fi
+        case "$task" in
+            :mobile:assembleStandaloneDebug|:mobile:assembleStandaloneRelease|:mobile:verifyStandaloneAuthentication) needs_auth=true ;;
+        esac
     done
 fi
 
@@ -101,9 +103,9 @@ if [[ "$needs_signing" == true ]]; then
         --env ANDROID_KEYSTORE_PASSWORD --env ANDROID_KEY_ALIAS --env ANDROID_KEY_PASSWORD)
 fi
 if [[ "$needs_auth" == true ]]; then
-    auth_input="${DIPLAY_AUTH_ASSETS_DIR:-$project_dir/.private/auth-assets}"
+    auth_input="$(python3 "$project_dir/scripts/resolve-auth-assets.py" "$project_dir")"
     if [[ ! -d "$auth_input" ]]; then
-        printf '%s\n' '缺少本地认证目录 .private/auth-assets/；可用 DIPLAY_AUTH_ASSETS_DIR 指定材料，或用 --source-only 构建源码验证包。' >&2
+        printf '%s\n' '认证目录不存在；请在 .env 或环境变量中配置 DIPLAY_AUTH_ASSETS_DIR，或用 --source-only 构建源码验证包。' >&2
         exit 2
     fi
     auth_dir="$(cd "$auth_input" && pwd)"
@@ -141,7 +143,7 @@ if [[ "$build_mode" == image ]]; then exit 0; fi
 mkdir -p "$project_dir/build"
 # 日志默认值也可从根目录 .env 读取；显式环境变量按变量名传递，不打印令牌。
 log_run_args=(run --rm --platform "$build_platform")
-for variable in L7_LOG_SERVER_URL L7_LOG_AUTHORIZATION; do
+for variable in GALAXY_PLAY_LOG_SERVER_URL GALAXY_PLAY_LOG_AUTHORIZATION; do
     if [[ ${!variable+x} ]]; then
         export "$variable"
         log_run_args+=(--env "$variable")
