@@ -10,6 +10,7 @@ internal interface L7MediaCenterPort : Closeable {
     val source: Int get() = CARPLAY_SOURCE
     /** 先准备回调快照，再请求控制权；此阶段不发状态 IPC。 */
     fun prepare(value: CarPlayNowPlaying, artwork: Uri?) {}
+    fun diagnosticFacts(): Map<String, Long> = emptyMap()
     fun register(): Boolean
     fun sources(values: IntArray): Boolean
     fun currentSource()

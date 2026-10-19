@@ -22,6 +22,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
     private lateinit var start: L7SettingRow
     private lateinit var end: L7SettingRow
     private lateinit var evidence: L7SettingRow
+    private val mediaFeedback: GalaxyMediaReportFeedback?
     private val details: L7DebugDetails
     private val actionsSection = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
     private var shown: L7ReportingTestController.Snapshot? = null
@@ -36,12 +37,12 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
                 L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && it.phase == L7ReportingTestController.Phase.RUNNING && it.preview != null }
             }, { guideBaseline = L7ReportingTests.snapshot().run }),
             L7DebugGuide.Step(R.string.debug_guide_observe, R.string.debug_guide_observe_body, { evidence }, {
-                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && it.observation != null }
+                L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline && (it.observation != null || hasMediaFeedback()) }
             }),
         ) + guidedActions().mapIndexed { index, (title, action) ->
             L7DebugGuide.Step(title, R.string.debug_guide_field_body, { controls.getOrNull(index) }, {
                 L7ReportingTests.snapshot().let { it.kind == kind && it.run > guideBaseline &&
-                    it.phase == L7ReportingTestController.Phase.RUNNING && it.step > guide.memory.getLong("actionBaseline") && it.lastAction == action && it.observation != null }
+                    it.phase == L7ReportingTestController.Phase.RUNNING && it.step > guide.memory.getLong("actionBaseline") && it.lastAction == action && (it.observation != null || hasMediaFeedback()) }
             }, { guide.memory.putLong("actionBaseline", L7ReportingTests.snapshot().step) })
         } + listOf(
             L7DebugGuide.Step(R.string.debug_guide_cleanup, R.string.debug_guide_cleanup_body, { if (end.visibility == View.VISIBLE) end else evidence }, {
@@ -77,6 +78,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
                 }.also(card::addView))
             }
         }
+        mediaFeedback = if (kind == L7ReportingKind.MEDIA) GalaxyMediaReportFeedback(activity, parent) else null
         details = L7DebugDetails(activity, parent)
         update()
     }
@@ -104,6 +106,7 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
 
     fun update() {
         if (disposed) return
+        mediaFeedback?.update()
         guide.update()
         val value = L7ReportingTests.snapshot()
         val phone = CarPlayBackgroundSession.hasSession()
@@ -160,7 +163,13 @@ internal class L7ReportingTestPage(private val activity: Activity, parent: Linea
         update()
     }
 
+    private fun hasMediaFeedback(): Boolean {
+        if (kind != L7ReportingKind.MEDIA) return false
+        val current = GalaxyMediaReportEvidence.active ?: return false
+        val snapshot = current.snapshot()
+        return current.available() && snapshot.facts["observedRevision"] == snapshot.revision
+    }
     fun resume() { guide.resume() }
-    fun background() { guide.background(); dialog?.dismiss(); dialog = null }
-    override fun close() { guide.close(); disposed = true; background() }
+    fun background() { mediaFeedback?.background(); guide.background(); dialog?.dismiss(); dialog = null }
+    override fun close() { mediaFeedback?.close(); guide.close(); disposed = true; background() }
 }

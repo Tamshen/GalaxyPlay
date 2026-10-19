@@ -41,8 +41,8 @@ internal class L7ManualMediaReport(
             } finally { released() }
         }
     }
-    private val oem = if (worker == null) L7MediaCenterSession(observed, app.packageName, current, ::command, log = log)
-        else L7MediaCenterSession(observed, app.packageName, current, ::command, worker = worker, log = log)
+    private val oem = if (worker == null) L7MediaCenterSession(observed, app.packageName, current, ::command, log = log, synthetic = true)
+        else L7MediaCenterSession(observed, app.packageName, current, ::command, worker = worker, log = log, synthetic = true)
     private val artwork = if (worker == null) L7MediaArtwork(app, report = log, publish = ::artworkChanged)
         else L7MediaArtwork(app, workerExecutor = worker, mainExecutor = worker, report = log, publish = ::artworkChanged)
 

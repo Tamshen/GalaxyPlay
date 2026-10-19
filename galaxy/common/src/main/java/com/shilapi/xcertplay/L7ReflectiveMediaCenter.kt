@@ -15,6 +15,8 @@ internal class L7ReflectiveMediaCenter(
     private val serviceEvidence: () -> Int? = { L7VendorServiceProbe.inspect(context.applicationContext)["mediaProviderEasSupport"]?.toIntOrNull() },
 ) : L7MediaCenterPort {
     private val app = context.applicationContext
+    private var diagnosticFacts: Map<String, Long> = emptyMap()
+    override fun diagnosticFacts() = diagnosticFacts
     private val vehicle = L7AudioTemplates.model(context).id
     private var api: Any? = null
     private var apiType: Class<*>? = null
@@ -48,6 +50,9 @@ internal class L7ReflectiveMediaCenter(
         infoClass = Class.forName(INFO, false, sdk.loader)
         val verified = GalaxyOemMediaContract(apiClass, clientClass, requireNotNull(infoClass))
         contract = verified
+        diagnosticFacts = GalaxyDimMediaProbe.inspect(app) + mapOf(
+            "sdkProvider" to listOf("APP_OR_FRAMEWORK", "com.geely.linkhmi").indexOf(sdk.source).toLong(),
+            "registrationParams" to if (verified.linkedSession) 3L else 2L)
         source = L7MediaSourcePolicy.resolve(serviceEvidence(), requireNotNull(infoClass))
         val callbackClass = Class.forName("com.ecarx.eas.sdk.ECarXApiClient\$Callback", false, sdk.loader)
         api = apiClass.getMethod("get", Context::class.java).invoke(null, app)
@@ -93,6 +98,7 @@ internal class L7ReflectiveMediaCenter(
         val catalog = GalaxyOemSourceRegistration.ensure(app, requireNotNull(api), requireNotNull(apiType), source) {
             valid && registration == epoch && binder.isBinderAlive
         }
+        diagnosticFacts = diagnosticFacts + ("catalog" to GalaxyMediaReportEvidence.catalogResults.indexOf(catalog).toLong())
         L7DebugLog.record("MediaCenter: sourceCatalog=$catalog source=$source")
         if (!valid || registration != epoch || !binder.isBinderAlive) return false
         L7DebugLog.record("MediaCenter: registration mediaSessionLinked=${verified.linkedSession} source=$source tokenValid=true")

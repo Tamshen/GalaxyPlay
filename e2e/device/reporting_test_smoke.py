@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--adb', default='../tools/scripts/adb.sh')
 parser.add_argument('--serial', default='emulator-5556')
+parser.add_argument('--media-feedback-only', action='store_true')
 parser.add_argument('--cases', nargs='+', choices=['zh-day', 'zh-night', 'en-day', 'en-night'],
                     default=['zh-day', 'zh-night', 'en-day', 'en-night'])
 args = parser.parse_args()
@@ -57,6 +58,8 @@ def row(label):
     for node in root.iter('node'):
         if node.get('text') != label and node.get('content-desc') != label:
             continue
+        if node.get('class') == 'android.widget.CheckedTextView':
+            return node
         while node.get('clickable') != 'true' and node in parents:
             node = parents[node]
         return node
@@ -68,7 +71,7 @@ def tap(label):
     for start, end in ((1550, 1100), (650, 1100)):
         for _ in range(12):
             node = row(label)
-            if node is not None and node.get('enabled') == 'true' and node.get('clickable') == 'true':
+            if node is not None and node.get('enabled') == 'true' and (node.get('clickable') == 'true' or node.get('class') == 'android.widget.CheckedTextView'):
                 x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
                 adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
                 time.sleep(.15)
@@ -133,6 +136,8 @@ try:
                 continue
             adb('shell', 'cmd', 'uimode', 'night', night_value)
             for kind, label in [('media', media), ('navigation', nav)]:
+                if args.media_feedback_only and kind != 'media':
+                    continue
                 launch('settings-debug')
                 tap('单项与高级调试' if language == 'zh' else 'Individual and advanced tests')
                 tap(label)
@@ -145,19 +150,44 @@ try:
                 assert row(end).get('enabled') == 'true'
                 assert not any('stage=' in text for text in visible()), '技术字段不能挤占样例'
                 if kind == 'media':
-                    tap(track)
-                    assert title_b in adb('shell', 'dumpsys', 'media_session').decode(errors='replace'), '真实 Android MediaSession 未更新曲目'
-                    tap(play); tap(progress); tap(cover)
-                    adb('shell', 'input', 'keyevent', '3')
-                    assert 'GalaxyPlay 手动上报测试' in adb('shell', 'dumpsys', 'media_session').decode(errors='replace'), '离开页面提前停止测试'
-                    launch('settings-debug-media')
-                    current = log()
-                    assert 'elapsedMs=15000' in current and 'cover=none' in current
-                    assert 'artwork' in current and 'result=SAVED' in current
+                    if args.media_feedback_only:
+                        tap(play)
+                    else:
+                        tap(track)
+                        assert title_b in adb('shell', 'dumpsys', 'media_session').decode(errors='replace'), '真实 Android MediaSession 未更新曲目'
+                        tap(play); tap(progress); tap(cover)
+                        adb('shell', 'input', 'keyevent', '3')
+                        assert 'GalaxyPlay 手动上报测试' in adb('shell', 'dumpsys', 'media_session').decode(errors='replace'), '离开页面提前停止测试'
+                        launch('settings-debug-media')
+                        current = log()
+                        assert 'elapsedMs=15000' in current and 'cover=none' in current
+                        assert 'artwork' in current and 'result=SAVED' in current
                 else:
                     tap(road); tap(refresh)
                     assert 'stage=explicitRefresh' in log()
                 assert 'exceptionType=ClassNotFoundException' in log(), 'AVD 缺 SDK 未明确记载'
+                if args.media_feedback_only:
+                    tap('记录仪表显示' if language == 'zh' else 'Record instrument cluster display')
+                    for field, result in ([('歌名', '显示正确'), ('封面', '未显示'),
+                                           ('播放状态／进度', '没有更新／仍是旧内容'),
+                                           ('其他应用在同一位置的表现', '其他应用可以正常显示')] if language == 'zh' else
+                                          [('Song title', 'Displayed correctly'), ('Artwork', 'Not displayed'),
+                                           ('Playback state / progress', 'Not updated / old content'),
+                                           ('Other apps in the same display area', 'Other apps display correctly')]):
+                        tap(field); tap(result); tap('保存' if language == 'zh' else 'Save')
+                    screenshot(f'{language}-media-feedback-{theme}-draft.png')
+                    tap('保存' if language == 'zh' else 'Save')
+                    nodes()
+                    current = log()
+                    for marker in ('MEDIA_REPORT', 'event=OBSERVATION', 'target=CLUSTER', 'title=CORRECT',
+                                   'cover=MISSING', 'playback=STALE', 'comparison=OTHER_WORKS', 'event=CHECKPOINT'):
+                        assert marker in current, '人工反馈未写入现有日志：' + marker
+                    screenshot(f'{language}-media-feedback-{theme}-recorded.png')
+                    launch('settings-debug-media')
+                    tap(end)
+                    assert 'event=STOP' in log(), '结束没有记录媒体诊断停止'
+                    print(f'{language} {theme} 仪表逐字段反馈、对照结果与会话日志关联通过', flush=True)
+                    continue
                 top(); tap(missing)
                 assert any(('已记录：未符合预期' if language == 'zh' else 'Recorded: did not match expectations') in text for text in visible())
                 assert not any('ClassNotFoundException' in text for text in visible()), '技术字段默认应折叠'
@@ -194,7 +224,8 @@ try:
                 top(); tap(back)
                 assert media in visible() or nav in visible()
                 print(f'{language} {theme} {kind} 页面、更新与结束通过', flush=True)
-    print('AVD 场景 ' + ', '.join(args.cases) + ' 的媒体／HUD 测试、取消、样例与结果绑定、明细、更新及停止通过；未连接手机、未上传')
+    scope = '媒体逐字段反馈、对照结果、日志关联与停止' if args.media_feedback_only else '媒体／HUD 测试、取消、样例与结果绑定、明细、更新及停止'
+    print('AVD 场景 ' + ', '.join(args.cases) + ' 的' + scope + '通过；未连接手机、未上传')
 except Exception:
     try:
         (output / 'failure.png').write_bytes(adb('exec-out', 'screencap', '-p'))

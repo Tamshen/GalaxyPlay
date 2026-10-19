@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_feedback_title">Record media display results</string>
+    <string name="media_feedback_hint">Play media from the phone or start a media test, then check the center screen and instrument cluster. Record the title, artwork and playback state. Results are linked to the current session and track and saved to logs. Upload manually when finished.</string>
+    <string name="media_feedback_center">Record center screen display</string>
+    <string name="media_feedback_cluster">Record instrument cluster display</string>
+    <string name="media_feedback_song">Song title</string>
+    <string name="media_feedback_artwork">Artwork</string>
+    <string name="media_feedback_playback">Playback state / progress</string>
+    <string name="media_feedback_unobserved">Not checked</string>
+    <string name="media_feedback_correct">Displayed correctly</string>
+    <string name="media_feedback_missing">Not displayed</string>
+    <string name="media_feedback_stale">Not updated / old content</string>
+    <string name="media_feedback_wrong">Incorrect content</string>
+    <string name="media_feedback_wait">Play media from the phone or start a media reporting test</string>
+    <string name="media_feedback_saved">Saved to logs. Please upload manually.</string>
+    <string name="media_feedback_sample">%1$s · %2$s · %3$s</string>
+    <string name="media_feedback_no_title">No song title</string>
+    <string name="media_feedback_unknown_playback">Playback state unknown</string>
+    <string name="media_feedback_comparison">Other apps in the same display area</string>
+    <string name="media_feedback_no_comparison">Not compared</string>
+    <string name="media_feedback_other_works">Other apps display correctly</string>
+    <string name="media_feedback_other_fails">Other apps also have display problems</string>
+    <string name="media_feedback_progress">%1$d s</string>
+    <string name="media_feedback_unknown_progress">Progress unknown</string>
+</resources>

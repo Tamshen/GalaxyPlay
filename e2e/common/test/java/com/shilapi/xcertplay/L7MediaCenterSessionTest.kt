@@ -82,6 +82,25 @@ class L7MediaCenterSessionTest {
     private val logs = mutableListOf<String>()
     private val retries = java.util.ArrayDeque<Runnable>()
     private val session = L7MediaCenterSession(port, "own", { current }, { index, _ -> sent += index }, worker, main, logs::add, retry = { retries.add(it) })
+    @Test fun feedbackQueriesRealFocusWithoutRequestingPlayChangingSourceOrPausingPhone() {
+        port.currentFocus = "own"
+        session.start(); worker.drain()
+        session.update(CarPlayNowPlaying(title = "Synthetic", playbackKnown = true, playing = true))
+        worker.drain(); port.ready(true); worker.drain()
+        val evidence = GalaxyMediaReportEvidence.active!!
+        val expected = evidence.snapshot()
+        port.currentFocus = "other"
+        port.calls.clear(); sent.clear()
+        assertTrue(evidence.observe(expected, GalaxyMediaReportEvidence.Target.CLUSTER,
+            GalaxyMediaReportEvidence.Seen.MISSING, GalaxyMediaReportEvidence.Seen.MISSING,
+            GalaxyMediaReportEvidence.Seen.MISSING))
+        worker.drain(); main.drain()
+        assertTrue(port.calls.isEmpty())
+        assertTrue(sent.isEmpty())
+        assertEquals(2L, evidence.snapshot().facts["focus"])
+        assertTrue(logs.any { "event=CHECKPOINT" in it })
+        session.close(); worker.drain()
+    }
     @Test fun diagnosticTraceStartsBeforeOemFilteringAndRejectsLateMainDelivery() {
         val store = L7SteeringDiagnostics.store
         store.clear()

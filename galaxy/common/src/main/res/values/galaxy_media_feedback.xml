@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_feedback_title">记录媒体显示结果</string>
+    <string name="media_feedback_hint">连接手机播放或开始媒体测试后，分别观察中控和仪表，再记录歌名、封面、播放状态。结果自动关联当前会话与曲目，并保存到日志；完成后手动上传。</string>
+    <string name="media_feedback_center">记录中控显示</string>
+    <string name="media_feedback_cluster">记录仪表显示</string>
+    <string name="media_feedback_song">歌名</string>
+    <string name="media_feedback_artwork">封面</string>
+    <string name="media_feedback_playback">播放状态／进度</string>
+    <string name="media_feedback_unobserved">未观察</string>
+    <string name="media_feedback_correct">显示正确</string>
+    <string name="media_feedback_missing">未显示</string>
+    <string name="media_feedback_stale">没有更新／仍是旧内容</string>
+    <string name="media_feedback_wrong">内容不正确</string>
+    <string name="media_feedback_wait">请连接手机播放，或开始媒体上报测试</string>
+    <string name="media_feedback_saved">已记录到日志，请手动上传</string>
+    <string name="media_feedback_sample">%1$s · %2$s · %3$s</string>
+    <string name="media_feedback_no_title">暂无歌名</string>
+    <string name="media_feedback_unknown_playback">播放状态未知</string>
+    <string name="media_feedback_comparison">其他应用在同一位置的表现</string>
+    <string name="media_feedback_no_comparison">未对照</string>
+    <string name="media_feedback_other_works">其他应用可以正常显示</string>
+    <string name="media_feedback_other_fails">其他应用也显示异常</string>
+    <string name="media_feedback_progress">%1$d 秒</string>
+    <string name="media_feedback_unknown_progress">进度未知</string>
+</resources>

@@ -27,9 +27,19 @@ internal class L7MediaCenterSession(
     private val traceSend: ((Int, String, L7SteeringTrace) -> Unit)? = null,
     private val localPlayback: Boolean = true,
     private val retry: (Runnable) -> Unit = { Handler(Looper.getMainLooper()).postDelayed(it, 1000) },
+    synthetic: Boolean = false,
 ) : Closeable {
     private val generation = generations.incrementAndGet()
     private val events = AtomicLong()
+    private val evidence: GalaxyMediaReportEvidence = GalaxyMediaReportEvidence(generation, localPlayback, { !closed && current() }, log,
+        { observation, revision -> enqueue {
+            if (registered) safely("observationFocus") {
+                evidenceFocus(port.focusClient()); "RETURNED"
+            }
+            evidenceCheckpoint(observation, revision)
+        } }, synthetic = synthetic)
+    private fun evidenceFocus(value: String?): Unit = evidence.focus(value?.takeIf(String::isNotBlank)?.let { it == packageName })
+    private fun evidenceCheckpoint(observation: Long, revision: Long): Unit = evidence.checkpoint(observation, revision)
     private val operations = com.shilapi.xcertplay.diagnostics.SampledDiagnosticOperation(
         { event("ipc $it") }, setOf("updateProgress"))
     private val scheduled = AtomicBoolean()
@@ -58,10 +68,12 @@ internal class L7MediaCenterSession(
     fun start() = synchronized(this) {
         if (started || closed) return
         started = true
+        evidence.activate()
         enqueue {
             event("initialize")
             try {
                 operations.run("initialize") { port.initialize(::apiReady, ::command, ::focus, ::selected) }
+                evidence.details(port.diagnosticFacts(), port.source)
                 event("initialize result=RETURNED_WAITING_CALLBACK")
             }
             catch (error: Exception) { failure("initialize", error) }
@@ -73,6 +85,7 @@ internal class L7MediaCenterSession(
         event("apiReady value=$value")
         if (ready == value && (!value || registered)) return@enqueue
         ready = value
+        evidence.ready(value)
         if (!value) {
             registration++
             registered = false
@@ -95,9 +108,12 @@ internal class L7MediaCenterSession(
             snapshot.let { value -> operations.run("registrationPrepare") { port.prepare(value.value, value.artwork) } }
             val valid = operations.run("register") { port.register() }
             if (closed || !current()) return@enqueue
+            evidence.details(port.diagnosticFacts(), port.source)
+            evidence.result("register", valid)
             event("register tokenValid=$valid attempt=$attempts")
             if (!valid) { retryRegistration(); return@enqueue }
             val accepted = operations.run("sourceList") { port.sources(intArrayOf(port.source)) }
+            evidence.result("sourceList", accepted)
             event("sourceList accepted=$accepted source=${port.source} origin=L7_SDK_POLICY")
             if (closed || !current()) return@enqueue
             if (!accepted) {
@@ -108,6 +124,7 @@ internal class L7MediaCenterSession(
             }
             registration++
             registered = true
+            evidence.result("registrationActive", true)
             safely("queryFocus") { applyFocus(port.focusClient()); "RETURNED" }
             published = null
             pending = null
@@ -132,6 +149,7 @@ internal class L7MediaCenterSession(
         if (closed) return
         val previous = snapshot
         snapshot = Snapshot(value, uri)
+        evidence.input(value, uri != null, uri?.let(L7MediaArtworkProvider::diagnosticKey))
         if (previous.value.copy(elapsedMillis = null) != value.copy(elapsedMillis = null) || previous.artwork != uri) {
             event("snapshot titlePresent=${!value.title.isNullOrBlank()} artistPresent=${!value.artist.isNullOrBlank()} albumPresent=${!value.album.isNullOrBlank()} durationKnown=${value.durationMillis != null} progressKnown=${value.elapsedMillis != null} playingKnown=${value.playbackKnown} playing=${value.playing} artworkAvailable=${uri != null} coalesced=${scheduled.get()} localPlayback=$localPlayback")
         }
@@ -275,6 +293,7 @@ internal class L7MediaCenterSession(
     }
 
     private fun applyFocus(value: String?, publish: Boolean = true) {
+        evidence.focus(value?.takeIf(String::isNotBlank)?.let { it == packageName })
         if (value.isNullOrBlank()) { event("focus known=false"); return }
         val foreign = value != packageName
         event("focus own=${!foreign}")
@@ -300,12 +319,16 @@ internal class L7MediaCenterSession(
     }
     private fun safely(stage: String, action: () -> Any?): Boolean = try {
         val result = operations.run(stage, action)
+        evidence.result(stage, result != false)
         if (stage != "updateProgress" || result == false) event("$stage result=$result")
         result != false
     } catch (error: Exception) { failure(stage, error); false }
       catch (error: LinkageError) { failure(stage, error); false }
     private fun failure(stage: String, error: Throwable) {
+        evidence.result(stage, false)
+        if (stage in setOf("queryFocus", "queryFocusAfterRequest", "observationFocus")) evidence.focus(null)
         val cause = if (error is InvocationTargetException) error.targetException else error
+        evidence.failure(stage, cause)
         event("$stage exceptionType=${cause.javaClass.simpleName}")
     }
     private fun event(body: String) {
@@ -319,6 +342,7 @@ internal class L7MediaCenterSession(
     @Synchronized override fun close() {
         if (closed) return
         closed = true
+        evidence.stop()
         registered = false
         port.invalidate()
         snapshot = Snapshot(CarPlayNowPlaying(), null)
@@ -327,6 +351,7 @@ internal class L7MediaCenterSession(
             safely("clearSources") { port.sources(intArrayOf()) }
             safely("unregister") { port.unregister() }
             safely("release") { port.close(); "RETURNED" }
+            evidence.released()
         } } catch (error: RuntimeException) { failure("cleanupQueue", error) }
     }
     private companion object {

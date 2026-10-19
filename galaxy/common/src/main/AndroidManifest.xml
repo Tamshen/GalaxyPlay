@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <!-- 仅查询和加载已核对的参考 SDK 包，避免 Android 11 包可见性过滤造成误判。 -->
     <queries>
+        <package android:name="com.autolink.diminteraction" />
         <package android:name="com.autolink.hardkeyservice" />
         <package android:name="com.android.settings" />
         <package android:name="com.ecarx.android.auto" />

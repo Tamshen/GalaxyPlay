@@ -50,7 +50,8 @@ internal class RemoteLogWindow<T>(private val maxCount: Int, private val maxCost
     }
 
     private companion object {
-        val ANCHOR = Regex("CORE_TRACE .*kind=(START|STOP|RELEASE)|CORE_TRACE .*state=(FAILED|UNKNOWN)|" +
+        val ANCHOR = Regex("MEDIA_REPORT .*event=(OBSERVATION|CHECKPOINT|STALE_CHECKPOINT|STOP|RELEASE)|" +
+            "CORE_TRACE .*kind=(START|STOP|RELEASE)|CORE_TRACE .*state=(FAILED|UNKNOWN)|" +
             "CONNECTION_DIAGNOSTIC .* (start |stage=|teardown)|Connection stage=|STEP (mfi|bt|wifi|iap2|handoff)/|" +
             "IAP2 (READY|CLOSE)|iap2 (authentication accepted|identification accepted|tx=0x4301|rx=0x5702|tx=0x5703)|" +
             "wireless startup .* (first TCP|StartSession|session established)|wireless startup .*tcpAccepted=|" +
