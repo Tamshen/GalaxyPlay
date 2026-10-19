@@ -20,6 +20,7 @@
         <package android:name="com.autolink.diminteraction" />
         <package android:name="com.autolink.hardkeyservice" />
         <package android:name="com.android.settings" />
+        <package android:name="com.android.systemui" />
         <package android:name="com.ecarx.android.auto" />
         <package android:name="com.ecarx.config" />
         <package android:name="com.flyme.auto.map" />

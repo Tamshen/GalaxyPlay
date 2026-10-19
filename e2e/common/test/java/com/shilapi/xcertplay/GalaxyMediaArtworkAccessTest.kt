@@ -35,26 +35,48 @@ class GalaxyMediaArtworkAccessTest {
         })
     }
 
-    @Test fun grantsFinalFlymeImageReaderAlongsideServicesOnlyForCurrentImage() {
-        val readers = setOf("ecarx.xsf.mediacenter", "com.ecarx.sdk.openapi", "com.flyme.auto.mediacontrol")
+    @Test fun grantsCardAndSystemBarReadersAlongsideServicesOnlyForCurrentImage() {
+        val readers = setOf("ecarx.xsf.mediacenter", "com.ecarx.sdk.openapi",
+            "com.flyme.auto.mediacontrol", "com.android.systemui")
         (readers + "synthetic.unrelated").forEach(::install)
         GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
         assertEquals(readers, granted.map { it.first }.toSet())
         assertTrue(granted.all { it.second == uri && it.third == Intent.FLAG_GRANT_READ_URI_PERMISSION })
         assertTrue(logs.any { "target=com.flyme.auto.mediacontrol" in it && "result=GRANTED" in it })
+        assertTrue(logs.any { "target=com.android.systemui" in it && "result=GRANTED" in it })
         assertFalse(logs.any { "content://" in it })
     }
 
     @Test fun unavailableOrDeniedServiceDoesNotBlockFinalReader() {
         install("com.ecarx.sdk.openapi"); install("com.flyme.auto.mediacontrol")
+        install("com.android.systemui")
         denied = "com.ecarx.sdk.openapi"
         GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
-        assertEquals(listOf("com.flyme.auto.mediacontrol"), granted.map { it.first })
+        assertEquals(listOf("com.flyme.auto.mediacontrol", "com.android.systemui"), granted.map { it.first })
         assertTrue(logs.any { "result=FAILED" in it })
+    }
+
+    @Test fun deniedSystemBarDoesNotDiscardCardGrant() {
+        install("com.flyme.auto.mediacontrol"); install("com.android.systemui")
+        denied = "com.android.systemui"
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        assertEquals(listOf("com.flyme.auto.mediacontrol"), granted.map { it.first })
+        assertTrue(logs.any { "target=com.android.systemui" in it && "result=FAILED" in it })
+    }
+
+    @Test fun changedCoverGrantsNewUriToSystemBarEvenWhenTransferIdIsReused() {
+        install("com.android.systemui")
+        val next = Uri.parse("content://${app.packageName}.media-artwork/covers/87654321-1234-1234-1234-123456789abc.jpg")
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        GalaxyMediaArtworkAccess.grant(context, next, 7, logs::add)
+        assertEquals(listOf(uri, next), granted.map { it.second })
+        assertTrue(granted.all { it.first == "com.android.systemui" && it.third == Intent.FLAG_GRANT_READ_URI_PERMISSION })
+        assertTrue(logs.any { "coverKey=87654321" in it && "target=com.android.systemui" in it })
     }
 
     @Test fun cannotGrantOtherProvidersOrFilePaths() {
         install("com.flyme.auto.mediacontrol")
+        install("com.android.systemui")
         for (value in listOf(Uri.parse("content://other/private.jpg"), Uri.parse("file:///private.jpg")))
             GalaxyMediaArtworkAccess.grant(context, value, 7, logs::add)
         assertTrue(granted.isEmpty())
