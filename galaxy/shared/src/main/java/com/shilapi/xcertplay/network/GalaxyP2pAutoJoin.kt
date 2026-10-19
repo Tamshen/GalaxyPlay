@@ -18,13 +18,14 @@ object GalaxyP2pAutoJoin {
     internal fun ensure(info: WirelessHotspotInfo, cancelled: () -> Boolean, log: (String) -> Unit,
                         connect: (Long) -> Shell) {
         if (info.backend != WirelessHotspotBackend.WIFI_P2P || info.frequencyMHz?.let { it in 5150..5895 } != true) return
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
+        val started = System.nanoTime()
+        val deadline = started + TimeUnit.SECONDS.toNanos(6)
         fun checkCurrent() {
             if (cancelled() || Thread.currentThread().isInterrupted || System.nanoTime() >= deadline)
                 throw IOException("P2P_AUTO_JOIN_CANCELLED_OR_TIMEOUT")
         }
         var acquired = false
-        fun event(body: String) { runCatching { log("p2pAutoJoin $body") } }
+        fun event(body: String) { runCatching { log("p2pAutoJoin $body atNs=${System.nanoTime()} elapsedMs=${(System.nanoTime() - started) / 1_000_000}") } }
         try {
             require(info.interfaceName == "p2p0") { "P2P_AUTO_JOIN_INTERFACE_UNSUPPORTED" }
             while (!acquired) { checkCurrent(); acquired = lock.tryLock(50, TimeUnit.MILLISECONDS) }
@@ -37,6 +38,7 @@ object GalaxyP2pAutoJoin {
                         ?: throw IOException("P2P_AUTO_JOIN_INVALID_READBACK")
                 }
                 val before = listOf(2, 3).associateWith(::read)
+                for ((frame, values) in before) event("stage=BEFORE frame=$frame targetPresent=${element in values} elementCount=${values.size} evidence=CONFIG_READBACK airBroadcast=UNVERIFIED")
                 if (before.values.any { !compatible(it) }) throw IOException("P2P_AUTO_JOIN_CONFLICT")
                 for ((frame, values) in before) {
                     checkCurrent()
@@ -48,6 +50,7 @@ object GalaxyP2pAutoJoin {
                 }
                 for ((frame, values) in before) {
                     val after = read(frame)
+                    event("stage=AFTER frame=$frame targetPresent=${element in after} elementCount=${after.size} evidence=CONFIG_READBACK airBroadcast=UNVERIFIED")
                     if (!compatible(after) || after.count { it == element } != 1 ||
                         values.groupingBy { it }.eachCount().any { (value, count) -> after.count { it == value } < count })
                         throw IOException("P2P_AUTO_JOIN_READBACK_MISMATCH")

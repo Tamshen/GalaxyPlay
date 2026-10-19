@@ -8,6 +8,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WirelessStartupDiagnosticsTest {
+    @Test fun anchorsRecordMilestonesWithoutInlineSamplingAndIgnoreLateCallbacks() {
+        val logs = mutableListOf<String>()
+        var samples = 0
+        var tcpStops = 0
+        val diagnostics = WirelessStartupDiagnostics({ samples++; "" }, logs::add,
+            onTcpAccepted = { tcpStops++ })
+        diagnostics.controlProgress("iap2 authentication accepted")
+        diagnostics.controlProgress("iap2 tx=0x5703 accessory-wifi-configuration")
+        diagnostics.controlProgress("iap2 tx=0x4301 carplay-start-session")
+        diagnostics.anchor("FIRST_TCP_TIMEOUT", includeSnapshot = true)
+        assertTrue(logs.any { "point=FIRST_TCP_TIMEOUT" in it && "tcpAccepted=0" in it })
+        diagnostics.connectionAccepted(); diagnostics.connectionAccepted(); diagnostics.sessionActive()
+        assertEquals(1, tcpStops)
+        assertEquals(0, samples)
+        assertEquals(1, logs.count { "point=FIRST_TCP" in it && "TIMEOUT" !in it })
+        assertTrue(logs.any { "point=AUTHENTICATED" in it })
+        assertTrue(logs.any { "point=WIFI_CONFIG_SENT" in it })
+        assertTrue(logs.any { "point=START_SESSION_SENT" in it })
+        diagnostics.close()
+        val count = logs.size
+        diagnostics.controlProgress("iap2 authentication accepted")
+        diagnostics.connectionAccepted(); diagnostics.sessionActive(); diagnostics.anchor("LATE")
+        assertEquals(count, logs.size)
+    }
+
     @Test fun streamingKeepsSamplingRuntimeLinesAndCloseRetiresTheListenerOnce() {
         val streaming = CountDownLatch(2)
         val closed = java.util.concurrent.atomic.AtomicInteger()
@@ -15,7 +40,7 @@ class WirelessStartupDiagnosticsTest {
         val diagnostics = WirelessStartupDiagnostics(
             sample = { "interfaceState=up\nreceiveCounters ifaceRx=sampled\nreceiveCounters udp4=sampled\n" +
                 "receiveCounters udp6=sampled\nwirelessRuntime scanEvents=1\nscanPauseResult=pending" },
-            log = { logs.add(it); if ("observationPhase=STREAMING" in it) streaming.countDown() },
+            log = { logs.add(it); if (it.startsWith("wireless startup") && "observationPhase=STREAMING" in it) streaming.countDown() },
             intervalMillis = 10, monoMs = { 5000 }, onClose = { closed.incrementAndGet() },
         )
         try {
@@ -45,6 +70,8 @@ class WirelessStartupDiagnosticsTest {
             assertTrue(logs.any { it.startsWith("wireless startup") && !it.contains("interfaceState") })
             assertTrue(logs.any { it.endsWith("lastCounter=3") })
             assertTrue(logs.all { !it.contains('\n') && !it.contains('\r') })
+            diagnostics.anchor("FIRST_TCP_TIMEOUT", includeSnapshot = true)
+            assertTrue(logs.any { "cached=true" in it && "lastCounter=3" in it })
         } finally { diagnostics.close() }
     }
 

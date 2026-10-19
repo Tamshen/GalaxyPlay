@@ -60,12 +60,15 @@ class CarPlayBonjourDualStackTest {
                 additionalAddresses = listOf(ipv4))
             bonjour.start()
             assertTrue(bonjour.diagnosticSnapshot().contains("mdnsFamilies=IPv6,IPv4"))
+            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=REGISTER_CALL_RETURNED registeredFamilies=2"))
+            assertTrue(bonjour.diagnosticSnapshot().contains("peerReception=UNVERIFIED"))
             listOf(v6, v4).forEach { dns ->
                 verify(dns).registerService(any(ServiceInfo::class.java))
                 verify(dns).addServiceListener(eq("_carplay-ctrl._tcp.local."), any(ServiceListener::class.java))
             }
             bonjour.close()
             bonjour.close()
+            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=CLOSED"))
             verify(v6).close()
             verify(v4).close()
             verify(lock).release()

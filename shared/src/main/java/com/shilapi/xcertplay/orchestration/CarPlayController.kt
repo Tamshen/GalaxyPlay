@@ -1296,6 +1296,7 @@ class CarPlayController(
                 onTimeout = {
                     if (!closed && generation == wirelessGeneration.get()) {
                         val protocolTimeout = firstTcpWatchdog?.protocolTimedOut == true
+                        wirelessDiagnostics?.anchor(if (protocolTimeout) "PROTOCOL_TIMEOUT" else "FIRST_TCP_TIMEOUT", includeSnapshot = true)
                         fail(WirelessStartupException(
                             if (protocolTimeout) WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT else WirelessStartupFailure.FIRST_TCP_TIMEOUT,
                             if (protocolTimeout) "AirPlay protocol did not become ready after TCP connected"
@@ -1361,6 +1362,9 @@ class CarPlayController(
             val receiveDiagnostics = WirelessReceiveDiagnostics(hotspotInfo.interfaceName)
             val runtimeDiagnostics = GalaxyWirelessRuntimeDiagnostics(appContext,
                 { message -> if (!isStaleWirelessRun(generation)) debugLog(message) })
+            val startupEvidence = if (prepareWirelessHotspot != null && hotspotInfo.backend == WirelessHotspotBackend.WIFI_P2P &&
+                hotspotInfo.interfaceName == "p2p0" && android.os.Build.VERSION.SDK_INT == 30)
+                com.shilapi.xcertplay.network.GalaxyP2pStartupEvidence({ isStaleWirelessRun(generation) }) else null
             val diagnostics = WirelessStartupDiagnostics(
                 sample = {
                     runtimeDiagnostics.start()
@@ -1370,11 +1374,14 @@ class CarPlayController(
                         receiveDiagnostics.snapshot() + "\n" + runtimeDiagnostics.snapshot() + "\n" +
                         "scanPauseEnabled=${config.wifiScanPauseEnabled} " +
                         (wifiScanPause?.diagnosticSnapshot() ?: "scanPauseResult=not_created") + "\n" +
-                        "wifiLockEnabled=${config.wifiHighPerformanceEnabled} ${wirelessPerformanceLock.diagnosticSnapshot()}"
+                        "wifiLockEnabled=${config.wifiHighPerformanceEnabled} ${wirelessPerformanceLock.diagnosticSnapshot()}" +
+                        (startupEvidence?.let { "\n${it.sample()}" } ?: "")
                 },
-                log = { message -> if (!isStaleWirelessRun(generation)) debugLog(message) },
+                log = { message -> if (!isStaleWirelessRun(generation))
+                    connectionDiagnostic("listener=${listenerIdentity.id} generation=$generation $message") },
                 monoMs = android.os.SystemClock::elapsedRealtime,
-                onClose = runtimeDiagnostics::close,
+                onClose = { startupEvidence?.close(); runtimeDiagnostics.close() },
+                onTcpAccepted = { startupEvidence?.close() },
             )
             wirelessDiagnostics = diagnostics
             onStatus(
@@ -1448,7 +1455,8 @@ class CarPlayController(
                 // The car hotspot previously used system NSD, which could resolve another interface
                 // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
                 useInterfaceMdns = true,
-                onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
+                onEvent = { event -> if (!isStaleWirelessRun(generation))
+                    connectionDiagnostic("listener=${listenerIdentity.id} WIRELESS_DISCOVERY ${event.diagnosticSummary()}") },
                 additionalAddresses = (addressRecovery?.publishedAddresses ?: hotspotInfo.hostAddresses)
                     .filter { it != hostAddress },
             )
@@ -2466,7 +2474,9 @@ class CarPlayController(
             prepareWirelessHotspot?.let { prepare ->
                 if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot preparation cancelled")
                 manager.validateReady()
-                prepare(info, { isStaleWirelessRun(generation) }, ::debugLog)
+                prepare(info, { isStaleWirelessRun(generation) }) { message ->
+                    if (!isStaleWirelessRun(generation)) connectionDiagnostic("generation=$generation $message")
+                }
                 if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot preparation cancelled")
                 manager.validateReady()
             }

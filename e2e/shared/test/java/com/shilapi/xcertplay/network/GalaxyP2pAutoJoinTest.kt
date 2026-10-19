@@ -39,6 +39,10 @@ class GalaxyP2pAutoJoinTest {
         assertEquals(other + target, radio.values[2]); assertEquals(target, radio.values[3])
         assertEquals(2, radio.commands.count { "vendor_elem_add" in it })
         assertTrue(logs.last().contains("changed=false"))
+        assertTrue(logs.any { "stage=BEFORE frame=2 targetPresent=false" in it })
+        assertTrue(logs.any { "stage=AFTER frame=2 targetPresent=true" in it })
+        assertTrue(logs.any { "evidence=CONFIG_READBACK airBroadcast=UNVERIFIED" in it })
+        assertTrue(logs.all { "atNs=" in it && "elapsedMs=" in it })
         assertFalse(logs.joinToString().contains("Synthetic"))
     }
 

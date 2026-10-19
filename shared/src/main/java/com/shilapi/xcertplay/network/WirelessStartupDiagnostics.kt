@@ -16,6 +16,7 @@ internal class WirelessStartupDiagnostics(
     private val nowNs: () -> Long = System::nanoTime,
     private val monoMs: () -> Long = { System.nanoTime() / 1_000_000 },
     private val onClose: () -> Unit = {},
+    private val onTcpAccepted: () -> Unit = {},
 ) : Closeable {
     private val closed = AtomicBoolean(false)
     private val startedNanos = nowNs()
@@ -39,24 +40,35 @@ internal class WirelessStartupDiagnostics(
     }
 
     @Synchronized fun controlProgress(message: String) {
-        when (message) {
-            "iap2 authentication accepted" -> authenticated = true
+        if (closed.get()) return
+        val point = when (message) {
+            "iap2 authentication accepted" -> { authenticated = true; "AUTHENTICATED" }
             "iap2 tx=0x5703 accessory-wifi-configuration",
-            "iap2 tx=0x5703 post-transport accessory-wifi-configuration" -> wifiConfigs++
+            "iap2 tx=0x5703 post-transport accessory-wifi-configuration" -> { wifiConfigs++; "WIFI_CONFIG_SENT" }
             "iap2 tx=0x4301 carplay-start-session" -> {
                 startRequests++
                 if (firstStartRequestNs == null) firstStartRequestNs = nowNs()
+                "START_SESSION_SENT"
             }
+            else -> return
         }
+        anchor(point)
     }
 
     @Synchronized fun connectionAccepted() {
+        if (closed.get()) return
         tcpAccepted++
+        if (tcpAccepted == 1) runCatching(onTcpAccepted)
         if (firstTcpAfterStartMs == null) {
             firstStartRequestNs?.let { firstTcpAfterStartMs = elapsedMillis(it) }
         }
+        if (tcpAccepted == 1) anchor("FIRST_TCP", includeSnapshot = true)
     }
-    @Synchronized fun sessionActive() { sessionActive = true; sessionWasActive = true }
+    @Synchronized fun sessionActive() {
+        if (closed.get()) return
+        sessionActive = true; sessionWasActive = true
+        anchor("SESSION_ACTIVE")
+    }
     @Synchronized fun sessionEnded() { sessionActive = false }
 
     @Synchronized fun summary(): String {
@@ -74,6 +86,13 @@ internal class WirelessStartupDiagnostics(
             "startRequestAgeMs=${firstStartRequestNs?.let(::elapsedMillis) ?: "none"} " +
             "firstTcpAfterStartMs=${firstTcpAfterStartMs ?: "none"} " +
             "observationPhase=${if (sessionActive) "STREAMING" else if (sessionWasActive) "IDLE" else "STARTUP"} monoMs=${monoMs()}"
+    }
+
+    /** 协议回调只输出缓存；不在握手或超时线程执行系统查询。 */
+    @Synchronized fun anchor(point: String, includeSnapshot: Boolean = false) {
+        if (closed.get()) return
+        emit("WIRELESS_ANCHOR point=$point ${summary()}")
+        if (includeSnapshot) emitSnapshot(lastSnapshot, cached = true)
     }
 
     private fun elapsedMillis(since: Long): Long = (nowNs() - since).coerceAtLeast(0) / 1_000_000

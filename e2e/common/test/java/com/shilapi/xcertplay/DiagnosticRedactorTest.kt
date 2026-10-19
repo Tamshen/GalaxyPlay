@@ -5,6 +5,24 @@ import org.junit.Test
 import java.nio.file.Files
 
 class DiagnosticRedactorTest {
+    @Test fun wirelessAttemptAnchorsAndReadOnlyEvidenceSurviveDiskRedaction() {
+        val lines = listOf(
+            "CONNECTION_DIAGNOSTIC attempt=2 run=1 monoMs=130 phase=WIRELESS listener=2 generation=1 WIRELESS_ANCHOR point=FIRST_TCP_TIMEOUT tcpAccepted=0 startRequestAgeMs=30000",
+            "p2pAutoJoin stage=BEFORE frame=2 targetPresent=false elementCount=1 evidence=CONFIG_READBACK airBroadcast=UNVERIFIED atNs=200000000 elapsedMs=23",
+            "P2P_LINK_EVIDENCE sample=2 durationMs=50 scope=ALL_P2P0_CLIENTS airBroadcast=UNVERIFIED dhcpLease=NOT_OBSERVED frame2=PRESENT stations=1 authorized=1 neighborsV4=1 reachable=0 stale=1 unresolved=0 evidence=NEIGHBOR_TABLE_NOT_DHCP",
+            "mdnsPublication=REGISTER_CALL_RETURNED registeredFamilies=1 publicationElapsedMs=120 peerReception=UNVERIFIED bonjourAdded=0",
+        )
+        val folder = Files.createTempDirectory("wireless-anchor-report").toFile()
+        try {
+            SessionLogFile(folder.resolve("diplay.log")).use { log ->
+                log.reset("started")
+                lines.forEach { assertEquals(it, DiagnosticRedactor.redact(it)); log.append(it) }
+            }
+            val saved = folder.resolve("diplay.log").readText()
+            lines.forEach { assertTrue(saved.contains(it)) }
+        } finally { folder.deleteRecursively() }
+    }
+
     @Test fun usbModeMetadataSurvivesRedactionAndDiskWithoutIdentity() {
         val lines = listOf(
             "CONNECTION_DIAGNOSTIC attempt=3 run=1 monoMs=123 phase=REENUMERATION USB mode rejection transferred=-1 expected=1 configurations=2 omitted=0 detail=1[0/0:6.1.1x2] interfaces=1 omitted=0;4[0/0:ff.fe.2x2,3/0:2.d.0x1] interfaces=2 omitted=0",

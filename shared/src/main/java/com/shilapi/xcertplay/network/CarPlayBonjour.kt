@@ -157,6 +157,10 @@ class CarPlayBonjour(
     private val localAdvertisedAddress = advertisedHostAddress()
     private val advertisedAddresses = (listOfNotNull(localAdvertisedAddress) + additionalAddresses).distinct()
     @Volatile private var publishedFamilies = "none"
+    @Volatile private var publicationState = "NOT_STARTED"
+    @Volatile private var publicationStartedNs = 0L
+    @Volatile private var publicationElapsedMs = -1L
+    private val registeredFamilies = AtomicInteger()
     private val addedCount = AtomicInteger()
     private val resolvedCount = AtomicInteger()
     private val addressMismatchCount = AtomicInteger()
@@ -166,7 +170,9 @@ class CarPlayBonjour(
 
     /** 保留零计数，便于识别服务发现期间没有回调的情况。 */
     fun diagnosticSnapshot(): String =
-        "bonjourAdded=${addedCount.get()} bonjourResolved=${resolvedCount.get()} " +
+        "mdnsPublication=$publicationState registeredFamilies=${registeredFamilies.get()} " +
+            "publicationElapsedMs=$publicationElapsedMs peerReception=UNVERIFIED " +
+            "bonjourAdded=${addedCount.get()} bonjourResolved=${resolvedCount.get()} " +
             "bonjourAddressMismatch=${addressMismatchCount.get()} connectProbes=${probeCount.get()} " +
             "connectProbe2xx=${successfulProbeCount.get()} lastProbe=${lastProbe.get()} " +
             "mdnsFamilies=$publishedFamilies"
@@ -224,9 +230,15 @@ class CarPlayBonjour(
     }
 
     private val registrationListener = object : NsdManager.RegistrationListener {
-        override fun onServiceRegistered(serviceInfo: NsdServiceInfo) = Unit
+        override fun onServiceRegistered(serviceInfo: NsdServiceInfo) {
+            if (!closed) {
+                publicationElapsedMs = (System.nanoTime() - publicationStartedNs).coerceAtLeast(0) / 1_000_000
+                publicationState = "SYSTEM_CONFIRMED"
+            }
+        }
 
         override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+            if (!closed) publicationState = "SYSTEM_REJECTED_$errorCode"
             Log.w(TAG, "AirPlay NSD registration failed code=$errorCode")
         }
 
@@ -272,6 +284,8 @@ class CarPlayBonjour(
             check(!closed) { "CarPlayBonjour is closed" }
             if (started) return
             started = true
+            publicationStartedNs = System.nanoTime()
+            publicationState = "REGISTERING"
             try {
                 multicastLock.acquire()
                 if (useInterfaceMdns) {
@@ -287,7 +301,10 @@ class CarPlayBonjour(
                             "$AIRPLAY_SERVICE_TYPE.local.", config.deviceName, config.port,
                             0, 0, CarPlayBonjourProtocol.airPlayTxtRecords(config, identity),
                         ))
+                        registeredFamilies.incrementAndGet()
                     }
+                    publicationElapsedMs = (System.nanoTime() - publicationStartedNs).coerceAtLeast(0) / 1_000_000
+                    publicationState = "REGISTER_CALL_RETURNED"
                     publishedFamilies = advertisedAddresses.joinToString(",") {
                         if (it is Inet4Address) "IPv4" else "IPv6"
                     }
@@ -306,6 +323,8 @@ class CarPlayBonjour(
                     start()
                 }
             } catch (error: Exception) {
+                publicationState = "FAILED"
+                publicationElapsedMs = (System.nanoTime() - publicationStartedNs).coerceAtLeast(0) / 1_000_000
                 closed = true
                 if (registrationRequested) {
                     registrationRequested = false
@@ -332,6 +351,7 @@ class CarPlayBonjour(
         synchronized(lifecycleLock) {
             if (closed) return
             closed = true
+            publicationState = "CLOSED"
             if (registrationRequested) {
                 registrationRequested = false
                 runCatching { nsdManager.unregisterService(registrationListener) }
