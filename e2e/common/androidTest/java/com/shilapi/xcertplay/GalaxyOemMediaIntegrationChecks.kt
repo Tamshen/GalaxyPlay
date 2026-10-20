@@ -61,6 +61,7 @@ object GalaxyOemMediaIntegrationChecks {
             check(!first.onSourceChanged(6, "synthetic.previous") && commands.size == 4)
             check(first.onSourceSelected(6) && !first.onSourceSelected(12))
             val uuid = info.uuid
+            checkLyricUpdates(port, sdk, value, cover, uuid)
             port.prepare(value.copy(title = "synthetic second", artworkTransferId = null), null)
             val secondInfo = first.musicPlaybackInfo
             check(secondInfo.uuid != uuid && secondInfo.artwork == null)
@@ -83,6 +84,30 @@ object GalaxyOemMediaIntegrationChecks {
         }
         invalidTokenIsRejected(base)
         unavailableCatalogKeepsMusicClient(base)
+    }
+
+    private fun checkLyricUpdates(port: L7ReflectiveMediaCenter, sdk: MediaCenterAPI,
+                                 song: CarPlayNowPlaying, cover: Uri, uuid: String) {
+        // 检查实际适配器生成的 SDK 快照，防止测试预先传入固定 UUID 而绕过曲目标识生成。
+        for ((index, title) in listOf("合成歌词第一句", "合成歌词第二句", "合成歌词第三句").withIndex()) {
+            val lyric = song.copy(title = title, elapsedMillis = 6000L + index * 3000L)
+            port.prepare(lyric, cover)
+            check(port.update(lyric, cover))
+            check(sdk.published.uuid == uuid) { "歌词更新不能更换曲目 UUID" }
+            check(sdk.published.title == title && sdk.published.artwork == cover)
+            port.progress(lyric.elapsedMillis!! + 1000)
+            check(sdk.client.musicPlaybackInfo.uuid == uuid)
+        }
+        // 同一歌手的下一首仍须区分；作者、专辑、时长和封面传输编号继续参与曲目标识。
+        for (next in listOf(song.copy(artist = "另一位合成歌手"), song.copy(album = "另一张合成专辑"),
+                song.copy(durationMillis = 240000), song.copy(artworkTransferId = 2))) {
+            port.prepare(song, cover)
+            val previous = sdk.client.musicPlaybackInfo.uuid
+            port.prepare(next, cover)
+            check(port.update(next, cover))
+            check(sdk.published.uuid != previous) { "歌曲信息变化仍须更新曲目 UUID" }
+        }
+        port.prepare(song, cover)
     }
 
     private fun invalidTokenIsRejected(context: Context) {

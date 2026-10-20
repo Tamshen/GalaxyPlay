@@ -131,7 +131,8 @@ internal class L7ReflectiveMediaCenter(
 
     override fun prepare(value: CarPlayNowPlaying, artwork: Uri?) {
         if (!valid) return
-        if (latest.title != value.title || latest.artist != value.artist || latest.album != value.album ||
+        // CarPlay 可把逐句歌词放在标题中；文字继续更新，但不能据此更换中控和 DIM 的曲目 UUID。
+        if (latest.artist != value.artist || latest.album != value.album ||
             latest.artworkTransferId != value.artworkTransferId || latest.durationMillis != value.durationMillis) track++
         latest = value
         latestArtwork = artwork
