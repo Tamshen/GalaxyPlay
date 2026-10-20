@@ -37,7 +37,7 @@ internal class GalaxyMediaReportEvidence(
     private val channel = DiagnosticChannel(id, DiagnosticSink { event ->
         val fields = event.metrics.entries.joinToString(" ") { (key, number) -> "$key=${label(key, number)}" }
         log("MEDIA_REPORT session=${event.session} seq=${event.sequence} elapsedMs=${event.elapsedMillis} " +
-            "dimPublish=NOT_IMPLEMENTED downstream=UNVERIFIED $fields")
+            "downstream=UNVERIFIED $fields")
     })
 
     fun activate() { currentEvidence.set(this) }
@@ -63,6 +63,7 @@ internal class GalaxyMediaReportEvidence(
             listOf("tokenValid", "sourceAccepted", "requestResult", "stateResult").forEach { facts[it] = -1L }
             facts["registered"] = 0
             facts["catalog"] = 0
+            listOf("catalogPresent", "registeredSourcePresent", "runtimeSourcePresent", "uiSourcePresent", "dimPublish").forEach { facts[it] = -1L }
             facts["focus"] = 0
             focusAt = null
         }
@@ -154,7 +155,8 @@ internal class GalaxyMediaReportEvidence(
             "NoSuchFieldException", "IllegalStateException", "IllegalArgumentException", "SecurityException",
             "DeadObjectException", "RemoteException", "InvocationTargetException")
         private val DETAIL_KEYS = setOf("sdkProvider", "registrationParams", "catalog", "dimService",
-            "dimEnabled", "dimExported", "dimPermissionDeclared", "dimPermissionGranted")
+            "dimEnabled", "dimExported", "dimPermissionDeclared", "dimPermissionGranted", "dimPublish",
+            "catalogPresent", "registeredSourcePresent", "runtimeSourcePresent", "uiSourcePresent")
         private fun flag(value: Boolean) = if (value) 1L else 0L
         private fun label(key: String, value: Long): String = when (key) {
             "failureStage" -> STAGES.getOrNull(value.toInt())
@@ -167,6 +169,7 @@ internal class GalaxyMediaReportEvidence(
             "sdkProvider" -> listOf("APP_OR_FRAMEWORK", "com.geely.linkhmi").getOrNull(value.toInt())
             "catalog" -> catalogResults.getOrNull(value.toInt())
             "dimService" -> serviceResults.getOrNull(value.toInt())
+            "dimPublish" -> when (value) { 0L -> "WAITING"; 1L -> "CONNECTED"; 2L -> "SENT_TO_FACTORY_SERVICE"; else -> "UNAVAILABLE_OR_FAILED" }
             else -> value.toString()
         } ?: "OTHER"
     }

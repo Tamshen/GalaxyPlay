@@ -25,9 +25,16 @@ internal object GalaxyTemporaryFiles {
     @Synchronized fun cleanup(context: Context) {
         cleanDirectories(File(context.cacheDir, "log-upload-snapshots"), Regex("upload-[a-zA-Z0-9-]+"))
         cleanDirectories(File(context.cacheDir, "l7-media-artwork"), Regex("[a-f0-9-]{36}"))
+        cleanupDim(context)
         val temporary = File(context.cacheDir, "app-updates/pending.tmp")
         if (temporary.isFile && System.currentTimeMillis() - temporary.lastModified() >= 60_000) temporary.delete()
         GalaxyUpdateCache.load(context)
+    }
+
+    @Synchronized fun cleanupDim(context: Context) {
+        context.externalMediaDirs.filterNotNull().forEach {
+            cleanDirectories(File(it, "dim-music"), Regex("[a-f0-9-]{36}"))
+        }
     }
 
     private fun cleanDirectories(root: File, name: Regex) {

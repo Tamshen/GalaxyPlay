@@ -10,6 +10,8 @@ public class EasMediaController {
     public int writes;
     public boolean rejectWrite;
     public boolean ignoreWrite;
+    public List<AppSourceInfo> runtime = new ArrayList<>();
+    public List<AppSourceInfo> getCustomAppSourceInfo() { return new ArrayList<>(runtime); }
     public List<AppSourceInfo> getAppSourceConfig() {
         reads++;
         return configuration == null ? null : new ArrayList<>(configuration);

@@ -18,6 +18,9 @@
     <!-- 仅查询和加载已核对的参考 SDK 包，避免 Android 11 包可见性过滤造成误判。 -->
     <queries>
         <package android:name="com.autolink.diminteraction" />
+        <package android:name="com.autolink.audioextservice" />
+        <package android:name="com.autolink.bluetoothservice" />
+        <package android:name="com.kotei.psdbluetooth" />
         <package android:name="com.autolink.hardkeyservice" />
         <package android:name="com.android.settings" />
         <package android:name="com.android.systemui" />

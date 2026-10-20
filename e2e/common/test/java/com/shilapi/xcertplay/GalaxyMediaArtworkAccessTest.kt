@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo
 import android.net.Uri
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -27,6 +28,11 @@ class GalaxyMediaArtworkAccessTest {
         }
     }
     private val uri = Uri.parse("content://${app.packageName}.media-artwork/covers/12345678-1234-1234-1234-123456789abc.jpg")
+
+    @Before fun clearPreviousGrants() {
+        GalaxyMediaArtworkAccess.revoke(context, uri)
+        GalaxyMediaArtworkAccess.revoke(context, Uri.parse("content://${app.packageName}.media-artwork/covers/87654321-1234-1234-1234-123456789abc.jpg"))
+    }
 
     private fun install(name: String) {
         shadowOf(app.packageManager).installPackage(PackageInfo().apply {
@@ -81,5 +87,37 @@ class GalaxyMediaArtworkAccessTest {
             GalaxyMediaArtworkAccess.grant(context, value, 7, logs::add)
         assertTrue(granted.isEmpty())
         assertTrue(logs.isEmpty())
+    }
+
+    @Test fun repeatedMetadataAndGetterShareSuccessfulGrantUntilRevoke() {
+        install("com.android.systemui")
+        repeat(10) { GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add) }
+        assertEquals(1, granted.size)
+        GalaxyMediaArtworkAccess.revoke(context, uri)
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        assertEquals(2, granted.size)
+    }
+
+    @Test fun failedGrantIsRetriedWithoutRepeatingSuccessfulReaders() {
+        install("com.android.systemui"); install("com.flyme.auto.mediacontrol")
+        denied = "com.android.systemui"
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        denied = null
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        assertEquals(listOf("com.flyme.auto.mediacontrol", "com.android.systemui"), granted.map { it.first })
+    }
+
+    @Test fun callerAndFixedReaderDeduplicateAndAdditionalCallerIsGranted() {
+        val name = "com.android.systemui"
+        install(name)
+        shadowOf(app.packageManager).setPackagesForUid(12001, name)
+        GalaxyMediaArtworkAccess.grant(context, uri, 7, logs::add)
+        assertEquals(0, GalaxyMediaArtworkAccess.grantCaller(context, uri, 12001))
+        shadowOf(app.packageManager).setPackagesForUid(12002, "synthetic.reader")
+        repeat(10) { GalaxyMediaArtworkAccess.grantCaller(context, uri, 12002) }
+        assertEquals(listOf(name, "synthetic.reader"), granted.map { it.first })
+        GalaxyMediaArtworkAccess.revoke(context, uri)
+        GalaxyMediaArtworkAccess.grantCaller(context, uri, 12002)
+        assertEquals(3, granted.size)
     }
 }

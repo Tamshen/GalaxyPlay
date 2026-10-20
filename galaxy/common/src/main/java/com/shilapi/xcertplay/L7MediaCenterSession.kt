@@ -33,6 +33,7 @@ internal class L7MediaCenterSession(
     private val events = AtomicLong()
     private val evidence: GalaxyMediaReportEvidence = GalaxyMediaReportEvidence(generation, localPlayback, { !closed && current() }, log,
         { observation, revision -> enqueue {
+            evidence.details(port.diagnosticFacts(), port.source)
             if (registered) safely("observationFocus") {
                 evidenceFocus(port.focusClient()); "RETURNED"
             }
@@ -167,7 +168,21 @@ internal class L7MediaCenterSession(
         playRequest.observe(value)
         if (explicitPlay) playRequest.select()
         val metadata = next.copy(value = value.copy(elapsedMillis = null))
-        if (pending != metadata) { pending = metadata; updateAttempts = 0 }
+        if (pending != metadata) {
+            val old = pending
+            val fields = buildList {
+                if (old?.value?.title != value.title) add("title")
+                if (old?.value?.artist != value.artist) add("artist")
+                if (old?.value?.album != value.album) add("album")
+                if (old?.value?.durationMillis != value.durationMillis) add("duration")
+                if (old?.value?.artworkTransferId != value.artworkTransferId || old?.artwork != uri) add("artwork")
+                if (old?.value?.playing != value.playing || old?.value?.playbackKnown != value.playbackKnown) add("playback")
+            }
+            event("metadataChanged fields=${fields.joinToString(",")}")
+            pending = metadata
+            updateAttempts = 0
+        }
+        evidence.details(port.diagnosticFacts(), port.source)
         val changed = published?.copy(elapsedMillis = null) != metadata.value || publishedArtwork != uri
         if (changed && !safely("prepare") { port.prepare(value, uri); true }) return
         if (closed || !current() || snapshot !== next) return

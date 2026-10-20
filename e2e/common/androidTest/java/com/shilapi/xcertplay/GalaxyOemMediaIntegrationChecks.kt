@@ -27,14 +27,18 @@ object GalaxyOemMediaIntegrationChecks {
             val cover = Uri.parse("content://${base.packageName}.synthetic/first")
             port.prepare(value, cover)
             check(port.register())
+            check(sdk.sourceController.writes == 0 && sdk.sourceController.reads == 0)
+            check(sdk.packageName == context.packageName && sdk.mediaSessionPackage == context.packageName)
+            check(port.sources(intArrayOf(port.source)))
+            awaitFact(port, "catalogPresent", 1L)
             check(sdk.sourceController.writes == 1)
+            check(sdk.sourceDeclarations.get() == 2) // 首次声明在前，目录修复后仅重申一次。
+            check(port.diagnosticFacts()["runtimeSourcePresent"] == 0L)
             val catalog = sdk.sourceController.configuration
             check(catalog.first().packageName == "synthetic.foreign")
             check(catalog.last().packageName == context.packageName)
             check(catalog.last().appName == context.getString(com.shilapi.xcertplay.host.R.string.app_name))
             check(catalog.last().sourceTypeList.contentEquals(intArrayOf(6, 13)))
-            check(sdk.packageName == context.packageName && sdk.mediaSessionPackage == context.packageName)
-            check(port.sources(intArrayOf(port.source)))
             port.currentSource()
             check(sdk.source == 6 && sdk.sources.contentEquals(intArrayOf(6)))
             check(port.requestPlay() && port.focusClient() == context.packageName)
@@ -65,6 +69,9 @@ object GalaxyOemMediaIntegrationChecks {
             check(!first.onNext() && first.musicPlaybackInfo == null)
             port.prepare(value, cover)
             check(port.register())
+            check(port.sources(intArrayOf(port.source)))
+            awaitFact(port, "catalogPresent", 1L)
+            check(sdk.sourceDeclarations.get() == 3) // 目录已存在，不重复写入或重申。
             check(sdk.sourceController.writes == 1 && sdk.sourceController.configuration.size == 2)
             check(sdk.client !== first && !first.onPlay() && sdk.client.onPlay())
             port.invalidate()
@@ -102,10 +109,20 @@ object GalaxyOemMediaIntegrationChecks {
             port.initialize({}, { true }, {}, { true })
             port.prepare(CarPlayNowPlaying(title = "synthetic", playing = true, playbackKnown = true), null)
             check(port.register() && port.sources(intArrayOf(6)))
+            awaitFact(port, "catalog", GalaxyMediaReportEvidence.catalogResults.indexOf(
+                if (missing) "NO_CONTROLLER" else "UNAVAILABLE_CALL").toLong())
             check(port.update(CarPlayNowPlaying(), null))
             check(sdk.published.title == "synthetic")
             check(port.unregister())
             port.close()
         }
+    }
+
+    private fun awaitFact(port: L7ReflectiveMediaCenter, key: String, expected: Long) {
+        val deadline = android.os.SystemClock.elapsedRealtime() + 5000L
+        while (port.diagnosticFacts()[key] != expected && android.os.SystemClock.elapsedRealtime() < deadline) {
+            Thread.sleep(20)
+        }
+        check(port.diagnosticFacts()[key] == expected) { "$key expected=$expected actual=${port.diagnosticFacts()}" }
     }
 }

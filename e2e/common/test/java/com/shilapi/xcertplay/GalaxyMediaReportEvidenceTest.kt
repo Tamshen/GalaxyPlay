@@ -34,7 +34,8 @@ class GalaxyMediaReportEvidenceTest {
         val text = logs.joinToString("\n")
         assertTrue(text.contains("focus=UNKNOWN"))
         assertTrue(text.contains("target=CLUSTER"))
-        assertTrue(text.contains("dimPublish=NOT_IMPLEMENTED downstream=UNVERIFIED"))
+        assertTrue(text.contains("downstream=UNVERIFIED"))
+        assertFalse(text.contains("NOT_IMPLEMENTED"))
         assertFalse(text.contains("private-song")); assertFalse(text.contains("private-artist"))
         assertEquals(1, checkpoints.size)
     }

@@ -19,6 +19,7 @@ public class MediaCenterAPI {
     public long progress;
     public int source;
     public int[] sources;
+    public final java.util.concurrent.atomic.AtomicInteger sourceDeclarations = new java.util.concurrent.atomic.AtomicInteger();
     public int unregistrations;
     public int releases;
     public boolean invalidToken;
@@ -40,7 +41,9 @@ public class MediaCenterAPI {
         token = invalidToken ? new Object() : new Token(); return token;
     }
     private void verify(Object value) { if (value != token) throw new AssertionError("TOKEN_CHANGED"); }
-    public boolean updateMediaSourceTypeList(Object value, int[] sources) { verify(value); this.sources = sources; return true; }
+    public boolean updateMediaSourceTypeList(Object value, int[] sources) {
+        verify(value); this.sources = sources; sourceDeclarations.incrementAndGet(); return true;
+    }
     public void updateCurrentSourceType(Object value, int source) { verify(value); this.source = source; }
     public boolean requestPlay(Object value) { verify(value); return true; }
     public String queryCurrentFocusClient(Object value) { verify(value); return packageName; }

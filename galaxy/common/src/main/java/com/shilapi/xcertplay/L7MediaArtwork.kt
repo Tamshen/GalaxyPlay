@@ -120,7 +120,7 @@ internal class L7MediaArtwork(context: Context,
 
     private fun uri(file: File) = FileProvider.getUriForFile(app, "${app.packageName}.media-artwork", file)
     private fun remove(file: File) {
-        runCatching { app.revokeUriPermission(uri(file), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        runCatching { GalaxyMediaArtworkAccess.revoke(app, uri(file)) }
         file.delete()
         directory.delete() // 仅在目录为空时成功，迟到结果也能清理。
     }
