@@ -12,24 +12,22 @@ import android.widget.ImageButton
 import com.shilapi.xcertplay.host.R
 import kotlin.math.abs
 
-/** 收起时窗口只有图标大小，展开时只有菜单大小，桌面其他区域仍可操作。 */
-internal class L7DesktopWindow(private val owner: Context, private val navigate: (String) -> Unit) {
+/** 程序外仅保留可拖动的返回图标，单击直接回到画面，其他区域仍可操作。 */
+internal class L7DesktopWindow(private val owner: Context, private val returnToDisplay: () -> Unit) {
     private val manager = owner.getSystemService(WindowManager::class.java)
     private var view: View? = null
     private var ui: Context = owner
     private var density = 0
-    private var expanded = false
     private lateinit var params: WindowManager.LayoutParams
     private fun dp(value: Int) = L7Components.dp(ui, value)
 
     fun show() {
         if (view != null && density != L7UiDensity.value(owner)) remove()
         if (view == null) build()
-        (view as? L7NavigationRail)?.setConnected(CarPlayBackgroundSession.active)
-        if (!expanded) view?.alpha = 1f - L7FloatingNavigationPreferences.transparency(owner) / 100f
+        view?.alpha = 1f - L7FloatingNavigationPreferences.transparency(owner) / 100f
     }
 
-    fun hide() { remove(); expanded = false }
+    fun hide() { remove() }
     fun refresh() { view?.let(L7Ui::refresh) }
 
     private fun remove() {
@@ -40,38 +38,22 @@ internal class L7DesktopWindow(private val owner: Context, private val navigate:
     private fun build() {
         ui = L7UiDensity.wrap(AppLocale.wrap(owner))
         density = L7UiDensity.value(owner)
-        params = WindowManager.LayoutParams(dp(if (expanded) 132 else 64),
-            if (expanded) WindowManager.LayoutParams.WRAP_CONTENT else dp(64),
+        params = WindowManager.LayoutParams(dp(64), dp(64),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH, PixelFormat.TRANSLUCENT).apply {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.TOP or Gravity.LEFT
             title = ui.getString(R.string.l7_desktop_title)
         }
-        val current = if (expanded) menu() else handle()
+        val current = handle()
         view = current
-        if (expanded) { params.x = dp(16); params.y = dp(16) } else position()
+        position()
         manager.addView(current, params)
     }
 
-    private fun menu() = L7NavigationRail(ui) { target ->
-        hide()
-        navigate(target)
-    }.apply {
-        // 系统悬浮菜单仅在应用不可见时显示，当前位置属于车机桌面/外部界面。
-        select("car-home")
-        L7MenuSurface.navigation(this)
-        setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                hide(); show(); true
-            } else false
-        }
-    }
-
     private fun handle() = ImageButton(ui).apply {
-        contentDescription = ui.getString(R.string.l7_desktop_expand)
+        contentDescription = ui.getString(R.string.l7_desktop_return)
         L7MenuSurface.handle(this)
-        setOnClickListener { remove(); expanded = true; show() }
+        setOnClickListener { hide(); returnToDisplay() }
         attachDrag(this)
     }
 

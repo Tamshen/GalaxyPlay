@@ -32,7 +32,7 @@ internal object L7DesktopNavigation : Application.ActivityLifecycleCallbacks {
         }
         if (Settings.canDrawOverlays(activity)) {
             runCatching { activity.startForegroundService(Intent(activity, L7DesktopNavigationService::class.java)) }
-                .onFailure { L7DebugLog.record("桌面悬浮菜单启动失败 ${it.javaClass.simpleName}") }
+                .onFailure { L7DebugLog.record("桌面悬浮图标启动失败 ${it.javaClass.simpleName}") }
         }
     }
 

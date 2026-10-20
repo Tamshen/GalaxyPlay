@@ -13,7 +13,7 @@
     <string name="l7_floating_transparency">Floating icon transparency</string>
     <string name="l7_in_app_title">In-app floating menu</string>
     <string name="l7_in_app_hint">Show a floating shortcut over CarPlay. When disabled, press the vehicle Back button to return to the app home screen and use its menu.</string>
-    <string name="l7_floating_hint">Control in-app and vehicle desktop menus separately. The in-app menu collapses after connecting and its shortcut can be dragged. When disabled, press Back to return to the app home screen. Transparency changes apply when returning to the display.</string>
+    <string name="l7_floating_hint">Control the in-app menu and vehicle desktop shortcut separately. The in-app menu collapses after connecting and its shortcut can be dragged. When disabled, press Back to return to the app home screen. Transparency changes apply when returning to the display.</string>
     <string name="l7_exit_app">Exit app</string>
     <string name="l7_exit_title">Exit GalaxyPlay?</string>
     <string name="l7_exit_message">This will disconnect CarPlay, close floating logs and background services, and end the app process.</string>

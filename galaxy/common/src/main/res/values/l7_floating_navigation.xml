@@ -12,7 +12,7 @@
     <string name="l7_floating_transparency">悬浮图标透明度</string>
     <string name="l7_in_app_title">应用内悬浮菜单</string>
     <string name="l7_in_app_hint">投屏时显示悬浮入口；关闭后按车机返回键回到首页使用菜单。</string>
-    <string name="l7_floating_hint">应用内与车机桌面菜单可分别开关。连接后应用内菜单收起，入口可拖动；关闭应用内菜单后按返回键回到首页。透明度调整返回画面后生效。</string>
+    <string name="l7_floating_hint">应用内悬浮菜单与车机桌面悬浮图标可分别开关。连接后应用内菜单收起，入口可拖动；关闭应用内菜单后按返回键回到首页。透明度调整返回画面后生效。</string>
     <string name="l7_exit_app">退出应用</string>
     <string name="l7_exit_title">退出 GalaxyPlay？</string>
     <string name="l7_exit_message">将断开 CarPlay、关闭悬浮日志和后台服务，并结束应用进程。</string>

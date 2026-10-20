@@ -1,6 +1,5 @@
 package com.shilapi.xcertplay
 
-import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,8 +19,6 @@ import com.shilapi.xcertplay.host.R
 class L7DesktopNavigationService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var floating: L7DesktopWindow
-    private var exitDialog: AlertDialog? = null
-    private var connectionDialog: AlertDialog? = null
     private val update = object : Runnable {
         override fun run() { sync(); handler.postDelayed(this, 500) }
     }
@@ -29,7 +26,7 @@ class L7DesktopNavigationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
         super.onCreate()
-        floating = L7DesktopWindow(this, ::navigate)
+        floating = L7DesktopWindow(this, ::returnToDisplay)
         L7DesktopNavigation.onVisibilityChanged = { sync() }
     }
 
@@ -53,9 +50,9 @@ class L7DesktopNavigationService : Service() {
 
     private fun sync() {
         if (!allowed()) { floating.hide(); stopSelf(); return }
-        if (L7DesktopNavigation.appVisible || exitDialog?.isShowing == true || connectionDialog?.isShowing == true) floating.hide()
+        if (L7DesktopNavigation.appVisible) floating.hide()
         else runCatching { floating.show() }.onFailure {
-            L7DebugLog.record("桌面悬浮菜单不可用 ${it.javaClass.simpleName}")
+            L7DebugLog.record("桌面悬浮图标不可用 ${it.javaClass.simpleName}")
             stopSelf()
         }
     }
@@ -63,19 +60,11 @@ class L7DesktopNavigationService : Service() {
     private fun homeIntent(page: String) = Intent(this, GalaxySettingsActivity::class.java).putExtra("page", page)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
 
-    private fun navigate(target: String) {
+    private fun returnToDisplay() {
         if (!allowed()) return
-        when (target) {
-            "home" -> startActivity(if (CarPlayBackgroundSession.hasSession())
-                Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                else homeIntent("home"))
-            "settings" -> startActivity(homeIntent("settings"))
-            "connection" -> connectionDialog = GalaxyConnectionMenu.select(this) {
-                startActivity(homeIntent("settings-connection"))
-            }
-            "car-home" -> startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            "exit" -> exitDialog = L7AppExit.confirm(this)
-        }
+        startActivity(if (CarPlayBackgroundSession.hasSession())
+            Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            else homeIntent("home"))
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -88,8 +77,6 @@ class L7DesktopNavigationService : Service() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         L7DesktopNavigation.onVisibilityChanged = null
-        exitDialog?.dismiss()
-        connectionDialog?.dismiss()
         floating.hide()
         super.onDestroy()
     }

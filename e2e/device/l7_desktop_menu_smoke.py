@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""仅在 AVD 验证桌面悬浮菜单；测试授权悬浮权限，最终退出应用。"""
+"""仅在 AVD 验证程序外悬浮图标的拖动、单击返回和前台隐藏，最终停止应用。"""
 import argparse
 from pathlib import Path
 import re
@@ -14,7 +14,7 @@ args = parser.parse_args()
 if not re.fullmatch(r'emulator-\d+', args.serial):
     parser.error('仅允许模拟器')
 package = 'com.ecarx.carplay'
-out = Path(__file__).resolve().parents[2] / 'build/previews/desktop-menu'
+out = Path(__file__).resolve().parents[2] / 'build/previews/desktop-shortcut'
 out.mkdir(parents=True, exist_ok=True)
 
 
@@ -35,6 +35,10 @@ def find(label):
 
 def tap(label):
     node = find(label)
+    for _ in range(5):
+        if node is not None: break
+        adb('shell', 'input', 'swipe', '1100', '1600', '1100', '650', '350')
+        node = find(label)
     assert node is not None, '找不到：' + label
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
@@ -52,31 +56,27 @@ def launch(page='home'):
 
 
 def overlay_bounds():
-    # Android 11 的 uiautomator dump 只返回焦点窗口；悬浮菜单不抢焦点，从系统窗口读取真实边界。
+    # Android 11 的 uiautomator dump 只返回焦点窗口；悬浮图标不抢焦点，从系统窗口读取真实边界。
     windows = adb('shell', 'dumpsys', 'window', 'windows')
     for window in re.split(r'(?=  Window #\d+ Window\{)', windows):
-        if 'GalaxyPlay 桌面菜单}:\n' in window and 'isVisible=true' in window:
+        if '车机桌面悬浮图标' in window and 'isVisible=true' in window:
             bounds = re.search(r'mFrame=\[(\d+),(\d+)\]\[(\d+),(\d+)\]', window)
             assert bounds, '悬浮窗口没有可见边界'
             return tuple(map(int, bounds.groups()))
     return None
 
 
-def tap_overlay(label):
+def tap_overlay():
     bounds = overlay_bounds()
     assert bounds is not None, '桌面悬浮窗口未显示'
     x1, y1, x2, y2 = bounds
-    if label == '展开桌面菜单':
-        assert x2 - x1 == y2 - y1, '当前不是收起入口'
-        y = (y1 + y2) // 2
-    else:
-        assert y2 - y1 > 3 * (x2 - x1), '当前不是五项菜单'
-        # 五项等高按钮；视觉状态另由留存截图复核，页面内的选中态仍读取无障碍节点。
-        index = ['画面', '连接', '设置', '车机', '退出'].index(label)
-        padding = (x2 - x1) * 10 / 132
-        y = round(y1 + padding + (y2 - y1 - 2 * padding) * (index + .5) / 5)
-    adb('shell', 'input', 'tap', str((x1 + x2) // 2), str(y))
-    time.sleep(.7)
+    assert x2 - x1 == y2 - y1, '后台窗口应始终只有图标大小'
+    adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+    # 等前台 Activity 转场稳定，不能把点击后立即移除旧图标当作返回完成。
+    nodes()
+    deadline = time.monotonic() + 5
+    while overlay_bounds() is not None and time.monotonic() < deadline:
+        time.sleep(.2)
 
 
 def desktop():
@@ -85,69 +85,35 @@ def desktop():
     assert overlay_bounds() is not None
 
 
-def host_id():
-    return re.search(r'ActivityRecord\{(\w+)[^\n]*CarPlayHostActivity',
-                     adb('shell', 'dumpsys', 'activity', 'activities')).group(1)
-
-
 adb('shell', 'am', 'force-stop', package)
-# 仅修改模拟器中本应用的悬浮权限，实车用户需自己在系统设置授权。
+# 仅修改模拟器中本应用的悬浮权限，实车用户需自行在系统设置授权。
 adb('shell', 'appops', 'set', package, 'SYSTEM_ALERT_WINDOW', 'allow')
 launch()
 assert find('有线连接') is not None, '请先在 AVD 完成协议确认'
 assert overlay_bounds() is None, '应用内重复显示桌面入口'
 desktop()
-screenshot('collapsed')
+screenshot('outside-shortcut')
 before_bounds = overlay_bounds()
 x1, y1, x2, y2 = before_bounds
-adb('shell', 'input', 'swipe', str((x1 + x2) // 2), str((y1 + y2) // 2), '1200', '700', '500')
-assert overlay_bounds() != before_bounds, '悬浮入口未移动'
-tap_overlay('展开桌面菜单')
-assert overlay_bounds()[0] < 100 and overlay_bounds()[1] < 150, '展开菜单没有固定在左上角'
-screenshot('expanded')
-tap_overlay('画面')
-assert find('有线连接') is not None and overlay_bounds() is None
-print('后台悬浮入口、拖动、固定五项菜单、返回首页与应用内隐藏通过', flush=True)
-tap('有线连接')
-assert find('返回 GalaxyPlay') is not None
-before = host_id()
+adb('shell', 'input', 'swipe', str((x1 + x2) // 2), str((y1 + y2) // 2), '500' if x1 > 800 else '1200', '700', '500')
+time.sleep(.5)
+after_bounds = overlay_bounds()
+assert after_bounds is not None and after_bounds != before_bounds, '拖动应只移动图标，不打开画面'
+screenshot('dragged-shortcut')
+tap_overlay()
+assert find('有线连接') is not None and overlay_bounds() is None, '单击应直接返回首页并隐藏图标'
+assert 'DiPlaySessionService' not in adb('shell', 'dumpsys', 'activity', 'services', package), '无会话返回不得主动连接'
+screenshot('single-tap-home')
 desktop()
-tap_overlay('展开桌面菜单')
-tap_overlay('画面')
-assert find('返回 GalaxyPlay') is not None and host_id() == before
-assert 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package)
-screenshot('returned-to-session')
-desktop()
-tap_overlay('展开桌面菜单')
-tap_overlay('设置')
-assert find('显示与性能') is not None
-assert find('设置').get('selected') == 'true'
-tap('显示与性能')
-assert find('设置').get('selected') == 'true'
-tap('桌面悬浮菜单')
-adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
-time.sleep(1)
-assert overlay_bounds() is None, '关闭后仍有桌面入口'
-launch('settings-display')
-tap('桌面悬浮菜单')
-desktop()
-tap_overlay('展开桌面菜单')
-tap_overlay('车机')
-assert overlay_bounds() is not None
-tap_overlay('展开桌面菜单')
-tap_overlay('退出')
-assert find('退出应用') is not None
-screenshot('exit-confirmation')
-tap('取消')
-assert overlay_bounds() is not None
-assert 'DiPlaySessionService' in adb('shell', 'dumpsys', 'activity', 'services', package)
-tap_overlay('展开桌面菜单')
-tap_overlay('退出')
-tap('退出应用')
-time.sleep(2)
-result = subprocess.run([args.adb, '-s', args.serial, 'shell', 'pidof', package], capture_output=True)
-assert not result.stdout.strip(), '退出后进程仍在'
+assert overlay_bounds() == after_bounds, '返回后台后未保留拖动位置'
+tap_overlay()
 assert overlay_bounds() is None
-assert not re.search(r'ServiceRecord[^\n]*(DiPlaySessionService|L7DesktopNavigationService|L7DebugOverlayService)',
-                     adb('shell', 'dumpsys', 'activity', 'services', package))
-print('桌面返回同一等待宿主、设置、开关、车机、退出取消及确认清理通过；没有真实 iPhone 会话', flush=True)
+launch('settings-general')
+tap('车机桌面悬浮图标')
+adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');time.sleep(1)
+assert overlay_bounds() is None, '关闭开关后仍有悬浮入口'
+launch('settings-general');tap('车机桌面悬浮图标')
+desktop();tap_overlay()
+assert overlay_bounds() is None
+adb('shell', 'am', 'force-stop', package)
+print('AVD 拖动不跳转、位置保留、单击直返首页、前台隐藏和独立开关通过；没有真实 CarPlay 会话', flush=True)

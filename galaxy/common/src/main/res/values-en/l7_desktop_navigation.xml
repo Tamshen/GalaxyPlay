@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="l7_desktop_title">Vehicle desktop floating menu</string>
-    <string name="l7_desktop_hint">Keep a floating shortcut when leaving the app. Select Display in its menu to return quickly.</string>
-    <string name="l7_desktop_expand">Expand desktop menu</string>
+    <string name="l7_desktop_title">Vehicle desktop floating shortcut</string>
+    <string name="l7_desktop_hint">Tap the floating shortcut outside the app to return directly to CarPlay, or to the home screen when disconnected. Drag to reposition.</string>
+    <string name="l7_desktop_return">Return to CarPlay display</string>
     <string name="l7_desktop_permission">Enable desktop overlay</string>
     <string name="l7_desktop_permission_hint">Allow this to return quickly from the vehicle home screen. CarPlay can still connect without it.</string>
     <string name="l7_desktop_home_permission">Enable overlay permission to return quickly from the home screen</string>
-    <string name="l7_desktop_notification">Desktop floating menu is enabled for quick access to GalaxyPlay</string>
+    <string name="l7_desktop_notification">Desktop floating shortcut is enabled. Tap the icon to return to the display.</string>
 </resources>
