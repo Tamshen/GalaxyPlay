@@ -15,6 +15,8 @@ internal class L7ProbeLabels(private val context: Context) {
         item.id.removePrefix("USB-")) else environmentNames[item.id]?.let(::text) ?: item.name.substringAfterLast('.')
     fun reason(item: L7ProbeItem): String {
         if (item.domain == "CARPLAY_ENV" && item.reason != "NOT_RUN") return text(R.string.carplay_environment_evidence)
+        if (item.facts["navigationContract"] == "OEM_MAP_API")
+            return text(R.string.l7_probe_navigation_oem)
         if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
             return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.reason == "REPORTING_UNVERIFIED") return context.getString(R.string.l7_probe_reporting_details,
@@ -52,6 +54,8 @@ internal class L7ProbeLabels(private val context: Context) {
     }
     fun compactReason(item: L7ProbeItem): String {
         if (item.domain == "CARPLAY_ENV" && item.reason != "NOT_RUN") return text(R.string.carplay_environment_evidence)
+        if (item.facts["navigationContract"] == "OEM_MAP_API")
+            return text(R.string.l7_probe_navigation_oem)
         if (item.facts["navigationContract"] == "AMAP_STANDARD_BROADCAST")
             return context.getString(R.string.l7_probe_navigation_broadcast)
         if (item.domain == "HOTSPOT") return reason(item)

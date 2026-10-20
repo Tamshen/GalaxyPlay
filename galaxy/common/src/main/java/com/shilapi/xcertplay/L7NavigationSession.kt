@@ -6,7 +6,7 @@ import java.io.Closeable
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 单线程发布高德导航广播；保留最新快照、有限失败预算及会话结束清理。 */
+/** 单线程发布导航快照；保留最新状态、有限失败预算及会话结束清理。 */
 internal class L7NavigationSession(
     private val port: L7NavigationPort,
     private val current: () -> Boolean,
@@ -61,7 +61,7 @@ internal class L7NavigationSession(
         if (failures >= 3) return
         if (!value.active) { stop(); return }
         if (!startConfirmed) {
-            // 开始广播可能已经发出后才抛错，退出仍须尝试发送结束状态。
+            // 开始状态可能已经发出后才抛错，退出仍须尝试发送结束状态。
             started = true
             if (!call("start") { port.start() }) { failures++; return }
             startConfirmed = true
@@ -81,7 +81,7 @@ internal class L7NavigationSession(
         published = null
     }
     private fun event(body: String) {
-        runCatching { log("Navigation: transport=AMAP_BROADCAST generation=$generation event=${sequence.incrementAndGet()} monoMs=${now()} $body") }
+        runCatching { log("Navigation: transport=${port.transport} generation=$generation event=${sequence.incrementAndGet()} monoMs=${now()} $body") }
     }
     private fun call(stage: String, action: () -> Unit): Boolean = try {
         operations.run(stage, action)

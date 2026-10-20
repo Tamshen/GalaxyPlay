@@ -15,12 +15,12 @@ class L7ReportingProbeTest {
         L7ProbeItem("PERM:$name", name, "PERMISSION", L7ProbeOutcome.UNKNOWN, "DEFINITION_NOT_VISIBLE",
             mapOf("declared" to declared, "granted" to granted, "definitionVisible" to visible, "appOpMode" to mode))
 
-    @Test fun navigationBroadcastDoesNotRequireVendorPermissionsOrClassesAndRemainsUnverified() {
-        val item = L7ReportingProbe({ error("导航不查询厂商权限") }, { error("导航不加载厂商类") }).inspect("REPORT-HUD")
+    @Test fun navigationSdkVisibilityDoesNotProveRegistrationOrDisplay() {
+        val item = L7ReportingProbe({ error("不猜测导航权限") }, { "VISIBLE" }).inspect("REPORT-HUD")
         assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(item))
         assertEquals("0", item.facts["permissionCount"])
-        assertEquals("0", item.facts["sdkCount"])
-        assertEquals("AMAP_STANDARD_BROADCAST", item.facts["navigationContract"])
+        assertEquals("3", item.facts["sdkCount"])
+        assertEquals("OEM_MAP_API", item.facts["navigationContract"])
         assertEquals("NOT_RUN", item.facts["effectiveCall"])
         assertEquals("UNKNOWN", item.facts["reportingSupported"])
     }

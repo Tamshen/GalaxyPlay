@@ -109,7 +109,7 @@ class L7ProbeRunnerTest {
         } finally { release.countDown() }
     }
 
-    @Test fun singleNavigationRecheckRecordsBroadcastWithoutVendorRequirementsOrUploading() {
+    @Test fun singleNavigationRecheckRecordsOemContractWithoutRegisteringOrUploading() {
         L7Agreement.accept(app)
         val upload = RemoteLogUpload.status
         assertTrue(L7ProbeRunner.start(app, emptyMap(), "REPORT-HUD"))
@@ -119,7 +119,7 @@ class L7ProbeRunnerTest {
         assertEquals(1, report.expected)
         assertEquals(listOf("REPORT-HUD"), report.items.map { it.id })
         assertEquals("", report.items.single().facts["candidatePermissions"])
-        assertEquals("AMAP_STANDARD_BROADCAST", report.items.single().facts["navigationContract"])
+        assertEquals("OEM_MAP_API", report.items.single().facts["navigationContract"])
         assertEquals("NOT_RUN", report.items.single().facts["effectiveCall"])
         assertEquals(L7ProbeStatus.PENDING, L7ProbeStatus.of(report.items.single()))
         assertEquals(upload, RemoteLogUpload.status)

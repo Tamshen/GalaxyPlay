@@ -29,9 +29,9 @@ internal class L7ReportingProbe(
                 ";reason=${item.reason}"
         }
         if (id == "REPORT-HUD") {
-            facts["permissionRequirement"] = "NO_VENDOR_SDK_AMAP_BROADCAST"
-            facts["navigationContract"] = "AMAP_STANDARD_BROADCAST"
-            facts["navigationMapping"] = "10001_GUIDANCE_10019_START8_STOP9_RECEPTION_UNVERIFIED"
+            facts["permissionRequirement"] = "OEM_SERVICE_AUTHORIZATION_NOT_VERIFIED"
+            facts["navigationContract"] = "OEM_MAP_API"
+            facts["navigationMapping"] = "REGISTER_LISTENER_GUIDANCE_START16_STOP17_DISPLAY_UNVERIFIED"
         }
         if (id == "REPORT-QNX") facts["qnxProtocol"] = "UNCONFIRMED_MEDIACENTER_DOWNSTREAM"
         return L7ProbeItem(id, id, "REPORTING", L7ProbeOutcome.UNKNOWN, "REPORTING_UNVERIFIED", facts)
@@ -47,7 +47,8 @@ internal class L7ReportingProbe(
         private val mediaClasses = listOf("com.ecarx.eas.sdk.mediacenter.MediaCenterAPI", "com.ecarx.eas.sdk.mediacenter.MusicClient")
         private val specs = linkedMapOf(
             "REPORT-MEDIA" to Spec(mediaPermissions, mediaClasses),
-            "REPORT-HUD" to Spec(emptyList(), emptyList()),
+            "REPORT-HUD" to Spec(emptyList(), listOf("com.ecarx.eas.framework.sdk.navi.MapAPI",
+                "com.ecarx.eas.mapsdk.interfaces.IMapClient", "com.ecarx.eas.mapsdk.model.response.GuidingInfoModel")),
             "REPORT-QNX" to Spec(mediaPermissions, mediaClasses),
         )
         val ids = specs.keys.toList()

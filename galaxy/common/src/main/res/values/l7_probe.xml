@@ -123,4 +123,5 @@
     <string name="l7_probe_invalid_response">系统返回类型、状态或安全模式无法识别。</string>
     <string name="l7_probe_next_hotspot">下一步：分别核对三条读取结果与候选权限。读取失败不覆盖已存配置，也不证明写入或开启失败。收集不会启停或改写热点；写入与开启需在连接设置主动操作，手机接入另行验证。</string>
     <string name="l7_probe_navigation_broadcast">高德标准广播；接收、HUD 与仪表显示待验证。</string>
+    <string name="l7_probe_navigation_oem">原厂导航接口；注册、系统接收及仪表显示需通过上报测试确认。</string>
 </resources>

@@ -6,7 +6,7 @@
     <string name="l7_report_media_title">媒体上报测试</string>
     <string name="l7_report_navigation_title">HUD 导航上报测试</string>
     <string name="l7_report_media_hint">使用无声测试曲目检查歌名、播放状态、进度与封面更新，可观察原车媒体卡片；不会向手机发送控制。请先结束 CarPlay 连接。</string>
-    <string name="l7_report_navigation_hint">发送高德格式的导航开始、测试路名、转向、距离、剩余时间与结束，再观察 HUD／仪表。请先结束 CarPlay 连接。</string>
+    <string name="l7_report_navigation_hint">向原车导航服务发送导航开始、测试路名、转向、距离、剩余时间与结束，再观察 HUD／仪表。请先结束 CarPlay 连接。</string>
     <string name="l7_report_status">1. 开始测试</string>
     <string name="l7_report_start">开始上报测试</string>
     <string name="l7_report_end">结束上报并清理</string>

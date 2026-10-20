@@ -5,25 +5,31 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.util.concurrent.Executor
 
-/** 与真实导航共用高德广播；合成样例供核对路名、转向、距离与剩余时间。 */
+/** 与真实导航共用原厂注册上报；合成样例供核对路名、转向、距离与剩余时间。 */
 internal class L7ManualNavigationReport(
     context: Context,
     private val log: (String) -> Unit,
     released: () -> Unit,
     private val current: () -> Boolean,
-    port: L7NavigationPort = GalaxyAmapNavigation(context),
+    port: L7NavigationPort = GalaxyOemNavigation(context, log),
     worker: Executor? = null,
 ) : L7ReportingSession {
     private val roads = listOf(context.getString(R.string.l7_report_road_a), context.getString(R.string.l7_report_road_b))
     private var road = 0
     private var closed = false
+    private val releaseOnce = java.util.concurrent.atomic.AtomicBoolean()
+    private val finish = { if (releaseOnce.compareAndSet(false, true)) released() }
     private val observed = object : L7NavigationPort by port {
         override fun close() {
-            try { port.close(); log("stage=broadcastCleanup result=RETURNED remoteClear=NOT_VERIFIED") }
+            try { port.close {
+                log("stage=navigationCleanup result=FINISHED remoteClear=NOT_VERIFIED")
+                finish()
+            } }
             catch (error: Throwable) {
                 if (error !is Exception && error !is LinkageError) throw error
-                log("stage=broadcastCleanup exceptionType=${error.javaClass.simpleName}")
-            } finally { released() }
+                log("stage=navigationCleanup exceptionType=${error.javaClass.simpleName}")
+                finish()
+            }
         }
     }
     private val session = if (worker == null) L7NavigationSession(observed, current, log = log)

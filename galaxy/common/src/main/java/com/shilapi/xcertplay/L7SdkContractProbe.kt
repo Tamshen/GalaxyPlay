@@ -29,16 +29,18 @@ internal object L7SdkContractProbe {
                 else -> "CARPLAY_REFERENCE_13_ACCEPTANCE_UNTESTED"
             }
         }
-        result["navigationSdkSource"] = "ANDROID_CONTEXT"
-        result["navigationContract"] = "AMAP_STANDARD_BROADCAST"
-        result["navigationMapping"] = "10001_GUIDANCE_10019_START8_STOP9_RECEPTION_UNVERIFIED"
+        check(context, "com.ecarx.eas.framework.sdk.navi.MapAPI", "navigation", result) { _, loader ->
+            GalaxyNavigationContract(loader)
+        }
+        result["navigationTransport"] = "OEM_MAP_API"
+        result["navigationMapping"] = "REGISTER_LISTENER_GUIDANCE_START16_STOP17_DISPLAY_UNVERIFIED"
         return result
     }
     private fun check(context: Context, name: String, key: String, result: MutableMap<String, String?>,
                       verify: (Class<*>, ClassLoader) -> Unit) {
         try {
             val loaded = if (key == "media") GalaxyMediaSdk.load(context)
-                else L7VendorSdk(context).load(name)
+                else L7VendorSdk(context).load(name) { GalaxyNavigationContract(it) }
             result["${key}SdkSource"] = loaded.source
             verify(Class.forName(name, false, loaded.loader), loaded.loader)
             result["${key}Contract"] = "VISIBLE_MATCH"

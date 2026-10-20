@@ -123,4 +123,5 @@
     <string name="l7_probe_invalid_response">The response type, state, or security mode is not recognized.</string>
     <string name="l7_probe_next_hotspot">Next: compare all three read results with candidate permissions. Failed reads preserve stored credentials and do not prove write or startup failure. Collection does not change the hotspot; use connection settings explicitly, then verify phone connectivity.</string>
     <string name="l7_probe_navigation_broadcast">AMap standard broadcast; reception and HUD or cluster display are unverified.</string>
+    <string name="l7_probe_navigation_oem">OEM navigation interface; registration, reception and cluster display require a reporting test.</string>
 </resources>

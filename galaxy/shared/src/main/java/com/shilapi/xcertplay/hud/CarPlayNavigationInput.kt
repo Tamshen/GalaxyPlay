@@ -107,7 +107,7 @@ class CarPlayNavigationInput(
         if (lastReport == Long.MIN_VALUE || time - lastReport >= 5_000_000_000L || shape != lastSnapshotShape) {
             lastReport = time
             lastSnapshotShape = shape
-            emit("NavigationInput: $shape frames=$frames mapping=AMAP_STANDARD")
+            emit("NavigationInput: $shape frames=$frames mapping=CARPLAY_NATIVE")
         }
         return value
     }

@@ -7,11 +7,13 @@ import com.shilapi.xcertplay.hud.CarPlayNavigationSnapshot
 import java.io.Closeable
 
 internal interface L7NavigationPort : Closeable {
+    val transport: String get() = "AMAP_BROADCAST"
     fun initialize()
     fun start()
     fun guidance(value: CarPlayNavigationSnapshot)
     fun stop()
     fun invalidate() {}
+    fun close(completed: () -> Unit) { try { close() } finally { completed() } }
 }
 
 /** 按高德车机标准广播发布；发送返回不代表系统接收或 HUD 显示成功。 */

@@ -7,7 +7,8 @@ internal class L7VendorSdk(private val context: Context, private val diagnostics
     data class Loaded(val loader: ClassLoader, val source: String)
 
     fun load(name: String, verify: (ClassLoader) -> Unit = {}): Loaded {
-        val packages = if (name.startsWith("ecarx.fw.api.")) listOf("com.flyme.auto.map", "com.geely.linkhmi")
+        val packages = if (name.startsWith("ecarx.fw.api.") || name.startsWith("com.ecarx.eas.framework.sdk.navi.") ||
+            name.startsWith("com.ecarx.eas.mapsdk.")) listOf("com.flyme.auto.map", "com.geely.linkhmi")
             else listOf("com.geely.linkhmi")
         val candidates = listOf("APP_OR_FRAMEWORK") + packages
         var mismatch: Exception? = null
