@@ -24,9 +24,14 @@ class WirelessRealtimeAudioRendererTest {
         assertTrue("音频 worker 未达到预期状态", condition())
     }
 
-    @Test fun mediaWorkerPreservesPcmAcrossZeroWriteAndRestartsPlayingTrackWithoutFlush() {
+    @Test fun mediaWorkerPreservesPcmAcrossZeroWriteAndRestartsPlayingTrackWithoutFlush() = verifyPcmWriter(false)
+
+    @Test fun separatedMusicWriterPreservesPcmAcrossZeroWriteAndStopsBeforeTrackRelease() = verifyPcmWriter(true)
+
+    private fun verifyPcmWriter(separate: Boolean) {
         val logs = CopyOnWriteArrayList<String>()
-        val sink = AndroidMediaSink(wirelessAudio = true, audioFocusEnabled = false, onAudioDiagnostic = logs::add)
+        val sink = AndroidMediaSink(wirelessAudio = true, audioFocusEnabled = false, onAudioDiagnostic = logs::add,
+            performanceOptions = MediaPerformanceOptions(separateMusicWriter = separate))
         val id = AudioStreamId(102, "media")
         val format = AudioFormat(AudioCodecKind.LPCM, 48_000, 2, 102, "media")
         var original: AudioTrack? = null
@@ -34,6 +39,7 @@ class WirelessRealtimeAudioRendererTest {
             sink.onAudioStarted(id, format, 0)
             await { logs.any { it.startsWith("Audio: ready") } }
             val renderer = ReflectionHelpers.getField<Map<AudioStreamId, Any>>(sink, "audioRenderers").getValue(id)
+            if (separate) await { logs.any { it.startsWith("Audio: music writer") } }
             original = ReflectionHelpers.getField(renderer, "track")
             val track = mock(AudioTrack::class.java)
             `when`(track.playState).thenReturn(AudioTrack.PLAYSTATE_PLAYING)
@@ -57,6 +63,11 @@ class WirelessRealtimeAudioRendererTest {
             verify(track).pause(); verify(track).play()
             verify(track, never()).flush()
             assertFalse(logs.any { "renderer failed" in it })
+            sink.close()
+            val worker: Thread = ReflectionHelpers.getField(renderer, "thread")
+            worker.join(2000)
+            assertFalse(worker.isAlive)
+            verify(track).release()
         } finally { sink.close(); original?.release() }
     }
 

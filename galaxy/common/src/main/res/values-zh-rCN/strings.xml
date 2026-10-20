@@ -468,4 +468,14 @@
     <string name="audio_buffer_160">160 ms</string>
     <string name="audio_buffer_300">300 ms</string>
     <string name="audio_buffer_500">500 ms</string>
+    <string name="media_performance_title">性能方案</string>
+    <string name="media_performance_default">软件默认</string>
+    <string name="media_performance_oem">原厂方案</string>
+    <string name="media_performance_music">音乐播放策略</string>
+    <string name="media_performance_music_hint">原厂方案将音乐解码和播放分开处理；额外队列最多 40 毫秒。</string>
+    <string name="media_performance_video_buffer">视频缓冲策略</string>
+    <string name="media_performance_video_buffer_hint">原厂方案复用视频转换缓冲，减少播放时反复分配内存。</string>
+    <string name="media_performance_low_latency">硬解低延迟策略</string>
+    <string name="media_performance_low_latency_hint">原厂方案尝试高通低延迟参数；不支持或解码恢复时自动退回默认参数。</string>
+    <string name="media_performance_reconnect_hint">三项可独立选择，默认为软件默认。确认后独立保存，不随配置文件切换；下次重新连接生效。遇到问题请切回软件默认，再使用菜单中的重连。原厂方案参考原车实现，实际效果以实车为准。</string>
 </resources>

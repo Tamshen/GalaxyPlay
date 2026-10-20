@@ -82,7 +82,65 @@ class VideoOperatingRateTest {
             assertEquals(if (presented) 2 else 1, f.formats.count { it.containsKey(MediaFormat.KEY_OPERATING_RATE) })
         }
     }
-    private class Fixture(val fps: Int = 30, val stream: Int = 110) : Closeable {
+    @Test fun qtiFailureRetriesSameRateWithoutVendorKeysAndDoesNotRepeatThem() {
+        for (stage in listOf("configure", "start")) Fixture(qti = true, enabled = true).use { f ->
+            if (stage == "configure") doAnswer {
+                val format = it.getArgument<MediaFormat>(0)
+                f.formats.add(format)
+                if (format.containsKey("vendor.qti-ext-dec-low-latency.enable")) throw IllegalArgumentException("refused")
+                null
+            }.`when`(f.codec).configure(any(MediaFormat::class.java), any(Surface::class.java), isNull(), eq(0))
+            else doAnswer {
+                if (f.formats.last().containsKey("vendor.qti-ext-dec-low-latency.enable")) throw IllegalStateException("refused")
+                null
+            }.`when`(f.codec).start()
+            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
+            assertEquals(2, f.formats.size)
+            assertEquals(1, f.formats.first().getInteger("vendor.qti-ext-dec-picture-order.enable"))
+            assertFalse(f.formats.last().containsKey("vendor.qti-ext-dec-low-latency.enable"))
+            assertEquals(30, f.formats.last().getInteger(MediaFormat.KEY_OPERATING_RATE))
+            verify(f.codec, times(1)).release()
+            assertTrue(f.retry()); f.barrier()
+            assertEquals(1, f.formats.count { it.containsKey("vendor.qti-ext-dec-low-latency.enable") })
+        }
+    }
+
+    @Test fun qtiIsOptInAndRuntimeRecoveryDropsVendorKeysForThisConnection() {
+        Fixture(qti = true).use { f ->
+            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
+            assertFalse(f.formats.single().containsKey("vendor.qti-ext-dec-low-latency.enable"))
+        }
+        Fixture(qti = true, enabled = true).use { f ->
+            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
+            assertTrue(f.formats.single().containsKey("vendor.qti-ext-dec-low-latency.enable"))
+            f.outputFailure.set(IllegalStateException("runtime failure"))
+            assertTrue(f.outputFailed.await(2, TimeUnit.SECONDS)); f.barrier()
+            assertTrue(f.retry()); f.barrier()
+            assertFalse(f.formats.last().containsKey("vendor.qti-ext-dec-low-latency.enable"))
+        }
+        Fixture(enabled = true).use { f ->
+            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
+            assertFalse(f.formats.single().containsKey("vendor.qti-ext-dec-low-latency.enable"))
+        }
+    }
+
+    @Test fun disconnectDuringVendorRejectionDoesNotCreateFallbackDecoder() {
+        Fixture(qti = true, enabled = true).use { f ->
+            val entered = CountDownLatch(1)
+            doAnswer {
+                (f.worker as Closeable).close()
+                entered.countDown()
+                throw IllegalArgumentException("cancelled")
+            }.`when`(f.codec).configure(any(MediaFormat::class.java), any(Surface::class.java), isNull(), eq(0))
+            f.configure()
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            f.close()
+            assertEquals(1, f.creations.get())
+            verify(f.codec, times(1)).release()
+        }
+    }
+
+    private class Fixture(val fps: Int = 30, val stream: Int = 110, val qti: Boolean = false, val enabled: Boolean = false) : Closeable {
         val codec = mock(MediaCodec::class.java)
         val ready = CountDownLatch(1)
         val inputQueued = CountDownLatch(1)
@@ -125,12 +183,12 @@ class VideoOperatingRateTest {
             val closedCallback: (Any) -> Unit = { closed.countDown() }
             val size: (Int, Int) -> Unit = { _, _ -> }
             val create: (String) -> MediaCodec = { creations.incrementAndGet(); codec }
-            worker = type.declaredConstructors.single { it.parameterCount == 14 }.apply { isAccessible = true }
+            worker = type.declaredConstructors.single { it.parameterCount == 15 }.apply { isAccessible = true }
                 .newInstance(stream, surface, 1280, 720, false, fps, {}, report, failure,
-                    recoveredCallback, closedCallback, size, create, null)
+                    recoveredCallback, closedCallback, size, create, null, MediaPerformanceOptions(qtiLowLatency = enabled))
             @Suppress("UNCHECKED_CAST")
             val candidates = field("decoderCandidateCache").get(worker) as MutableMap<String, List<VideoDecoderCandidate>>
-            candidates[MediaFormat.MIMETYPE_VIDEO_AVC] = listOf(VideoDecoderCandidate("test.avc", true, false, false))
+            candidates[MediaFormat.MIMETYPE_VIDEO_AVC] = listOf(VideoDecoderCandidate(if (qti) "OMX.qcom.video.decoder.avc" else "test.avc", true, false, false))
         }
         fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
         fun configure() = type.getDeclaredMethod("configure", VideoCodec::class.java, ByteArray::class.java)

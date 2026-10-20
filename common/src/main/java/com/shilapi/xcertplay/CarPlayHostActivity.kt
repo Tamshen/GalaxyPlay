@@ -3234,6 +3234,7 @@ class CarPlayHostActivity : ComponentActivity() {
             videoHeight = videoHeight,
             preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
             preferredAvcDecoder = GalaxyVideoDecoderPreferences.load(this).decoder,
+            performanceOptions = GalaxyMediaPerformancePreferences.snapshot(this),
             advancedAudioChannelMapping = if (audioTemplate != null) true else advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
             localMediaAudioEnabled = localMusic,

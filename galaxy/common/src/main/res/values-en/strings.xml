@@ -124,4 +124,14 @@
     <string name="galaxy_wifi_scan_pause_hint">Try to pause background network searches during a connection to reduce interruptions; restore after disconnecting. If system control is unavailable, the reason is logged. Applies next connection.</string>
     <string name="galaxy_wifi_performance_lock">Optimize wireless performance</string>
     <string name="galaxy_wifi_performance_lock_hint">Keep Wi-Fi in high-performance and low-latency modes during projection, then release on disconnect. Applies next connection.</string>
+    <string name="media_performance_title">Performance options</string>
+    <string name="media_performance_default">Software default</string>
+    <string name="media_performance_oem">OEM approach</string>
+    <string name="media_performance_music">Music playback strategy</string>
+    <string name="media_performance_music_hint">The OEM approach separates music decoding and playback, with up to 40 ms of additional queued audio.</string>
+    <string name="media_performance_video_buffer">Video buffer strategy</string>
+    <string name="media_performance_video_buffer_hint">The OEM approach reuses video conversion buffers to reduce repeated memory allocation.</string>
+    <string name="media_performance_low_latency">Hardware low latency strategy</string>
+    <string name="media_performance_low_latency_hint">The OEM approach tries Qualcomm low latency parameters and falls back if rejected or decoder recovery occurs.</string>
+    <string name="media_performance_reconnect_hint">Each option defaults to Software default. Confirmed changes are saved separately from profiles and apply on the next connection. If problems occur, select Software default and use Reconnect in the menu. The OEM approach is based on vehicle app implementations; results require testing on your vehicle.</string>
 </resources>

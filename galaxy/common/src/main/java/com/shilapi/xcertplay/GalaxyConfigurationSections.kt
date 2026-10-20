@@ -46,6 +46,7 @@ internal object GalaxyConfigurationSections {
                 GalaxyProfileFieldsView.add(context, card, R.string.config_page_reporting)
             }
         }
+        if (group == 0) GalaxyMediaPerformanceSettings.add(context, parent)
         parent.addView(L7Components.note(context, text(R.string.config_page_next_connection)))
     }
 

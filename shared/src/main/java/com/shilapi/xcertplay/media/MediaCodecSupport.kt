@@ -62,19 +62,20 @@ object MediaCodecSupport {
     }
 
     /** IDR (AVC) or IRAP (HEVC) starts an independently decodable reference chain. */
-    fun isRandomAccess(annexB: ByteArray, codec: VideoCodec): Boolean {
+    fun isRandomAccess(annexB: ByteArray, codec: VideoCodec, size: Int = annexB.size): Boolean {
+        require(size in 0..annexB.size)
         var cursor = 0
-        while (cursor + 3 < annexB.size) {
+        while (cursor + 3 < size) {
             val prefix = when {
                 annexB[cursor] != 0.toByte() || annexB[cursor + 1] != 0.toByte() -> 0
                 annexB[cursor + 2] == 1.toByte() -> 3
                 annexB[cursor + 2] == 0.toByte() && annexB[cursor + 3] == 1.toByte() -> 4
                 else -> 0
             }
-            if (prefix > 0 && cursor + prefix < annexB.size) {
+            if (prefix > 0 && cursor + prefix < size) {
                 val header = annexB[cursor + prefix].toInt() and 255
                 if (codec == VideoCodec.H264 && header and 31 == 5) return true
-                if (codec == VideoCodec.H265 && cursor + prefix + 1 < annexB.size &&
+                if (codec == VideoCodec.H265 && cursor + prefix + 1 < size &&
                     (header shr 1) and 63 in 16..21) return true
                 cursor += prefix
             } else cursor++

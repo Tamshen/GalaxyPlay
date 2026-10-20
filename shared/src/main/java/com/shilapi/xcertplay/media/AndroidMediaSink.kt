@@ -61,6 +61,7 @@ class AndroidMediaSink(
     platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
     onVideoRecovered: (() -> Unit)? = null,
     private val preferredAvcDecoder: String? = null,
+    private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -381,6 +382,7 @@ class AndroidMediaSink(
                     }
                 },
                 preferredAvcDecoder = preferredAvcDecoder,
+                performanceOptions = performanceOptions,
             )
         }
     }
@@ -413,6 +415,7 @@ class AndroidMediaSink(
             communicationResources::started,
             communicationResources::released,
             phoneChannel = audioRoutingTemplate?.choice(AudioOutputRole.PHONE) ?: 0,
+            separateMusicWriter = performanceOptions.separateMusicWriter,
         ).also { it.configureBuffering(audioBufferSettings); audioRenderers[id] = it }
     }
 }
@@ -438,6 +441,7 @@ private class VideoDecoder(
     // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
     private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
     private val preferredAvcDecoder: String? = null,
+    private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
 ) : Closeable {
     @Volatile private var running = true
     @Volatile private var decoder: MediaCodec? = null
@@ -453,6 +457,9 @@ private class VideoDecoder(
     private val startupWatchdog = VideoStartupWatchdog()
     private val playbackWatchdog = VideoPlaybackWatchdog()
     @Volatile private var failureReported = false
+    private val annexBBuffer = if (performanceOptions.reuseVideoBuffer) VideoAnnexBBuffer() else null
+    private val qtiLatency = QtiLowLatencyPolicy(performanceOptions.qtiLowLatency)
+    private var configuredQtiLatency = false
     private val decoderCandidateCache = mutableMapOf<String, List<VideoDecoderCandidate>>()
     private val outputInfo = MediaCodec.BufferInfo()
     private val inputTiming = VideoInputTiming()
@@ -643,6 +650,7 @@ private class VideoDecoder(
         }
         var next: MediaCodec? = null
         var usedRate = 0
+        configuredQtiLatency = false
         for (attempt in attempts) {
             // 系统 create/configure/start 为同步调用；只约束后续候选，不用第二个线程争抢 codec。
             if (!running || System.nanoTime() - setupStartedNs >= 3_000_000_000L) break
@@ -689,11 +697,26 @@ private class VideoDecoder(
             csd.forEachIndexed { index, bytes -> setByteBuffer("csd-$index", ByteBuffer.wrap(bytes)) }
         }
 
-    private fun tryConfigure(
+    private fun tryConfigure(mime: String, csd: List<ByteArray>, surface: Surface,
+        attempt: DecoderAttempt): MediaCodec? {
+        if (attempt.tuned && qtiLatency.applies(attempt.candidate)) {
+            configureAttempt(mime, csd, surface, attempt, true)?.let {
+                configuredQtiLatency = true
+                return it
+            }
+            qtiLatency.reject()
+            report("QTI low latency rejected; reverting to software default parameters for this connection")
+        }
+        if (!running) return null
+        return configureAttempt(mime, csd, surface, attempt, false)
+    }
+
+    private fun configureAttempt(
         mime: String,
         csd: List<ByteArray>,
         surface: Surface,
         attempt: DecoderAttempt,
+        useQtiLatency: Boolean,
     ): MediaCodec? {
         var candidate: MediaCodec? = null
         var phase = "create"
@@ -705,6 +728,7 @@ private class VideoDecoder(
                 attempt.candidate.lowLatency) {
                 format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
             }
+            if (useQtiLatency) qtiLatency.configure(format::setInteger)
             phase = "configure"
             codec.configure(format, surface, null, 0)
             codec.setOnFrameRenderedListener({ source, presentationUs, renderedNs ->
@@ -733,11 +757,12 @@ private class VideoDecoder(
             phase = "start"
             codec.start()
             report("decoder attempt=${codec.name} tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} " +
-                "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency}")
+                "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency} " +
+                "qtiLowLatency=$useQtiLatency reuseVideoBuffer=${annexBBuffer != null}")
             codec
         } catch (error: Exception) {
             runCatching { candidate?.release() }
-            if (attempt.operatingRate > 0) dropOperatingRate("rejected at $phase")
+            if (!useQtiLatency && attempt.operatingRate > 0) dropOperatingRate("rejected at $phase")
             val detail = (error as? MediaCodec.CodecException)?.diagnosticInfo ?: error.javaClass.simpleName
             val codecError = error as? MediaCodec.CodecException
             report("configure rejected decoder=${attempt.candidate.name} phase=$phase tuned=${attempt.tuned} " +
@@ -810,9 +835,11 @@ private class VideoDecoder(
         if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) {
             stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return
         }
-        val annexB = MediaCodecSupport.toAnnexB(nalus)
-        if (annexB.isEmpty()) { stats.onDropped(); resync("invalid video access unit"); return }
-        if (!referenceChain.accepts(annexB, config.codec)) {
+        val annexBSize = annexBBuffer?.convert(nalus)
+        val annexB = annexBBuffer?.bytes ?: MediaCodecSupport.toAnnexB(nalus)
+        val size = annexBSize ?: annexB.size
+        if (size == 0) { stats.onDropped(); resync("invalid video access unit"); return }
+        if (!referenceChain.accepts(annexB, config.codec, size)) {
             stats.onDropped(reason = VideoDropReason.WAIT_KEYFRAME)
             requestKeyFrameIfDue()
             return
@@ -828,8 +855,8 @@ private class VideoDecoder(
             submittedFrameLogged = true
             Log.i(
                 TAG,
-                "video decoder first input avcc=${nalus.size} annexB=${annexB.size} " +
-                    "head=${annexB.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
+                "video decoder first input avcc=${nalus.size} annexB=$size " +
+                    "head=${annexB.take(minOf(16, size)).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
             )
         }
         val index = inputSlot.acquire { VideoInputPump.acquire(
@@ -857,15 +884,15 @@ private class VideoDecoder(
         }
         val input = checkNotNull(codec.getInputBuffer(index)) { "Decoder input buffer unavailable" }
         input.clear()
-        if (annexB.size <= input.remaining()) {
-            input.put(annexB)
+        if (size <= input.remaining()) {
+            input.put(annexB, 0, size)
             if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
                 stats.onDropped(reason = VideoDropReason.EXPIRED)
                 resync("video input copy expired; retaining input slot"); return
             }
             // 本地接收时刻作为 PTS，可关联输入、输出和 Surface 回调的帧龄。
             val inputNs = System.nanoTime()
-            codec.queueInputBuffer(index, 0, annexB.size, frame.receivedNs / 1000, 0)
+            codec.queueInputBuffer(index, 0, size, frame.receivedNs / 1000, 0)
             inputSlot.queued()
             inputProgress.reset()
             inputTiming.record(frame.receivedNs / 1000, inputNs)
@@ -891,6 +918,11 @@ private class VideoDecoder(
 
     private fun recover(reason: String) {
         if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) return
+        if (configuredQtiLatency) {
+            qtiLatency.reject()
+            configuredQtiLatency = false
+            report("QTI low latency disabled after recovery; next decoder uses software default parameters")
+        }
         Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
         stats.onRecovery()
         recoveryGate.onFailure(System.nanoTime())
@@ -1041,6 +1073,7 @@ private class AudioRenderer(
     private val onCallStarted: (Any) -> Unit,
     private val onCallReleased: (Any) -> Unit,
     private val phoneChannel: Int = 0,
+    private val separateMusicWriter: Boolean = false,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int, val receivedNs: Long)
 
@@ -1064,6 +1097,7 @@ private class AudioRenderer(
     private var softwareOpus: SoftwareOpusDecoder? = null
     private var softwareDecodeErrors = 0
     private var track: AudioTrack? = null
+    @Volatile private var pcmWriter: MusicPcmWriter? = null
     private var pcm = ByteArray(64 * 1024)
     private var playbackStarted = false
     private var prebufferBytes = 0
@@ -1077,11 +1111,11 @@ private class AudioRenderer(
     private var firstAacPayloadLogged = false
     private var firstOpusShortPacketLogged = false
     private var firstInputQueuedLogged = false
-    private var inputQueued = 0
-    private var inputDropped = 0
-    private var shortOpusPackets = 0
-    private var decoderUnavailablePackets = 0
-    private var outputBuffers = 0
+    @Volatile private var inputQueued = 0
+    @Volatile private var inputDropped = 0
+    @Volatile private var shortOpusPackets = 0
+    @Volatile private var decoderUnavailablePackets = 0
+    @Volatile private var outputBuffers = 0
     private var firstPcmLogged = false
     private val packetsReceived = AtomicInteger()
     private val packetsDropped = AtomicInteger()
@@ -1106,7 +1140,7 @@ private class AudioRenderer(
     private var lastPcmWriteNs = 0L
     private var rebufferCount = 0
     private var rebufferStartedNs = 0L
-    private var diagnosticStage = "starting"
+    @Volatile private var diagnosticStage = "starting"
     private var lastDecoderOutputMetadata: String? = null
     private var decoderOutputReports = 0
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
@@ -1182,6 +1216,7 @@ private class AudioRenderer(
     override fun close() {
         callTimeline.stopRequested(callTicket)
         running = false
+        pcmWriter?.stop()
         thread.interrupt()
     }
 
@@ -1201,17 +1236,20 @@ private class AudioRenderer(
             createTrack()
             diagnosticStage = "focus"
             requestAudioFocus()
+            startPcmWriter()
             while (running) {
-                restorePlayback()
+                if (pcmWriter == null) restorePlayback()
                 diagnosticStage = "packet"
                 nextPacket()?.let(::handle)
                 // 尾包之后仍需轮询解码输出，避免短句等待下一个网络包才播放。
                 diagnosticStage = "decoder-output"
                 codec?.let(::drainCodec)
-                diagnosticStage = "buffer-maintenance"
-                maintainPlaybackBuffer()
-                diagnosticStage = "stats"
-                logStatsIfDue()
+                if (pcmWriter == null) {
+                    diagnosticStage = "buffer-maintenance"
+                    maintainPlaybackBuffer()
+                    diagnosticStage = "stats"
+                    logStatsIfDue()
+                }
             }
         } catch (_: InterruptedException) {
             // 会话关闭，结束当前 worker。
@@ -1225,12 +1263,33 @@ private class AudioRenderer(
             if (running) reportFailure(error)
             throw error
         } finally {
+            running = false
+            pcmWriter?.stopAndJoin()
             runCatching { logStatsIfDue(force = true) }
             try { release() } finally {
                 if (format.audioType.equals("telephony", true)) onCallReleased(this)
                 callTimeline.released(callTicket)
             }
         }
+    }
+
+    private fun startPcmWriter() {
+        if (!separateMusicWriter || mappedChannel != AudioChannel.MEDIA || format.audioType != "media") return
+        pcmWriter = MusicPcmWriter(format.sampleRate, frameBytes, ::writePcm,
+            maintain = { restorePlayback(); maintainPlaybackBuffer(); logStatsIfDue() },
+            failed = { error ->
+                runCatching { reportFailure(error) }
+                running = false
+                thread.interrupt()
+            },
+            initialize = { runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) } })
+            .also { it.start() }
+        report("Audio: music writer mode=OEM pcmQueueMaxMs=40 speedAdjustment=false")
+    }
+
+    private fun outputPcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
+        val writer = pcmWriter
+        if (writer == null) writePcm(data, offset, length) else writer.submit(data, offset, length)
     }
 
     private fun nextPacket(): AudioPacket? {
@@ -1540,7 +1599,7 @@ private class AudioRenderer(
         val rtp = packet.rtp
         val timestampUs = sampleTimestampUs(packet.sample)
         when (format.codec) {
-            AudioCodecKind.LPCM -> writePcm(byteSwapS16(rtp.copyOfRange(12, rtp.size)))
+            AudioCodecKind.LPCM -> outputPcm(byteSwapS16(rtp.copyOfRange(12, rtp.size)))
             AudioCodecKind.AAC_LC -> {
                 val accessUnit = rtp.copyOfRange(12, rtp.size)
                 if (accessUnit.isNotEmpty()) {
@@ -1589,7 +1648,7 @@ private class AudioRenderer(
         }
         inputQueued++
         outputBuffers++
-        writePcm(decoder.pcm, 0, size)
+        outputPcm(decoder.pcm, 0, size)
     }
 
     private fun sampleTimestampUs(sample: Int): Long =
@@ -1668,17 +1727,22 @@ private class AudioRenderer(
                             )
                         }
                     }
-                    if (size > 0) {
-                        val output = codec.getOutputBuffer(index)
-                        if (output != null) {
-                            if (size > pcm.size) pcm = ByteArray(size)
-                            output.position(info.offset)
-                            output.limit(info.offset + size)
-                            output.get(pcm, 0, size)
-                            writePcm(pcm, 0, size)
+                    var copied = false
+                    try {
+                        if (size > 0) {
+                            val output = codec.getOutputBuffer(index)
+                            if (output != null) {
+                                if (size > pcm.size) pcm = ByteArray(size)
+                                output.position(info.offset)
+                                output.limit(info.offset + size)
+                                output.get(pcm, 0, size)
+                                copied = true
+                                if (pcmWriter == null) writePcm(pcm, 0, size)
+                            }
                         }
-                    }
-                    codec.releaseOutputBuffer(index, false)
+                    } finally { codec.releaseOutputBuffer(index, false) }
+                    // 等待 PCM 空位前交还 codec 输出，避免播放背压长期占有解码器缓冲。
+                    if (copied && pcmWriter != null) outputPcm(pcm, 0, size)
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
                 }
                 else -> return
@@ -1765,7 +1829,7 @@ private class AudioRenderer(
             }
         }
         if (bufferProgress.shouldRebuffer(!wirelessRealtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition,
+                track.underrunCount > underrunsAtPlaybackStart, (queue.isEmpty() && pcmWriter?.hasPending() != true), track.playbackHeadPosition,
                 startThresholdBytes / 2L, recoverOnQueuedBurst = wirelessMusic)) {
             // An underrun left the track below the recovery waterline. Retain PCM while paused,
             // then use the configured start threshold again when music resumes.
@@ -1782,7 +1846,7 @@ private class AudioRenderer(
                 "sinceRxMs=${lastArrivalNs.get().takeIf { it > 0 }?.let { (rebufferStartedNs - it).coerceAtLeast(0) / 1_000_000 } ?: "unknown"}") }
         }
         // A short final burst may never reach the start threshold. Play it after a bounded wait.
-        if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
+        if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() && pcmWriter?.hasPending() != true &&
             System.nanoTime() - lastPcmWriteNs >= BUFFER_TAIL_WAIT_NS) {
             startPlayback(track)
         }

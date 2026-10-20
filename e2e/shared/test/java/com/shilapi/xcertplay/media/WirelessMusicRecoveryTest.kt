@@ -19,11 +19,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [29, 30], manifest = Config.NONE)
 class WirelessMusicRecoveryTest {
     private val type = Class.forName("com.shilapi.xcertplay.media.AudioRenderer")
-    private fun renderer(wireless: Boolean = true) = type.declaredConstructors.single { it.parameterCount == 18 }
+    private fun renderer(wireless: Boolean = true) = type.declaredConstructors.single { it.parameterCount == 19 }
         .apply { isAccessible = true }.newInstance(
             AudioFormat(AudioCodecKind.AAC_LC, 48_000, 2, 96, "media"), false, false, 0, 0, 0,
             AudioFocusCoordinator(null, false), null, null, 0, 300, { _: String -> }, wireless,
-            CallAudioTimeline(report = { _: String -> }), { "test" }, { _: Any -> }, { _: Any -> }, 0)
+            CallAudioTimeline(report = { _: String -> }), { "test" }, { _: Any -> }, { _: Any -> }, 0, false)
     private fun set(worker: Any, name: String, value: Any) = type.getDeclaredField(name)
         .apply { isAccessible = true }.set(worker, value)
     private fun get(worker: Any, name: String) = type.getDeclaredField(name).apply { isAccessible = true }.get(worker)

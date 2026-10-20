@@ -161,7 +161,7 @@
      private val mediaChannel: Int = 0,
      private val navigationChannel: Int = 0,
      context: Context? = null,
-@@ -181,70 +52,83 @@
+@@ -181,70 +52,84 @@
      onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
      private val mediaBufferMillis: Int = MediaAudioBuffer.DEFAULT_MILLIS,
      private val onAudioDiagnostic: (String) -> Unit = {},
@@ -188,6 +188,7 @@
 +    platformAdaptation: MediaPlatformAdaptation = MediaPlatformAdaptation.NONE,
 +    onVideoRecovered: (() -> Unit)? = null,
 +    private val preferredAvcDecoder: String? = null,
++    private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
  ) : MediaSink {
 -    // Each downlink publishes its own reference; a mic must match that stream and sample rate.
 -    private val callEchoReferences = ConcurrentHashMap<AudioStreamId, EchoReference>()
@@ -289,7 +290,7 @@
      private val recoveryExecutor = Executors.newSingleThreadExecutor { task ->
          Thread(task, "carplay-video-recovery").apply { isDaemon = true }
      }
-@@ -261,7 +145,7 @@
+@@ -261,7 +146,7 @@
          if (!recoveryPending.compareAndSet(false, true)) return
          try {
              recoveryExecutor.execute {
@@ -298,7 +299,7 @@
                  catch (error: Exception) { Log.w("xcertplay-usb", "Video keyframe request failed", error) }
                  finally { recoveryPending.set(false) }
              }
-@@ -269,146 +153,36 @@
+@@ -269,146 +154,36 @@
      }
  
      fun setSurface(type: Int, surface: Surface) {
@@ -463,7 +464,7 @@
      }
  
      fun setScreenStreamActiveChangedListener(listener: ((Int, Boolean) -> Unit)?) {
-@@ -418,51 +192,58 @@
+@@ -418,51 +193,58 @@
          }
      }
  
@@ -556,7 +557,7 @@
          }
          synchronized(screenStateLock) {
              if (active) activeScreenTypes.add(type) else activeScreenTypes.remove(type)
-@@ -470,20 +251,22 @@
+@@ -470,20 +252,22 @@
          }
      }
  
@@ -588,7 +589,7 @@
          updateMediaAudio(id, false)
      }
  
-@@ -493,72 +276,48 @@
+@@ -493,72 +277,48 @@
              if (active) mediaAudioTypes.add(id) else mediaAudioTypes.remove(id)
              before to mediaAudioTypes.isNotEmpty()
          }
@@ -689,7 +690,7 @@
          }
          synchronized(screenStateLock) {
              activeScreenTypes.forEach { screenStreamActiveChanged?.invoke(it, false) }
-@@ -568,322 +327,273 @@
+@@ -568,322 +328,279 @@
          videoRecoveryHandlers.clear()
          videoDiagnosticHandlers.clear()
          recoveryExecutor.shutdownNow()
@@ -786,6 +787,7 @@
 +                    }
 +                },
 +                preferredAvcDecoder = preferredAvcDecoder,
++                performanceOptions = performanceOptions,
 +            )
 +        }
 +    }
@@ -836,6 +838,7 @@
 +            communicationResources::started,
 +            communicationResources::released,
 +            phoneChannel = audioRoutingTemplate?.choice(AudioOutputRole.PHONE) ?: 0,
++            separateMusicWriter = performanceOptions.separateMusicWriter,
 +        ).also { it.configureBuffering(audioBufferSettings); audioRenderers[id] = it }
      }
  }
@@ -944,6 +947,7 @@
 +    // 创建入口可替换以在 worker 回归中控制系统调用耗时，生产仍使用原生 codec。
 +    private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
 +    private val preferredAvcDecoder: String? = null,
++    private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
  ) : Closeable {
 -    private val pacer = FramePacer()
 -    private val pacingDelay = if (pacingDelayNanos > 0) PacingDelay(pacingDelayNanos) else null
@@ -980,6 +984,9 @@
 +    private val startupWatchdog = VideoStartupWatchdog()
 +    private val playbackWatchdog = VideoPlaybackWatchdog()
 +    @Volatile private var failureReported = false
++    private val annexBBuffer = if (performanceOptions.reuseVideoBuffer) VideoAnnexBBuffer() else null
++    private val qtiLatency = QtiLowLatencyPolicy(performanceOptions.qtiLowLatency)
++    private var configuredQtiLatency = false
 +    private val decoderCandidateCache = mutableMapOf<String, List<VideoDecoderCandidate>>()
 +    private val outputInfo = MediaCodec.BufferInfo()
 +    private val inputTiming = VideoInputTiming()
@@ -1207,7 +1214,7 @@
          if (
              decoder != null &&
              previous?.codec == config.codec &&
-@@ -896,10 +606,13 @@
+@@ -896,10 +613,13 @@
              return
          }
          lastConfig = config
@@ -1222,7 +1229,7 @@
          val codec = config.codec
          val codecData = config.codecData
          val mime = if (codec == VideoCodec.H265) MediaFormat.MIMETYPE_VIDEO_HEVC
-@@ -914,24 +627,44 @@
+@@ -914,24 +634,45 @@
                  pps.takeIf { it.isNotEmpty() }?.let { START_CODE + it },
              )
          }
@@ -1245,6 +1252,7 @@
 -        var used: DecoderAttempt? = null
 -        for (attempt in videoDecoderAttempts(requestedRate, softwareDecoderName(mime))) {
 +        var usedRate = 0
++        configuredQtiLatency = false
 +        for (attempt in attempts) {
 +            // 系统 create/configure/start 为同步调用；只约束后续候选，不用第二个线程争抢 codec。
 +            if (!running || System.nanoTime() - setupStartedNs >= 3_000_000_000L) break
@@ -1277,7 +1285,7 @@
              Log.i(
                  TAG,
                  "video decoder configured name=${next.name} mime=$mime size=${width}x$height",
-@@ -939,8 +672,10 @@
+@@ -939,8 +680,10 @@
          }
      }
  
@@ -1289,8 +1297,31 @@
          operatingRate = 0
      }
  
-@@ -961,109 +696,100 @@
+@@ -954,116 +697,124 @@
+             csd.forEachIndexed { index, bytes -> setByteBuffer("csd-$index", ByteBuffer.wrap(bytes)) }
+         }
+ 
+-    private fun tryConfigure(
++    private fun tryConfigure(mime: String, csd: List<ByteArray>, surface: Surface,
++        attempt: DecoderAttempt): MediaCodec? {
++        if (attempt.tuned && qtiLatency.applies(attempt.candidate)) {
++            configureAttempt(mime, csd, surface, attempt, true)?.let {
++                configuredQtiLatency = true
++                return it
++            }
++            qtiLatency.reject()
++            report("QTI low latency rejected; reverting to software default parameters for this connection")
++        }
++        if (!running) return null
++        return configureAttempt(mime, csd, surface, attempt, false)
++    }
++
++    private fun configureAttempt(
+         mime: String,
+         csd: List<ByteArray>,
+         surface: Surface,
          attempt: DecoderAttempt,
++        useQtiLatency: Boolean,
      ): MediaCodec? {
          var candidate: MediaCodec? = null
 +        var phase = "create"
@@ -1304,6 +1335,7 @@
 +                attempt.candidate.lowLatency) {
                  format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
              }
++            if (useQtiLatency) qtiLatency.configure(format::setInteger)
 +            phase = "configure"
              codec.configure(format, surface, null, 0)
 +            codec.setOnFrameRenderedListener({ source, presentationUs, renderedNs ->
@@ -1332,12 +1364,13 @@
 +            phase = "start"
              codec.start()
 +            report("decoder attempt=${codec.name} tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} " +
-+                "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency}")
++                "lowLatency=${attempt.tuned && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && attempt.candidate.lowLatency} " +
++                "qtiLowLatency=$useQtiLatency reuseVideoBuffer=${annexBBuffer != null}")
              codec
          } catch (error: Exception) {
              runCatching { candidate?.release() }
 -            reportFailure("stage=configure tuned=${attempt.tuned} operatingRate=${attempt.operatingRate} mime=$mime", error)
-+            if (attempt.operatingRate > 0) dropOperatingRate("rejected at $phase")
++            if (!useQtiLatency && attempt.operatingRate > 0) dropOperatingRate("rejected at $phase")
 +            val detail = (error as? MediaCodec.CodecException)?.diagnosticInfo ?: error.javaClass.simpleName
 +            val codecError = error as? MediaCodec.CodecException
 +            report("configure rejected decoder=${attempt.candidate.name} phase=$phase tuned=${attempt.tuned} " +
@@ -1460,11 +1493,16 @@
                  Log.i(TAG, "video decoder output surface updated")
                  return
              } catch (error: Exception) {
-@@ -1074,119 +800,147 @@
+@@ -1074,119 +825,154 @@
          lastConfig?.let(::configureDecoder)
      }
  
 -    private fun feed(nalus: ByteArray, presentNs: Long = 0L) {
+-        val annexB = MediaCodecSupport.toAnnexB(nalus)
+-        val config = lastConfig ?: return
+-        if (outputSurface == null) return
+-        if (annexB.isEmpty()) { recover("invalid video access unit"); return }
+-        if (!referenceChain.accepts(annexB, config.codec)) {
 +    private fun feed(frame: VideoJob.Frame) {
 +        val nalus = frame.nalus
 +        val config = lastConfig ?: run { stats.onDropped(reason = VideoDropReason.NO_CONFIG); return }
@@ -1475,12 +1513,11 @@
 +        if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) {
 +            stats.onDropped(reason = VideoDropReason.RECOVERY_WAIT); return
 +        }
-         val annexB = MediaCodecSupport.toAnnexB(nalus)
--        val config = lastConfig ?: return
--        if (outputSurface == null) return
--        if (annexB.isEmpty()) { recover("invalid video access unit"); return }
-+        if (annexB.isEmpty()) { stats.onDropped(); resync("invalid video access unit"); return }
-         if (!referenceChain.accepts(annexB, config.codec)) {
++        val annexBSize = annexBBuffer?.convert(nalus)
++        val annexB = annexBBuffer?.bytes ?: MediaCodecSupport.toAnnexB(nalus)
++        val size = annexBSize ?: annexB.size
++        if (size == 0) { stats.onDropped(); resync("invalid video access unit"); return }
++        if (!referenceChain.accepts(annexB, config.codec, size)) {
 +            stats.onDropped(reason = VideoDropReason.WAIT_KEYFRAME)
              requestKeyFrameIfDue()
              return
@@ -1499,8 +1536,8 @@
              Log.i(
                  TAG,
 -                "video decoder first input avcc=${nalus.size} annexB=${annexB.size}",
-+                "video decoder first input avcc=${nalus.size} annexB=${annexB.size} " +
-+                    "head=${annexB.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
++                "video decoder first input avcc=${nalus.size} annexB=$size " +
++                    "head=${annexB.take(minOf(16, size)).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
              )
          }
 -        val index = VideoInputPump.acquire(
@@ -1533,8 +1570,8 @@
 +        }
          val input = checkNotNull(codec.getInputBuffer(index)) { "Decoder input buffer unavailable" }
          input.clear()
-         if (annexB.size <= input.remaining()) {
-             input.put(annexB)
+-        if (annexB.size <= input.remaining()) {
+-            input.put(annexB)
 -            // A paced frame carries its local time; MediaCodec returns it with the decoded output.
 -            val presentationUs = if (presentNs > 0) presentNs / 1000 else System.nanoTime() / 1000
 -            codec.queueInputBuffer(index, 0, annexB.size, presentationUs, 0)
@@ -1555,13 +1592,15 @@
 -                recentPacedSlots[0] = queuedSlot
 -            }
 -            queuedSlot = (queuedSlot + 1) % queuedPresentationUs.size
++        if (size <= input.remaining()) {
++            input.put(annexB, 0, size)
 +            if (VideoFrameBudget.remainingNs(frame.receivedNs, System.nanoTime()) == 0L) {
 +                stats.onDropped(reason = VideoDropReason.EXPIRED)
 +                resync("video input copy expired; retaining input slot"); return
 +            }
 +            // 本地接收时刻作为 PTS，可关联输入、输出和 Surface 回调的帧龄。
 +            val inputNs = System.nanoTime()
-+            codec.queueInputBuffer(index, 0, annexB.size, frame.receivedNs / 1000, 0)
++            codec.queueInputBuffer(index, 0, size, frame.receivedNs / 1000, 0)
 +            inputSlot.queued()
 +            inputProgress.reset()
 +            inputTiming.record(frame.receivedNs / 1000, inputNs)
@@ -1587,6 +1626,11 @@
 +
      private fun recover(reason: String) {
 +        if (decoder == null && !recoveryGate.canRetry(System.nanoTime())) return
++        if (configuredQtiLatency) {
++            qtiLatency.reject()
++            configuredQtiLatency = false
++            report("QTI low latency disabled after recovery; next decoder uses software default parameters")
++        }
          Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
          stats.onRecovery()
 -        report("recovery: $reason; waiting for keyframe")
@@ -1675,7 +1719,7 @@
                      if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
                  }
                  else -> return
-@@ -1195,6 +949,14 @@
+@@ -1195,6 +981,14 @@
      }
  
      private fun logOutputFormat(format: MediaFormat) {
@@ -1690,7 +1734,7 @@
          report("output format requested=${width}x${height} " +
              "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
              "crop=${format.intOrNull("crop-left")},${format.intOrNull("crop-top")}," +
-@@ -1214,20 +976,19 @@
+@@ -1214,20 +1008,19 @@
          )
      }
  
@@ -1718,7 +1762,7 @@
              try {
                  codec.stop()
              } catch (_: Exception) {
-@@ -1245,16 +1006,6 @@
+@@ -1245,16 +1038,6 @@
          const val TAG = "xcertplay-usb"
          const val MAX_INPUT_SIZE = 8 * 1024 * 1024
          const val INPUT_TIMEOUT_US = 10_000L
@@ -1735,7 +1779,7 @@
          val START_CODE = byteArrayOf(0x00, 0x00, 0x00, 0x01)
      }
  }
-@@ -1277,30 +1028,50 @@
+@@ -1277,40 +1060,62 @@
      private val audioFocusEnabled: Boolean,
      private val mediaChannel: Int,
      private val navigationChannel: Int,
@@ -1755,6 +1799,7 @@
 +    private val onCallStarted: (Any) -> Unit,
 +    private val onCallReleased: (Any) -> Unit,
 +    private val phoneChannel: Int = 0,
++    private val separateMusicWriter: Boolean = false,
  ) : Closeable {
 -    private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 -
@@ -1783,6 +1828,7 @@
 +    private var softwareOpus: SoftwareOpusDecoder? = null
 +    private var softwareDecodeErrors = 0
      private var track: AudioTrack? = null
++    @Volatile private var pcmWriter: MusicPcmWriter? = null
      private var pcm = ByteArray(64 * 1024)
      private var playbackStarted = false
      private var prebufferBytes = 0
@@ -1794,7 +1840,22 @@
      private var fadeApplied = false
      private var droppedPacketsLogged = false
      private var firstAacPayloadLogged = false
-@@ -1326,20 +1097,56 @@
+     private var firstOpusShortPacketLogged = false
+     private var firstInputQueuedLogged = false
+-    private var inputQueued = 0
+-    private var inputDropped = 0
+-    private var shortOpusPackets = 0
+-    private var decoderUnavailablePackets = 0
+-    private var outputBuffers = 0
++    @Volatile private var inputQueued = 0
++    @Volatile private var inputDropped = 0
++    @Volatile private var shortOpusPackets = 0
++    @Volatile private var decoderUnavailablePackets = 0
++    @Volatile private var outputBuffers = 0
+     private var firstPcmLogged = false
+     private val packetsReceived = AtomicInteger()
+     private val packetsDropped = AtomicInteger()
+@@ -1326,20 +1131,56 @@
      private var lastPlaybackHeadFrames: Long? = null
      private var maxWriteMs = 0L
      private var statsWindowStartNs = 0L
@@ -1806,8 +1867,9 @@
      private var underrunsAtPlaybackStart = 0
      private var lastPcmWriteNs = 0L
      private var rebufferCount = 0
+-    private var diagnosticStage = "starting"
 +    private var rebufferStartedNs = 0L
-     private var diagnosticStage = "starting"
++    @Volatile private var diagnosticStage = "starting"
      private var lastDecoderOutputMetadata: String? = null
      private var decoderOutputReports = 0
      private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
@@ -1851,7 +1913,7 @@
          thread.start()
      }
  
-@@ -1348,9 +1155,21 @@
+@@ -1348,9 +1189,21 @@
              packetsReceived.incrementAndGet()
              val now = System.nanoTime()
              val previous = lastArrivalNs.getAndSet(now)
@@ -1876,12 +1938,13 @@
              if (started) packetsDropped.incrementAndGet()
              if (started && !droppedPacketsLogged) {
                  droppedPacketsLogged = true
-@@ -1361,29 +1180,32 @@
+@@ -1361,51 +1214,97 @@
      }
  
      override fun close() {
 +        callTimeline.stopRequested(callTicket)
          running = false
++        pcmWriter?.stop()
          thread.interrupt()
      }
  
@@ -1902,8 +1965,9 @@
              createTrack()
              diagnosticStage = "focus"
              requestAudioFocus()
++            startPcmWriter()
              while (running) {
-+                restorePlayback()
++                if (pcmWriter == null) restorePlayback()
                  diagnosticStage = "packet"
 -                queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
 -                // Output becomes ready asynchronously, including after the last packet of a burst.
@@ -1912,9 +1976,16 @@
 +                // 尾包之后仍需轮询解码输出，避免短句等待下一个网络包才播放。
                  diagnosticStage = "decoder-output"
                  codec?.let(::drainCodec)
-                 diagnosticStage = "buffer-maintenance"
-@@ -1392,20 +1214,38 @@
-                 logStatsIfDue()
+-                diagnosticStage = "buffer-maintenance"
+-                maintainPlaybackBuffer()
+-                diagnosticStage = "stats"
+-                logStatsIfDue()
++                if (pcmWriter == null) {
++                    diagnosticStage = "buffer-maintenance"
++                    maintainPlaybackBuffer()
++                    diagnosticStage = "stats"
++                    logStatsIfDue()
++                }
              }
          } catch (_: InterruptedException) {
 -            // Worker shut down.
@@ -1930,6 +2001,8 @@
              if (running) reportFailure(error)
              throw error
          } finally {
++            running = false
++            pcmWriter?.stopAndJoin()
              runCatching { logStatsIfDue(force = true) }
 -            release()
 -        }
@@ -1938,6 +2011,25 @@
 +                callTimeline.released(callTicket)
 +            }
 +        }
++    }
++
++    private fun startPcmWriter() {
++        if (!separateMusicWriter || mappedChannel != AudioChannel.MEDIA || format.audioType != "media") return
++        pcmWriter = MusicPcmWriter(format.sampleRate, frameBytes, ::writePcm,
++            maintain = { restorePlayback(); maintainPlaybackBuffer(); logStatsIfDue() },
++            failed = { error ->
++                runCatching { reportFailure(error) }
++                running = false
++                thread.interrupt()
++            },
++            initialize = { runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) } })
++            .also { it.start() }
++        report("Audio: music writer mode=OEM pcmQueueMaxMs=40 speedAdjustment=false")
++    }
++
++    private fun outputPcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
++        val writer = pcmWriter
++        if (writer == null) writePcm(data, offset, length) else writer.submit(data, offset, length)
 +    }
 +
 +    private fun nextPacket(): AudioPacket? {
@@ -1956,7 +2048,7 @@
      }
  
      private fun configureCodec(mime: String) {
-@@ -1432,13 +1272,20 @@
+@@ -1432,13 +1331,20 @@
              )
          }
          codec = try {
@@ -1981,7 +2073,7 @@
                  runCatching {
                      val name = it.name
                      Log.i(TAG, "audio decoder configured mime=$mime name=$name")
-@@ -1446,6 +1293,16 @@
+@@ -1446,6 +1352,16 @@
                  }
              }
          } catch (error: Exception) {
@@ -1998,7 +2090,7 @@
              Log.e(TAG, "audio decoder configuration failed mime=$mime", error)
              reportFailure(error)
              null
-@@ -1460,9 +1317,8 @@
+@@ -1460,9 +1376,8 @@
          val minBuffer = AudioTrack.getMinBufferSize(format.sampleRate, channelMask, encoding)
          if (minBuffer <= 0) {
              Log.e(TAG, "AudioTrack buffer size unavailable rate=${format.sampleRate} channels=${format.channels}")
@@ -2010,7 +2102,7 @@
              return
          }
          val selection = mappedSelection()
-@@ -1470,15 +1326,15 @@
+@@ -1470,15 +1385,15 @@
          val streamOverride = channelOverride(selection.channel)
          var attributes = audioAttributesFor(selection, streamOverride)
          trackAttributes = attributes
@@ -2031,7 +2123,7 @@
              built = AudioTrack.Builder()
                  .setAudioAttributes(attributes)
                  .setAudioFormat(pcmFormat(encoding, channelMask))
-@@ -1512,19 +1368,20 @@
+@@ -1512,19 +1427,20 @@
          track = built
          diagnosticStage = "track-attributes"
          trackAttributes = audioTrackAttributesForFocus(built, attributes)
@@ -2059,7 +2151,7 @@
          Log.i(
              TAG,
              "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
-@@ -1537,19 +1394,21 @@
+@@ -1537,19 +1453,21 @@
              TAG,
              "audio route type=${format.payloadType} audioType=${format.audioType} " +
                  "mode=${if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE} " +
@@ -2086,7 +2178,7 @@
  
      private fun audioAttributesFor(
          selection: AudioChannelSelection,
-@@ -1565,13 +1424,17 @@
+@@ -1565,13 +1483,17 @@
                  Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
              }
          }
@@ -2105,7 +2197,7 @@
          val mode = if (advancedAudioChannelMapping) {
              AudioChannelMappingMode.AUTOMOTIVE_BUS
          } else {
-@@ -1585,20 +1448,17 @@
+@@ -1585,20 +1507,17 @@
      }
  
      private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
@@ -2130,7 +2222,7 @@
              return
          }
          track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
-@@ -1639,12 +1499,8 @@
+@@ -1639,12 +1558,8 @@
      private fun usageFor(channel: AudioChannel): Int = when (channel) {
          AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
          AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
@@ -2145,7 +2237,16 @@
          AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
      }
  
-@@ -1714,9 +1570,26 @@
+@@ -1684,7 +1599,7 @@
+         val rtp = packet.rtp
+         val timestampUs = sampleTimestampUs(packet.sample)
+         when (format.codec) {
+-            AudioCodecKind.LPCM -> writePcm(byteSwapS16(rtp.copyOfRange(12, rtp.size)))
++            AudioCodecKind.LPCM -> outputPcm(byteSwapS16(rtp.copyOfRange(12, rtp.size)))
+             AudioCodecKind.AAC_LC -> {
+                 val accessUnit = rtp.copyOfRange(12, rtp.size)
+                 if (accessUnit.isNotEmpty()) {
+@@ -1714,9 +1629,26 @@
                      }
                      return
                  }
@@ -2171,11 +2272,11 @@
 +        }
 +        inputQueued++
 +        outputBuffers++
-+        writePcm(decoder.pcm, 0, size)
++        outputPcm(decoder.pcm, 0, size)
      }
  
      private fun sampleTimestampUs(sample: Int): Long =
-@@ -1725,7 +1598,10 @@
+@@ -1725,7 +1657,10 @@
      private fun feedCodec(payload: ByteArray, presentationTimeUs: Long) {
          val codec = codec ?: run { decoderUnavailablePackets++; return }
          diagnosticStage = "decoder-input"
@@ -2187,7 +2288,7 @@
          if (index < 0) {
              inputDropped++
              if (inputDropped == 1) {
-@@ -1759,14 +1635,14 @@
+@@ -1759,14 +1694,14 @@
  
      private fun drainCodec(codec: MediaCodec) {
          diagnosticStage = "decoder-output"
@@ -2204,7 +2305,40 @@
                      if (decoderOutputReports < 4) runCatching {
                          val outputFormat = codec.outputFormat
                          val metadata = "rate=${outputFormat.intOrNull(MediaFormat.KEY_SAMPLE_RATE)} " +
-@@ -1820,21 +1696,22 @@
+@@ -1792,17 +1727,22 @@
+                             )
+                         }
+                     }
+-                    if (size > 0) {
+-                        val output = codec.getOutputBuffer(index)
+-                        if (output != null) {
+-                            if (size > pcm.size) pcm = ByteArray(size)
+-                            output.position(info.offset)
+-                            output.limit(info.offset + size)
+-                            output.get(pcm, 0, size)
+-                            writePcm(pcm, 0, size)
++                    var copied = false
++                    try {
++                        if (size > 0) {
++                            val output = codec.getOutputBuffer(index)
++                            if (output != null) {
++                                if (size > pcm.size) pcm = ByteArray(size)
++                                output.position(info.offset)
++                                output.limit(info.offset + size)
++                                output.get(pcm, 0, size)
++                                copied = true
++                                if (pcmWriter == null) writePcm(pcm, 0, size)
++                            }
+                         }
+-                    }
+-                    codec.releaseOutputBuffer(index, false)
++                    } finally { codec.releaseOutputBuffer(index, false) }
++                    // 等待 PCM 空位前交还 codec 输出，避免播放背压长期占有解码器缓冲。
++                    if (copied && pcmWriter != null) outputPcm(pcm, 0, size)
+                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
+                 }
+                 else -> return
+@@ -1820,21 +1760,22 @@
                  "audio first PCM type=${format.payloadType} bytes=$length",
              )
          }
@@ -2230,7 +2364,7 @@
              maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
              if (count < 0) {
                  writeErrorsThisWindow++
-@@ -1843,6 +1720,7 @@
+@@ -1843,6 +1784,7 @@
              }
              if (count == 0) {
                  zeroWritesThisWindow++
@@ -2238,7 +2372,7 @@
                  break
              }
              if (count < writeLength) partialWritesThisWindow++
-@@ -1859,14 +1737,6 @@
+@@ -1859,14 +1801,6 @@
                      Log.i(TAG, "audio playback started type=${format.payloadType}")
                  }
              }
@@ -2253,7 +2387,7 @@
          }
      }
  
-@@ -1875,23 +1745,41 @@
+@@ -1875,26 +1809,44 @@
          underrunsAtPlaybackStart = track.underrunCount
          track.play()
          playbackStarted = true
@@ -2268,6 +2402,10 @@
      private fun maintainPlaybackBuffer() {
          val track = track ?: return
 -        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
+-                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition,
+-                startThresholdBytes / 2L)) {
+-            // The hardware buffer has starved below the recovery floor. Pause without flushing
+-            // or discarding PCM, then use the configured start threshold again when music resumes.
 +        val wirelessMusic = wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA
 +        if (wirelessMusic && dynamicMusicBuffer) {
 +            val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
@@ -2278,10 +2416,7 @@
 +            }
 +        }
 +        if (bufferProgress.shouldRebuffer(!wirelessRealtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
-                 track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition,
--                startThresholdBytes / 2L)) {
--            // The hardware buffer has starved below the recovery floor. Pause without flushing
--            // or discarding PCM, then use the configured start threshold again when music resumes.
++                track.underrunCount > underrunsAtPlaybackStart, (queue.isEmpty() && pcmWriter?.hasPending() != true), track.playbackHeadPosition,
 +                startThresholdBytes / 2L, recoverOnQueuedBurst = wirelessMusic)) {
 +            // An underrun left the track below the recovery waterline. Retain PCM while paused,
 +            // then use the configured start threshold again when music resumes.
@@ -2300,8 +2435,12 @@
 +                "sinceRxMs=${lastArrivalNs.get().takeIf { it > 0 }?.let { (rebufferStartedNs - it).coerceAtLeast(0) / 1_000_000 } ?: "unknown"}") }
          }
          // A short final burst may never reach the start threshold. Play it after a bounded wait.
-         if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
-@@ -1905,7 +1793,11 @@
+-        if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
++        if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() && pcmWriter?.hasPending() != true &&
+             System.nanoTime() - lastPcmWriteNs >= BUFFER_TAIL_WAIT_NS) {
+             startPlayback(track)
+         }
+@@ -1905,7 +1857,11 @@
          val now = System.nanoTime()
          if (statsWindowStartNs == 0L) statsWindowStartNs = now
          if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
@@ -2313,7 +2452,7 @@
          val lastRx = lastArrivalNs.get()
          val currentTrack = track
          val playbackHeadFrames = currentTrack?.playbackHeadPosition
-@@ -1919,7 +1811,7 @@
+@@ -1919,7 +1875,7 @@
          val line = "audio stats audioType=${format.audioType} channel=$mappedChannel " +
              "routeType=${currentTrack?.routedDevice?.type ?: -1} codec=${format.codec} " +
              "trackState=${currentTrack?.state ?: -1} playState=${currentTrack?.playState ?: -1} " +
@@ -2322,7 +2461,7 @@
              "trackBufferFrames=${currentTrack?.bufferSizeInFrames ?: -1} " +
              "rx=${packetsReceived.getAndSet(0)} " +
              "dropped=${packetsDropped.getAndSet(0)} underruns=+${underruns - statsLastUnderruns} queue=${queue.size} " +
-@@ -1930,11 +1822,18 @@
+@@ -1930,11 +1886,18 @@
              "estimatedQueuedFrames=${queuedFrames ?: -1} writeErrors=$writeErrorsThisWindow " +
              "lastWriteError=${lastWriteErrorCode ?: "none"} zeroWrites=$zeroWritesThisWindow " +
              "partialWrites=$partialWritesThisWindow " +
@@ -2343,7 +2482,7 @@
              val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                  "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                  "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
-@@ -1981,7 +1880,10 @@
+@@ -1981,7 +1944,10 @@
  
      @Synchronized
      private fun release() {
@@ -2355,7 +2494,7 @@
          val codec = codec
          this.codec = null
          if (codec != null) {
-@@ -2015,12 +1917,13 @@
+@@ -2015,12 +1981,13 @@
                  // Best effort.
              }
          }
@@ -2803,7 +2942,32 @@
              return lengthPrefixed
          }
  
-@@ -188,6 +155,4 @@
+@@ -95,19 +62,20 @@
+     }
+ 
+     /** IDR (AVC) or IRAP (HEVC) starts an independently decodable reference chain. */
+-    fun isRandomAccess(annexB: ByteArray, codec: VideoCodec): Boolean {
++    fun isRandomAccess(annexB: ByteArray, codec: VideoCodec, size: Int = annexB.size): Boolean {
++        require(size in 0..annexB.size)
+         var cursor = 0
+-        while (cursor + 3 < annexB.size) {
++        while (cursor + 3 < size) {
+             val prefix = when {
+                 annexB[cursor] != 0.toByte() || annexB[cursor + 1] != 0.toByte() -> 0
+                 annexB[cursor + 2] == 1.toByte() -> 3
+                 annexB[cursor + 2] == 0.toByte() && annexB[cursor + 3] == 1.toByte() -> 4
+                 else -> 0
+             }
+-            if (prefix > 0 && cursor + prefix < annexB.size) {
++            if (prefix > 0 && cursor + prefix < size) {
+                 val header = annexB[cursor + prefix].toInt() and 255
+                 if (codec == VideoCodec.H264 && header and 31 == 5) return true
+-                if (codec == VideoCodec.H265 && cursor + prefix + 1 < annexB.size &&
++                if (codec == VideoCodec.H265 && cursor + prefix + 1 < size &&
+                     (header shr 1) and 63 in 16..21) return true
+                 cursor += prefix
+             } else cursor++
+@@ -188,6 +156,4 @@
              ((source[offset + 2].toInt() and 0xff) shl 8) or
              (source[offset + 3].toInt() and 0xff)
  
@@ -3667,7 +3831,14 @@
  }
  
  /** Do not resume dependent pictures after losing a reference frame. */
-@@ -32,35 +26,73 @@
+@@ -27,40 +21,78 @@
+     var needsKeyFrame = true
+         private set
+     fun reset() { needsKeyFrame = true }
+-    fun accepts(bytes: ByteArray, codec: VideoCodec): Boolean =
+-        !needsKeyFrame || MediaCodecSupport.isRandomAccess(bytes, codec)
++    fun accepts(bytes: ByteArray, codec: VideoCodec, size: Int = bytes.size): Boolean =
++        !needsKeyFrame || MediaCodecSupport.isRandomAccess(bytes, codec, size)
      fun onQueued() { needsKeyFrame = false }
  }
  

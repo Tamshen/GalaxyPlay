@@ -20,12 +20,12 @@ class AudioPitchStabilityTest {
     private class Playback(val rate: Int, wireless: Boolean) : Closeable {
         private val type = Class.forName("com.shilapi.xcertplay.media.AudioRenderer")
         val reports = mutableListOf<String>()
-        private val renderer = type.declaredConstructors.single { it.parameterCount == 18 }
+        private val renderer = type.declaredConstructors.single { it.parameterCount == 19 }
             .apply { isAccessible = true }
             .newInstance(AudioFormat(AudioCodecKind.LPCM, rate, 2, 96, "media"),
                 false, false, 0, 0, 0, AudioFocusCoordinator(null, false), null, null, 0, 300,
                 { message: String -> reports.add(message) }, wireless,
-                CallAudioTimeline(report = { _: String -> }), { "test" }, { _: Any -> }, { _: Any -> }, 0)
+                CallAudioTimeline(report = { _: String -> }), { "test" }, { _: Any -> }, { _: Any -> }, 0, false)
         private val original: AudioTrack
         val track = mock(AudioTrack::class.java)
         val output = ByteArrayOutputStream()

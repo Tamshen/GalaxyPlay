@@ -5,9 +5,9 @@ internal class AudioCodecInputWait(
     private val nanoTime: () -> Long = System::nanoTime,
     private val pause: () -> Unit = { Thread.sleep(2) },
 ) {
-    var retries = 0L
+    @Volatile var retries = 0L
         private set
-    var timeouts = 0L
+    @Volatile var timeouts = 0L
         private set
 
     fun await(active: () -> Boolean, dequeue: () -> Int, drain: () -> Unit): Int {
