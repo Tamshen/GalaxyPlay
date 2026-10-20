@@ -38,9 +38,13 @@
          val release = CountDownLatch(1)
 --- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayBonjourDualStackTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayBonjourDualStackTest.kt
-@@ -60,12 +60,15 @@
+@@ -58,14 +58,20 @@
+             factory.`when`<JmDNS> { JmDNS.create(ipv4, "carplay-020000000002") }.thenReturn(v4)
+             val bonjour = CarPlayBonjour(context, config, identity, ipv6.hostAddress, true,
                  additionalAddresses = listOf(ipv4))
++            assertFalse(bonjour.publicationReady())
              bonjour.start()
++            assertTrue(bonjour.publicationReady())
              assertTrue(bonjour.diagnosticSnapshot().contains("mdnsFamilies=IPv6,IPv4"))
 +            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=REGISTER_CALL_RETURNED registeredFamilies=2"))
 +            assertTrue(bonjour.diagnosticSnapshot().contains("peerReception=UNVERIFIED"))
@@ -50,10 +54,36 @@
              }
              bonjour.close()
              bonjour.close()
++            assertFalse(bonjour.publicationReady())
 +            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=CLOSED"))
              verify(v6).close()
              verify(v4).close()
              verify(lock).release()
+@@ -91,6 +97,24 @@
+             val queue = ReflectionHelpers.getField<java.util.concurrent.LinkedBlockingQueue<*>>(bonjour, "interfaceServices")
+             assertEquals(1, queue.size)
+             verify(dns, never()).getInterface()
++        }
++    }
++
++    @Test fun partialPublicationFailureNeverOpensReadinessGateAndClosesRegistries() {
++        setup()
++        val v4 = mock(JmDNS::class.java)
++        val v6 = mock(JmDNS::class.java)
++        doThrow(java.io.IOException("synthetic failure")).`when`(v4).registerService(any(ServiceInfo::class.java))
++        mockStatic(JmDNS::class.java).use { factory ->
++            factory.`when`<JmDNS> { JmDNS.create(ipv6, "carplay-020000000002") }.thenReturn(v6)
++            factory.`when`<JmDNS> { JmDNS.create(ipv4, "carplay-020000000002") }.thenReturn(v4)
++            val bonjour = CarPlayBonjour(context, config, identity, ipv6.hostAddress, true,
++                additionalAddresses = listOf(ipv4))
++            assertThrows(java.io.IOException::class.java) { bonjour.start() }
++            assertFalse(bonjour.publicationReady())
++            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=FAILED"))
++            verify(v4).close(); verify(v6).close(); verify(lock).release()
++            bonjour.close()
+         }
+     }
+ 
 --- a/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
 +++ b/e2e/common/test/java/com/shilapi/xcertplay/CarPlayControllerUsbServiceTest.kt
 @@ -48,6 +48,24 @@
@@ -969,7 +999,7 @@
      }
  
      @Test fun staleCloseCannotRemoveANewerDiPlaySession() {
-@@ -419,9 +449,13 @@
+@@ -419,19 +449,25 @@
          val requests = mutableListOf<WifiP2pConfig?>()
          var group: WifiP2pGroup? = null
          var removals = 0
@@ -983,7 +1013,19 @@
          var noCreateReply = false
          var fixed24Only = false
          var allowed24 = setOf(2412, 2437, 2462)
-@@ -457,16 +491,26 @@
+         var reportedFrequency: Int? = null
++        var noGroupReply = false
+ 
+         @Implementation protected fun requestP2pState(channel: WifiP2pManager.Channel, listener: WifiP2pManager.P2pStateListener) {
+             listener.onP2pStateAvailable(WifiP2pManager.WIFI_P2P_STATE_ENABLED)
+         }
+ 
+         @Implementation override fun requestGroupInfo(channel: WifiP2pManager.Channel, listener: WifiP2pManager.GroupInfoListener) {
++            if (noGroupReply) return
+             listener.onGroupInfoAvailable(group)
+         }
+ 
+@@ -457,16 +493,26 @@
  
          @Implementation override fun removeGroup(channel: WifiP2pManager.Channel, listener: WifiP2pManager.ActionListener) {
              removals++
@@ -4372,7 +4414,32 @@
  import org.junit.Assert.*
  import org.junit.Test
  import java.util.concurrent.CountDownLatch
-@@ -23,11 +24,103 @@
+@@ -9,6 +10,24 @@
+ import kotlin.concurrent.thread
+ 
+ class FirstTcpWatchdogTest {
++    @Test fun earlyNetworkFailureAndTcpHaveExactlyOneWinner() {
++        repeat(50) {
++            val watch = watchdog()
++            assertFalse(watch.terminateBeforeFirstTcp())
++            watch.startSessionSent(0)
++            val outcomes = AtomicInteger()
++            val start = CountDownLatch(1)
++            val tcp = thread { start.await(); if (watch.accepted(event())) outcomes.incrementAndGet() }
++            val lost = thread { start.await(); if (watch.terminateBeforeFirstTcp()) outcomes.incrementAndGet() }
++            start.countDown(); tcp.join(2000); lost.join(2000)
++            assertFalse(tcp.isAlive); assertFalse(lost.isAlive)
++            assertEquals(1, outcomes.get())
++            assertFalse(watch.terminateBeforeFirstTcp())
++            timer?.invoke()
++            assertEquals(0, failures)
++        }
++    }
++
+     private var now = 0L
+     private var deadline: Long? = null
+     private var timer: (() -> Unit)? = null
+@@ -23,11 +42,103 @@
      private fun event(owner: AirPlayListenerIdentity = identity, internal: Boolean = false) =
          AirPlayTcpAccepted(owner, internal, now * 1_000_000)
  

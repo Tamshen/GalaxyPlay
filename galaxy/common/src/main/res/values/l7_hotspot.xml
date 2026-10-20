@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_wireless_not_ready">无线网络或 CarPlay 接收服务尚未就绪，正在结束本次连接；请留意重试提示。</string>
     <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct 自动加入准备未完成。请确认车机本地维护服务可用后重新连接；详细阶段已记录到日志。</string>
     <string name="galaxy_l7_direct_channel_hint">L7 专用连接固定使用 5 GHz 149 信道，修改使用地区后按对应地区配置连接。</string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct 使用地区</string>
@@ -9,7 +10,8 @@
     <string name="galaxy_p2p_region_channel_invalid">已保存频道不适用于当前车载地区。请选择“自动”或当前地区的其他频道，原设置未被覆盖。</string>
     <string name="galaxy_p2p_region_failure">当前频道或系统建组能力不满足所选车载地区限制。请核对使用地区，选择“自动”或可用频道；若系统无法固定频道，请使用原生热点。</string>
     <string name="galaxy_p2p_configuration_changed">Wi-Fi Direct 的当前配置未确认或已变化。请重新发起连接，应用不会让手机使用旧配置。</string>
-    <string name="galaxy_wireless_waiting_network">热点已就绪，正在等待 iPhone 建立 CarPlay 连接…</string>
+    <string name="galaxy_wireless_waiting_network">无线网络已准备好，正在等待 iPhone 接入…</string>
+    <string name="galaxy_wireless_client_observed">已检测到无线设备接入，正在等待 CarPlay 建立连接…</string>
     <string name="galaxy_wireless_step">（%1$d/5）%2$s</string>
     <string name="galaxy_wireless_authenticating">蓝牙已连接，正在认证 iPhone…</string>
     <string name="galaxy_wireless_refresh_network">尚未收到 iPhone 的无线连接，正在再次请求连接…</string>

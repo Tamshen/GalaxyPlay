@@ -460,12 +460,14 @@ class WifiP2pGroupManagerTest {
         var fixed24Only = false
         var allowed24 = setOf(2412, 2437, 2462)
         var reportedFrequency: Int? = null
+        var noGroupReply = false
 
         @Implementation protected fun requestP2pState(channel: WifiP2pManager.Channel, listener: WifiP2pManager.P2pStateListener) {
             listener.onP2pStateAvailable(WifiP2pManager.WIFI_P2P_STATE_ENABLED)
         }
 
         @Implementation override fun requestGroupInfo(channel: WifiP2pManager.Channel, listener: WifiP2pManager.GroupInfoListener) {
+            if (noGroupReply) return
             listener.onGroupInfoAvailable(group)
         }
 

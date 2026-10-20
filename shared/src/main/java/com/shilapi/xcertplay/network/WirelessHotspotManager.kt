@@ -51,6 +51,9 @@ interface WirelessHotspotManager : Closeable {
 
     /** Counts reported by the framework, when available; never contains station identities. */
     fun connectionDiagnosticSnapshot(): String = "association=not_exposed"
+
+    /** 默认后端不提供判断依据，不据此触发恢复。 */
+    fun connectionReadiness(): WirelessLinkReadiness = WirelessLinkReadiness(WirelessLinkReadiness.Condition.UNKNOWN)
 }
 
 /**

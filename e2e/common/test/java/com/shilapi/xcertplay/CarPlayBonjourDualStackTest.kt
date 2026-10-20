@@ -58,7 +58,9 @@ class CarPlayBonjourDualStackTest {
             factory.`when`<JmDNS> { JmDNS.create(ipv4, "carplay-020000000002") }.thenReturn(v4)
             val bonjour = CarPlayBonjour(context, config, identity, ipv6.hostAddress, true,
                 additionalAddresses = listOf(ipv4))
+            assertFalse(bonjour.publicationReady())
             bonjour.start()
+            assertTrue(bonjour.publicationReady())
             assertTrue(bonjour.diagnosticSnapshot().contains("mdnsFamilies=IPv6,IPv4"))
             assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=REGISTER_CALL_RETURNED registeredFamilies=2"))
             assertTrue(bonjour.diagnosticSnapshot().contains("peerReception=UNVERIFIED"))
@@ -68,6 +70,7 @@ class CarPlayBonjourDualStackTest {
             }
             bonjour.close()
             bonjour.close()
+            assertFalse(bonjour.publicationReady())
             assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=CLOSED"))
             verify(v6).close()
             verify(v4).close()
@@ -94,6 +97,24 @@ class CarPlayBonjourDualStackTest {
             val queue = ReflectionHelpers.getField<java.util.concurrent.LinkedBlockingQueue<*>>(bonjour, "interfaceServices")
             assertEquals(1, queue.size)
             verify(dns, never()).getInterface()
+        }
+    }
+
+    @Test fun partialPublicationFailureNeverOpensReadinessGateAndClosesRegistries() {
+        setup()
+        val v4 = mock(JmDNS::class.java)
+        val v6 = mock(JmDNS::class.java)
+        doThrow(java.io.IOException("synthetic failure")).`when`(v4).registerService(any(ServiceInfo::class.java))
+        mockStatic(JmDNS::class.java).use { factory ->
+            factory.`when`<JmDNS> { JmDNS.create(ipv6, "carplay-020000000002") }.thenReturn(v6)
+            factory.`when`<JmDNS> { JmDNS.create(ipv4, "carplay-020000000002") }.thenReturn(v4)
+            val bonjour = CarPlayBonjour(context, config, identity, ipv6.hostAddress, true,
+                additionalAddresses = listOf(ipv4))
+            assertThrows(java.io.IOException::class.java) { bonjour.start() }
+            assertFalse(bonjour.publicationReady())
+            assertTrue(bonjour.diagnosticSnapshot().contains("mdnsPublication=FAILED"))
+            verify(v4).close(); verify(v6).close(); verify(lock).release()
+            bonjour.close()
         }
     }
 

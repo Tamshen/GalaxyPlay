@@ -38,7 +38,9 @@ class GalaxyP2pStartupIntegrationTest {
         app.getSystemService(WifiManager::class.java).isWifiEnabled = true
     }
 
-    private fun controller(control: WifiScanPauseControl? = null, prepare: (WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit): CarPlayController {
+    private fun controller(control: WifiScanPauseControl? = null,
+        beforeGroup: ((Int?, () -> Boolean, (String) -> Unit) -> Unit)? = null,
+        prepare: (WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit): CarPlayController {
         val context = object : ContextWrapper(app) {
             override fun getApplicationContext(): Context = this
             override fun bindService(service: Intent, conn: ServiceConnection, flags: Int) = false
@@ -50,7 +52,8 @@ class GalaxyP2pStartupIntegrationTest {
             AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480)),
             AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
             object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {},
-            prepareWirelessHotspot = prepare, wifiScanPauseControl = control).also { controller ->
+            prepareWirelessHotspot = prepare, prepareWirelessGroup = beforeGroup,
+            wifiScanPauseControl = control).also { controller ->
             val phase = controller.javaClass.declaredClasses.first { it.simpleName == "Phase" }
                 .enumConstants.first { (it as Enum<*>).name == "WIRELESS" }
             ReflectionHelpers.setField(controller, "phase", phase)
@@ -106,6 +109,45 @@ class GalaxyP2pStartupIntegrationTest {
         try { assertNotNull(start(controller)); assertEquals(1, calls) }
         finally { controller.close(); controller.awaitClosed(2000) }
         assertNull(radio.group)
+    }
+
+    @Test fun controllerPreparesBeforeCreationAndRechecksTheActualGroupAfterward() {
+        val phases = mutableListOf<String>()
+        val controller = controller(beforeGroup = { frequency, cancelled, _ ->
+            assertEquals(5745, frequency); assertFalse(cancelled())
+            assertNull(radio.group); assertTrue(radio.requests.isEmpty())
+            phases += "before"
+        }) { _, _, _ ->
+            assertNotNull(radio.group); phases += "after"
+        }
+        try {
+            start(controller)
+            assertEquals(listOf("before", "after"), phases)
+        } finally { controller.close(); controller.awaitClosed(2000) }
+    }
+
+    @Test fun generationChangeDuringPrecreationCannotCreateOrPublishGroup() {
+        lateinit var controller: CarPlayController
+        controller = controller(beforeGroup = { _, cancelled, _ ->
+            ReflectionHelpers.getField<AtomicInteger>(controller, "wirelessGeneration").incrementAndGet()
+            assertTrue(cancelled())
+            throw java.io.InterruptedIOException("cancelled")
+        }) { _, _, _ -> error("must not publish") }
+        try {
+            assertThrows(java.io.InterruptedIOException::class.java) { start(controller) }
+            assertTrue(radio.requests.isEmpty()); assertNull(radio.group)
+        } finally { controller.close(); controller.awaitClosed(2000) }
+    }
+
+    @Test fun groupAppearingDuringPrecreationIsPreserved() {
+        val controller = controller(beforeGroup = { _, _, _ -> radio.group = radio.makeGroup(null) })
+            { _, _, _ -> error("must not publish") }
+        try {
+            val error = assertThrows(java.io.IOException::class.java) { start(controller) }
+            assertTrue(generateSequence(error as Throwable) { it.cause }.any { it is P2pResetRequiredException })
+            assertTrue(radio.requests.isEmpty()); assertEquals(0, radio.removals)
+            assertEquals("DIRECT-system-test", radio.group!!.networkName)
+        } finally { controller.close(); controller.awaitClosed(2000) }
     }
 
     @Test fun preparationFailureClosesOwnedGroupAndCannotReturnReady() {

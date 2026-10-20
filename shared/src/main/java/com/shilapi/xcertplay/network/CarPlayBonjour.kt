@@ -176,6 +176,11 @@ class CarPlayBonjour(
             "bonjourAddressMismatch=${addressMismatchCount.get()} connectProbes=${probeCount.get()} " +
             "connectProbe2xx=${successfulProbeCount.get()} lastProbe=${lastProbe.get()} " +
             "mdnsFamilies=$publishedFamilies"
+
+    /** 仅确认本地发布调用完成，不表示手机收到广播。 */
+    fun publicationReady(): Boolean = !closed && if (useInterfaceMdns)
+        publicationState == "REGISTER_CALL_RETURNED" && registeredFamilies.get() == advertisedAddresses.size
+        else publicationState == "SYSTEM_CONFIRMED"
     private val multicastLock = (context.applicationContext ?: context)
         .getSystemService(WifiManager::class.java)
         .createMulticastLock("carplay-bonjour").apply { setReferenceCounted(false) }

@@ -43,6 +43,7 @@ class WifiP2pGroupManager(
     private val interfaceLookup: (String) -> NetworkInterface? = NetworkInterface::getByName,
     private val channelPolicy: P2pChannelPolicy? = null,
     private val addressMode: P2pAddressMode = P2pAddressMode.DUAL_STACK,
+    private val beforeGroupCreate: ((Int?, () -> Boolean) -> Unit)? = null,
 ) : WirelessHotspotManager {
     init {
         require(WifiP2pChannels.isValid(preferredChannel)) { "Unsupported Wi-Fi Direct channel: $preferredChannel" }
@@ -238,6 +239,13 @@ class WifiP2pGroupManager(
                     val usingRemembered = preferred?.request == selection
                     if (usingRemembered) synchronized(stateLock) { rememberedAttempt = preferred }
                     try {
+                        beforeGroupCreate?.invoke(selection.frequencyMHz, { synchronized(stateLock) { closed || startAttempt !== attempt } })
+                        ensureStartActive(attempt)
+                        if (remainingNanos(deadlineNanos) == 0L) throw IOException("Wi-Fi P2P preparation deadline exceeded")
+                        // 预准备可能耗时；其他应用在此期间建组时，不继续抢占。
+                        if (beforeGroupCreate != null &&
+                            requestGroupInfo(attempt, p2pChannel, REQUEST_POLL_NANOS, requireResponse = true) != null)
+                            throw P2pResetRequiredException()
                         if (legacyChannels) {
                             p2pManager.createGroup(p2pChannel, createActionListener(attempt, request))
                         } else {
@@ -296,6 +304,32 @@ class WifiP2pGroupManager(
             cleanupFailedStart(attempt)
             throw failure
         }
+    }
+
+    override fun connectionReadiness(): WirelessLinkReadiness {
+        val (active, expected) = synchronized(stateLock) {
+            if (closed || !created || channel == null || readyInfo == null)
+                return WirelessLinkReadiness(WirelessLinkReadiness.Condition.UNKNOWN)
+            requireNotNull(channel) to requireNotNull(readyInfo)
+        }
+        val result = AtomicReference<WifiP2pGroup?>()
+        val latch = CountDownLatch(1)
+        p2pManager.requestGroupInfo(active) { result.set(it); latch.countDown() }
+        if (!latch.await(500, TimeUnit.MILLISECONDS)) return WirelessLinkReadiness(WirelessLinkReadiness.Condition.UNKNOWN)
+        val group = result.get() ?: return WirelessLinkReadiness(WirelessLinkReadiness.Condition.GROUP_MISSING)
+        val condition = when {
+            !group.isGroupOwner || group.networkName != expected.ssid || group.getInterface() != expected.interfaceName ||
+                (Build.VERSION.SDK_INT >= 29 && group.frequency != expected.frequencyMHz) -> WirelessLinkReadiness.Condition.GROUP_CHANGED
+            else -> {
+                val network = expected.interfaceName?.let(interfaceLookup)
+                when {
+                    network == null || !network.isUp -> WirelessLinkReadiness.Condition.INTERFACE_MISSING
+                    Collections.list(network.inetAddresses).none { it == expected.hostAddress } -> WirelessLinkReadiness.Condition.ADDRESS_MISSING
+                    else -> WirelessLinkReadiness.Condition.READY
+                }
+            }
+        }
+        return WirelessLinkReadiness(condition, group.clientList.size)
     }
 
     override fun validateReady() {

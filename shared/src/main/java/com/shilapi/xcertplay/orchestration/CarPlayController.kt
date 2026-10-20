@@ -126,7 +126,7 @@ sealed class CarPlayStatus {
     data object WaitingForPairedIphone : CarPlayStatus()
     data object ConnectingBluetooth : CarPlayStatus()
     data object RunningWireless : CarPlayStatus()
-    data class WaitingForWirelessNetwork(val request: Int) : CarPlayStatus()
+    data class WaitingForWirelessNetwork(val request: Int, val clientObserved: Boolean = false) : CarPlayStatus()
     data object NegotiatingWireless : CarPlayStatus()
     data object PreparingWirelessVideo : CarPlayStatus()
     data object WirelessActive : CarPlayStatus()
@@ -179,6 +179,7 @@ class CarPlayController(
     diagnosticSink: DiagnosticSink = DiagnosticSink.NONE,
     val localMediaAudioEnabled: Boolean = true,
     private val prepareWirelessHotspot: ((WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit)? = null,
+    private val prepareWirelessGroup: ((Int?, () -> Boolean, (String) -> Unit) -> Unit)? = null,
     private val wifiScanPauseControl: WifiScanPauseControl? = null,
 ) : Closeable {
     /** 重连沿用当前控制器的实际传输方式，不使用可能已被修改的设置草稿。 */
@@ -291,6 +292,7 @@ class CarPlayController(
 
     @Volatile private var hotspot: WirelessHotspotManager? = null
     @Volatile private var wifiScanPause: WifiScanPause? = null
+    @Volatile private var wirelessReadiness: com.shilapi.xcertplay.network.GalaxyWirelessReadinessMonitor? = null
     @Volatile private var bonjour: CarPlayBonjour? = null
     private val wirelessResourceLock = Any()
     private val wirelessFailureReported = AtomicBoolean(false)
@@ -1566,7 +1568,25 @@ class CarPlayController(
                     "location=false vehicleStatus=false",
             )
             startedHotspot?.validateReady()
-            var startRequests = 0
+            val startRequests = AtomicInteger()
+            val readiness = if (prepareWirelessHotspot != null && hotspotInfo.backend == WirelessHotspotBackend.WIFI_P2P)
+                com.shilapi.xcertplay.network.GalaxyWirelessReadinessMonitor(
+                    current = { !isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp() },
+                    probe = { requireNotNull(startedHotspot).connectionReadiness() },
+                    onClientObserved = { if (!isStaleWirelessRun(generation) && watchdog.waitingForFirstTcp())
+                        onStatus(CarPlayStatus.WaitingForWirelessNetwork(startRequests.get(), clientObserved = true), generation) },
+                    onLost = { reason -> if (!isStaleWirelessRun(generation) && watchdog.terminateBeforeFirstTcp()) {
+                        connectionDiagnostic("WIRELESS_READINESS stage=RECOVERY reason=${reason.name} beforeFirstTcp=true")
+                        fail(WirelessStartupException(WirelessStartupFailure.HOTSPOT_NOT_READY,
+                            "Wi-Fi Direct readiness lost: ${reason.name}"), generation)
+                        closeWirelessStack(generation = generation)
+                    } },
+                    log = { message -> if (!isStaleWirelessRun(generation)) connectionDiagnostic(message) },
+                ) else null
+            synchronized(wirelessResourceLock) {
+                if (isStaleWirelessRun(generation)) { readiness?.close(); return }
+                wirelessReadiness = readiness
+            }
             val result = Iap2WirelessControlClient(
                 session = channel,
                 mfi = Iap2MfiAuthenticationClient(mfi),
@@ -1575,12 +1595,21 @@ class CarPlayController(
                 endpoint = endpoint,
                 timeoutMillis = controlLoopTimeoutMillis(),
                 keepAliveAfterDeadline = { keepBluetoothControlAlive(generation) },
-                beforeStartSession = { startedHotspot?.validateReady() },
+                beforeStartSession = {
+                    startedHotspot?.validateReady()
+                    if (readiness != null && (service.boundPort() != listenerPort || !bonjourClient.publicationReady()))
+                        throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_NOT_READY,
+                            "AirPlay listener or discovery publication is no longer ready")
+                    if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Wireless startup cancelled")
+                    if (readiness != null)
+                        connectionDiagnostic("WIRELESS_READY_GATE groupValidated=true listenerBound=true publicationReady=true peerReception=UNVERIFIED")
+                },
                 onStartSessionSent = {
                     watchdog.startSessionSent(it.sentAtNanos)
-                    startRequests++
+                    val count = startRequests.incrementAndGet()
                     if (watchdog.waitingForFirstTcp())
-                        onStatus(CarPlayStatus.WaitingForWirelessNetwork(startRequests), generation)
+                        onStatus(CarPlayStatus.WaitingForWirelessNetwork(count, readiness?.clientObserved == true), generation)
+                    readiness?.start()
                 },
                 startupRecovery = if (refreshEnabled)
                     com.shilapi.xcertplay.transport.WirelessStartSessionRecovery({
@@ -1725,6 +1754,7 @@ class CarPlayController(
             override fun onTcpAccepted(event: AirPlayTcpAccepted) {
                 if (isStaleWirelessRun(generation)) return
                 if (watchdog.accepted(event)) {
+                    wirelessReadiness?.close()
                     wirelessDiagnostics?.connectionAccepted()
                     if (watchdog.waitingForProtocol()) onStatus(CarPlayStatus.NegotiatingWireless, generation)
                 }
@@ -2490,7 +2520,12 @@ class CarPlayController(
         val manager: WirelessHotspotManager = when (hotspotMode) {
             WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
                 preferredChannel = config.wifiP2pPreferredChannel, channelPolicy = config.wifiP2pChannelPolicy,
-                addressMode = config.wifiP2pAddressMode)
+                addressMode = config.wifiP2pAddressMode,
+                beforeGroupCreate = prepareWirelessGroup?.let { prepare -> { frequency, cancelled ->
+                    prepare(frequency, { cancelled() || isStaleWirelessRun(generation) }) { message ->
+                        if (!isStaleWirelessRun(generation)) connectionDiagnostic("generation=$generation $message")
+                    }
+                } })
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
             WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
                 appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
@@ -2667,6 +2702,8 @@ class CarPlayController(
             val owner = firstTcpWatchdog?.listener
             firstTcpWatchdog?.terminate()
             val diagnostics = wirelessDiagnostics
+            wirelessReadiness?.close()
+            wirelessReadiness = null
             hotspotAddressRecovery?.close()
             hotspotAddressRecovery = null
             wirelessDiagnostics = null

@@ -65,6 +65,9 @@ internal class FirstTcpWatchdog(
         return true
     }
 
+    /** 网络故障与 TCP 到达竞争时，只允许尚未接通的一方提前恢复。 */
+    @Synchronized fun terminateBeforeFirstTcp(): Boolean = waitingForFirstTcp() && terminate()
+
     private fun expire() {
         synchronized(this) {
             if (terminated || success || firstAcceptNanos != null || firstStartNanos == null) return

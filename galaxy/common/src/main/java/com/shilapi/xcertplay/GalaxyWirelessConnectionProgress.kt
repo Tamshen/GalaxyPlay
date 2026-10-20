@@ -31,11 +31,15 @@ internal class GalaxyWirelessConnectionProgress {
         }
         step = next
         val text = when {
+            status is CarPlayStatus.WaitingForWirelessNetwork && status.clientObserved ->
+                context.getString(R.string.galaxy_wireless_client_observed)
             status == CarPlayStatus.RunningWireless -> context.getString(R.string.galaxy_wireless_authenticating)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.FIRST_TCP_TIMEOUT ->
                 context.getString(R.string.galaxy_wireless_network_timeout)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.AIRPLAY_PROTOCOL_TIMEOUT ->
                 context.getString(R.string.galaxy_wireless_protocol_timeout)
+            status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_NOT_READY ->
+                context.getString(R.string.galaxy_wireless_not_ready)
             status is CarPlayStatus.Failed && status.startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION &&
                 status.message.contains(com.shilapi.xcertplay.network.GalaxyP2pAutoJoin.FAILURE) ->
                 context.getString(R.string.galaxy_p2p_auto_join_failed)

@@ -6,6 +6,45 @@ import org.junit.Test
 import java.net.InetAddress
 
 class GalaxyP2pAutoJoinTest {
+    @Test fun onlyPostcreationChangesRequireStabilizationAndReconnectHasNoExtraDelay() {
+        val radio = Radio()
+        var windows = 0
+        repeat(2) { GalaxyP2pAutoJoin.prepare(info(), { false }, {}, { radio }) { windows++ } }
+        assertEquals(1, windows)
+        val precreated = Radio()
+        GalaxyP2pAutoJoin.prepareBeforeGroup({ false }, {}) { precreated }
+        GalaxyP2pAutoJoin.prepare(info(), { false }, {}, { precreated }) { windows++ }
+        assertEquals(1, windows)
+    }
+
+    @Test fun precreationWritesAreReverifiedWithoutAnotherChangeAfterCreation() {
+        val radio = Radio()
+        val logs = mutableListOf<String>()
+        GalaxyP2pAutoJoin.prepareBeforeGroup({ false }, logs::add) { radio }
+        assertTrue(logs.any { "BEFORE_GROUP_READY changed=true" in it })
+        assertFalse(GalaxyP2pAutoJoin.ensure(info(), { false }, logs::add) { radio })
+        assertEquals(2, radio.commands.count { "vendor_elem_add" in it })
+        assertEquals(8, radio.commands.count { "vendor_elem_get" in it })
+    }
+
+    @Test fun unavailablePrecreationDefersToPostcreationButCancellationNeverDoes() {
+        val logs = mutableListOf<String>()
+        GalaxyP2pAutoJoin.prepareBeforeGroup({ false }, logs::add) { throw java.io.IOException("private") }
+        assertTrue(logs.last().contains("DEFERRED_TO_GROUP"))
+        assertFalse(logs.joinToString().contains("private"))
+        assertTrue(GalaxyP2pAutoJoin.ensure(info(), { false }, {}) { Radio() })
+        logs.clear()
+        assertThrows(WirelessStartupException::class.java) {
+            GalaxyP2pAutoJoin.prepareBeforeGroup({ true }, logs::add) { error("must not connect") }
+        }
+        assertFalse(logs.any { "DEFERRED_TO_GROUP" in it })
+    }
+
+    @Test fun twoGhzOrUnknownPrecreationDoesNotConnect() {
+        for (frequency in listOf(null, 2437))
+            GalaxyP2pAutoJoin.prepareBeforeGroup(frequency, { error("must not prepare") }, {})
+    }
+
     private val target = GalaxyP2pAutoJoin.element
     private val other = "dd0411223344"
     private fun info(backend: WirelessHotspotBackend = WirelessHotspotBackend.WIFI_P2P, frequency: Int = 5745) =

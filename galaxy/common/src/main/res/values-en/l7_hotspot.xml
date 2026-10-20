@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="galaxy_wireless_not_ready">The wireless network or CarPlay receiver is not ready. Ending this attempt; watch for the retry prompt.</string>
     <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct auto-join preparation could not be confirmed. Check that the head unit’s local maintenance service is available, then reconnect. Details are recorded in the log.</string>
     <string name="galaxy_l7_direct_channel_hint">The L7 connection uses fixed 5 GHz channel 149. Changing the region applies the channel settings for that region.</string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct region of use</string>
@@ -9,7 +10,8 @@
     <string name="galaxy_p2p_region_channel_invalid">The saved channel is outside this vehicle region. Choose Auto or an allowed channel. Your saved setting has been preserved.</string>
     <string name="galaxy_p2p_region_failure">The channel or system group-creation capability does not meet the selected vehicle region limits. Check the region and choose Auto or an allowed channel. Use the native hotspot if the system cannot fix a channel.</string>
     <string name="galaxy_p2p_configuration_changed">The current Wi-Fi Direct configuration could not be confirmed or has changed. Start a new connection to use the current configuration.</string>
-    <string name="galaxy_wireless_waiting_network">Hotspot ready. Waiting for the iPhone to connect to CarPlay…</string>
+    <string name="galaxy_wireless_waiting_network">Wireless network ready. Waiting for the iPhone to join…</string>
+    <string name="galaxy_wireless_client_observed">A wireless client was detected. Waiting for the CarPlay connection…</string>
     <string name="galaxy_wireless_step">(%1$d/5) %2$s</string>
     <string name="galaxy_wireless_authenticating">Bluetooth connected. Authenticating the iPhone…</string>
     <string name="galaxy_wireless_refresh_network">No wireless connection from the iPhone yet. Requesting it again…</string>

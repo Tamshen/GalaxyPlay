@@ -12,6 +12,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], qualifiers = "zh-rCN")
 class GalaxyWirelessConnectionProgressTest {
+    @Test fun observedClientIsNotIpOrCarPlaySuccessAndReadinessLossIsReadable() {
+        val text = describe(CarPlayStatus.WaitingForWirelessNetwork(1, clientObserved = true))
+        assertTrue(text.contains("4/5")); assertTrue(text.contains("已检测到无线设备"))
+        assertTrue(text.contains("等待 CarPlay")); assertFalse(text.contains("IP"))
+        val failure = describe(CarPlayStatus.Failed("private exception",
+            startupFailure = WirelessStartupFailure.HOTSPOT_NOT_READY))
+        assertTrue(failure.contains("尚未就绪")); assertFalse(failure.contains("private"))
+    }
     private val progress = GalaxyWirelessConnectionProgress()
     private fun describe(status: CarPlayStatus) = progress.describe(RuntimeEnvironment.getApplication(), status, "阶段说明")
 

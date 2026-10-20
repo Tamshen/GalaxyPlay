@@ -3586,6 +3586,7 @@ class CarPlayHostActivity : ComponentActivity() {
             diagnosticSink = GalaxyDiagnosticSink.create(applicationContext),
             localMediaAudioEnabled = localMusic,
             prepareWirelessHotspot = GalaxyP2pPreparation.forSession(config),
+            prepareWirelessGroup = GalaxyP2pPreparation.beforeGroup(config),
             wifiScanPauseControl = com.shilapi.xcertplay.network.GalaxyWifiScanPause,
             loadPairRecord = { key, current -> AirPlayPersistence.loadLockdownRecord(this, key, current) },
             savePairRecord = { record, current -> AirPlayPersistence.saveLockdownRecord(this, record, current) },

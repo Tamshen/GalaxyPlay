@@ -29,11 +29,16 @@ class GalaxyP2pPreparationTest {
             for (model in listOf("l6", "l7", "custom", "unknown", null)) {
                 preferences.edit().putString("model", model).commit()
                 assertNotNull("车型 $model 应共用 Direct 准备", GalaxyP2pPreparation.forSession(config(), 30))
+                assertNotNull(GalaxyP2pPreparation.beforeGroup(config(), 30))
             }
         } finally { preferences.edit().putString("model", before).commit() }
     }
 
     @Test fun onlyAndroid11WirelessDirectUsesTheMaintenanceInterface() {
+        for (api in listOf(29, 31, 33)) assertNull(GalaxyP2pPreparation.beforeGroup(config(), api))
+        for (mode in WirelessHotspotMode.entries.filter { it != WirelessHotspotMode.WIFI_P2P })
+            assertNull(GalaxyP2pPreparation.beforeGroup(config(mode), 30))
+        assertNull(GalaxyP2pPreparation.beforeGroup(config(transport = CarPlayTransport.WIRED), 30))
         for (api in listOf(29, 31, 33))
             assertNull(GalaxyP2pPreparation.forSession(config(), api))
         for (mode in WirelessHotspotMode.entries.filter { it != WirelessHotspotMode.WIFI_P2P })

@@ -9,6 +9,12 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** Wi-Fi Direct 共用自动加入准备；只捕获连接快照，不依赖车型与配置模板。 */
 internal object GalaxyP2pPreparation {
+    fun beforeGroup(config: CarPlayRuntimeConfig, api: Int = Build.VERSION.SDK_INT):
+        ((Int?, () -> Boolean, (String) -> Unit) -> Unit)? {
+        if (forSession(config, api) == null) return null
+        return { frequency, cancelled, log -> GalaxyP2pAutoJoin.prepareBeforeGroup(frequency, cancelled, log) }
+    }
+
     fun forSession(config: CarPlayRuntimeConfig,
                    api: Int = Build.VERSION.SDK_INT): ((WirelessHotspotInfo, () -> Boolean, (String) -> Unit) -> Unit)? {
         if (api != 30 || config.transport != CarPlayTransport.WIRELESS ||

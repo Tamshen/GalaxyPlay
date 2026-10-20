@@ -10,6 +10,24 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class FirstTcpWatchdogTest {
+    @Test fun earlyNetworkFailureAndTcpHaveExactlyOneWinner() {
+        repeat(50) {
+            val watch = watchdog()
+            assertFalse(watch.terminateBeforeFirstTcp())
+            watch.startSessionSent(0)
+            val outcomes = AtomicInteger()
+            val start = CountDownLatch(1)
+            val tcp = thread { start.await(); if (watch.accepted(event())) outcomes.incrementAndGet() }
+            val lost = thread { start.await(); if (watch.terminateBeforeFirstTcp()) outcomes.incrementAndGet() }
+            start.countDown(); tcp.join(2000); lost.join(2000)
+            assertFalse(tcp.isAlive); assertFalse(lost.isAlive)
+            assertEquals(1, outcomes.get())
+            assertFalse(watch.terminateBeforeFirstTcp())
+            timer?.invoke()
+            assertEquals(0, failures)
+        }
+    }
+
     private var now = 0L
     private var deadline: Long? = null
     private var timer: (() -> Unit)? = null
