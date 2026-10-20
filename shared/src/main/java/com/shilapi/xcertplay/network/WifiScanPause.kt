@@ -37,11 +37,27 @@ internal class WifiScanPause(
     private val app = context.applicationContext
     private val owner = Any()
     @Volatile private var closed = false
+    @Volatile private var connected = false
     @Volatile private var lastReport = "scanPauseResult=not_requested"
     @Volatile private var lastReportAtMs = 0L
 
     fun diagnosticSnapshot(): String = "scanPauseClosed=$closed " +
-        "scanPauseResultAgeMs=${if (lastReportAtMs == 0L) "unknown" else (android.os.SystemClock.elapsedRealtime() - lastReportAtMs).coerceAtLeast(0)} $lastReport"
+        "scanPauseResultAgeMs=${if (lastReportAtMs == 0L) "unknown" else (android.os.SystemClock.elapsedRealtime() - lastReportAtMs).coerceAtLeast(0)} $lastReport " +
+        control.diagnosticSnapshot(owner)
+
+    @Synchronized fun sessionActive() {
+        if (!closed) {
+            connected = true
+            control.sessionActive(app, owner, { !closed && connected }, log)
+        }
+    }
+
+    @Synchronized fun sessionEnded() {
+        connected = false
+        if (!closed) control.sessionEnded(app, owner, log)
+    }
+
+    fun scanObservation(updated: Boolean?) { if (!closed) control.scanObservation(owner, updated) }
 
     /** Asynchronously stops the periodic scans; repeated calls are harmless. */
     @Synchronized
@@ -110,6 +126,10 @@ interface WifiScanPauseControl {
     fun recover(app: Context) {}
     fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit)
     fun release(app: Context, owner: Any, log: (String) -> Unit)
+    fun sessionActive(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {}
+    fun sessionEnded(app: Context, owner: Any, log: (String) -> Unit) {}
+    fun scanObservation(owner: Any, updated: Boolean?) {}
+    fun diagnosticSnapshot(owner: Any): String = ""
 }
 
 /** The single writer is shared across full controller rebuilds, including delayed restore retries. */
@@ -134,7 +154,7 @@ internal class ProcessWifiScanPause(
             log("Wi-Fi scan pause stage=BEGIN monoMs=$started")
             val outcome = state.acquire(owner, current)
             val now = android.os.SystemClock.elapsedRealtime()
-            log("Wi-Fi connectivity scans paused=${outcome.paused} reason=${outcome.reason} api=${Build.VERSION.SDK_INT} " +
+            log("Wi-Fi autojoin control accepted=${outcome.paused} scanStopVerified=false reason=${outcome.reason} api=${Build.VERSION.SDK_INT} " +
                 "monoMs=$now elapsedMs=${(now - started).coerceAtLeast(0)} evidence=autojoin_control transport=${transport.lastTransport}")
         }
     }

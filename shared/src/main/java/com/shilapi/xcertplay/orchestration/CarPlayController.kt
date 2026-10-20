@@ -1362,7 +1362,8 @@ class CarPlayController(
             var startedBonjour: CarPlayBonjour? = null
             val receiveDiagnostics = WirelessReceiveDiagnostics(hotspotInfo.interfaceName)
             val runtimeDiagnostics = GalaxyWirelessRuntimeDiagnostics(appContext,
-                { message -> if (!isStaleWirelessRun(generation)) debugLog(message) })
+                { message -> if (!isStaleWirelessRun(generation)) debugLog(message) },
+                onScanObservation = { updated -> if (!isStaleWirelessRun(generation)) wifiScanPause?.scanObservation(updated) })
             val startupEvidence = if (prepareWirelessHotspot != null && hotspotInfo.backend == WirelessHotspotBackend.WIFI_P2P &&
                 hotspotInfo.interfaceName == "p2p0" && android.os.Build.VERSION.SDK_INT == 30)
                 com.shilapi.xcertplay.network.GalaxyP2pStartupEvidence({ isStaleWirelessRun(generation) }) else null
@@ -1744,6 +1745,7 @@ class CarPlayController(
                 }
                 // 播放期间继续低频观察，才能把音频缺口与扫描、接口及内核计数对齐。
                 wirelessDiagnostics?.sessionActive()
+                wifiScanPause?.sessionActive()
                 wirelessConnectionProof.activate(generation, session)
                 onStatus(CarPlayStatus.PreparingWirelessVideo, generation)
                 // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
@@ -1753,7 +1755,10 @@ class CarPlayController(
 
             override fun onSessionEnded(session: AirPlaySession) {
                 if (isStaleWirelessRun(generation)) return
-                if (activeSession === session) wirelessDiagnostics?.sessionEnded()
+                if (activeSession === session) {
+                    wirelessDiagnostics?.sessionEnded()
+                    wifiScanPause?.sessionEnded()
+                }
                 wirelessConnectionProof.end(generation, session)
                 sessionListener.onSessionEnded(session)
             }

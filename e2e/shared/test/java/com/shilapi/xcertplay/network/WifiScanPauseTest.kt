@@ -13,6 +13,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class WifiScanPauseTest {
+    @Test fun establishedSessionOwnsScanGuardAndEndedOrClosedSessionRejectsLateWork() {
+        val currentChecks = mutableListOf<() -> Boolean>()
+        var starts = 0; var ends = 0
+        val control = object : WifiScanPauseControl {
+            override fun acquire(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {}
+            override fun release(app: Context, owner: Any, log: (String) -> Unit) {}
+            override fun sessionActive(app: Context, owner: Any, current: () -> Boolean, log: (String) -> Unit) {
+                starts++; currentChecks.add(current)
+            }
+            override fun sessionEnded(app: Context, owner: Any, log: (String) -> Unit) { ends++ }
+        }
+        val pause = WifiScanPause(context, {}, control)
+        pause.pause(); assertEquals(0, starts)
+        pause.sessionActive(); assertTrue(currentChecks.last()())
+        pause.sessionEnded(); assertEquals(1, ends); assertTrue(currentChecks.none { it() })
+        pause.sessionActive(); assertEquals(2, starts)
+        pause.close(); pause.sessionActive(); assertEquals(2, starts); assertTrue(currentChecks.none { it() })
+    }
     @Test fun periodicSnapshotKeepsTheActualFailureAndLateResultsCannotOverwriteAClosedOwner() {
         var callback: ((String) -> Unit)? = null
         val control = object : WifiScanPauseControl {

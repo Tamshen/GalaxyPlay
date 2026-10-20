@@ -15,6 +15,7 @@ internal class GalaxyWirelessRuntimeDiagnostics(
     private val log: (String) -> Unit,
     private val clockMs: () -> Long = SystemClock::elapsedRealtime,
     private val station: () -> String = { stationSnapshot(context.applicationContext) },
+    private val onScanObservation: (Boolean?) -> Unit = {},
 ) : Closeable {
     private val app = context.applicationContext
     private var closed = false
@@ -51,6 +52,7 @@ internal class GalaxyWirelessRuntimeDiagnostics(
 
     @Synchronized private fun scanResults(updated: Boolean) {
         if (closed || !registered) return
+        runCatching { onScanObservation(updated) }
         val now = clockMs()
         scans++
         lastScan = now
@@ -64,6 +66,7 @@ internal class GalaxyWirelessRuntimeDiagnostics(
     }
 
     @Synchronized fun snapshot(): String {
+        if (registered && !closed) runCatching { onScanObservation(null) }
         val now = clockMs()
         fun age(at: Long?) = at?.let { (now - it).coerceAtLeast(0).toString() } ?: "unknown"
         val state = if (closed) "stationQuery=closed" else try { station() }
