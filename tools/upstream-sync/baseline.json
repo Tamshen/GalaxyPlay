@@ -803,7 +803,7 @@
   ],
   "resultSha256": {
     "build.gradle.kts": "be7dbfa1841b18b020f744e203b995d3dac5709c2a6b8e310fbcfaed0364919a",
-    "common/build.gradle.kts": "1ec53dcb7b15b7ecc149ba3d77a8ff98fcfe4b3588ffa90943f114ceea815c72",
+    "common/build.gradle.kts": "8f4f62c55d092578e3d92745f22679e67759aebd24a13e82eb15534ec7e3dbcd",
     "common/src/main/AndroidManifest.xml": "0dbbd7e8e429ff0c73216d346c7325136eb50ccd2853eee4760ec8d44a8b89b9",
     "common/src/main/java/com/shilapi/xcertplay/AdbClusterActivity.kt": "027b5ca8b0e3d2861e5a1f9a765defe0baba530b170567b994010869fd461d55",
     "common/src/main/java/com/shilapi/xcertplay/AdbClusterRouter.kt": "2236d8881a12515eaec1ae5ef937ebe6e5c82e67df6439ec2d4c004c2364631e",
@@ -844,7 +844,7 @@
     "common/src/main/java/com/shilapi/xcertplay/DiLink4ClusterDisplay.kt": "f11edb1a262a8ec6c89b48c7f65db652b07cf16c29397827ac1049fd9214e014",
     "common/src/main/java/com/shilapi/xcertplay/DiLink51ClusterLayout.kt": "1bf73a94eb09a01c1ad911f4cf19a1c5a24f885b363b3e115f2d2a9ea13326ca",
     "common/src/main/java/com/shilapi/xcertplay/DiLink51ClusterMonitor.kt": "bd16616196f20f6a0396ad33f73e4d354d89ab192bde55b18d37eaa0ad0f377e",
-    "common/src/main/java/com/shilapi/xcertplay/DiPlayActivity.kt": "ce3a4a7ac7132bebc03d7071016841b306e4a052b6b5afa4010835aca8bbedb9",
+    "common/src/main/java/com/shilapi/xcertplay/DiPlayActivity.kt": "918dea7065d7fa73c6b50bfc6099b0188253689abf531cfb5b1ce654c7bdcbd8",
     "common/src/main/java/com/shilapi/xcertplay/DiPlayBluetooth.kt": "4528006c3c5e83f5c94203db0e0326fe90d694a7dba51fb6d01b22a94026173b",
     "common/src/main/java/com/shilapi/xcertplay/DiPlayBootstrap.kt": "e934718c032f110b36045ab261b0a9635d4f0891abebb0c391a93e509784f327",
     "common/src/main/java/com/shilapi/xcertplay/DiPlayPalette.kt": null,

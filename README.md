@@ -85,6 +85,6 @@ docs/     使用、开发、测试、安全、更新记录及界面截图
 
 ## 开源与说明
 
-感谢 [DiPlay](https://github.com/shihabal3amri/DiPlay) 提供接收核心，当前基线为 v0.2.15。项目保留 [GPL-3.0](LICENSE) 及原有源码声明，依赖与资源出处见[第三方许可](docs/第三方许可.md)。
+感谢 [DiPlay](https://github.com/shihabal3amri/DiPlay) 提供接收核心，当前基线为 v0.2.15。项目保留 [GPL-3.0](LICENSE) 及原有源码声明，依赖与资源声明可在应用「关于 → 第三方许可」中离线查看。
 
 本项目独立维护，与 Apple、吉利、ECARX 或 Flyme Auto 无隶属或背书关系。使用前请阅读[首次使用须知与风险确认协议](galaxy/common/src/main/assets/galaxyplay-first-use-agreement.md)，数据与凭据处理见[安全与隐私](docs/安全与隐私.md)。

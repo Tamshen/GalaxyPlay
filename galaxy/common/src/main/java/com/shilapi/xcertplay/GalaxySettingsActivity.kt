@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// 基于 DiPlay 宿主代码适配，保留其上游 DiAuto 来源声明；许可见 docs/第三方许可.md。
+// 基于 DiPlay 宿主代码适配，保留其上游 DiAuto 来源声明；许可见应用内第三方声明。
 package com.shilapi.xcertplay
 
 import android.Manifest

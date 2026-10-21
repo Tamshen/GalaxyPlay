@@ -3,10 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// 离线许可直接从现有文档生成，限定输入范围，不复制整个工作区或认证目录。
+// 许可原文限定输入范围；中英文声明由产品 assets 直接内置。
 val prepareGalaxyPlayLicenses by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("generated/galaxyplay-license-assets/third-party"))
-    from(rootProject.file("docs/第三方许可.md")) { rename { "NOTICE.md" } }
     from(rootProject.file("docs/licenses")) {
         include("**/*.txt")
         into("licenses")

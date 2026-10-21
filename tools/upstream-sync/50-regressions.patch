@@ -3362,7 +3362,7 @@
  }
 --- a/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoOperatingRateTest.kt
 +++ b/e2e/shared/test/java/com/shilapi/xcertplay/media/VideoOperatingRateTest.kt
-@@ -1,44 +1,194 @@
+@@ -1,44 +1,210 @@
  package com.shilapi.xcertplay.media
  
 -import org.junit.Assert.assertEquals
@@ -3380,12 +3380,13 @@
 +import java.util.concurrent.atomic.AtomicReference
 +import org.junit.Assert.*
  import org.junit.Test
+-
 +import org.junit.runner.RunWith
 +import org.mockito.ArgumentMatchers.*
 +import org.mockito.Mockito.*
 +import org.robolectric.RobolectricTestRunner
 +import org.robolectric.annotation.Config
- 
++
 +/** Exercises operating-rate rejection and presentation using the production worker. */
 +@RunWith(RobolectricTestRunner::class)
 +@Config(sdk = [30], manifest = Config.NONE)
@@ -3394,6 +3395,38 @@
 -        assertEquals(60, videoOperatingRate(110, statsLabel = null, frameRate = 60))
 -        assertEquals(30, videoOperatingRate(110, statsLabel = null, frameRate = 30))
 -        assertEquals(0, videoOperatingRate(110, statsLabel = null, frameRate = 0)) // none known: leave it unset
+-    }
+-
+-    @Test fun otherDecodersKeepTheirFormat() {
+-        assertEquals(0, videoOperatingRate(111, statsLabel = null, frameRate = 60)) // the cluster stream
+-        assertEquals(0, videoOperatingRate(110, statsLabel = " stream=110 mirror=centre", frameRate = 60))
+-    }
+-
+-    @Test fun theRateIsTriedFirstOnItsOwnBeforeTheExistingFallbacks() {
+-        assertEquals(
+-            listOf(
+-                DecoderAttempt(null, tuned = true, operatingRate = 60),
+-                DecoderAttempt(null, tuned = true),
+-                DecoderAttempt(null, tuned = false),
+-                DecoderAttempt("c2.android.avc.decoder", tuned = false),
+-            ),
+-            videoDecoderAttempts(60, "c2.android.avc.decoder"),
+-        )
+-    }
+-
+-    @Test fun withoutARateTheAttemptsAreTheOnesBefore() {
+-        assertEquals(
+-            listOf(DecoderAttempt(null, tuned = true), DecoderAttempt(null, tuned = false)),
+-            videoDecoderAttempts(0, softwareDecoder = null),
+-        )
+-    }
+-
+-    @Test fun aRefusedRateIsNotAskedForAgain() {
+-        assertEquals(60, nextOperatingRate(60, DecoderAttempt(null, tuned = true, operatingRate = 60)))
+-        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = true))) // refused, tuned worked
+-        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = false))) // the MediaTek case
+-        assertEquals(60, nextOperatingRate(60, used = null)) // nothing worked: not the rate's fault
+-        assertEquals(0, nextOperatingRate(0, DecoderAttempt(null, tuned = true)))
 +    @Test fun usesNegotiatedFpsOnlyOnTheMainStream() {
 +        for (fps in listOf(30, 60)) Fixture(fps).use {
 +            it.configure(); assertTrue(it.ready.await(2, TimeUnit.SECONDS)); it.barrier()
@@ -3403,11 +3436,8 @@
 +            it.configure(); assertTrue(it.ready.await(2, TimeUnit.SECONDS)); it.barrier()
 +            assertFalse(it.formats.single().containsKey(MediaFormat.KEY_OPERATING_RATE))
 +        }
-     }
- 
--    @Test fun otherDecodersKeepTheirFormat() {
--        assertEquals(0, videoOperatingRate(111, statsLabel = null, frameRate = 60)) // the cluster stream
--        assertEquals(0, videoOperatingRate(110, statsLabel = " stream=110 mirror=centre", frameRate = 60))
++    }
++
 +    @Test fun configureRejectionKeepsTunedFallbackAndNeverRepeatsHint() {
 +        Fixture().use { f ->
 +            doAnswer {
@@ -3424,18 +3454,8 @@
 +            assertEquals(1, f.formats.count { it.containsKey(MediaFormat.KEY_OPERATING_RATE) })
 +            assertEquals(0, f.gate.failures)
 +        }
-     }
- 
--    @Test fun theRateIsTriedFirstOnItsOwnBeforeTheExistingFallbacks() {
--        assertEquals(
--            listOf(
--                DecoderAttempt(null, tuned = true, operatingRate = 60),
--                DecoderAttempt(null, tuned = true),
--                DecoderAttempt(null, tuned = false),
--                DecoderAttempt("c2.android.avc.decoder", tuned = false),
--            ),
--            videoDecoderAttempts(60, "c2.android.avc.decoder"),
--        )
++    }
++
 +    @Test fun startRejectionAlsoReleasesHintedCodecAndFallsBack() {
 +        Fixture().use { f ->
 +            val starts = AtomicInteger()
@@ -3444,13 +3464,8 @@
 +            assertEquals(2, starts.get()); assertEquals(0, f.field("configuredRate").getInt(f.worker))
 +            verify(f.codec, times(1)).release()
 +        }
-     }
- 
--    @Test fun withoutARateTheAttemptsAreTheOnesBefore() {
--        assertEquals(
--            listOf(DecoderAttempt(null, tuned = true), DecoderAttempt(null, tuned = false)),
--            videoDecoderAttempts(0, softwareDecoder = null),
--        )
++    }
++
 +    @Test fun onlyARealFreshPresentationProtectsTheAcceptedHintFromEarlyCodecFailure() {
 +        for (presented in listOf(false, true)) Fixture().use { f ->
 +            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
@@ -3491,14 +3506,8 @@
 +            assertTrue(f.retry()); f.barrier()
 +            assertEquals(1, f.formats.count { it.containsKey("vendor.qti-ext-dec-low-latency.enable") })
 +        }
-     }
- 
--    @Test fun aRefusedRateIsNotAskedForAgain() {
--        assertEquals(60, nextOperatingRate(60, DecoderAttempt(null, tuned = true, operatingRate = 60)))
--        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = true))) // refused, tuned worked
--        assertEquals(0, nextOperatingRate(60, DecoderAttempt(null, tuned = false))) // the MediaTek case
--        assertEquals(60, nextOperatingRate(60, used = null)) // nothing worked: not the rate's fault
--        assertEquals(0, nextOperatingRate(0, DecoderAttempt(null, tuned = true)))
++    }
++
 +    @Test fun qtiIsOptInAndRuntimeRecoveryDropsVendorKeysForThisConnection() {
 +        Fixture(qti = true).use { f ->
 +            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
@@ -3515,6 +3524,22 @@
 +        Fixture(enabled = true).use { f ->
 +            f.configure(); assertTrue(f.ready.await(2, TimeUnit.SECONDS)); f.barrier()
 +            assertFalse(f.formats.single().containsKey("vendor.qti-ext-dec-low-latency.enable"))
++        }
++    }
++
++    @Test fun disconnectDuringVendorRejectionDoesNotCreateFallbackDecoder() {
++        Fixture(qti = true, enabled = true).use { f ->
++            val entered = CountDownLatch(1)
++            doAnswer {
++                (f.worker as Closeable).close()
++                entered.countDown()
++                throw IllegalArgumentException("cancelled")
++            }.`when`(f.codec).configure(any(MediaFormat::class.java), any(Surface::class.java), isNull(), eq(0))
++            f.configure()
++            assertTrue(entered.await(2, TimeUnit.SECONDS))
++            f.close()
++            assertEquals(1, f.creations.get())
++            verify(f.codec, times(1)).release()
 +        }
 +    }
 +

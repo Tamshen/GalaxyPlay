@@ -1,12 +1,12 @@
-# 开源项目与第三方许可
+# 第三方许可
 
-[项目入口](../README.md)。每个独立项目单列来源、用途、引入关系和许可；同项目多个模块在对应项内说明。源码旁的版权与许可声明继续保留。
+本声明记录应用所用项目的来源、用途和许可。源码旁的版权与许可声明继续保留。
 
-应用依赖依据模块 Gradle 声明及当前调试构建的依赖模型核对，构建与测试部分列直接使用的项目。声明版本见[版本目录](../gradle/libs.versions.toml)和各模块构建文件；解析版本以具体构建为准，许可依据中的版本链接对应核对过的制品。
+应用依赖依据模块 Gradle 声明及当前调试构建的依赖模型核对，构建与测试部分列直接使用的项目。声明版本见[版本目录](../../../../../../gradle/libs.versions.toml)和各模块构建文件；解析版本以具体构建为准，许可依据中的版本链接对应核对过的制品。
 
-Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.txt)，各项目仍分别保留来源和版权。
+Apache-2.0 通用原文保存在[许可目录](../../../../../../docs/licenses/dependencies/Apache-2.0.txt)，各项目仍分别保留来源和版权。
 
-应用“关于”展示官方 DiPlay 接收核心及其版本；点击项目以模态框显示版本、项目 URL 与说明，支持复制或打开链接。其余内容通过“第三方许可”文本模态框查看。本页与现有许可原文同步打包供离线阅读，英文界面提供对应英文说明，许可证原文不翻译、不删节。
+应用“关于”展示官方 DiPlay 接收核心及其版本；点击项目以模态框显示版本、项目 URL 与说明，支持复制或打开链接。其余内容通过“第三方许可”文本模态框查看。本声明与许可原文随应用内置，供离线阅读，英文界面提供对应英文说明，许可证原文不翻译、不删节。
 
 ## 上游项目
 
@@ -16,7 +16,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[DiPlay](https://github.com/shihabal3amri/DiPlay)。
 - 用途：接收核心的直接上游，提供协议、连接及恢复能力。
-- 许可：[GPL-3.0](../LICENSE)。
+- 许可：[GPL-3.0](../../../../../../LICENSE)。
 - 选择移植：0.1.142 引入 DiPlay [扫描暂停 #570](https://github.com/shihabal3amri/DiPlay/pull/570)、[线程优先级 #740](https://github.com/shihabal3amri/DiPlay/pull/740) 和主线 [积压修复 #814](https://github.com/shihabal3amri/DiPlay/pull/814)；同批引入的[音乐时钟补偿 #788](https://github.com/shihabal3amri/DiPlay/pull/788) 因调速会改变音高，在 0.1.143 撤除。热点只读回退参考尚未合入的 [#769](https://github.com/shihabal3amri/DiPlay/pull/769)，不包含该 PR 的热点写入功能。
 - 范围：核心基于官方 [v0.2.15 发布标签](https://github.com/shihabal3amri/DiPlay/tree/v0.2.15)，固定提交见版本配置；同步核心代码时保留 L7 适配、来源与各文件声明。
 
@@ -24,7 +24,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[shilapi/xcertplay](https://github.com/shilapi/xcertplay)，原作者 shilapi。
 - 用途：0.1.142 选择引入无线性能锁（[57221e4](https://github.com/shilapi/xcertplay/commit/57221e4491dbabe6cde605044ca172a46705f4f3)）及收包／解码线程优先级思路（[1836c27](https://github.com/shilapi/xcertplay/commit/1836c279054c602f5826b3f99728d0925fc25fb1)），产品维护关闭后的迟到回调门禁与诊断失败隔离。
-- 许可：[GPL-3.0](../LICENSE)。直接核心基线仍为 DiPlay v0.2.15，本次为选择性移植，不宣称已同步完整新版本。
+- 许可：[GPL-3.0](../../../../../../LICENSE)。直接核心基线仍为 DiPlay v0.2.15，本次为选择性移植，不宣称已同步完整新版本。
 
 ## 车机接口参考
 
@@ -36,7 +36,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[Project Nayuki QR Code generator](https://github.com/nayuki/QR-Code-generator)。
 - 用途：`io.nayuki:qrcodegen:1.8.0`，只生成车型配置分享二维码，不包含图片识别或扫码入口。
-- 许可：MIT，[该版本源码中的原始许可](licenses/dependencies/QrCodeGen-LICENSE.txt)随 APK 离线打包。
+- 许可：MIT，[该版本源码中的原始许可](../../../../../../docs/licenses/dependencies/QrCodeGen-LICENSE.txt)随 APK 离线打包。
 - 生成二维码的往返回归使用 ZXing 3.5.4 作为测试解码器，`testImplementation` 不进入产品 APK；来源：[ZXing](https://github.com/zxing/zxing)，许可 Apache-2.0。
 
 <a id="concentus"></a>
@@ -45,7 +45,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[Concentus](https://github.com/lostromb/concentus)，[Plasmo 发布制品](https://central.sonatype.com/artifact/com.plasmoverse/concentus/1.0.0)。
 - 用途：`com.plasmoverse:concentus:1.0.0` 的纯 Java Opus 编解码；系统没有可启动 Opus 时，为无线导航／Siri 下行与麦克风上行提供软件后备，不新增 JNI 或改变音频路由。
-- 许可：BSD-3-Clause，[制品原始许可](licenses/dependencies/Concentus-LICENSE.txt)从该版本 JAR 的 `META-INF/LICENSE` 原样保留，并随 APK 离线打包。
+- 许可：BSD-3-Clause，[制品原始许可](../../../../../../docs/licenses/dependencies/Concentus-LICENSE.txt)从该版本 JAR 的 `META-INF/LICENSE` 原样保留，并随 APK 离线打包。
 - 接入维护：编解码算法来自 Concentus，GalaxyPlay 维护能力检测、流级后备及资源释放；具体实现与验证记录见开发说明的 0.1.122 记录。
 
 <a id="dexmaker"></a>
@@ -54,14 +54,14 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[LinkedIn DexMaker](https://github.com/linkedin/dexmaker/tree/2.28.6)。
 - 用途：以 `com.linkedin.dexmaker:dexmaker:2.28.6` 生成本应用的厂商回调薄子类，配合公开 `InMemoryDexClassLoader`；不使用 ProxyBuilder 的隐藏 API 信任设置，不包含原厂 SDK 实现。
-- 许可：[Apache-2.0 原文](licenses/dependencies/DexMaker-LICENSE.txt)。原项目版权与声明保留。
+- 许可：[Apache-2.0 原文](../../../../../../docs/licenses/dependencies/DexMaker-LICENSE.txt)。原项目版权与声明保留。
 - 传递依赖：同版 [构建声明](https://github.com/linkedin/dexmaker/blob/2.28.6/dexmaker/build.gradle) 引入 `dalvik-dx:9.0.0_r3`，另列如下。
 
 ### Android dalvik Dx Library
 
 - 来源：[JakeWharton/dalvik-dx](https://github.com/JakeWharton/dalvik-dx)，封装 AOSP platform/dalvik 的 dx。
 - 用途：DexMaker 传递引入的 Dex 编码实现，`com.jakewharton.android.repackaged:dalvik-dx:9.0.0_r3`。
-- 许可：仓库封装代码 [Apache-2.0 原文](licenses/dependencies/Dalvik-dx-LICENSE.txt)；制品中的 AOSP 代码按原项目 NOTICE，见随包保留的 [AOSP 声明](licenses/dependencies/Dalvik-dx-NOTICE.txt)。
+- 许可：仓库封装代码 [Apache-2.0 原文](../../../../../../docs/licenses/dependencies/Dalvik-dx-LICENSE.txt)；制品中的 AOSP 代码按原项目 NOTICE，见随包保留的 [AOSP 声明](../../../../../../docs/licenses/dependencies/Dalvik-dx-NOTICE.txt)。
 
 
 <a id="androidx"></a>
@@ -123,7 +123,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[Bouncy Castle](https://www.bouncycastle.org/)。
 - 用途：bcprov-jdk18on 密码算法、证书与密钥处理。
-- 许可：[Bouncy Castle 许可（MIT 风格）](licenses/dependencies/Bouncy-Castle-LICENSE.txt)。
+- 许可：[Bouncy Castle 许可（MIT 风格）](../../../../../../docs/licenses/dependencies/Bouncy-Castle-LICENSE.txt)。
 - 范围：权利人：The Legion of the Bouncy Castle Inc.；另见[官方许可说明](https://www.bouncycastle.org/about/license/)。
 
 <a id="jmdns"></a>
@@ -140,7 +140,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[SLF4J](https://www.slf4j.org/)。
 - 用途：由 JmDNS 传递引入的 slf4j-api 日志接口。
-- 许可：[MIT](licenses/dependencies/SLF4J-LICENSE.txt)。
+- 许可：[MIT](../../../../../../docs/licenses/dependencies/SLF4J-LICENSE.txt)。
 - 范围：权利人：QOS.ch；另见[官方许可说明](https://www.slf4j.org/license.html)。
 
 <a id="guava"></a>
@@ -220,7 +220,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 - 来源：[Mockito 5.20.0](https://github.com/mockito/mockito/tree/v5.20.0)。
 - 用途：宿主窗口与重连单元测试的构造隔离，仅测试依赖，不进入 APK。
-- 许可：[MIT](licenses/dependencies/Mockito-LICENSE.txt)。
+- 许可：[MIT](../../../../../../docs/licenses/dependencies/Mockito-LICENSE.txt)。
 
 <a id="gradle"></a>
 
@@ -267,7 +267,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 - 来源：[DiAuto](https://github.com/shihabal3amri/DiAuto)，经 DiPlay 保留的宿主文件来源注记。
 - 当前界面：首页、设置与悬浮菜单由 `L7HomePanel`、`L7Components`、`L7Ui` 等本项目组件实现，使用 Flyme Auto 参考样式。
 - 保留范围：`DiPlayActivity.kt` 仍基于 DiPlay 原宿主文件继续适配，文件保留 DiAuto 来源注记和 `AGPL-3.0-only` 标记；其他源文件按各自声明保留。已移除的站点不列为本项目使用内容。
-- 许可：[AGPL-3.0 原文](licenses/DiAuto-AGPL-3.0.txt)。当前源码没有将 DiAuto 作为独立模块、SDK 或 Gradle 依赖引入，既有文件的来源与许可单独保留。
+- 许可：[AGPL-3.0 原文](../../../../../../docs/licenses/DiAuto-AGPL-3.0.txt)。当前源码没有将 DiAuto 作为独立模块、SDK 或 Gradle 依赖引入，既有文件的来源与许可单独保留。
 
 ## 单独声明的资源与品牌
 
@@ -279,7 +279,7 @@ Apache-2.0 通用原文保存在[许可目录](licenses/dependencies/Apache-2.0.
 
 Required Notice: Copyright AndyShaman (https://github.com/AndyShaman/BYDMate)
 
-[shared/src/main/assets/byd-hud-icons](../shared/src/main/assets/byd-hud-icons/) 的转向 PNG 来自 BYDMate，PolyForm Noncommercial 1.0.0 条款和必需声明与资源一起保留，另见 [资产说明](../shared/BYD_HUD_ICONS_NOTICE.md)。这些图片与项目源码许可证分别管理；上游称其为捐赠资源，原始出处未独立核实。上游已验证的 DiLink5.1 路径使用原厂转向代码，不使用这些图片；上述功能不在 L7 产品中启用。
+[shared/src/main/assets/byd-hud-icons](../../../../../../shared/src/main/assets/byd-hud-icons) 的转向 PNG 来自 BYDMate，PolyForm Noncommercial 1.0.0 条款和必需声明与资源一起保留，另见 [资产说明](../../../../../../shared/BYD_HUD_ICONS_NOTICE.md)。这些图片与项目源码许可证分别管理；上游称其为捐赠资源，原始出处未独立核实。上游已验证的 DiLink5.1 路径使用原厂转向代码，不使用这些图片；上述功能不在 L7 产品中启用。
 
 <a id="flyme-auto"></a>
 
@@ -298,8 +298,8 @@ CarPlay“回到车机”的默认返回图标由本项目现有原创车型轮�
 
 ## 本地认证输入
 
-配套认证材料独立于项目源码许可证，不随源码仓库分发；Android 安装签名与 CarPlay 认证分别管理。构建可通过外部目录显式输入材料，不代表实车连接或长期兼容性已经验证。操作规则见[开发说明](开发与验证.md)与[安全与隐私](安全与隐私.md)。
+配套认证材料独立于项目源码许可证，不随源码仓库分发；Android 安装签名与 CarPlay 认证分别管理。构建可通过外部目录显式输入材料，不代表实车连接或长期兼容性已经验证。操作规则见[开发说明](../../../../../../docs/开发与验证.md)与[安全与隐私](../../../../../../docs/安全与隐私.md)。
 
 ## 解码诊断合成样例
 
-`galaxy/common/src/main/assets/codec-probe/` 的 H.264／HEVC MP4 由 FFmpeg `testsrc2` 在构建辅助容器中生成，无外部视频、音频、手机载荷或用户素材。生成脚本见 [generate_codec_samples.sh](../e2e/runtime/generate_codec_samples.sh)；FFmpeg、libx264 与 libx265 仅是生成工具，不将其程序或库打入 APK。样例是工具生成的合成测试图，不复制第三方影片；JNI 实现依据 Android 公共 NDK API 独立编写，不复制原厂或其他项目 native 实现。
+`galaxy/common/src/main/assets/codec-probe/` 的 H.264／HEVC MP4 由 FFmpeg `testsrc2` 在构建辅助容器中生成，无外部视频、音频、手机载荷或用户素材。生成脚本见 [generate_codec_samples.sh](../../../../../../e2e/runtime/generate_codec_samples.sh)；FFmpeg、libx264 与 libx265 仅是生成工具，不将其程序或库打入 APK。样例是工具生成的合成测试图，不复制第三方影片；JNI 实现依据 Android 公共 NDK API 独立编写，不复制原厂或其他项目 native 实现。

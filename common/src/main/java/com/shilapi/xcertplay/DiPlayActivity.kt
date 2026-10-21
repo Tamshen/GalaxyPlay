@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// UI copy and visual language adapted from DiAuto. See docs/THIRD_PARTY_NOTICES.md.
+// 界面文案与视觉语言改编自 DiAuto；许可见应用内第三方声明。
 package com.shilapi.xcertplay
 
 import android.Manifest
