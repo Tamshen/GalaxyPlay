@@ -5,7 +5,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.os.SystemClock
 
 /**
- * 上游模式诊断与 参考样本的只读能力查询；不切换主从角色或解绑驱动。
+ * 上游模式诊断与 USB 只读能力查询；不切换主从角色或解绑驱动。
  * 在既有 USB 工作线程、已授权连接上调用；连接仍由 IphoneUsbHost 的 finally 关闭。
  */
 internal object UsbModeDiagnostics {
@@ -42,7 +42,7 @@ internal object UsbModeDiagnostics {
         }
         emit(report, "USB mode rejection transferred=$transferred expected=1 $descriptors")
         if (!query(connection, 0x45, "mode", report)) return
-        // 参考样本的能力检查请求；仅补诊断，不据此选择其 0x51 角色切换或判定 NCM 可用。
+        // USB 能力检查请求；仅补诊断，不据此选择其 0x51 角色切换或判定 NCM 可用。
         query(connection, 0x53, "capability", report)
     }
 

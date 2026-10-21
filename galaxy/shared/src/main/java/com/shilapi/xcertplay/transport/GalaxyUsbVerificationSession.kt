@@ -38,8 +38,9 @@ class GalaxyUsbVerificationSession(
     }
     override fun close() = attempt.close()
     companion object {
-        fun needsRecovery(context: Context): Boolean = context.getSharedPreferences(
-            GalaxyUsbGadgetPlatform.JOURNAL, Context.MODE_PRIVATE).contains("original")
+        fun needsRecovery(context: Context): Boolean = runCatching {
+            GalaxyUsbVerificationPreferences.journal(context).contains("original")
+        }.getOrDefault(true)
         fun recover(context: Context, report: (String) -> Unit) = GalaxyUsbGadgetPlatform.recover(context, report)
     }
 }

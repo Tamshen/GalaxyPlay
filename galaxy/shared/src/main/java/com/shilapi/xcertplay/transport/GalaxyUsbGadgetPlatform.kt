@@ -15,7 +15,7 @@ internal class GalaxyUsbGadgetPlatform(
     },
 ) : GalaxyUsbVerificationAttempt.Platform {
     private val report: (String) -> Unit = { message -> try { report(message) } catch (_: Exception) { } }
-    private val prefs = context.getSharedPreferences(JOURNAL, Context.MODE_PRIVATE)
+    private val prefs = GalaxyUsbVerificationPreferences.journal(context)
     private var ownsLease = false
     private var original = ""
     private var controller = ""
@@ -60,7 +60,7 @@ internal class GalaxyUsbGadgetPlatform(
     }
 
     override fun activate() = withShell { shell ->
-        // 与 USB验证 相同的组合，仅用已核实的 init 入口。设置返回成功不代表已配置。
+        // 仅使用已核实的 USB 组合与 init 入口。设置返回成功不代表已配置。
         shell("setprop sys.usb.config '${GalaxyUsbGadgetRules.CONFIG}'")
         shell("setprop carplay.config.usb 1")
         Unit
@@ -100,7 +100,7 @@ internal class GalaxyUsbGadgetPlatform(
         val savedCarplay = prefs.getString("carplay", "").orEmpty()
         if (!GalaxyUsbGadgetRules.safeConfig(saved) || !GalaxyUsbGadgetRules.safeController(savedController) ||
             savedCarplay !in setOf("", "0", "1")) fail(GalaxyUsbVerificationFailure.Reason.RESTORE_FAILED)
-        // 独立恢复预算，不继承用户取消标记；绝不按 USB验证 固定写 diag,adb 覆盖用户原配置。
+        // 独立恢复预算，不继承用户取消标记；不固定写 diag,adb 覆盖用户原配置。
         withShell(recovery = true) { shell ->
             if (shell("id -u") != "0") fail(GalaxyUsbVerificationFailure.Reason.RESTORE_FAILED)
             val current = shell("getprop sys.usb.config")
@@ -133,11 +133,12 @@ internal class GalaxyUsbGadgetPlatform(
 
     private fun fail(reason: GalaxyUsbVerificationFailure.Reason): Nothing = throw GalaxyUsbVerificationFailure(reason)
     companion object {
-        const val JOURNAL = "galaxy_usb_verification_recovery"
+        const val JOURNAL = GalaxyUsbVerificationPreferences.JOURNAL
         private val lease = AtomicBoolean(false)
         fun recover(context: Context, report: (String) -> Unit) {
+            val platform = GalaxyUsbGadgetPlatform(context, { false }, report)
             if (!lease.compareAndSet(false, true)) throw GalaxyUsbVerificationFailure(GalaxyUsbVerificationFailure.Reason.RESTORE_REQUIRED)
-            val platform = GalaxyUsbGadgetPlatform(context, { false }, report).also { it.ownsLease = true }
+            platform.ownsLease = true
             try {
                 platform.report("USB_VERIFY stage=MANUAL_RESTORE result=BEGIN")
                 platform.restore()

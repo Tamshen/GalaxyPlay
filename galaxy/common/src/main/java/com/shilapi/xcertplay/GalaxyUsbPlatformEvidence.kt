@@ -6,7 +6,7 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/** 参考样本已确认的依赖与候选线索分开采集；所有动态文本先缩减为固定标记。 */
+/** 已确认的 USB 依赖与候选线索分开采集；所有动态文本先缩减为固定标记。 */
 internal class GalaxyUsbPlatformEvidence(private val context: Context, private val files: GalaxyUsbFileEvidence) {
     fun property(name: String): Map<String, String?> {
         val raw = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java, String::class.java)

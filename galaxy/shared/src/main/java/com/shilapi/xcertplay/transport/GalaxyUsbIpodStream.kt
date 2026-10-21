@@ -8,7 +8,7 @@ import java.io.FileDescriptor
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** USB验证 CUSBHostMode 同样以 O_RDWR|O_NONBLOCK 打开 ipodout0；不引入原厂协议库。 */
+/** 以 O_RDWR|O_NONBLOCK 打开 ipodout0；不引入原厂协议库。 */
 internal class GalaxyUsbIpodStream private constructor(
     private val fd: FileDescriptor,
     private val report: (String) -> Unit,

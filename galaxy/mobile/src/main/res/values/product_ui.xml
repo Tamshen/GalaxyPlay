@@ -1,6 +1,6 @@
 <resources>
     <item name="ic_dp_permissions" type="drawable">@drawable/ic_l7_permissions</item>
-    <!-- Flyme Auto 的文字透明度与蓝色层级，背景采用 CarPlayReference 的灰蓝色层级。 -->
+    <!-- Flyme Auto 的文字透明度与蓝色层级，背景采用 既定灰蓝色层级。 -->
     <color name="product_ui_background">#D3DBE5</color>
     <color name="product_ui_surface">#FFFFFF</color>
     <color name="product_ui_control">#E5EBF2</color>

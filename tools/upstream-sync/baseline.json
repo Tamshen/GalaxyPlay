@@ -1538,7 +1538,7 @@
     "shared/src/main/java/com/shilapi/xcertplay/transport/NcmUsbBridge.kt": "0e5a448e4cae3da67fb1b15a102d38eb7e1e8f88f90c3ee80e6c67caf1c45558",
     "shared/src/main/java/com/shilapi/xcertplay/transport/Ntb16Codec.kt": "91932f559953e914e6103c43de0358598a757afb6d544c01aef23dcf1b4d4388",
     "shared/src/main/java/com/shilapi/xcertplay/transport/TlsDuplexChannel.kt": "2d8c0f34119a2799b4743bf8c244b4144b9bdc068aaea4aba9c9b5b35d5b55cb",
-    "shared/src/main/java/com/shilapi/xcertplay/transport/UsbModeDiagnostics.kt": "f50316a17e6e33ad19cd72fe764ea2e6e1ee855aeafca4ad9f4506de123f8b86",
+    "shared/src/main/java/com/shilapi/xcertplay/transport/UsbModeDiagnostics.kt": "4044530aa198422dfab4fb9a55b59a79f885f32ef893dca2e65323e1e07a52a1",
     "shared/src/main/java/com/shilapi/xcertplay/transport/UsbMuxFrameBuffer.kt": "ee98aa31fb00025c67a9ff11c6faf2368533138146bc88b4c6b2dac548441b6d",
     "shared/src/main/java/com/shilapi/xcertplay/transport/UsbReadQueuePolicy.kt": "4636855c49b83ef30ab97482d01cdbd0a69847e5a5af33ddb5e888557f800935",
     "shared/src/main/java/com/shilapi/xcertplay/transport/UsbRequestQueue.kt": null,

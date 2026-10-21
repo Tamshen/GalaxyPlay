@@ -4,7 +4,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
 
-/** USB验证 CpUsbTransport 的两个请求；不会调用现有 0x52、USBMUX 或再次申请权限。 */
+/** USB 能力查询与角色切换的两个请求；不会调用现有 0x52、USBMUX 或再次申请权限。 */
 internal class GalaxyUsbVerificationPhone(
     private val manager: UsbManager,
     private val device: UsbDevice,

@@ -53,7 +53,7 @@ internal class GalaxyUsbVerificationControlRunner(
             val stream = usb.open()
             if (!current()) return
             status(CarPlayStatus.ConnectingControl)
-            val channel = Iap2Session.open(stream, traceContext = "usb-usb", onTrace = report, onArtwork = onArtwork)
+            val channel = Iap2Session.open(stream, traceContext = "usb-verification", onTrace = report, onArtwork = onArtwork)
             if (!resources.own("USB_VERIFY_IAP2", channel)) return
             sessionOpened(channel)
             emit("stage=IAP2_LINK result=BEGIN")
@@ -79,7 +79,7 @@ internal class GalaxyUsbVerificationControlRunner(
                 network.mac.joinToString(":") { "%02x".format(it.toInt() and 255) },
             )
             status(CarPlayStatus.RunningControl)
-            // 参考样本的 iap2_usb_host.cfg 声明 CarPlayInterface=1；其余身份与认证来自本应用。
+            // 已核对的 USB 配置声明 CarPlayInterface=1；其余身份与认证来自本应用。
             val result = Iap2WiredControlClient(channel, Iap2MfiAuthenticationClient(mfi)).run(
                 config.identification.copy(carPlayUsbInterfaceNumber = 1), endpoint,
                 config.availableCurrentMilliAmps, Iap2WiredControlClient.NO_TIMEOUT_MILLIS,

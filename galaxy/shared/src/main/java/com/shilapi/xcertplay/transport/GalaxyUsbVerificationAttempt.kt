@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.transport
 import java.io.Closeable
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** USB验证 角色切换事务；基础管道先关闭，随后恢复本次拥有的 gadget 配置。 */
+/** USB 角色切换事务；基础管道先关闭，随后恢复本次拥有的 gadget 配置。 */
 internal class GalaxyUsbVerificationAttempt(
     private val platform: Platform,
     private val phone: Phone,
@@ -31,7 +31,7 @@ internal class GalaxyUsbVerificationAttempt(
     private var stream: BlockingDuplexByteStream? = null
 
     fun open(): BlockingDuplexByteStream = synchronized(lock) {
-        check(!started) { "USB验证 attempt already started" }
+        check(!started) { "USB verification attempt already started" }
         started = true
         try {
             step("PREFLIGHT") { platform.prepare() }

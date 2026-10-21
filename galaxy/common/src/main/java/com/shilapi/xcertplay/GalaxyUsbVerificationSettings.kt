@@ -6,10 +6,11 @@ import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.transport.GalaxyUsbVerificationFailure
 import com.shilapi.xcertplay.transport.GalaxyUsbVerificationSession
+import com.shilapi.xcertplay.transport.GalaxyUsbVerificationPreferences
 
 internal object GalaxyUsbVerificationSettings {
-    private const val KEY = "galaxy_usb_verification_enabled"
-    fun enabled(context: Context) = context.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).getBoolean(KEY, false)
+    private const val KEY = GalaxyUsbVerificationPreferences.KEY
+    fun enabled(context: Context) = GalaxyUsbVerificationPreferences.enabled(context)
     fun add(activity: Activity, parent: LinearLayout) {
         val row = L7SettingRow(activity, activity.getString(R.string.usb_verification_method), activity.getString(R.string.usb_verification_hint))
         fun refresh() { row.setFeedback(activity.getString(if (enabled(activity)) R.string.usb_verification_experimental else R.string.usb_verification_standard)) }
