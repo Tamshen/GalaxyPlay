@@ -8,11 +8,11 @@
     <string name="usb_verification_restore">Restore original USB configuration</string>
     <string name="usb_verification_recovery_hint">After an interrupted experiment or failed recovery, disconnect, unplug the iPhone cable and restore USB here.</string>
     <string name="usb_verification_restored">USB configuration restored. Reconnect your iPhone before starting.</string>
-    <string name="usb_verification_control_missing">The head unit control interface is unavailable. USB连接验证测试 switching could not start. Please upload the logs.</string>
-    <string name="usb_verification_environment_missing">A usable USB连接验证测试 configuration or controller could not be confirmed. The experiment has stopped. Please upload the logs.</string>
+    <string name="usb_verification_control_missing">The head unit control interface is unavailable. The USB connection verification test could not start. Please upload the logs.</string>
+    <string name="usb_verification_environment_missing">A usable USB configuration or controller could not be confirmed. The experiment has stopped. Please upload the logs.</string>
     <string name="usb_verification_recovery_required">The original USB configuration has not been confirmed restored. Disconnect and unplug the iPhone cable, then select Restore original USB configuration. Upload the logs if recovery still fails.</string>
-    <string name="usb_verification_phone_failed">The iPhone did not complete the USB连接验证测试 capability check or role switch. Unlock it, reconnect the cable, retry, and upload the logs.</string>
-    <string name="usb_verification_stage_failed">USB连接验证测试 did not complete the connection. Retries stopped and recovery was attempted. Please upload the logs to identify the failed stage.</string>
+    <string name="usb_verification_phone_failed">The iPhone did not complete the USB capability check or role switch. Unlock it, reconnect the cable, retry, and upload the logs.</string>
+    <string name="usb_verification_stage_failed">The USB connection verification test did not complete the connection. Retries stopped and recovery was attempted. Please upload the logs to identify the failed stage.</string>
     <string name="usb_verification_reason">Diagnostic result: %1$s</string>
     <string name="usb_verification_restoring">Restoring the original USB configuration…</string>
     <string name="usb_verification_no_recovery">There is no pending USB configuration to restore. The system was not changed.</string>

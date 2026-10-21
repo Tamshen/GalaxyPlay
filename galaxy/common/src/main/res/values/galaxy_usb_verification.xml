@@ -8,11 +8,11 @@
     <string name="usb_verification_restore">恢复 USB 原配置</string>
     <string name="usb_verification_recovery_hint">实验中断或恢复失败后，先断开连接并拔出 iPhone 数据线，再使用此入口恢复。</string>
     <string name="usb_verification_restored">USB 配置已恢复。请重新插入 iPhone 后连接。</string>
-    <string name="usb_verification_control_missing">车机控制接口不可用，无法开始 USB连接验证测试 切换。请上传日志。</string>
-    <string name="usb_verification_environment_missing">未确认可用的 USB连接验证测试 配置或控制器，已停止实验。请上传日志。</string>
+    <string name="usb_verification_control_missing">车机控制接口不可用，无法开始USB连接验证测试。请上传日志。</string>
+    <string name="usb_verification_environment_missing">未确认可用的 USB 配置或控制器，已停止实验。请上传日志。</string>
     <string name="usb_verification_recovery_required">USB 原配置尚未确认恢复。请先断开连接并拔出 iPhone 数据线，再点“恢复 USB 原配置”；若仍失败，请上传日志。</string>
-    <string name="usb_verification_phone_failed">iPhone 未完成 USB连接验证测试 能力检查或角色切换。请解锁手机、重新插线后重试，并上传日志。</string>
-    <string name="usb_verification_stage_failed">USB连接验证测试 未完成连接，已停止重试并尝试恢复原配置。请上传日志以定位具体阶段。</string>
+    <string name="usb_verification_phone_failed">iPhone 未完成 USB 能力检查或角色切换。请解锁手机、重新插线后重试，并上传日志。</string>
+    <string name="usb_verification_stage_failed">USB连接验证测试未完成连接，已停止重试并尝试恢复原配置。请上传日志以定位具体阶段。</string>
     <string name="usb_verification_reason">检测结果：%1$s</string>
     <string name="usb_verification_restoring">正在恢复 USB 原配置，请稍候…</string>
     <string name="usb_verification_no_recovery">没有待恢复的 USB 配置；未修改系统。</string>
