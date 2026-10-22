@@ -7,6 +7,7 @@ import android.widget.LinearLayout
 import android.widget.ImageView
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
+import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** 首页只承担连接入口；配置和认证仍进入统一设置页。 */
 internal class L7HomePanel(
@@ -92,10 +93,17 @@ internal class L7HomePanel(
         fun configured(context: Context): Boolean {
             // 默认方式为无线；USB 无需热点配置，曾明确选择 USB 即可再次发起。
             if (!AirPlayPersistence.loadWirelessEnabled(context)) return true
-            return DiPlayPreferences.phoneAddress(context) != null && ManualHotspotValidation.error(
-                AirPlayPersistence.loadManualHotspotSsid(context),
-                AirPlayPersistence.loadManualHotspotPassphrase(context),
-            ) == null
+            if (DiPlayPreferences.phoneAddress(context) == null) return false
+            return when (AirPlayPersistence.loadWirelessHotspotMode(context)) {
+                WirelessHotspotMode.EXISTING_WIFI -> ManualHotspotValidation.error(
+                    AirPlayPersistence.loadExistingWifiSsid(context),
+                    AirPlayPersistence.loadExistingWifiPassphrase(context),
+                ) == null
+                else -> ManualHotspotValidation.error(
+                    AirPlayPersistence.loadManualHotspotSsid(context),
+                    AirPlayPersistence.loadManualHotspotPassphrase(context),
+                ) == null
+            }
         }
     }
 }

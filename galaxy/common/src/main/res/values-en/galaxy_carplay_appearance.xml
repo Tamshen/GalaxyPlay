@@ -1,17 +1,17 @@
 <resources>
     <string name="galaxy_carplay_return_default">Back to Car</string>
     <string name="galaxy_carplay_return_title">CarPlay return button</string>
-    <string name="galaxy_carplay_return_hint">Shown in CarPlay to return to the head unit. The name and icon are saved independently and apply on the next connection.</string>
+    <string name="galaxy_carplay_return_hint"></string>
     <string name="galaxy_carplay_return_name">Button name</string>
-    <string name="galaxy_carplay_return_name_hint">Enter 1–32 characters, or restore the default name.</string>
+    <string name="galaxy_carplay_return_name_hint"></string>
     <string name="galaxy_carplay_return_name_invalid">Enter 1–32 characters without line breaks or control characters.</string>
     <string name="galaxy_carplay_return_save_failed">Could not save. Please retry.</string>
     <string name="galaxy_carplay_return_reset_name">Default name</string>
     <string name="galaxy_carplay_return_preview">CarPlay return button icon preview</string>
     <string name="galaxy_carplay_return_import">Choose button icon</string>
-    <string name="galaxy_carplay_return_crop_hint">Select a picture and crop it to a square. Confirm to save; cancel to keep the current icon.</string>
+    <string name="galaxy_carplay_return_crop_hint"></string>
     <string name="galaxy_carplay_return_icon_default">Default icon</string>
     <string name="galaxy_carplay_return_icon_custom">Custom icon</string>
     <string name="galaxy_carplay_return_reset_icon">Restore default icon</string>
-    <string name="galaxy_carplay_return_reset_hint">Restore the return icon and keep your custom name and other settings. Applies on the next connection.</string>
+    <string name="galaxy_carplay_return_reset_hint"></string>
 </resources>

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="galaxy_media_reporting_hint">默认开启，以 Galaxy Play 身份注册原车媒体服务。关闭后不注册；保存并重新连接生效。</string>
+    <string name="galaxy_media_reporting_hint"></string>
 </resources>

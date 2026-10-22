@@ -6,7 +6,7 @@
     <string name="profile_saved_active">Current configuration saved. Connection settings apply to the next connection.</string>
     <string name="profile_audio_recovery">A legacy audio file cannot be read and is preserved. The built-in fallback and recovery marker are recorded. Review and save its template in Audio.</string>
     <string name="profile_flow">Choose → Review → Save → Test → Upload logs</string>
-    <string name="profile_apply_hint">Connection, audio and video changes apply to the next connection. Saving never disconnects or reconnects.</string>
+    <string name="profile_apply_hint"></string>
     <string name="profile_saved_current">Saved configuration</string>
     <string name="profile_effective">Current connection configuration</string>
     <string name="profile_no_connection">No connection started</string>
@@ -15,12 +15,12 @@
     <string name="profile_edit">Edit configuration</string>
     <string name="profile_edit_current">Edit a draft first. Only Save writes the file.</string>
     <string name="profile_switch">Local configuration files</string>
-    <string name="profile_switch_hint">Edit any file. Use this configuration selects settings for the next connection; the current connection keeps its original settings.</string>
+    <string name="profile_switch_hint"></string>
     <string name="profile_files">Choose a configuration file</string>
     <string name="profile_use">Use this configuration</string>
     <string name="profile_switched">Saved configuration switched. Applies to the next connection.</string>
     <string name="profile_new">New configuration</string>
-    <string name="profile_new_hint">Choose a starting point, then name, edit and save. A new file is not automatically selected.</string>
+    <string name="profile_new_hint"></string>
     <string name="profile_default_l7">L7 default</string>
     <string name="profile_default_l6">L6 default</string>
     <string name="profile_default_custom">System default</string>
@@ -32,7 +32,7 @@
     <string name="profile_category">Settings category</string>
     <string name="profile_view_category">View category</string>
     <string name="profile_update_draft">Confirm</string>
-    <string name="profile_draft_hint">This window edits a draft. Changing categories keeps your edits. Save writes the complete file; Cancel preserves the original file.</string>
+    <string name="profile_draft_hint"></string>
     <string name="profile_discard_title">Discard these changes?</string>
     <string name="profile_discard_message">Unsaved edits will be discarded. The saved file keeps its original values.</string>
     <string name="profile_keep_editing">Keep editing</string>

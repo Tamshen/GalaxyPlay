@@ -1774,8 +1774,7 @@ private class AudioRenderer(
             }
             val writeStarted = System.nanoTime()
             diagnosticStage = "track-write"
-            val count = track.write(data, offset + written, writeLength,
-                if (mappedChannel == AudioChannel.MEDIA) AudioTrack.WRITE_NON_BLOCKING else AudioTrack.WRITE_BLOCKING)
+            val count = track.write(data, offset + written, writeLength, AudioTrack.WRITE_BLOCKING)
             maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
             if (count < 0) {
                 writeErrorsThisWindow++

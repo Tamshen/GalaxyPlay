@@ -38,7 +38,7 @@
     <string name="debug_guide_collect">Collect environment checks</string>
     <string name="debug_guide_collect_body">Tap Collect checks and wait for the task dialog. Read specific failure reasons; stop from the dialog if needed. The report describes environment facts, not a successful phone connection or vehicle display.</string>
     <string name="debug_guide_scenario">Guided reproduction</string>
-    <string name="debug_guide_scenario_hint">Step through USB, hotspot, video, audio / calls and Bluetooth handoff</string>
+    <string name="debug_guide_scenario_hint"></string>
     <string name="debug_guide_mark">Record action performed</string>
     <string name="debug_guide_ok">Expected behavior observed</string>
     <string name="debug_guide_bad">Missing / abnormal</string>

@@ -4,19 +4,19 @@
     <string name="config_share_default_name">Profile %1$02d</string>
     <string name="config_share_title">Share profile</string>
     <string name="config_share_import">Paste profile</string>
-    <string name="config_share_name_hint">Add an optional sharing note. It travels with the shared profile and does not change its name. Current vehicle preferences, including unsaved edits, will be included.</string>
+    <string name="config_share_name_hint"></string>
     <string name="config_share_generate">Generate shared profile</string>
     <string name="config_share_paste">Paste text</string>
-    <string name="config_share_paste_hint">Paste the complete shared profile text. Preview it before applying. You can also paste the complete contents of a profile file.</string>
+    <string name="config_share_paste_hint"></string>
     <string name="config_share_preview">Preview profile</string>
-    <string name="config_share_replace_hint">Applying replaces the current vehicle profile and unsaved edits. Hotspot details, authentication, app settings and logs are kept. Changes take effect on the next connection.</string>
+    <string name="config_share_replace_hint"></string>
     <string name="config_share_apply">Import and apply</string>
     <string name="config_share_qr">Shared profile QR code</string>
     <string name="config_share_qr_large">This profile is too large for one QR code. Copy its text or save the profile file to share it.</string>
     <string name="config_share_copy">Copy profile text</string>
     <string name="config_share_file">Save profile file</string>
     <string name="config_share_save_qr">Save QR code</string>
-    <string name="config_share_qr_hint">Photograph or save this QR code to share it. The recipient scans it on a phone, copies the text, and pastes it into the head unit.</string>
+    <string name="config_share_qr_hint"></string>
     <string name="config_share_summary">Profile name: %1$s\nVehicle: %2$s\nFrame rate: %3$d fps\nResolution: %4$d%%\nIP mode: %5$s\nAudio focus: %6$s</string>
     <string name="config_share_off">Off</string>
     <string name="config_share_on">On</string>
@@ -28,7 +28,7 @@
     <string name="config_action_share">Share</string>
     <string name="config_action_import">Import</string>
     <string name="config_save_title">Save configuration file</string>
-    <string name="config_save_name_hint">Save to the current file. You may rename it. Saving does not create another file or advance its name.</string>
+    <string name="config_save_name_hint"></string>
     <string name="config_share_remark">Sharing note (optional)</string>
     <string name="config_share_remark_value">Sharing note: %1$s</string>
 </resources>

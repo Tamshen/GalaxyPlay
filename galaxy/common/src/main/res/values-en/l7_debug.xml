@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="l7_diagnostics_title">Diagnostics and logs</string>
-    <string name="l7_diagnostics_row_hint">Session logs, diagnostic reports and floating logs</string>
+    <string name="l7_diagnostics_row_hint"></string>
     <string name="l7_logs_and_reports">Logs and reports</string>
     <string name="l7_debug_title">Floating logs</string>
-    <string name="l7_debug_desc">Enable this to view connection, reconnection, video and audio logs over other screens. Drag the title to move the window or collapse it to reduce obstruction. Recent logs remain after a disconnect and are included in diagnostic reports.</string>
+    <string name="l7_debug_desc"></string>
     <string name="l7_debug_permission">Manage overlay permission</string>
     <string name="l7_debug_permission_help">Find GalaxyPlay in system settings and allow it to display over other apps. The log window will open when you return.</string>
     <string name="l7_debug_permission_denied">Overlay permission is off. Enable it for GalaxyPlay in system settings.</string>
@@ -38,5 +38,5 @@
     <string name="l7_debug_live">Live</string>
     <string name="l7_debug_paused">Display paused; recording continues</string>
     <string name="l7_logs_title">Logs</string>
-    <string name="l7_logs_entry_hint">View, export and upload runtime and debug logs</string>
+    <string name="l7_logs_entry_hint"></string>
 </resources>

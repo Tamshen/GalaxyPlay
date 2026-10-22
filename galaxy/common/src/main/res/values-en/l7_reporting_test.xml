@@ -5,8 +5,8 @@
     <string name="l7_report_first_issue">First issue in this run: %1$s</string>
     <string name="l7_report_media_title">Media reporting test</string>
     <string name="l7_report_navigation_title">HUD navigation reporting test</string>
-    <string name="l7_report_media_hint">Use silent test tracks to check title, playback state, progress and artwork in the vehicle media card. No commands are sent to a phone. End the CarPlay connection first.</string>
-    <string name="l7_report_navigation_hint">Send navigation start, road, turn, distance, remaining time and stop to the vehicle navigation service, then inspect the HUD or cluster. End the CarPlay connection first.</string>
+    <string name="l7_report_media_hint"></string>
+    <string name="l7_report_navigation_hint"></string>
     <string name="l7_report_status">1. Start the test</string>
     <string name="l7_report_start">Start reporting test</string>
     <string name="l7_report_end">End reporting and clean up</string>
@@ -19,7 +19,7 @@
     <string name="l7_report_refresh">Republish the current navigation sample</string>
     <string name="l7_report_lifetime">You can leave this page to inspect the vehicle UI. Tests stop after two minutes, when ended, on a real connection, on consent withdrawal or on app exit.</string>
     <string name="l7_report_evidence">2. Compare the sample and record</string>
-    <string name="l7_report_evidence_hint">Results are linked to the current sample. After ending, check that the vehicle test information clears. Actions and results are saved to the logs.</string>
+    <string name="l7_report_evidence_hint"></string>
     <string name="l7_report_visible">Display matches the sample</string>
     <string name="l7_report_missing">No display or a sample mismatch</string>
     <string name="l7_report_logs">View and upload test logs</string>

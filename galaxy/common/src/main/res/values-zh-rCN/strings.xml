@@ -12,8 +12,8 @@
     <string name="marker_up">上</string>
     <string name="marker_down">下</string>
     <string name="marker_centre_default">居中 · 默认</string>
-    <string name="hotspot_mode_manual_desc">无线 CarPlay 使用 Android 原生设置中的热点，与车机桌面自带的热点不是同一个服务。请开启原生热点；支持时建议选择 5 GHz。</string>
-    <string name="hotspot_mode_p2p_desc">备选方案。需要打开车机 Wi-Fi 开关；2.4 GHz 连接可能会卡顿。</string>
+    <string name="hotspot_mode_manual_desc"></string>
+    <string name="hotspot_mode_p2p_desc"></string>
     <string name="hotspot_details_off">原生热点未开启，请在 Android 原生设置中开启。</string>
     <string name="hotspot_details_saved">配置已保存，请确认 Android 原生热点已开启且名称和密码一致。</string>
     <string name="permission_enabled_ready">权限已启用 · 可以使用</string>
@@ -73,7 +73,7 @@
     <string name="safe_area_full_screen_at">安全区域：全屏，</string>
     <string name="safe_area_prefix">安全区域：</string>
     <string name="settings_android9_compat">以下设置在 Android 9（API 28）上不可用且已隐藏：\n• Wi-Fi P2P（5 GHz）— 将改用 LocalOnlyHotspot。\n• HEVC 软解码器 — 将改用硬件解码。</string>
-    <string name="settings_mfi_address_hint">地址必须以 http:// 或 https:// 开头。令牌为可选项，将作为 Authorization bearer token 发送。</string>
+    <string name="settings_mfi_address_hint"></string>
     <string name="a_familiar_drive">熟悉的驾乘体验。</string>
     <string name="a_previous_wi_fi_direct_connection_is_still_running_reset">之前的 Wi-Fi Direct 连接仍在运行。请重置后再连接。</string>
     <string name="about">关于</string>
@@ -220,7 +220,7 @@
     <string name="keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow">请将 iPhone 放在附近并开启蓝牙和 Wi-Fi。\niPhone 出现提示时允许使用 CarPlay。</string>
     <string name="language_app_language">应用语言</string>
     <string name="language_apply">应用</string>
-    <string name="language_hint">选择 DiPlay 的语言。“跟随系统”将使用设备语言。</string>
+    <string name="language_hint"></string>
     <string name="language_section_title">语言</string>
     <string name="language_system_default">跟随系统</string>
     <string name="later">稍后</string>
@@ -307,11 +307,11 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. 打开车机热点设置，开启热点，如有 5 GHz 请选择。\n2. 在下方准确复制热点名称和密码。\n3. 连接时保持车机热点开启。DiPlay 通过蓝牙发送热点信息，iPhone 会自动加入。</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · 配对你的 iPhone</string>
-    <string name="s_300_ms_default">300 毫秒 · 默认</string>
+    <string name="s_300_ms_default">300 毫秒</string>
     <string name="s_30_fps_lighter_load">30 帧/秒 · 减轻负载</string>
     <string name="s_3_connect">3 · 连接</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. 点击下方“检查并启用”。这将启用仪表盘地图和自动主题跟随。正在进行的 CarPlay 会话会重新连接一次，之后即可断开电脑。</string>
-    <string name="s_500_ms">500 毫秒</string>
+    <string name="s_500_ms">500 毫秒 · 默认</string>
     <string name="s_5_ghz">5 GHz</string>
     <string name="s_60_fps_smoother_motion">60 帧/秒 · 更流畅</string>
     <string name="s_60_lightest_load" formatted="false">60% · 最低负载</string>
@@ -457,7 +457,7 @@
     <string name="video_pause">暂停</string>
     <string name="video_cannot_play">此视频无法在车机屏幕上播放。受保护的视频（例如 Apple TV+）需要获得授权的接收器。</string>
     <string name="audio_buffer_title">分用途播放缓冲</string>
-    <string name="audio_buffer_hint">分别设置电话、Siri 和导航的播放缓冲。缓冲越大，越能吸收网络抖动，但声音会更晚播放；通话和 Siri 建议保留默认策略。跟随手机协商使用本次连接的缓冲目标，手机未提供有效值时使用默认值。保存后下次连接生效。</string>
+    <string name="audio_buffer_hint"></string>
     <string name="audio_buffer_existing">默认策略</string>
     <string name="audio_buffer_phone">跟随手机协商</string>
     <string name="audio_buffer_phone_title">电话缓冲</string>
@@ -472,10 +472,10 @@
     <string name="media_performance_default">软件默认</string>
     <string name="media_performance_oem">原厂方案</string>
     <string name="media_performance_music">音乐播放策略</string>
-    <string name="media_performance_music_hint">原厂方案将音乐解码和播放分开处理；额外队列最多 40 毫秒。</string>
+    <string name="media_performance_music_hint"></string>
     <string name="media_performance_video_buffer">视频缓冲策略</string>
-    <string name="media_performance_video_buffer_hint">原厂方案复用视频转换缓冲，减少播放时反复分配内存。</string>
+    <string name="media_performance_video_buffer_hint"></string>
     <string name="media_performance_low_latency">硬解低延迟策略</string>
-    <string name="media_performance_low_latency_hint">原厂方案尝试高通低延迟参数；不支持或解码恢复时自动退回默认参数。</string>
-    <string name="media_performance_reconnect_hint">三项可独立选择，默认为软件默认。确认后独立保存，不随配置文件切换；下次重新连接生效。遇到问题请切回软件默认，再使用菜单中的重连。原厂方案参考原车实现，实际效果以实车为准。</string>
+    <string name="media_performance_low_latency_hint"></string>
+    <string name="media_performance_reconnect_hint"></string>
 </resources>

@@ -6,7 +6,7 @@
     <string name="profile_saved_active">当前配置已保存，连接参数在下次连接生效</string>
     <string name="profile_audio_recovery">旧音频文件无法读取，原文件已保留；沿用内置回退并记录恢复标记。请在音频分类检查模板后保存。</string>
     <string name="profile_flow">选择配置 → 检查参数 → 保存 → 开始测试 → 上传日志</string>
-    <string name="profile_apply_hint">连接、音频和视频参数在下次连接生效，不会自动断开或重连。</string>
+    <string name="profile_apply_hint"></string>
     <string name="profile_saved_current">已保存配置</string>
     <string name="profile_effective">当前连接配置</string>
     <string name="profile_no_connection">尚未建立连接</string>
@@ -15,12 +15,12 @@
     <string name="profile_edit">编辑配置</string>
     <string name="profile_edit_current">先修改草稿，点击保存才写入文件。</string>
     <string name="profile_switch">本地配置文件</string>
-    <string name="profile_switch_hint">可编辑任意文件。点击“使用此配置”后作为下次连接的参数，当前连接保持原配置。</string>
+    <string name="profile_switch_hint"></string>
     <string name="profile_files">选择配置文件</string>
     <string name="profile_use">使用此配置</string>
     <string name="profile_switched">已切换保存的配置，下次连接生效</string>
     <string name="profile_new">新建配置</string>
-    <string name="profile_new_hint">选择起始方案，然后命名、修改并保存。新文件不会自动切换为当前配置。</string>
+    <string name="profile_new_hint"></string>
     <string name="profile_default_l7">L7 默认</string>
     <string name="profile_default_l6">L6 默认</string>
     <string name="profile_default_custom">系统默认</string>
@@ -32,7 +32,7 @@
     <string name="profile_category">参数分类</string>
     <string name="profile_view_category">查看分类</string>
     <string name="profile_update_draft">确定</string>
-    <string name="profile_draft_hint">本窗口只修改草稿。切换分类不会丢失修改；点击底部“保存”才写入完整配置文件，取消保留原文件。</string>
+    <string name="profile_draft_hint"></string>
     <string name="profile_discard_title">放弃本次修改？</string>
     <string name="profile_discard_message">未保存的修改会丢弃，已保存文件保持原值。</string>
     <string name="profile_keep_editing">继续编辑</string>

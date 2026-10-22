@@ -3,10 +3,10 @@
     <string name="usb_verification_method">USB connection method</string>
     <string name="usb_verification_standard">Standard USB</string>
     <string name="usb_verification_experimental">USB connection verification test</string>
-    <string name="usb_verification_hint">The experimental method uses the head unit’s USB network. It switches USB mode, stops and records the reason on failure, and restores the original configuration when finished.</string>
+    <string name="usb_verification_hint"></string>
     <string name="usb_verification_stop_first">Disconnect the current session before changing the method or restoring USB.</string>
     <string name="usb_verification_restore">Restore original USB configuration</string>
-    <string name="usb_verification_recovery_hint">After an interrupted experiment or failed recovery, disconnect, unplug the iPhone cable and restore USB here.</string>
+    <string name="usb_verification_recovery_hint"></string>
     <string name="usb_verification_restored">USB configuration restored. Reconnect your iPhone before starting.</string>
     <string name="usb_verification_control_missing">The head unit control interface is unavailable. The USB connection verification test could not start. Please upload the logs.</string>
     <string name="usb_verification_environment_missing">A usable USB configuration or controller could not be confirmed. The experiment has stopped. Please upload the logs.</string>

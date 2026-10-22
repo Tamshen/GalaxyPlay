@@ -4,7 +4,7 @@
     <string name="l7_source_diplay_description">CarPlay receiver core · GPL-3.0</string>
     <string name="l7_source_diplay_details">DiPlay is the direct upstream of GalaxyPlay, providing the CarPlay protocol, connection, authentication and media receiver core. GalaxyPlay uses the official release as its baseline and maintains its own interface, configuration and head-unit adaptations for Galaxy L6 and L7. The current core version appears in this dialog title.\n\nProject URL:\n%1$s\n\nProject root license: GPL-3.0. Original author attribution and individual file license notices are retained. See Third-party licenses for the complete texts.</string>
     <string name="l7_licenses_title">Third-party licenses</string>
-    <string name="l7_licenses_hint">View dependency notices and license texts</string>
+    <string name="l7_licenses_hint"></string>
     <string name="l7_licenses_load_failed">License files could not be read. Please reopen this dialog.</string>
     <string name="l7_source_open_project">Open project link</string>
     <string name="l7_source_browser_unavailable">No browser is available. Select and copy the link in the project details.</string>

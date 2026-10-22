@@ -8,15 +8,15 @@
     <string name="l7_steering_status">Current control path</string>
     <string name="l7_steering_session">Phone session</string>
     <string name="l7_steering_chain">Observed state</string>
-    <string name="l7_steering_hint">Press a steering control and check the events. No INPUT means this app has not received an event through that path. A channel write does not confirm phone execution. Phone state observations are recorded separately.</string>
+    <string name="l7_steering_hint"></string>
     <string name="l7_steering_markers">Issue markers</string>
     <string name="l7_steering_mark_failed">Mark a missed control</string>
     <string name="l7_steering_mark_ok">Mark a working control</string>
     <string name="l7_steering_logs">View and export logs</string>
     <string name="l7_steering_clear">Clear this page</string>
-    <string name="l7_steering_clear_hint">Clears the current display only; existing logs are kept.</string>
+    <string name="l7_steering_clear_hint"></string>
     <string name="l7_steering_events">Recent inputs and stages</string>
-    <string name="l7_steering_events_hint">Keeps 256 stages and displays 12 groups. Match trace IDs and session generations in STEERING_TRACE logs. Timing starts at event receipt. Bluetooth waits, repeat filtering, foreign focus, queues and channel results are recorded separately.</string>
+    <string name="l7_steering_events_hint"></string>
     <string name="l7_steering_connected">Connected · generation %1$d</string>
     <string name="l7_steering_disconnected">Disconnected · generation %1$d</string>
     <string name="l7_steering_empty">No steering or media control events yet</string>
@@ -29,12 +29,12 @@
     <string name="l7_usb_retry">Check and request consent again</string>
     <string name="l7_usb_back_settings">Return to wired settings</string>
     <string name="l7_usb_previous_title">Previous wired connection ended unexpectedly</string>
-    <string name="l7_usb_previous_hint">The previous wired connection did not end normally or did not finish starting. Stages and available exit reasons for the last two attempts were kept. View, upload or export diagnostics from the log page, then retry manually.</string>
+    <string name="l7_usb_previous_hint"></string>
     <string name="l7_steering_vehicle">Vehicle and input capture</string>
     <string name="l7_steering_l7_capture">L7 keeps the existing steering implementation</string>
     <string name="l7_steering_other_capture">Extra input diagnostics are enabled by default. Unknown inputs are recorded without mapping. Vendor callback observation applies on the next connection.</string>
     <string name="l7_steering_test_key">Mark the key to test</string>
-    <string name="l7_steering_test_key_hint">Select a key, press the physical control, then mark success or failure. Records enter the logs by default; you initiate uploads.</string>
+    <string name="l7_steering_test_key_hint"></string>
     <string-array name="l7_steering_test_keys">
         <item>Left key</item>
         <item>Right key</item>
@@ -59,14 +59,14 @@
     <string name="l7_listen_question">Which steering control did you just press? Your choice will be linked to this input group, then listening will continue. Wait until you finish labeling before pressing another key.</string>
     <string name="l7_listen_skip">Ignore this input group</string>
     <string name="l7_listen_no_input">Pressed a control but received no input</string>
-    <string name="l7_listen_no_input_hint">Record the missing input for investigation after upload.</string>
+    <string name="l7_listen_no_input_hint"></string>
     <string name="l7_listen_records">2. Labeled controls</string>
     <string name="l7_listen_saved">Inputs and labels are saved to the logs. Labels do not change control mappings.</string>
     <string name="l7_listen_empty">Start listening and press a control. Choose its label after an input arrives.</string>
     <string name="l7_listen_sample">Input group %1$d</string>
     <string name="l7_listen_bound">Linked to %1$d input records</string>
     <string name="l7_listen_finish">3. Finish and upload</string>
-    <string name="l7_listen_upload_hint">Stop listening, then upload the records manually from Logs.</string>
+    <string name="l7_listen_upload_hint"></string>
     <string name="l7_listen_no_input_saved">Recorded: no input arrived for this press</string>
     <string name="l7_report_expected_media">%1$s\nState: %2$s · Progress: %3$d seconds\nArtwork: %4$s</string>
     <string name="l7_report_expected_road">Test road: %1$s\nSample A: left in 300 m; sample B: right in 500 m. Route remaining: 5 km, 10 min.\nCheck whether the HUD or cluster matches the current sample.</string>
@@ -79,7 +79,7 @@
     <string name="l7_report_cleanup_question">Check the vehicle display: has the test information been cleared?</string>
     <string name="l7_report_preparing">Preparing the sample. Please wait.</string>
     <string name="l7_report_begin_first">Start the test to see the current sample here.</string>
-    <string name="l7_report_compare_hint">Check the vehicle display before recording a result. Check again after each sample update.</string>
+    <string name="l7_report_compare_hint"></string>
     <string name="l7_report_result_ok">Recorded: matched expectations</string>
     <string name="l7_report_result_bad">Recorded: did not match expectations</string>
     <string name="l7_report_sample_changed">The sample changed. Check the current content before recording a result.</string>
@@ -90,7 +90,7 @@
     <string name="l7_voice_system_muted">The system is muting capture. End the call or check microphone permission.</string>
     <string name="l7_voice_input_level">Input level: %1$d%%. Say a short sentence.</string>
     <string name="l7_voice_data_received">Recording data received</string>
-    <string name="l7_voice_speak_hint">Start the test, speak toward the vehicle microphone, and watch the input level.</string>
+    <string name="l7_voice_speak_hint"></string>
     <string name="l7_voice_elapsed">Captured for %1$d seconds</string>
     <string name="l7_voice_phone_recording">The phone has opened voice input. Speak toward the vehicle microphone.</string>
     <string name="l7_voice_phone_ready">Request Siri, speak when it opens, then record whether the phone responds.</string>
@@ -99,7 +99,7 @@
     <string name="l7_voice_response_saved">Recorded: the phone responded</string>
     <string name="l7_voice_no_response_saved">Recorded: no response or recognition issues</string>
     <string name="l7_debug_choose">Choose a function to test</string>
-    <string name="l7_debug_choose_hint">Follow the steps to start, observe, and record a result. Test logs are saved automatically; you upload them manually.</string>
+    <string name="l7_debug_choose_hint"></string>
     <string name="l7_debug_goal_steering">Listen for controls, then label the key after its input arrives.</string>
     <string name="l7_debug_goal_voice">Check vehicle recording, then test the phone response to Siri.</string>
     <string name="l7_debug_goal_media">Publish a test track and compare it with the vehicle media card.</string>
@@ -109,7 +109,7 @@
     <string name="galaxy_wireless_retry">Retry connection</string>
     <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
     <string name="audio_buffer_title">Playback buffering by purpose</string>
-    <string name="audio_buffer_hint">Set separate playback buffers for calls, Siri and navigation. Larger buffers absorb more network jitter but delay the sound; the default policy is recommended for calls and Siri. Follow iPhone uses the buffer target negotiated for this connection, or a default if no valid target is provided. Saved changes apply on the next connection.</string>
+    <string name="audio_buffer_hint"></string>
     <string name="audio_buffer_existing">Default policy</string>
     <string name="audio_buffer_phone">Follow iPhone negotiation</string>
     <string name="audio_buffer_phone_title">Call buffer</string>
@@ -121,17 +121,17 @@
     <string name="audio_buffer_300">300 ms</string>
     <string name="audio_buffer_500">500 ms</string>
     <string name="galaxy_wifi_scan_pause">Pause background scans during Direct</string>
-    <string name="galaxy_wifi_scan_pause_hint">Try to pause background network searches during a connection to reduce interruptions; restore after disconnecting. If system control is unavailable, the reason is logged. Applies next connection.</string>
+    <string name="galaxy_wifi_scan_pause_hint"></string>
     <string name="galaxy_wifi_performance_lock">Optimize wireless performance</string>
-    <string name="galaxy_wifi_performance_lock_hint">Keep Wi-Fi in high-performance and low-latency modes during projection, then release on disconnect. Applies next connection.</string>
+    <string name="galaxy_wifi_performance_lock_hint"></string>
     <string name="media_performance_title">Performance options</string>
     <string name="media_performance_default">Software default</string>
     <string name="media_performance_oem">OEM approach</string>
     <string name="media_performance_music">Music playback strategy</string>
-    <string name="media_performance_music_hint">The OEM approach separates music decoding and playback, with up to 40 ms of additional queued audio.</string>
+    <string name="media_performance_music_hint"></string>
     <string name="media_performance_video_buffer">Video buffer strategy</string>
-    <string name="media_performance_video_buffer_hint">The OEM approach reuses video conversion buffers to reduce repeated memory allocation.</string>
+    <string name="media_performance_video_buffer_hint"></string>
     <string name="media_performance_low_latency">Hardware low latency strategy</string>
-    <string name="media_performance_low_latency_hint">The OEM approach tries Qualcomm low latency parameters and falls back if rejected or decoder recovery occurs.</string>
-    <string name="media_performance_reconnect_hint">Each option defaults to Software default. Confirmed changes are saved separately from profiles and apply on the next connection. If problems occur, select Software default and use Reconnect in the menu. The OEM approach is based on vehicle app implementations; results require testing on your vehicle.</string>
+    <string name="media_performance_low_latency_hint"></string>
+    <string name="media_performance_reconnect_hint"></string>
 </resources>

@@ -2,7 +2,7 @@
 <resources>
     <string name="carplay_environment_category">Environment checks</string>
     <string name="carplay_environment_title">CarPlay environment test</string>
-    <string name="carplay_environment_hint">Collect prerequisites for USB connection verification, possible dependencies and plug events in one report and log.</string>
+    <string name="carplay_environment_hint"></string>
     <string name="carplay_environment_intro">Park and end any active projection session before testing. Unplug the iPhone cable, then start. When observation begins, plug in the unlocked phone within the 20-second window, wait about 5 seconds, then unplug and reconnect once. Keep this page in the foreground.\n\nChecks cover USB roles and configuration, device nodes and permissions, OEM libraries and APVP service clues, kernel and startup configuration, networking and plug events. The local service port is connected only to check reachability; no control payload, USB permission request, role switch, phone session or upload is performed.\n\nNot found does not mean unsupported; access restrictions are reported separately. Completing this test does not prove USB CarPlay connectivity. Afterwards, upload from Logs and include whether you followed the plug steps, your iPhone model and iOS version.</string>
     <string name="carplay_environment_start">Start full environment test</string>
     <string name="carplay_environment_monitor">Static checks run first. When Plug observation appears, the 20-second window starts: connect the phone, wait about 5 seconds, then unplug and reconnect. Keep this page open and upload logs afterwards.</string>

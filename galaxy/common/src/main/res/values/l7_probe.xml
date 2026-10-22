@@ -11,7 +11,7 @@
     <string name="l7_probe_packages">参考组件所在包的可见性</string>
     <string name="l7_probe_executor">当前执行身份与辅助连接</string>
     <string name="l7_probe_title">调试</string>
-    <string name="l7_probe_entry_hint">环境、方控、语音及媒体／HUD 测试；明细默认写入日志</string>
+    <string name="l7_probe_entry_hint"></string>
     <string name="l7_probe_environment">环境与权限</string>
     <string name="l7_probe_modules">调试模块</string>
     <string name="l7_probe_logs">日志与报告</string>
@@ -67,7 +67,7 @@
     <string name="l7_probe_saved">报告已保存：%1$s</string>
     <string name="l7_probe_delete">删除此报告</string>
     <string name="l7_probe_delete_confirm">只删除所选本地检查报告，不影响连接和运行日志。</string>
-    <string name="l7_probe_historical_hint">历史结果仅供对照，不能作为当前权限与接口能力。</string>
+    <string name="l7_probe_historical_hint"></string>
     <string name="l7_probe_system">系统与运行环境</string>
     <string name="l7_probe_app">当前安装身份</string>
     <string name="l7_probe_apk">当前安装包摘要</string>
@@ -95,7 +95,7 @@
     <string name="l7_probe_search_short">搜索</string>
     <string name="l7_probe_report_actions">报告操作</string>
     <string name="l7_probe_table_summary">共 %1$d 项 · 支持/授权 %2$d · 无权限 %3$d · 异常 %4$d · 不支持 %5$d · 待验证/未执行 %6$d</string>
-    <string name="l7_probe_table_hint">绿勾：检查通过或已授权；灰：无权限或待验证；黄：异常；红：不支持。点击行查看证据。</string>
+    <string name="l7_probe_table_hint"></string>
     <string name="l7_probe_reason_query">状态查询可用</string>
     <string name="l7_probe_reason_granted">接口调用待验证</string>
     <string name="l7_probe_reason_declared">应用未声明</string>

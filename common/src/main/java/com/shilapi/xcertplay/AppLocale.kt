@@ -25,10 +25,10 @@ object AppLocale {
     fun preference(context: Context): String {
         if (Build.VERSION.SDK_INT >= 33) {
             val locales = context.getSystemService(LocaleManager::class.java).applicationLocales
-            return if (locales.isEmpty) SYSTEM else locales[0].language.takeIf { it in ALL } ?: SYSTEM
+            return if (locales.isEmpty) SIMPLIFIED_CHINESE else locales[0].language.takeIf { it in ALL } ?: SYSTEM
         }
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_LANGUAGE, SYSTEM)?.takeIf { it in ALL } ?: SYSTEM
+            .getString(KEY_LANGUAGE, SIMPLIFIED_CHINESE)?.takeIf { it in ALL } ?: SYSTEM
     }
 
     fun save(context: Context, language: String) {
@@ -53,12 +53,15 @@ object AppLocale {
             val removedLanguage = !current.isEmpty && current[0].language !in ALL
             if (removedLanguage) manager.applicationLocales = LocaleList.getEmptyLocaleList()
             if (!prefs.getBoolean(KEY_MIGRATED, false)) {
-                val previous = locale(prefs.getString(KEY_LANGUAGE, SYSTEM) ?: SYSTEM)
+                val previous = locale(prefs.getString(KEY_LANGUAGE, SIMPLIFIED_CHINESE) ?: SIMPLIFIED_CHINESE)
                 // 已有系统选择优先，清理旧语言时也不恢复更早的应用偏好。
                 if (!removedLanguage && manager.applicationLocales.isEmpty && previous != null) {
                     manager.applicationLocales = LocaleList(previous)
                 }
                 prefs.edit().putBoolean(KEY_MIGRATED, true).remove(KEY_LANGUAGE).apply()
+            }
+            if (manager.applicationLocales.isEmpty) {
+                manager.applicationLocales = LocaleList(locale(SIMPLIFIED_CHINESE))
             }
             return context
         }

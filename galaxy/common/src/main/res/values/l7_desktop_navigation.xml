@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="l7_desktop_title">车机桌面悬浮图标</string>
-    <string name="l7_desktop_hint">离开应用后保留悬浮图标，点击直接返回 CarPlay 画面；没有连接时返回首页。可拖动调整位置。</string>
+    <string name="l7_desktop_hint"></string>
     <string name="l7_desktop_return">返回 CarPlay 画面</string>
     <string name="l7_desktop_permission">开启桌面悬浮权限</string>
-    <string name="l7_desktop_permission_hint">授权后可从车机桌面快速返回；未授权仍可正常连接。</string>
-    <string name="l7_desktop_home_permission">点击开启悬浮权限，即可从桌面快速返回</string>
+    <string name="l7_desktop_permission_hint"></string>
+    <string name="l7_desktop_home_permission"></string>
     <string name="l7_desktop_notification">桌面悬浮图标已开启，点击图标直接返回画面</string>
 </resources>

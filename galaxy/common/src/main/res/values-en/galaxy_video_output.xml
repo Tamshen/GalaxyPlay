@@ -5,7 +5,7 @@
     <string name="galaxy_video_decoder_default">DiPlay default</string>
     <string name="galaxy_video_decoder_c2">C2 · c2.qti.avc.decoder</string>
     <string name="galaxy_video_decoder_omx">OMX · OMX.qcom.video.decoder.avc</string>
-    <string name="galaxy_video_decoder_hint">Prefer the selected hardware decoder for H.264, with automatic fallback. Reconnect to apply. HEVC uses the default selection.</string>
+    <string name="galaxy_video_decoder_hint"></string>
     <string name="galaxy_video_decoder_unavailable">The current vehicle or device does not support these decoder choices. DiPlay selects the decoder automatically.</string>
     <string name="galaxy_video_decoder_disabled">%1$s (unavailable)</string>
 </resources>

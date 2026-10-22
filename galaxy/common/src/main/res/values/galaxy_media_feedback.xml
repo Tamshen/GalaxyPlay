@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="media_feedback_title">记录媒体显示结果</string>
-    <string name="media_feedback_hint">连接手机播放或开始媒体测试后，分别观察中控和仪表，再记录歌名、封面、播放状态。结果自动关联当前会话与曲目，并保存到日志；完成后手动上传。</string>
+    <string name="media_feedback_hint"></string>
     <string name="media_feedback_center">记录中控显示</string>
     <string name="media_feedback_cluster">记录仪表显示</string>
     <string name="media_feedback_song">歌名</string>

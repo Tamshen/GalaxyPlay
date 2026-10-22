@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="performance_title">性能检测</string>
-    <string name="performance_hint">手动查看 CPU、内存、UFPS（应用）与 CFPS（CarPlay），默认关闭。</string>
+    <string name="performance_hint"></string>
     <string name="performance_state">检测状态</string>
     <string name="performance_start">开始检测</string>
     <string name="performance_stop">停止检测</string>
@@ -11,25 +11,25 @@
     <string name="performance_fallback">基础检测中，悬浮窗未获授权；可在本页查看</string>
     <string name="performance_failed">操作未完成，请检查系统授权后重试；已有检测状态以本页显示为准。</string>
     <string name="performance_overlay">左上角悬浮面板</string>
-    <string name="performance_overlay_hint">两行只读数值，整块区域触控透传，不改变投屏布局。</string>
-    <string name="performance_permission_hint">允许后可在其他页面上显示；拒绝时保留应用内检测。</string>
+    <string name="performance_overlay_hint"></string>
+    <string name="performance_permission_hint"></string>
     <string name="performance_deep">深度采样 15 秒</string>
-    <string name="performance_deep_hint">额外读取本进程线程 CPU，开销较高；只在需要定位卡顿时手动开启。</string>
+    <string name="performance_deep_hint"></string>
     <string name="performance_details">检测明细</string>
-    <string name="performance_cpu_hint">本应用 CPU 时间除以采样时间，按一颗核心累计，可超过 100%；不是整机占用。</string>
+    <string name="performance_cpu_hint"></string>
     <string name="performance_memory">内存</string>
-    <string name="performance_memory_hint">Java 堆与 Native 堆分别显示；PSS、RSS 约每 10 秒更新，不能将这些数值直接相加。</string>
+    <string name="performance_memory_hint"></string>
     <string name="performance_fps">CFPS · CarPlay 投屏帧率</string>
-    <string name="performance_fps_hint">CFPS 统计 CarPlay 视频实际呈现帧率，不是应用界面帧率。未投屏会明确提示；连接后尚无有效样本时等待视频帧，接收帧率另列。</string>
+    <string name="performance_fps_hint"></string>
     <string name="performance_no_stream">未投屏</string>
     <string name="performance_cost">检测自身耗时</string>
     <string name="performance_cost_value">本次采样 %1$s ms · 面板绘制 %2$s ms</string>
     <string name="performance_budget">本次检测耗时偏高，可关闭面板或等待深度采样结束。</string>
     <string name="performance_extra">GC 与深度线程采样</string>
-    <string name="performance_measurement_hint">采样和绘制耗时不代表检测的全部 CPU 成本。对比关闭、基础检测、显示面板和深度采样时，请保持相同业务场景。停止后保留的数值是本次历史，重新开始会清空。</string>
+    <string name="performance_measurement_hint"></string>
     <string name="performance_notification">正在手动检测 CPU、内存、UFPS 与 CFPS，可随时停止。</string>
     <string name="performance_ufps">UFPS · 应用界面帧率</string>
-    <string name="performance_ufps_hint">UFPS 统计应用前台主窗口实际完成的帧，不含性能悬浮窗、CarPlay 独立视频 Surface 或屏幕刷新率。静止界面帧率低是正常现象，不会固定显示 60。</string>
+    <string name="performance_ufps_hint"></string>
     <string name="performance_ui_idle">界面静止（0 FPS）</string>
     <string name="performance_ui_idle_short">静止</string>
     <string name="performance_ui_background">应用在后台</string>

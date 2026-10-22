@@ -38,7 +38,7 @@
     <string name="debug_guide_collect">收集环境检查</string>
     <string name="debug_guide_collect_body">点击收集检查，等待任务弹窗完成。检查失败时阅读具体原因；可在弹窗停止。报告描述环境事实，不代表真实手机连接或车辆显示通过。</string>
     <string name="debug_guide_scenario">故障复现引导</string>
-    <string name="debug_guide_scenario_hint">USB、热点、黑屏、音频／通话与蓝牙交接，逐步记录操作和现象</string>
+    <string name="debug_guide_scenario_hint"></string>
     <string name="debug_guide_mark">记录操作已执行</string>
     <string name="debug_guide_ok">本步现象正常</string>
     <string name="debug_guide_bad">未出现／异常</string>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="media_feedback_title">Record media display results</string>
-    <string name="media_feedback_hint">Play media from the phone or start a media test, then check the center screen and instrument cluster. Record the title, artwork and playback state. Results are linked to the current session and track and saved to logs. Upload manually when finished.</string>
+    <string name="media_feedback_hint"></string>
     <string name="media_feedback_center">Record center screen display</string>
     <string name="media_feedback_cluster">Record instrument cluster display</string>
     <string name="media_feedback_song">Song title</string>
