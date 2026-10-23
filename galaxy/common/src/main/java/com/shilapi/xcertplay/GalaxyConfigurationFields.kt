@@ -103,7 +103,8 @@ internal object GalaxyConfigurationFields {
     fun defaults(context: Context, vehicleOnly: Boolean = true): Map<String, Map<String, Any?>> {
         val groups = names.associateWith { mutableMapOf<String, Any?>() }
         fields.forEach { groups.getValue(it.space)[it.key] = it.default }
-        groups.getValue(MAIN).putAll(mapOf("wireless_hotspot_mode" to "MANUAL", "media_buffer_ms" to 300,
+        groups.getValue(MAIN).putAll(mapOf("wireless_hotspot_mode" to "MANUAL",
+            "media_buffer_ms" to com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS,
             "advanced_audio_channel_mapping" to true, "audio_focus_enabled" to true,
             "l7_audio_bus_enabled" to false, "l7_call_processing_enabled" to true,
             "bluetooth_media_exclusive" to true, "media_audio_channel" to 101,

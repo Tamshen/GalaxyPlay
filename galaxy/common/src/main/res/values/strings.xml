@@ -346,6 +346,7 @@
     <string name="starting">Starting</string>
     <string name="starting_airplay_service">Starting AirPlay service</string>
     <string name="starting_wireless_hotspot">Starting wireless hotspot</string>
+    <string name="starting_existing_wifi">正在连接已有 Wi-Fi</string>
     <string name="startup">Startup</string>
     <string name="still_waiting_for_usage_access_check_that_the_command_ran">Still waiting for Usage Access. Check that the command ran successfully for this car, then try again.</string>
     <string name="tap_a_number_to_test_14_driver_speaker_on_byd">Tap a number to test. 14 = driver speaker on BYD.</string>

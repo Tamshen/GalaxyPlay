@@ -199,7 +199,10 @@ class GalaxySettingsActivity : ComponentActivity() {
         GalaxyMediaEntry.handle(intent, CarPlayBackgroundSession.active, CarPlayBackgroundSession.isStopping(), ::openProjection)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                // 先回分页；回到首页后，只要还有 CarPlay 会话就回投屏（与 DiPlay 一致：
+                // 边缘手势/返回键第二次一定是回投屏，而不是被首页导航吃掉）。
                 if (page != "home") { page = if (l7Ui) L7Routes.back(page) else "home"; render() }
+                else if (CarPlayBackgroundSession.hasSession()) openProjection()
                 else if (pageNavigation != null) pageNavigation?.expand()
                 else { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
             }

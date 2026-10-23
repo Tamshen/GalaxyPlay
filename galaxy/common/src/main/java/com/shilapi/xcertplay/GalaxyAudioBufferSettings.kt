@@ -19,16 +19,17 @@ internal object GalaxyAudioBufferSettings {
     fun load(context: Context): AudioBufferSettings {
         val preferences = context.getSharedPreferences("xcertplay_airplay", 0)
         fun realtime(key: String) = AudioBufferSettings.sanitizeRealtime(preferences.getInt(key, AudioBufferSettings.SYSTEM_DEFAULT))
-        return AudioBufferSettings(AirPlayPersistence.loadMediaBufferMillis(context), realtime(PHONE),
-            realtime(ASSISTANT), realtime(NAVIGATION))
+        val mediaMillis = AirPlayPersistence.loadMediaBufferMillis(context)
+        // 音乐水位只按用户选择的档位（DiPlay 原版语义：300/500/1000），不再跟随手机协商值。
+        return AudioBufferSettings(mediaMillis, realtime(PHONE), realtime(ASSISTANT), realtime(NAVIGATION))
     }
 
     fun add(context: Context, parent: LinearLayout, includeMusic: Boolean) {
         L7SettingsSection.add(parent, context.getString(R.string.audio_buffer_title),
             description = context.getString(R.string.audio_buffer_hint)) { card ->
             if (includeMusic) choice(context, card, "media_buffer_ms", R.string.music_buffer,
-                MediaAudioBuffer.presets, listOf(R.string.s_300_ms_default, R.string.s_500_ms,
-                    R.string.s_1000_ms_most_stable, R.string.audio_buffer_phone), MediaAudioBuffer.DEFAULT_MILLIS)
+                MediaAudioBuffer.wirelessPresets, listOf(R.string.s_300_ms_default, R.string.s_500_ms,
+                    R.string.s_1000_ms_most_stable), MediaAudioBuffer.DEFAULT_MILLIS)
             for ((key, title) in listOf(PHONE to R.string.audio_buffer_phone_title,
                 ASSISTANT to R.string.audio_buffer_assistant_title, NAVIGATION to R.string.audio_buffer_navigation_title))
                 choice(context, card, key, title, AudioBufferSettings.realtimeChoices, realtimeLabels, AudioBufferSettings.SYSTEM_DEFAULT)

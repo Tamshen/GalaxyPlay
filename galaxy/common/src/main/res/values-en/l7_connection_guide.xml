@@ -62,7 +62,7 @@
     <string name="l7_wireless_bt_settings_missing">Bluetooth settings could not be opened. Open them from the head unit system settings, enable Bluetooth and pair iPhone.</string>
     <string name="l7_wireless_join_iphone">On your iPhone</string>
     <string name="l7_usb_permission_no_device">Pending: USB access can be checked after an Apple USB device is detected.</string>
-    <string name="l7_usb_vpn_adb_hint"></string>
+    <string name="l7_usb_vpn_adb_hint">The app already tried to allow the VPN through the head unit’s own debugging interface, but it did not take effect. Enable “USB debugging / ADB over network” in the head unit developer options, allow this app in the debugging prompt, and connect again.</string>
     <string name="wireless_connection_method">Wireless connection method</string>
     <string name="wireless_connection_method_hint"></string>
     <string name="wifi_direct_wifi_off">Turn on the car’s Wi-Fi switch before connecting with Wi-Fi Direct.</string>

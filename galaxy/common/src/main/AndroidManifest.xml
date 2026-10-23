@@ -84,6 +84,21 @@
         <service android:name="com.shilapi.xcertplay.DiPlaySessionService"
             android:exported="false" android:foregroundServiceType="connectedDevice|microphone|location" />
 
+        <!-- 语音键过滤器：车机自带的语音助手会在系统层先拿走语音键，这里在输入过滤阶段更早拿到按键，
+             有 CarPlay 会话时转成 Siri；只在用户手动开启该无障碍服务后生效。 -->
+        <service
+            android:name="com.shilapi.xcertplay.WheelKeyService"
+            android:exported="true"
+            android:label="@string/wheel_key_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/wheel_key_service" />
+        </service>
+
         <activity
             android:name="com.shilapi.xcertplay.CarPlayHostActivity"
             android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"

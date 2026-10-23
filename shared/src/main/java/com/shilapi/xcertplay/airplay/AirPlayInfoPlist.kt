@@ -69,7 +69,7 @@ object AirPlayInfoPlist {
                     "imageData" to icon.data,
                     "widthPixels" to icon.widthPixels,
                     "heightPixels" to icon.heightPixels,
-                    "prerendered" to false,
+                    "prerendered" to true,
                 )
             }
         }

@@ -74,4 +74,8 @@
     <string name="profile_draw_outside">安全区外显示画面</string>
     <string name="profile_pip">分屏／小窗自动适配</string>
     <string name="profile_pip_description">开启后，窗口比例变化可能重连 CarPlay 以适配画面；关闭时通常直接缩放。与悬浮菜单无关，默认关闭。</string>
+    <string name="profile_delete_title">删除配置</string>
+    <string name="profile_delete_message">删除“%1$s”？已保存的参数文件将被移除，无法恢复。</string>
+    <string name="profile_delete">删除</string>
+    <string name="profile_delete_failed">当前配置不能删除，且至少保留一个配置。</string>
 </resources>

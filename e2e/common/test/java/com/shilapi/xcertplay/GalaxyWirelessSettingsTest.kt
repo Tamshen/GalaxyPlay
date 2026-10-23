@@ -126,13 +126,15 @@ class GalaxyWirelessSettingsTest {
         assertEquals("synthetic-native", AirPlayPersistence.loadManualHotspotSsid(activity))
     }
 
-    @Test fun l7ShowsFixedChannelWithoutReplacingSavedChannelForOtherModels() {
+    @Test fun l7KeepsChannelSelectableAndUsesPolicyChannelOnlyAsDefault() {
         activity.getSharedPreferences("l7_audio_templates", 0).edit().putString("model", "l7").commit()
+        // 没有手动选择时仍用车型策略的默认频道，但这一行不再被锁死。
+        assertEquals(149, GalaxyP2pSettings.effectiveChannel(activity))
         AirPlayPersistence.saveWifiP2pPreferredChannel(activity, 153)
         settings.addDirect(parent)
         val row = rows().single { it.titleView.text == activity.getString(R.string.wifi_direct_channel_title) }
-        assertFalse(row.isEnabled)
-        assertEquals(149, GalaxyP2pSettings.effectiveChannel(activity))
+        assertTrue(row.isEnabled)
+        assertEquals(153, GalaxyP2pSettings.effectiveChannel(activity))
         assertEquals(153, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
         GalaxyP2pSettings.save(activity, com.shilapi.xcertplay.network.GalaxyP2pRegion.OTHER_CONSERVATIVE)
         settings.update()

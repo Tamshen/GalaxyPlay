@@ -7,6 +7,8 @@
     <string name="galaxy_p2p_region_mainland">Mainland China · vehicle use</string>
     <string name="galaxy_p2p_region_other">Other regions · conservative 2.4 GHz</string>
     <string name="galaxy_p2p_region_hint"></string>
+    <string name="galaxy_smooth_video">Smooth video</string>
+    <string name="galaxy_smooth_video_hint">Shows frames at the iPhone frame time for steadier motion while driving, with about 0.1 s more touch delay. Off feels most direct. Applies on the next connection.</string>
     <string name="galaxy_p2p_region_channel_invalid">The saved channel is outside this vehicle region. Choose Auto or an allowed channel. Your saved setting has been preserved.</string>
     <string name="galaxy_p2p_region_failure">The channel or system group-creation capability does not meet the selected vehicle region limits. Check the region and choose Auto or an allowed channel. Use the native hotspot if the system cannot fix a channel.</string>
     <string name="galaxy_p2p_configuration_changed">The current Wi-Fi Direct configuration could not be confirmed or has changed. Start a new connection to use the current configuration.</string>

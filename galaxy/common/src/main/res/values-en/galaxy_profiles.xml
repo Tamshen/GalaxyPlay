@@ -74,4 +74,8 @@
     <string name="profile_draw_outside">Draw outside safe area</string>
     <string name="profile_pip">Adapt to split screen / picture-in-picture</string>
     <string name="profile_pip_description">When enabled, changing the window aspect ratio may reconnect CarPlay to fit the screen. When disabled, the picture usually scales directly. Unrelated to the floating menu. Off by default.</string>
+    <string name="profile_delete_title">Delete configuration</string>
+    <string name="profile_delete_message">Delete “%1$s”? The saved settings file will be removed and cannot be restored.</string>
+    <string name="profile_delete">Delete</string>
+    <string name="profile_delete_failed">The active configuration cannot be deleted, and at least one configuration must remain.</string>
 </resources>

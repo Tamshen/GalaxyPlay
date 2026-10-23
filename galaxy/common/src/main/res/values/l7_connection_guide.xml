@@ -62,7 +62,7 @@
     <string name="l7_wireless_bt_settings_missing">无法打开蓝牙设置，请从车机系统设置进入蓝牙，开启并配对 iPhone。</string>
     <string name="l7_wireless_join_iphone">在 iPhone 上操作</string>
     <string name="l7_usb_permission_no_device">待检测：识别到 Apple USB 设备后才能检查访问权限。</string>
-    <string name="l7_usb_vpn_adb_hint"></string>
+    <string name="l7_usb_vpn_adb_hint">应用已尝试通过车机自身的调试接口自动放行 VPN 授权，但未能生效。请在车机开发者选项中开启“USB 调试/网络调试（ADB over network）”，并在弹出的“允许调试吗”中允许本应用，然后重新连接。</string>
     <string name="wireless_connection_method">无线连接方式</string>
     <string name="wireless_connection_method_hint"></string>
     <string name="wifi_direct_wifi_off">请先开启车机 Wi-Fi 开关，再使用 Wi-Fi Direct 连接。</string>

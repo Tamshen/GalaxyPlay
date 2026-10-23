@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.network.WifiP2pChannels
 import com.shilapi.xcertplay.network.GalaxyP2pRegion
+import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** 无线方式独立保存；只由用户确认切换，不启动或关闭任何网络。 */
@@ -47,6 +48,15 @@ internal class GalaxyWirelessSettings(
             existingPassRow = L7Components.valueRow(activity, activity.getString(R.string.existing_wifi_password),
                 mask(AirPlayPersistence.loadExistingWifiPassphrase(activity))) { editExistingWifi(false) }
                 .also { card.addView(it) }
+            // 平滑视频属于视频链路，和联网方式无关；放在这张卡片里，Direct / 局域网 / 热点三种模式都能看到。
+            lateinit var smoothRow: L7SettingRow
+            smoothRow = L7Components.switchRow(activity, activity.getString(R.string.galaxy_smooth_video),
+                activity.getString(R.string.galaxy_smooth_video_hint),
+                AirPlayPersistence.loadSmoothVideo(activity)) { selected ->
+                if (!closed && canEdit()) AirPlayPersistence.saveSmoothVideo(activity, selected)
+                smoothRow.setSwitchChecked(AirPlayPersistence.loadSmoothVideo(activity))
+            }.apply { isEnabled = !closed && canEdit() }
+            card.addView(smoothRow)
         }
         update()
     }
@@ -79,11 +89,10 @@ internal class GalaxyWirelessSettings(
         val showExisting = AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.EXISTING_WIFI
         existingSsidRow?.visibility = if (showExisting) View.VISIBLE else View.GONE
         existingPassRow?.visibility = if (showExisting) View.VISIBLE else View.GONE
-        val fixedChannel = GalaxyP2pSettings.fixedChannel(activity)
         channelRow?.setValue(channelLabel(GalaxyP2pSettings.effectiveChannel(activity)))
-        channelRow?.isEnabled = fixedChannel == null && !closed && canEdit()
-        channelRow?.setDescription(activity.getString(if (fixedChannel != null)
-            R.string.galaxy_l7_direct_channel_hint else R.string.wifi_direct_channel_description))
+        // 频道行始终可手动选择：车型策略的固定频道只作为未选择时的默认值，不再锁死这一行。
+        channelRow?.isEnabled = !closed && canEdit()
+        channelRow?.setDescription(activity.getString(R.string.wifi_direct_channel_description))
         val region = GalaxyP2pSettings.load(activity)
         regionRow?.setValue(regionLabel(region))
         regionRow?.isEnabled = !closed && canEdit()
@@ -117,6 +126,8 @@ internal class GalaxyWirelessSettings(
                 if (canConfirm(generation) && selection != current &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == current &&
                     (selection == WirelessHotspotMode.MANUAL || selection == WirelessHotspotMode.EXISTING_WIFI || supported(activity))) {
+                    // 与 DiPlay 一致：选择“已有 Wi-Fi”只切换模式，SSID/密码在随后出现的两行里填写；
+                    // 连接前的合法性校验由 CarPlayHostActivity.validateManualHotspotSettings() 负责。
                     AirPlayPersistence.saveWirelessHotspotMode(activity, selection)
                     changed()
                 }
@@ -124,23 +135,24 @@ internal class GalaxyWirelessSettings(
     }
 
     private fun chooseChannel() {
-        if (closed || !canEdit() || GalaxyP2pSettings.fixedChannel(activity) != null) return
+        if (closed || !canEdit()) return
         val region = GalaxyP2pSettings.load(activity)
         val choices = listOf(WifiP2pChannels.AUTO) + region.policy.channels
+        // 已保存值用于判重，弹窗高亮当前实际生效的频道（没有用户选择时即车型默认频道）。
         val current = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
-        var selection = current
+        val effective = GalaxyP2pSettings.effectiveChannel(activity)
+        var selection = effective
         dismiss()
         val generation = pickerGeneration
         dialog = L7Dialogs.builder(activity).setTitle(R.string.wifi_direct_channel_title).setFixedHeight()
-            .setSingleChoiceItems(choices.map(::channelLabel).toTypedArray(), choices.indexOf(selection)) { _, index ->
+            .setSingleChoiceItems(choices.map(::channelLabel).toTypedArray(), choices.indexOf(effective)) { _, index ->
                 selection = choices[index]
             }.setPositiveButton(R.string.save) { _, _ ->
                 if (canConfirm(generation) && selection != current &&
-                    AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
                     GalaxyP2pSettings.load(activity) == region &&
-                    GalaxyP2pSettings.fixedChannel(activity) == null &&
+                    AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.WIFI_P2P) {
-                    AirPlayPersistence.saveWifiP2pPreferredChannel(activity, selection)
+                    GalaxyP2pSettings.saveChannel(activity, selection)
                     update()
                 }
             }.setNegativeButton(R.string.cancel, null).show()

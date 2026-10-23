@@ -38,6 +38,7 @@ class ExistingWifiManager(
     private var interfaceIndex = 0
     @Volatile private var interfaceName: String? = null
     private var callbackRegistered = false
+    private var lastNudgeNs = 0L
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
@@ -140,9 +141,41 @@ class ExistingWifiManager(
             if ((System.nanoTime() - started) / 1_000_000 >= timeoutMillis) {
                 throw IOException("Existing Wi-Fi is not connected or has no usable address. Connect both devices to the same Wi-Fi in system settings")
             }
+            // 车机 Wi-Fi 掉线时系统不会自己重连，“同一局域网”模式就一直空等到超时。
+            // 这里只是温和地让系统连回已保存的网络（不改任何配置、不新建网络）。
+            nudgeAssociation(started)
             Thread.sleep(200)
         }
         throw IOException("Existing Wi-Fi attachment was cancelled")
+    }
+
+    /**
+     * 车机 Wi-Fi 断开后系统不会主动连回（也不该由用户先手动点一次）。
+     * 只要还没关联上，就每隔几秒请系统连回**已保存**的目标网络；找不到保存项时退回 reconnect()。
+     */
+    private fun nudgeAssociation(started: Long) {
+        val now = System.nanoTime()
+        if ((now - started) / 1_000_000 < NUDGE_GRACE_MILLIS) return
+        if (lastNudgeNs != 0L && now - lastNudgeNs < NUDGE_INTERVAL_NS) return
+        lastNudgeNs = now
+        val requested = runCatching {
+            val saved = wifi.configuredNetworks?.firstOrNull { it.SSID?.trim('"') == ssid }
+            when {
+                saved != null -> {
+                    wifi.enableNetwork(saved.networkId, true)
+                    wifi.reconnect()
+                    "saved"
+                }
+                else -> {
+                    wifi.reconnect()
+                    "reconnect"
+                }
+            }
+        }.getOrElse { error ->
+            onDiagnostic("Existing Wi-Fi reconnect request failed: ${error.javaClass.simpleName}")
+            return
+        }
+        onDiagnostic("Existing Wi-Fi not associated yet; asked the system to reconnect ($requested)")
     }
 
     private fun sameLink(properties: LinkProperties): Boolean =
@@ -183,3 +216,7 @@ class ExistingWifiManager(
         }
     }
 }
+
+/** 同一局域网模式：先等 1.5 秒看系统是否自己连上，之后每 3 秒温和地请求一次重连。 */
+private const val NUDGE_GRACE_MILLIS = 1_500L
+private const val NUDGE_INTERVAL_NS = 3_000_000_000L

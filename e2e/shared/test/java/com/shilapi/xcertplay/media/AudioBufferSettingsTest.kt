@@ -31,7 +31,8 @@ class AudioBufferSettingsTest {
         val settings = AudioBufferSettings(0, 32, 0, 500)
         val hint = AudioBufferHint.parse(mapOf("audioLatencyMs" to 160), 48_000)
         val negotiated = format.copy(bufferHint = hint)
-        assertEquals(160, StreamAudioBuffer.resolve(settings, AudioChannel.MEDIA, negotiated, true)!!.targetMillis)
+        // 音乐层（DiPlay 原版）不跟随手机协商值：0 会落回出厂默认 300 毫秒。
+        assertEquals(300, StreamAudioBuffer.resolve(settings, AudioChannel.MEDIA, negotiated, true)!!.targetMillis)
         assertEquals(32, StreamAudioBuffer.resolve(settings, AudioChannel.PHONE, negotiated, true)!!.targetMillis)
         assertEquals(160, StreamAudioBuffer.resolve(settings, AudioChannel.ASSISTANT, negotiated, true)!!.targetMillis)
         assertEquals(500, StreamAudioBuffer.resolve(settings, AudioChannel.NAVIGATION, negotiated, true)!!.targetMillis)
@@ -46,9 +47,9 @@ class AudioBufferSettingsTest {
         assertEquals(32, StreamAudioBuffer.resolve(settings, AudioChannel.PHONE, format, false)!!.targetMillis)
         assertEquals(0, settings.phoneMillis)
         assertNull(StreamAudioBuffer.resolve(AudioBufferSettings(phoneMillis = 999), AudioChannel.PHONE, format, true))
-        val plan = MediaAudioBuffer.plan(true, 48_000, 2, 4096, 0, 160)
-        assertEquals(30_720, plan.startBytes)
-        assertEquals(69_120, plan.trackBufferBytes)
+        val plan = MediaAudioBuffer.plan(true, 48_000, 2, 4096, 0)
+        assertEquals(57_600, plan.startBytes)
+        assertEquals(96_000, plan.trackBufferBytes)
     }
 
     @Test fun largeNegotiatedTargetAndTimestampWrapStayBounded() {

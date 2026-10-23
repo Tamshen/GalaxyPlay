@@ -27,6 +27,8 @@ class AudioBufferSelectionRendererTest {
         val logs = CopyOnWriteArrayList<String>()
         val sink = AndroidMediaSink(wirelessAudio = true, advancedAudioChannelMapping = true,
             audioFocusEnabled = false,
+            // 音乐水位只由 mediaBufferMillis 决定（DiPlay 原版语义），设置快照不再改写它。
+            mediaBufferMillis = 500,
             platformAdaptation = object : MediaPlatformAdaptation { override val buffers = AudioBufferSettings(500) },
             onAudioDiagnostic = logs::add)
         try {
@@ -59,7 +61,8 @@ class AudioBufferSelectionRendererTest {
                     val threshold = ReflectionHelpers.getField<Int>(renderer, "startThresholdBytes")
                     if (purpose == "media") {
                         assertNull(clock)
-                        assertEquals(46_080, threshold)
+                        // 音乐层只按 DiPlay 的 300 毫秒出厂值起播，不再跟随手机上报的 240 毫秒。
+                        assertEquals(57_600, threshold)
                     } else {
                         assertEquals(target, clock!!.targetMillis)
                         assertEquals(4, threshold)

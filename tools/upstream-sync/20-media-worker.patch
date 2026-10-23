@@ -1779,7 +1779,7 @@
          val START_CODE = byteArrayOf(0x00, 0x00, 0x00, 0x01)
      }
  }
-@@ -1277,40 +1060,62 @@
+@@ -1277,40 +1060,60 @@
      private val audioFocusEnabled: Boolean,
      private val mediaChannel: Int,
      private val navigationChannel: Int,
@@ -1811,7 +1811,6 @@
 +    private var wirelessRealtime = WirelessRealtimeAudioBuffer.applies(wirelessAudio, format)
 +    private var playoutClock = if (wirelessRealtime) WirelessAudioPlayoutClock(format.sampleRate) else null
 +    private var streamBuffer: StreamAudioBuffer? = null
-+    private var dynamicMusicBuffer = true
 +    private var pendingPacket: AudioPacket? = null
 +    private var pendingDueNs = 0L
 +
@@ -1833,7 +1832,6 @@
      private var playbackStarted = false
      private var prebufferBytes = 0
      private var startThresholdBytes = 0
-+    private var trackCapacityBytes = 0
 +    private val musicJitter = MusicJitterRecovery()
 +    private val codecInputWait = AudioCodecInputWait()
 +    private val audioOutputInfo = MediaCodec.BufferInfo()
@@ -1855,7 +1853,7 @@
      private var firstPcmLogged = false
      private val packetsReceived = AtomicInteger()
      private val packetsDropped = AtomicInteger()
-@@ -1326,20 +1131,56 @@
+@@ -1326,20 +1131,55 @@
      private var lastPlaybackHeadFrames: Long? = null
      private var maxWriteMs = 0L
      private var statsWindowStartNs = 0L
@@ -1878,11 +1876,10 @@
 +
 +    fun configureBuffering(settings: AudioBufferSettings?) {
 +        check(!started)
-+        val selected = settings ?: if (mediaBufferMillis == MediaAudioBuffer.FOLLOW_PHONE)
-+            AudioBufferSettings(mediaMillis = mediaBufferMillis) else return
++        // 音乐水位只认 mediaBufferMillis（DiPlay 原版语义）；这里只负责实时通话/导航的协商目标。
++        val selected = settings ?: return
 +        val channel = mappedSelection().channel
 +        streamBuffer = StreamAudioBuffer.resolve(selected, channel, format, wirelessAudio)
-+        dynamicMusicBuffer = false
 +        val buffer = streamBuffer
 +        if (buffer != null) {
 +            wirelessRealtime = channel != AudioChannel.MEDIA
@@ -2110,7 +2107,7 @@
 -            format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
 +        val plan = if (wirelessRealtime) WirelessRealtimeAudioBuffer.plan(format.sampleRate, format.channels, minBuffer)
 +            else MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
-+                format.sampleRate, format.channels, minBuffer, mediaBufferMillis, streamBuffer?.targetMillis)
++                format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
          bytesPerSecond = format.sampleRate * frameBytes
          val built: AudioTrack
          var routeLabel: String
@@ -2123,7 +2120,7 @@
              built = AudioTrack.Builder()
                  .setAudioAttributes(attributes)
                  .setAudioFormat(pcmFormat(encoding, channelMask))
-@@ -1512,19 +1427,20 @@
+@@ -1512,19 +1427,19 @@
          track = built
          diagnosticStage = "track-attributes"
          trackAttributes = audioTrackAttributesForFocus(built, attributes)
@@ -2137,7 +2134,6 @@
 -                "usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType} " +
 -                "attributesSource=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "track" else "configured"}"
 -        }.getOrDefault("api=${Build.VERSION.SDK_INT} trackMetadata=unavailable")
-+        trackCapacityBytes = capacityBytes
 +        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
 +            if (wirelessRealtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
 +        // 缓冲水位不代表硬件时钟偏差；保持协商采样率，避免调速引起音乐升降调。
@@ -2387,7 +2383,7 @@
          }
      }
  
-@@ -1875,26 +1809,44 @@
+@@ -1875,26 +1809,36 @@
          underrunsAtPlaybackStart = track.underrunCount
          track.play()
          playbackStarted = true
@@ -2407,14 +2403,6 @@
 -            // The hardware buffer has starved below the recovery floor. Pause without flushing
 -            // or discarding PCM, then use the configured start threshold again when music resumes.
 +        val wirelessMusic = wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA
-+        if (wirelessMusic && dynamicMusicBuffer) {
-+            val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
-+            if (threshold > startThresholdBytes) {
-+                startThresholdBytes = threshold
-+                report("Audio: jitter recovery startMs=${threshold * 1000L / bytesPerSecond} " +
-+                    "observedGapMs=${musicJitter.gapMillis} capacityMs=${trackCapacityBytes * 1000L / bytesPerSecond}")
-+            }
-+        }
 +        if (bufferProgress.shouldRebuffer(!wirelessRealtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
 +                track.underrunCount > underrunsAtPlaybackStart, (queue.isEmpty() && pcmWriter?.hasPending() != true), track.playbackHeadPosition,
 +                startThresholdBytes / 2L, recoverOnQueuedBurst = wirelessMusic)) {
@@ -2820,40 +2808,6 @@
      fun <T> build(
          createLegacy: () -> T,
          isInitialized: (T) -> Boolean,
---- a/shared/src/main/java/com/shilapi/xcertplay/media/MediaAudioBuffer.kt
-+++ b/shared/src/main/java/com/shilapi/xcertplay/media/MediaAudioBuffer.kt
-@@ -7,7 +7,8 @@
-  */
- object MediaAudioBuffer {
-     const val DEFAULT_MILLIS = 300
--    val presets = listOf(DEFAULT_MILLIS, 500, 1000)
-+    const val FOLLOW_PHONE = 0
-+    val presets = listOf(DEFAULT_MILLIS, 500, 1000, FOLLOW_PHONE)
- 
-     private const val HEADROOM_MILLIS = 200 // room above the start level so bursts after a gap fit
-     private const val MIN_TRACK_BUFFER_BYTES = 16 * 1024
-@@ -18,15 +19,18 @@
-     data class Plan(val trackBufferBytes: Int, val startBytes: Int)
- 
-     /** AudioTrack capacity and the amount to queue before play() for one output stream. */
--    fun plan(isMedia: Boolean, sampleRate: Int, channels: Int, minBufferBytes: Int, mediaMillis: Int): Plan {
-+    fun plan(isMedia: Boolean, sampleRate: Int, channels: Int, minBufferBytes: Int, mediaMillis: Int,
-+             resolvedMillis: Int? = null): Plan {
-         val lowLatency = Plan(
-             trackBufferBytes = maxOf(minBufferBytes * 4, MIN_TRACK_BUFFER_BYTES),
-             startBytes = maxOf(minBufferBytes, MIN_START_BUFFER_BYTES),
-         )
-         if (!isMedia) return lowLatency
-         val bytesPerSecond = sampleRate.toLong() * channels.coerceIn(1, 2) * 2
--        val start = (bytesPerSecond * sanitize(mediaMillis) / 1000).toInt()
--        val capacity = (bytesPerSecond * (sanitize(mediaMillis) + HEADROOM_MILLIS) / 1000).toInt()
-+        val target = resolvedMillis ?: sanitize(mediaMillis).takeIf { it != FOLLOW_PHONE } ?: DEFAULT_MILLIS
-+        require(target in 1..com.shilapi.xcertplay.airplay.AudioBufferHint.MAX_MILLIS)
-+        val start = (bytesPerSecond * target / 1000).toInt()
-+        val capacity = (bytesPerSecond * (target + HEADROOM_MILLIS) / 1000).toInt()
-         return Plan(
-             trackBufferBytes = maxOf(capacity, lowLatency.trackBufferBytes),
-             startBytes = maxOf(start, lowLatency.startBytes),
 --- a/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecStartup.kt
 +++ b/shared/src/main/java/com/shilapi/xcertplay/media/MediaCodecStartup.kt
 @@ -1,7 +1,20 @@

@@ -7,6 +7,8 @@
     <string name="galaxy_p2p_region_mainland">中国大陆车载</string>
     <string name="galaxy_p2p_region_other">其他地区（2.4 GHz 保守模式）</string>
     <string name="galaxy_p2p_region_hint"></string>
+    <string name="galaxy_smooth_video">平滑视频（减少画面卡顿）</string>
+    <string name="galaxy_smooth_video_hint">开启后按 iPhone 的帧时间均匀上屏，行驶中更顺；代价是拖动手感多约 0.1 秒延迟。关闭最跟手。修改后重新连接生效。</string>
     <string name="galaxy_p2p_region_channel_invalid">已保存频道不适用于当前车载地区。请选择“自动”或当前地区的其他频道，原设置未被覆盖。</string>
     <string name="galaxy_p2p_region_failure">当前频道或系统建组能力不满足所选车载地区限制。请核对使用地区，选择“自动”或可用频道；若系统无法固定频道，请使用原生热点。</string>
     <string name="galaxy_p2p_configuration_changed">Wi-Fi Direct 的当前配置未确认或已变化。请重新发起连接，应用不会让手机使用旧配置。</string>
