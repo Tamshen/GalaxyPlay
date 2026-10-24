@@ -5,6 +5,17 @@ import org.junit.Test
 
 class MediaAudioBufferTest {
     @Test
+    fun `presets match the DiPlay upstream contract`() {
+        assertEquals(300, MediaAudioBuffer.DEFAULT_MILLIS)
+        assertEquals(1000, MediaAudioBuffer.MOST_STABLE_MILLIS)
+        assertEquals(listOf(300, 500, 1000), MediaAudioBuffer.wirelessPresets)
+        assertEquals(listOf(50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000),
+            MediaAudioBuffer.wiredPresets)
+        assertEquals(MediaAudioBuffer.DEFAULT_MILLIS, MediaAudioBuffer.sanitizeWireless(50))
+        assertEquals(50, MediaAudioBuffer.sanitizeWired(50))
+    }
+
+    @Test
     fun `music buffers the chosen delay plus headroom`() {
         // 48 kHz stereo 16-bit = 192 000 bytes/s.
         val plan = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 500)

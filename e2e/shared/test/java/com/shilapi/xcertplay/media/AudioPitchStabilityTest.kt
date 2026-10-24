@@ -132,13 +132,14 @@ class AudioPitchStabilityTest {
         }
     }
 
-    @Test fun jitterRecoveryChangesTheWaterlineWithoutChangingPitch() {
+    @Test fun observedNetworkGapKeepsTheConfiguredWaterlineAndPitch() {
         Playback(48_000, true).use {
             val before = it.threshold
             it.set("playbackStarted", true)
             it.observeGap()
             it.call("maintainPlaybackBuffer")
-            assertTrue(it.threshold > before)
+            // DiPlay 原版：音乐水位只由用户所选档位决定，实测抖动不会抬高启动水位。
+            assertEquals(before, it.threshold)
             it.write(ByteArray(1_920))
             it.assertOriginalRate()
         }

@@ -1,9 +1,9 @@
 <resources>
     <string name="l7_diagnostics_title">诊断与日志</string>
-    <string name="l7_diagnostics_row_hint">运行日志、诊断报告与悬浮日志</string>
+    <string name="l7_diagnostics_row_hint"></string>
     <string name="l7_logs_and_reports">日志与报告</string>
     <string name="l7_debug_title">悬浮日志</string>
-    <string name="l7_debug_desc">手动开启后可在其他页面查看连接、重连、视频和音频日志。拖动标题移动窗口，折叠可减少遮挡。断联后保留最近记录，诊断报告包含当前日志。</string>
+    <string name="l7_debug_desc"></string>
     <string name="l7_debug_permission">管理悬浮窗权限</string>
     <string name="l7_debug_permission_help">请在系统设置中找到 GalaxyPlay，允许显示在其他应用上层，返回后将打开日志窗。</string>
     <string name="l7_debug_permission_denied">悬浮窗权限未开启，请在系统设置中为 GalaxyPlay 开启。</string>
@@ -37,5 +37,5 @@
     <string name="l7_debug_live">实时</string>
     <string name="l7_debug_paused">显示暂停，仍在记录</string>
     <string name="l7_logs_title">日志</string>
-    <string name="l7_logs_entry_hint">查看、导出与上传运行及调试日志</string>
+    <string name="l7_logs_entry_hint"></string>
 </resources>

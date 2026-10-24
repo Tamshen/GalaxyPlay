@@ -9,7 +9,13 @@ import kotlin.concurrent.withLock
 
 internal sealed interface VideoJob {
     data class Config(val codec: VideoCodec, val codecData: ByteArray) : VideoJob
-    data class Frame(val nalus: ByteArray, val receivedNs: Long = System.nanoTime()) : VideoJob
+    data class Frame(
+        val nalus: ByteArray,
+        val receivedNs: Long = System.nanoTime(),
+        /** iPhone 的帧时间与到帧时刻（System.nanoTime）；未知时为 0，用于帧节奏排期。 */
+        val senderNanos: Long = 0L,
+        val arrivalNanos: Long = 0L,
+    ) : VideoJob
     // 完成信号只在 worker 解除旧目标后调用，宿主据此释放 Surface。
     data class SurfaceChanged(val surface: Surface?, val onApplied: () -> Unit = {}) : VideoJob
     data object Resync : VideoJob

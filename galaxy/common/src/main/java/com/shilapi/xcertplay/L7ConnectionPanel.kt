@@ -70,9 +70,9 @@ internal class L7ConnectionPanel(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(32), dp(32)).apply { topMargin = dp(24); bottomMargin = dp(12) })
         card.addView(stage, row())
-        card.addView(L7Components.text(context, context.getString(
-            if (wireless) R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow
-            else R.string.galaxy_usb_waiting_hint
+        // 无线连接时不展示提示行，仅 USB 连接保留等待提示。
+        if (!wireless) card.addView(L7Components.text(context, context.getString(
+            R.string.galaxy_usb_waiting_hint
         ), secondary = true).apply { textSize = 18f; gravity = Gravity.CENTER }, row(top = 16))
         card.addView(retryButton, row(top = 24))
         card.addView(recoveryButton, row(top = 24))

@@ -2,7 +2,7 @@
 <resources>
     <string name="update_installer_busy">The installer is already open. Finish or close it before trying again.</string>
     <string name="update_check">Check for updates</string>
-    <string name="update_check_hint">Check the latest version, then download and install</string>
+    <string name="update_check_hint"></string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_current">You are up to date (store version %1$s)</string>
     <string name="update_available">Version %1$s is available</string>
@@ -14,10 +14,10 @@
     <string name="update_download_progress">Downloaded %1$d%%</string>
     <string name="update_verifying">Verifying the APK…</string>
     <string name="update_ready">Version %1$s downloaded and verified</string>
-    <string name="update_ready_hint">Tap Install and confirm the system prompt. Your app settings will be kept. The package is in private app cache and can be restored for 24 hours. Expired packages are cleaned when the app resumes or starts another download.</string>
+    <string name="update_ready_hint"></string>
     <string name="update_install">Install update</string>
     <string name="update_stop">Stop</string>
-    <string name="update_close_hint">Closing will stop this check or download. You can check for updates again later.</string>
+    <string name="update_close_hint"></string>
     <string name="update_stopped">Update stopped. You can retry.</string>
     <string name="update_network_error">Could not reach the update server or the download was interrupted. Check your network and retry.</string>
     <string name="update_bad_manifest">Update information is incomplete or belongs to another app. Try again later.</string>
@@ -27,7 +27,7 @@
     <string name="update_no_storage">Not enough space or the APK could not be saved. Free some space and retry.</string>
     <string name="update_end_connection">End the CarPlay connection before installing the update.</string>
     <string name="update_install_permission">Allow update installation</string>
-    <string name="update_permission_hint">Allow GalaxyPlay to install apps in system settings, then return and tap Install update again.</string>
+    <string name="update_permission_hint"></string>
     <string name="update_open_permission">Open install permission</string>
     <string name="update_permission_ready">Installation allowed. Tap Install update again.</string>
     <string name="update_permission_denied">Installation is not allowed. Tap Install update again to open permission settings.</string>

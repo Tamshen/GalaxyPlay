@@ -6,10 +6,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pManager
+import android.text.InputType
+import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.network.WifiP2pChannels
 import com.shilapi.xcertplay.network.GalaxyP2pRegion
+import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 
 /** 无线方式独立保存；只由用户确认切换，不启动或关闭任何网络。 */
@@ -26,6 +30,8 @@ internal class GalaxyWirelessSettings(
     private var channelRow: L7SettingRow? = null
     private var regionRow: L7SettingRow? = null
     private var wifiRow: L7SettingRow? = null
+    private var existingSsidRow: L7SettingRow? = null
+    private var existingPassRow: L7SettingRow? = null
     private val performanceRows = mutableListOf<Pair<String, L7SettingRow>>()
 
     init {
@@ -36,6 +42,21 @@ internal class GalaxyWirelessSettings(
             card.addView(modeRow)
             GalaxyWirelessPerformanceSettings.add(activity, card, false) { !closed && canEdit() }
                 .also { performanceRows += GalaxyWirelessPerformanceSettings.LOCK to it }
+            existingSsidRow = L7Components.valueRow(activity, activity.getString(R.string.existing_wifi_ssid),
+                AirPlayPersistence.loadExistingWifiSsid(activity)) { editExistingWifi(true) }
+                .also { card.addView(it) }
+            existingPassRow = L7Components.valueRow(activity, activity.getString(R.string.existing_wifi_password),
+                mask(AirPlayPersistence.loadExistingWifiPassphrase(activity))) { editExistingWifi(false) }
+                .also { card.addView(it) }
+            // 平滑视频属于视频链路，和联网方式无关；放在这张卡片里，Direct / 局域网 / 热点三种模式都能看到。
+            lateinit var smoothRow: L7SettingRow
+            smoothRow = L7Components.switchRow(activity, activity.getString(R.string.galaxy_smooth_video),
+                activity.getString(R.string.galaxy_smooth_video_hint),
+                AirPlayPersistence.loadSmoothVideo(activity)) { selected ->
+                if (!closed && canEdit()) AirPlayPersistence.saveSmoothVideo(activity, selected)
+                smoothRow.setSwitchChecked(AirPlayPersistence.loadSmoothVideo(activity))
+            }.apply { isEnabled = !closed && canEdit() }
+            card.addView(smoothRow)
         }
         update()
     }
@@ -65,11 +86,13 @@ internal class GalaxyWirelessSettings(
         }
         modeRow.setValue(modeLabel(AirPlayPersistence.loadWirelessHotspotMode(activity)))
         modeRow.isEnabled = !closed && canEdit()
-        val fixedChannel = GalaxyP2pSettings.fixedChannel(activity)
+        val showExisting = AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.EXISTING_WIFI
+        existingSsidRow?.visibility = if (showExisting) View.VISIBLE else View.GONE
+        existingPassRow?.visibility = if (showExisting) View.VISIBLE else View.GONE
         channelRow?.setValue(channelLabel(GalaxyP2pSettings.effectiveChannel(activity)))
-        channelRow?.isEnabled = fixedChannel == null && !closed && canEdit()
-        channelRow?.setDescription(activity.getString(if (fixedChannel != null)
-            R.string.galaxy_l7_direct_channel_hint else R.string.wifi_direct_channel_description))
+        // 频道行始终可手动选择：车型策略的固定频道只作为未选择时的默认值，不再锁死这一行。
+        channelRow?.isEnabled = !closed && canEdit()
+        channelRow?.setDescription(activity.getString(R.string.wifi_direct_channel_description))
         val region = GalaxyP2pSettings.load(activity)
         regionRow?.setValue(regionLabel(region))
         regionRow?.isEnabled = !closed && canEdit()
@@ -78,7 +101,8 @@ internal class GalaxyWirelessSettings(
         channelRow?.setFeedback(if (invalid) activity.getString(R.string.galaxy_p2p_region_channel_invalid) else "", error = invalid)
         val available = supported(activity)
         val enabled = wifiEnabled(activity)
-        modeRow.setFeedback(if (available) "" else activity.getString(R.string.this_head_unit_does_not_support_wi_fi_direct))
+        val mode = AirPlayPersistence.loadWirelessHotspotMode(activity)
+        modeRow.setFeedback(if (available || mode == WirelessHotspotMode.EXISTING_WIFI) "" else activity.getString(R.string.this_head_unit_does_not_support_wi_fi_direct))
         wifiRow?.setFeedback(activity.getString(when {
             !available -> R.string.this_head_unit_does_not_support_wi_fi_direct
             enabled == null -> R.string.wifi_direct_wifi_unknown
@@ -89,7 +113,7 @@ internal class GalaxyWirelessSettings(
 
     private fun chooseMode() {
         if (closed || !canEdit()) return
-        val choices = listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P)
+        val choices = listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI)
         val current = AirPlayPersistence.loadWirelessHotspotMode(activity)
         var selection = current
         val available = supported(activity)
@@ -97,11 +121,13 @@ internal class GalaxyWirelessSettings(
         val generation = pickerGeneration
         dialog = L7Dialogs.builder(activity).setTitle(R.string.wireless_connection_method)
             .setSingleChoiceItems(choices.map(::modeLabel).toTypedArray(), choices.indexOf(selection),
-                { it == 0 || available }) { _, index -> selection = choices[index] }
+                { index -> choices[index] != WirelessHotspotMode.WIFI_P2P || available }) { _, index -> selection = choices[index] }
             .setPositiveButton(R.string.save) { _, _ ->
                 if (canConfirm(generation) && selection != current &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == current &&
-                    (selection == WirelessHotspotMode.MANUAL || supported(activity))) {
+                    (selection == WirelessHotspotMode.MANUAL || selection == WirelessHotspotMode.EXISTING_WIFI || supported(activity))) {
+                    // 与 DiPlay 一致：选择“已有 Wi-Fi”只切换模式，SSID/密码在随后出现的两行里填写；
+                    // 连接前的合法性校验由 CarPlayHostActivity.validateManualHotspotSettings() 负责。
                     AirPlayPersistence.saveWirelessHotspotMode(activity, selection)
                     changed()
                 }
@@ -109,23 +135,24 @@ internal class GalaxyWirelessSettings(
     }
 
     private fun chooseChannel() {
-        if (closed || !canEdit() || GalaxyP2pSettings.fixedChannel(activity) != null) return
+        if (closed || !canEdit()) return
         val region = GalaxyP2pSettings.load(activity)
         val choices = listOf(WifiP2pChannels.AUTO) + region.policy.channels
+        // 已保存值用于判重，弹窗高亮当前实际生效的频道（没有用户选择时即车型默认频道）。
         val current = AirPlayPersistence.loadWifiP2pPreferredChannel(activity)
-        var selection = current
+        val effective = GalaxyP2pSettings.effectiveChannel(activity)
+        var selection = effective
         dismiss()
         val generation = pickerGeneration
         dialog = L7Dialogs.builder(activity).setTitle(R.string.wifi_direct_channel_title).setFixedHeight()
-            .setSingleChoiceItems(choices.map(::channelLabel).toTypedArray(), choices.indexOf(selection)) { _, index ->
+            .setSingleChoiceItems(choices.map(::channelLabel).toTypedArray(), choices.indexOf(effective)) { _, index ->
                 selection = choices[index]
             }.setPositiveButton(R.string.save) { _, _ ->
                 if (canConfirm(generation) && selection != current &&
-                    AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
                     GalaxyP2pSettings.load(activity) == region &&
-                    GalaxyP2pSettings.fixedChannel(activity) == null &&
+                    AirPlayPersistence.loadWifiP2pPreferredChannel(activity) == current &&
                     AirPlayPersistence.loadWirelessHotspotMode(activity) == WirelessHotspotMode.WIFI_P2P) {
-                    AirPlayPersistence.saveWifiP2pPreferredChannel(activity, selection)
+                    GalaxyP2pSettings.saveChannel(activity, selection)
                     update()
                 }
             }.setNegativeButton(R.string.cancel, null).show()
@@ -156,8 +183,11 @@ internal class GalaxyWirelessSettings(
     })
 
 
-    private fun modeLabel(mode: WirelessHotspotMode) = activity.getString(
-        if (mode == WirelessHotspotMode.WIFI_P2P) R.string.wifi_direct else R.string.built_in_car_hotspot)
+    private fun modeLabel(mode: WirelessHotspotMode) = activity.getString(when (mode) {
+        WirelessHotspotMode.WIFI_P2P -> R.string.wifi_direct
+        WirelessHotspotMode.EXISTING_WIFI -> R.string.existing_wifi_title
+        else -> R.string.built_in_car_hotspot
+    })
     private fun channelLabel(channel: Int) = if (channel == WifiP2pChannels.AUTO) activity.getString(R.string.auto)
         else activity.getString(R.string.wifi_direct_channel_choice, channel,
             activity.getString(if (channel < 36) R.string.s_2_4_ghz else R.string.s_5_ghz))
@@ -167,6 +197,34 @@ internal class GalaxyWirelessSettings(
 
     fun dismiss() { pickerGeneration++; dialog?.dismiss(); dialog = null }
     fun dispose() { closed = true; performanceRows.forEach { it.second.isEnabled = false }; dismiss() }
+
+    private fun mask(value: String): String = if (value.isEmpty()) "" else "••••••"
+
+    private fun editExistingWifi(isSsid: Boolean) {
+        if (closed || !canEdit()) return
+        val ctx = activity
+        val ssid = AirPlayPersistence.loadExistingWifiSsid(ctx)
+        val pass = AirPlayPersistence.loadExistingWifiPassphrase(ctx)
+        val edit = EditText(ctx).apply {
+            setText(if (isSsid) ssid else pass)
+            inputType = if (isSsid) InputType.TYPE_CLASS_TEXT
+                else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine()
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle(if (isSsid) R.string.existing_wifi_ssid else R.string.existing_wifi_password)
+            .setView(edit)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val text = edit.text.toString()
+                if (isSsid) AirPlayPersistence.saveExistingWifiCredentials(ctx, text, pass)
+                else AirPlayPersistence.saveExistingWifiCredentials(ctx, ssid, text)
+                existingSsidRow?.setValue(AirPlayPersistence.loadExistingWifiSsid(ctx))
+                existingPassRow?.setValue(mask(AirPlayPersistence.loadExistingWifiPassphrase(ctx)))
+                changed()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
 
     companion object {
         fun supported(context: Context) = context.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT) &&

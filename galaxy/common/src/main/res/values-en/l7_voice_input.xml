@@ -1,14 +1,14 @@
 <resources>
     <string name="l7_voice_title">Voice input test</string>
     <string name="l7_voice_permission">1. Microphone permission</string>
-    <string name="l7_voice_permission_hint">Tap to grant access, then start manually. Reconnect if the current CarPlay session was opened without microphone access.</string>
+    <string name="l7_voice_permission_hint"></string>
     <string name="l7_voice_privacy">Manual capture on this page only, for up to 10 seconds. Leaving or backgrounding stops capture. No recording is saved or automatically uploaded.</string>
     <string name="l7_voice_granted">Granted</string>
     <string name="l7_voice_missing">Not granted</string>
     <string name="l7_voice_permission_ready">Access granted. Start the test manually.</string>
     <string name="l7_voice_permission_denied">Access denied. Enable microphone access in system app permissions and retry.</string>
     <string name="l7_voice_local">2. Check vehicle recording</string>
-    <string name="l7_voice_local_hint">Start, speak a short sentence, and watch the input level. This checks audio capture; use the phone test below to check recognition.</string>
+    <string name="l7_voice_local_hint"></string>
     <string name="l7_voice_source">Recording mode</string>
     <string name="l7_voice_start">Start test (10 seconds)</string>
     <string name="l7_voice_stop">Stop test</string>
@@ -31,7 +31,7 @@
     <string name="l7_voice_carplay">3. Test phone Siri</string>
     <string name="l7_voice_siri">Start Siri voice test</string>
     <string name="l7_voice_uplink">Phone voice status</string>
-    <string name="l7_voice_uplink_hint">Connect the phone and request Siri. Speak when it opens, check whether the phone responds, then record the result. A request does not confirm recognition.</string>
+    <string name="l7_voice_uplink_hint"></string>
     <string name="l7_voice_disconnected">Connect the phone first</string>
     <string name="l7_voice_connected">Connected; ready to test</string>
     <string name="l7_voice_stop_first">Stop the local test first</string>

@@ -5,8 +5,8 @@
     <string name="l7_report_first_issue">本轮首个异常：%1$s</string>
     <string name="l7_report_media_title">媒体上报测试</string>
     <string name="l7_report_navigation_title">HUD 导航上报测试</string>
-    <string name="l7_report_media_hint">使用无声测试曲目检查歌名、播放状态、进度与封面更新，可观察原车媒体卡片；不会向手机发送控制。请先结束 CarPlay 连接。</string>
-    <string name="l7_report_navigation_hint">向原车导航服务发送导航开始、测试路名、转向、距离、剩余时间与结束，再观察 HUD／仪表。请先结束 CarPlay 连接。</string>
+    <string name="l7_report_media_hint"></string>
+    <string name="l7_report_navigation_hint"></string>
     <string name="l7_report_status">1. 开始测试</string>
     <string name="l7_report_start">开始上报测试</string>
     <string name="l7_report_end">结束上报并清理</string>
@@ -19,7 +19,7 @@
     <string name="l7_report_refresh">重新发布当前导航样例</string>
     <string name="l7_report_lifetime">返回页面或临时切到原车界面可继续观察。测试最长两分钟；点击结束、开始真实连接、撤回协议或退出应用时会停止并注销。</string>
     <string name="l7_report_evidence">2. 对照样例记录结果</string>
-    <string name="l7_report_evidence_hint">结果绑定当前样例。结束后请检查车机测试信息是否清除；实际操作与结果都会保存到日志。</string>
+    <string name="l7_report_evidence_hint"></string>
     <string name="l7_report_visible">显示与样例一致</string>
     <string name="l7_report_missing">未显示或与样例不符</string>
     <string name="l7_report_logs">查看与上传测试日志</string>

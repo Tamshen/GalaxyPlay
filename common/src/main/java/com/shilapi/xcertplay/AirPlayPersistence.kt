@@ -38,6 +38,8 @@ object AirPlayPersistence {
     private const val KEY_DISPLAY_SCALE_TENTHS = "display_scale_tenths"
     private const val KEY_UI_SCALE_PERCENT = "ui_scale_percent"
     private const val KEY_HEVC_ENABLED = "hevc_enabled"
+    /** 平滑视频（DiPlay 同名键）：按 iPhone 帧时间排期上屏，默认关闭，与 DiPlay 默认一致。 */
+    private const val KEY_SMOOTH_VIDEO = "smooth_video"
     private const val KEY_HEVC_SOFTWARE_DECODER = "hevc_software_decoder"
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
@@ -99,6 +101,15 @@ object AirPlayPersistence {
     fun saveAmbientDelaySeconds(context: Context, seconds: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt("ambient_delay_seconds", seconds.coerceIn(0, 60)).apply()
+    }
+
+    /** 平滑视频：开启后主画面改用 SurfaceView，按 iPhone 帧时间 + 自适应延迟上屏。 */
+    fun loadSmoothVideo(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SMOOTH_VIDEO, false)
+
+    fun saveSmoothVideo(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SMOOTH_VIDEO, enabled).apply()
     }
 
     fun loadDisplayScalePercent(context: Context): Int =

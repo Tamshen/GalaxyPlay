@@ -72,6 +72,7 @@ import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.media.CarPlayTouchMapper
 import com.shilapi.xcertplay.media.VideoViewport
 import com.shilapi.xcertplay.network.CarPlayVpnService
+import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
@@ -202,6 +203,8 @@ class CarPlayHostActivity : ComponentActivity() {
         manualHotspotBand = manualHotspotBand,
         manualHotspotChannel = manualHotspotChannel,
         manualHotspotSecurity = manualHotspotSecurity,
+        existingWifiSsid = existingWifiSsid,
+        existingWifiPassphrase = existingWifiPassphrase,
         locationReportingEnabled = locationReportingEnabled,
     )
 
@@ -344,6 +347,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var pendingVideoFailure: Pair<Int, com.shilapi.xcertplay.airplay.VideoCodec>? = null
     private var videoRecoveryPanel: L7VideoRecoveryPanel? = null
     private var hevcEnabled = true
+    /** 平滑视频：主画面改用 SurfaceView，帧按 iPhone 的帧时间 + 自适应延迟交给合成器上屏（DiPlay 同款，默认关闭）。 */
+    private var smoothVideoOutput = false
     private var sessionAvcFallback = false
     private var hevcSoftwareDecoderEnabled = false
     private var advancedAudioChannelMappingSupported = false
@@ -380,15 +385,20 @@ class CarPlayHostActivity : ComponentActivity() {
     private var manualHotspotBand = ManualHotspotBand.AUTO
     private var manualHotspotChannel = 0
     private var manualHotspotSecurity = ManualHotspotSecurity.OPEN
+    private var existingWifiSsid = ""
+    private var existingWifiPassphrase = ""
     private var awaitingVpnConsent = false
     private var awaitingWirelessPermissions = false
     private var awaitingLocationPermission = false
     private var vpnReady = false
+    // 车机无 VPN 授权对话框时，用车机自身的 adb 放行；每次有线尝试只试一次。
+    private var vpnAdbConsentTried = false
     private var hotspotStatus = HotspotStatus(state = "off")
     private var menuOpen = false
     private var latestStage = "Preparing CarPlay"
     private var darkMode = false
     private var activeAirPlaySession: AirPlaySession? = null
+    private val seenKeys = mutableSetOf<Int>()
     private val activeScreenStreamTypes = mutableSetOf<Int>()
     private var handshakeResetInProgress = false
     private var startAfterHandshakeReset = false
@@ -463,9 +473,6 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!L7StartupGuard.enterHost(this)) return
         L7DesktopNavigation.attach(this)
         languagePreferenceAtCreate = AppLocale.preference(this)
-        if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
-            AirPlayPersistence.saveWirelessEnabled(this, false)
-        }
         val restoredVpnAttempt = L7VpnConsent.savedAttempt(savedInstanceState, AirPlayPersistence.loadWirelessEnabled(this))
         if (!AirPlayPersistence.loadWirelessEnabled(this))
             wiredAttempt = L7WiredDiagnostics.beginOrResume(this, restoredVpnAttempt)
@@ -539,6 +546,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // Galaxy 使用独立图标比例，其他宿主保留上游默认行为。
         uiScalePercent = if (GalaxyProjectionScale.enabled(this)) AirPlayPersistence.loadUiScalePercent(this) else CarPlayUiScale.DEFAULT
         hevcEnabled = AirPlayPersistence.loadHevcEnabled(this)
+        smoothVideoOutput = AirPlayPersistence.loadSmoothVideo(this)
         hevcSoftwareDecoderEnabled =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                 AirPlayPersistence.loadHevcSoftwareDecoderEnabled(this)
@@ -576,6 +584,8 @@ class CarPlayHostActivity : ComponentActivity() {
         manualHotspotBand = AirPlayPersistence.loadManualHotspotBand(this)
         manualHotspotChannel = AirPlayPersistence.loadManualHotspotChannel(this)
         manualHotspotSecurity = AirPlayPersistence.loadManualHotspotSecurity(this)
+        existingWifiSsid = AirPlayPersistence.loadExistingWifiSsid(this)
+        existingWifiPassphrase = AirPlayPersistence.loadExistingWifiPassphrase(this)
         wirelessPermissionsReady = !wirelessEnabled || hasRequiredWirelessPermissions()
     }
 
@@ -618,10 +628,50 @@ class CarPlayHostActivity : ComponentActivity() {
         vpnGate.request()
     }
 
+    /**
+     * 车机没有 VPN 授权对话框时（部分固件），有线连接会一直停在授权这一步。用车机自身已获批准的
+     * adb 放行 ACTIVATE_VPN，再复查一次实际授权；成功则继续连接，不会打断驾驶员。
+     * 复刻自 DiPlay 的同名机制（其 issue #604）。
+     */
+    private fun preConsentVpnOverAdb() {
+        if (vpnAdbConsentTried) return
+        vpnAdbConsentTried = true
+        val app = applicationContext
+        Thread({
+            val access = runCatching { VpnPreConsent.grant(app) }.getOrDefault(LocalAdb.Access.UNREACHABLE)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                val granted = VpnPreConsentGate(
+                    preConsent = { access == LocalAdb.Access.READY },
+                    prepare = { CarPlayVpnService.prepare(this) },
+                ).satisfied()
+                L7DebugLog.record("VPN consent over adb access=$access granted=$granted")
+                L7WiredDiagnostics.event(this, wiredAttempt, "VPN_ADB_CONSENT", "GRANTED=$granted", outcome = if (granted) "OK" else "FAILED")
+                if (granted && !awaitingVpnConsent && !vpnReady) {
+                    vpnReady = true
+                    wiredStartupFeedback = null
+                    maybeStartCarPlay()
+                } else {
+                    // adb 放行未生效：交回提示流程，vpnAdbConsentTried 已置位，不会再次尝试 adb。
+                    showWiredFailureDialog(L7VpnConsent.Failure.PAGE_MISSING)
+                }
+            }
+        }, "l7-vpn-adb-consent").start()
+    }
+
     private fun wiredStartupFailed(failure: L7VpnConsent.Failure) {
         awaitingVpnConsent = false
         vpnReady = false
         L7WiredDiagnostics.event(this, wiredAttempt, "VPN", failure.name, outcome = "FAILED")
+        // 授权页缺失或被系统拒绝时，先尝试用车机 adb 放行；adb 不可用才提示用户。
+        if (failure in setOf(L7VpnConsent.Failure.PAGE_MISSING, L7VpnConsent.Failure.SYSTEM_DENIED) && !vpnAdbConsentTried) {
+            preConsentVpnOverAdb()
+            return
+        }
+        showWiredFailureDialog(failure)
+    }
+
+    private fun showWiredFailureDialog(failure: L7VpnConsent.Failure) {
         val message = getString(when (failure) {
             L7VpnConsent.Failure.PAGE_MISSING -> R.string.l7_usb_vpn_missing
             L7VpnConsent.Failure.SYSTEM_DENIED -> R.string.l7_usb_vpn_system_denied
@@ -637,6 +687,7 @@ class CarPlayHostActivity : ComponentActivity() {
         wiredFailureDialog = L7Dialogs.builder(this).setTitle(R.string.l7_usb_start_failed).setMessage(guidance)
             .setPositiveButton(R.string.l7_usb_retry) { _, _ ->
                 wiredStartupFeedback = null
+                vpnAdbConsentTried = false
                 wiredAttempt = L7WiredDiagnostics.begin(this)
                 requestStartupPrerequisites()
             }
@@ -685,13 +736,7 @@ class CarPlayHostActivity : ComponentActivity() {
         setIntent(intent)
         if (!L7Agreement.require(this)) return
         if (!L7StartupGuard.enterHost(this)) return
-        if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED" && wirelessEnabled) {
-            shutdown(false, "switching to USB") {
-                AirPlayPersistence.saveWirelessEnabled(this, false)
-                startActivity(Intent(this, CarPlayHostActivity::class.java))
-            }
-            finish()
-        }
+        // USB 插入（含 MFi 认证芯片 CH341）不改变连接方式：连接通道始终跟随「默认使用无线连接」设置。
     }
 
     override fun onResume() {
@@ -863,6 +908,10 @@ class CarPlayHostActivity : ComponentActivity() {
 
     // L7 标准媒体键与系统媒体控制共用转发路径；语音广播另由会话所属接收器处理。
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // 首次见到的按键写一条持久日志：用于确认车机语音键到底有没有送到投屏页（每键只记一次）。
+        if (event.action == KeyEvent.ACTION_DOWN && seenKeys.add(event.keyCode)) {
+            appendLog("Key seen ${event.keyCode}/${event.scanCode} device=${event.deviceId}")
+        }
         if (l7DebugLogs && GalaxyMediaKeys.onHardwareKey(controller, event)) return true
         val voiceKey = if (l7DebugLogs) event.keyCode == KeyEvent.KEYCODE_VOICE_ASSIST
             else CarPlayMediaButton.opensSiri(event.keyCode)
@@ -987,9 +1036,9 @@ class CarPlayHostActivity : ComponentActivity() {
                 setTextColor(getColor(R.color.product_ui_text))
             }
             panel.addView(stage)
-            panel.addView(TextView(this).apply {
-                text = if (wirelessEnabled) getString(R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow)
-                    else getString(R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an)
+            // 无线连接时不再展示该提示行，仅 USB 连接保留接线说明。
+            if (!wirelessEnabled) panel.addView(TextView(this).apply {
+                text = getString(R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an)
                 textSize = 18f; gravity = Gravity.CENTER; setTextColor(getColor(R.color.product_ui_muted))
                 setPadding(0, dp(14), 0, dp(24))
             })
@@ -2744,6 +2793,18 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun validateManualHotspotSettings(): Boolean {
+        // 与上游 DiPlay 一致：已有 Wi-Fi 也要在连接前校验，空 SSID 必须拦下来而不是落进 require 崩溃。
+        if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI) {
+            val error = com.shilapi.xcertplay.orchestration.ManualHotspotValidation.error(existingWifiSsid, existingWifiPassphrase)
+            // Galaxy 的 Wi-Fi 设置在独立 GalaxySettingsActivity，host 没有 existingWifiErrorView 容器；
+            // 这里用文件里既有的提示通道（Toast + 诊断日志）承担同一职责：报错并阻断连接。
+            if (error != null) {
+                android.widget.Toast.makeText(this, getString(error.messageResource()),
+                    android.widget.Toast.LENGTH_LONG).show()
+                appendLog("Settings not saved; existing Wi-Fi details rejected")
+            }
+            return error == null
+        }
         if (wirelessHotspotMode != WirelessHotspotMode.MANUAL) return true
         val error = when {
             manualHotspotSsid.isBlank() -> getString(R.string.hotspot_ssid_is_required)
@@ -3260,6 +3321,10 @@ class CarPlayHostActivity : ComponentActivity() {
             mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
             onAudioDiagnostic = GalaxySessionDiagnostics.audio(applicationContext, diagnosticLog, controllerGeneration, l7DebugLogs),
             onVideoSizeChanged = { width, height -> updateVideoCanvas(controllerGeneration, width, height) },
+            // 平滑视频（DiPlay 新版同款）：开启后按 iPhone 帧时间 + 自适应延迟排期上屏，
+            // 起始延迟取 3 帧 + 40ms（30fps→140ms，60fps→90ms）；关闭则解码出来就上屏。
+            videoPacingDelayMillis = if (smoothVideoOutput) 40 + 3_000 / videoFps.coerceIn(30, 60) else 0,
+            mainVideoFrameRate = videoFps,
         )
     }
 
@@ -3330,6 +3395,11 @@ class CarPlayHostActivity : ComponentActivity() {
                     L7StartupGuard.connected(this@CarPlayHostActivity) {
                         activeAirPlaySession === session && controllerGeneration == restartGeneration &&
                             CarPlayBackgroundSession.active
+                    }
+                    // 首次连接成功后默认开启“打开应用自动连接”，后续启动直接按上一次的连接方式自动重连，
+                    // 无需用户再次进入无线 / 有线 / 设置选择页。
+                    if (!DiPlayPreferences.autoConnect(this@CarPlayHostActivity)) {
+                        DiPlayPreferences.saveAutoConnect(this@CarPlayHostActivity, true)
                     }
                     projectionNavigation?.setConnected(true)
                     reconnectAttempts = 0
@@ -3524,6 +3594,13 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         val controllerGeneration = restartGeneration
         L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "BEGIN")
+        // 上游 DiPlay 在“保存设置并重连”里校验无线参数；Galaxy 的设置页在别处，这里必须在建配置前
+        // 再守一道，否则空 SSID 会直接命中 CarPlayRuntimeConfig 的 require 而不是给出提示。
+        if (wirelessEnabled && wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI &&
+            !validateManualHotspotSettings()) {
+            appendLog("Existing Wi-Fi details incomplete; connection blocked")
+            return
+        }
         val config = createRuntimeConfig()
         val airPlayConfig = createAirPlayConfig(size)
         val locationProvider: Iap2LocationProvider? =
@@ -4040,9 +4117,11 @@ class CarPlayHostActivity : ComponentActivity() {
         val probe = android.view.ViewTreeObserver.OnPreDrawListener {
             if (!texture.isAttachedToWindow) true else {
                 removeVideoWindowProbe()
-                if (!isDestroyed && videoView === texture && !texture.isHardwareAccelerated) {
-                    useSoftwareVideoOutput(texture)
-                    false
+                if (!isDestroyed && videoView === texture) {
+                    // 平滑视频的帧节奏要靠系统合成器按时间戳上屏，TextureView 做不到（DiPlay 同款做法）。
+                    if (smoothVideoOutput) { useSoftwareVideoOutput(texture, smooth = true); false }
+                    else if (!texture.isHardwareAccelerated) { useSoftwareVideoOutput(texture); false }
+                    else true
                 } else true
             }
         }
@@ -4057,7 +4136,7 @@ class CarPlayHostActivity : ComponentActivity() {
         videoWindowProbe = null
     }
 
-    private fun useSoftwareVideoOutput(texture: TextureView) {
+    private fun useSoftwareVideoOutput(texture: TextureView, smooth: Boolean = false) {
         if (videoView !== texture || softwareVideo != null || isDestroyed) return
         val root = texture.parent as? FrameLayout ?: return
         val index = root.indexOfChild(texture)
@@ -4069,6 +4148,8 @@ class CarPlayHostActivity : ComponentActivity() {
         output = GalaxySoftwareVideoOutput(this, created = { surface ->
             if (!isDestroyed && softwareVideo === output) {
                 currentSurface = surface
+                // SurfaceView 的上屏时间由合成器按时间戳决定，解码端不再自己压缓冲。
+                sink?.setSurfaceUsesTimestamps(smooth)
                 attachSurface(surface)
             }
         }, destroyed = { surface ->
@@ -4086,13 +4167,19 @@ class CarPlayHostActivity : ComponentActivity() {
         videoView = output.viewport
         root.removeView(texture)
         root.addView(output.viewport, index, texture.layoutParams)
-        appendLog("Video output mode=SURFACE windowHardwareAccelerated=false pictureAdjustments=false")
-        android.widget.Toast.makeText(this, R.string.galaxy_software_video_note, android.widget.Toast.LENGTH_LONG).show()
+        if (smooth) {
+            appendLog("Video output mode=SURFACE smoothVideo=true")
+        } else {
+            appendLog("Video output mode=SURFACE windowHardwareAccelerated=false pictureAdjustments=false")
+            android.widget.Toast.makeText(this, R.string.galaxy_software_video_note, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun attachSurface(surface: Surface) {
         if (surface in retiringSurfaces) return
         sink?.let { owner -> surfaceOwners.getOrPut(surface) { mutableMapOf() }[owner] = ++surfaceOwnerEpoch }
+        // SurfaceView 的主画面才能让合成器按时间戳上屏；TextureView 仍由解码端压缓冲。
+        sink?.setSurfaceUsesTimestamps(softwareVideo != null)
         sink?.setSurface(SCREEN_TYPE_MAIN, surface)
         if (AirPlayPersistence.loadClusterMapEnabled(this)) {
             clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }
@@ -4310,7 +4397,10 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.WaitingForMfi -> getString(R.string.waiting_for_mfi_coprocessor)
         CarPlayStatus.RequestingMfiPermission -> getString(R.string.requesting_mfi_usb_permission)
         CarPlayStatus.MfiReady -> getString(R.string.mfi_authentication_ready)
-        CarPlayStatus.StartingHotspot -> getString(R.string.starting_wireless_hotspot)
+        // 同一局域网模式并不开热点，这里如实显示“正在连接已有 Wi-Fi”。
+        CarPlayStatus.StartingHotspot -> getString(
+            if (wirelessHotspotMode == com.shilapi.xcertplay.orchestration.WirelessHotspotMode.EXISTING_WIFI)
+                R.string.starting_existing_wifi else R.string.starting_wireless_hotspot)
         is CarPlayStatus.HotspotReady ->
             getString(R.string.status_hotspot_ready, backend, ssid, band, if (channel == 0) getString(R.string.auto_value) else channel.toString())
         CarPlayStatus.WaitingForPairedIphone -> getString(R.string.waiting_for_paired_iphone)

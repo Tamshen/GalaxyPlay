@@ -57,7 +57,7 @@ class WirelessMusicRecoveryTest {
         assertEquals(1L, (get(worker, "codecInputWait") as AudioCodecInputWait).retries)
     }
 
-    @Test fun underrunWithQueuedBurstRetainsPcmAndRefillsToObservedGapWithoutFlushingOrBlocking() {
+    @Test fun underrunWithQueuedBurstRetainsPcmAndRefillsToTheConfiguredWaterlineWithoutFlushingOrBlocking() {
         val worker = renderer()
         val track = mock(AudioTrack::class.java)
         var playing = true
@@ -78,7 +78,7 @@ class WirelessMusicRecoveryTest {
         }
         set(worker, "track", track); set(worker, "mappedChannel", AudioChannel.MEDIA)
         set(worker, "playbackStarted", true); set(worker, "startThresholdBytes", 57_600)
-        set(worker, "trackCapacityBytes", 96_000); set(worker, "bytesPerSecond", 192_000)
+        set(worker, "bytesPerSecond", 192_000)
         set(worker, "fadeApplied", true)
         (get(worker, "bufferProgress") as AudioBufferProgress).written(8000)
         (get(worker, "musicJitter") as MusicJitterRecovery).observe(400)
@@ -89,13 +89,14 @@ class WirelessMusicRecoveryTest {
         maintain(worker)
         assertFalse(playing)
         assertEquals(8000, get(worker, "prebufferBytes"))
-        assertEquals(86_400, get(worker, "startThresholdBytes"))
+        // DiPlay 的音乐水位固定为用户所选档位（300 毫秒 = 57 600 字节），不会因实测抖动被抬高。
+        assertEquals(57_600, get(worker, "startThresholdBytes"))
         assertEquals(1, get(worker, "rebufferCount"))
-        val remaining = ByteArray(86_400 - 8000) { 42 }
+        val remaining = ByteArray(57_600 - 8000) { 42 }
         type.getDeclaredMethod("writePcm", ByteArray::class.java, Int::class.javaPrimitiveType,
             Int::class.javaPrimitiveType).apply { isAccessible = true }.invoke(worker, remaining, 0, remaining.size)
         assertTrue(playing)
-        assertEquals(86_400, queued)
+        assertEquals(57_600, queued)
         assertArrayEquals(remaining, written.toByteArray())
         maintain(worker)
         assertEquals(1, get(worker, "rebufferCount"))

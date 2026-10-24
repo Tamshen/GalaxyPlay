@@ -44,6 +44,7 @@ class WheelKeyService : AccessibilityService() {
     private var learning: WheelZoomSettings.Role? = null
     private var learnt: ((WheelZoomSettings.Role, WheelKey) -> Unit)? = null
     private var learningCancelled: (() -> Unit)? = null
+    private val seenKeys = mutableSetOf<Int>()
     private val endLearning = Runnable { clearLearning() }
     private val endTimedMode = Runnable {
         refreshEligibility()
@@ -115,6 +116,17 @@ class WheelKeyService : AccessibilityService() {
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         val down = event.action == KeyEvent.ACTION_DOWN
+        // 银河车机的语音键在本机被系统语音助手先拿走；无障碍过滤器能更早看到按键。
+        // 有 CarPlay 会话时把它转成 Siri，没有会话时原样交回系统，不影响车机自带语音。
+        if (CarPlayMediaButton.opensSiri(event.keyCode) && session() != null) {
+            if (!down) Log.i(TAG, "CarPlay voice key ${event.keyCode}: Siri sent=" +
+                (CarPlayBackgroundSession.snapshot()?.controller?.requestSiri() == true))
+            return true
+        }
+        // 首次见到的按键记一行，便于对上银河车型实际的语音键码（不重复刷屏）。
+        if (down && seenKeys.add(event.keyCode)) {
+            Log.i(TAG, "key seen: ${event.keyCode}/${event.scanCode} device=${deviceName(event.deviceId)} carplay=${session() != null}")
+        }
         if (CarPlayCallKeys.onKey(this, event.keyCode, down)) return true
         if (BydOutputSettings.carPlayCallControls(this) &&
             CarPlayMediaButton.opensSiriWhileCarPlay(event.keyCode) && session() != null) {

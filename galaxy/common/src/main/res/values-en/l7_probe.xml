@@ -11,7 +11,7 @@
     <string name="l7_probe_packages">Visibility of reference packages</string>
     <string name="l7_probe_executor">Execution identity and auxiliary connections</string>
     <string name="l7_probe_title">Debug</string>
-    <string name="l7_probe_entry_hint">Environment, steering, voice, media and HUD tests; details are logged by default</string>
+    <string name="l7_probe_entry_hint"></string>
     <string name="l7_probe_environment">Environment and permissions</string>
     <string name="l7_probe_modules">Debug modules</string>
     <string name="l7_probe_logs">Logs and reports</string>
@@ -67,7 +67,7 @@
     <string name="l7_probe_saved">Report saved: %1$s</string>
     <string name="l7_probe_delete">Delete this report</string>
     <string name="l7_probe_delete_confirm">Deletes only the selected local check report. Connection and runtime logs are unaffected.</string>
-    <string name="l7_probe_historical_hint">Previous results are for comparison and do not establish current permissions or interface capabilities.</string>
+    <string name="l7_probe_historical_hint"></string>
     <string name="l7_probe_system">System and runtime</string>
     <string name="l7_probe_app">Current app identity</string>
     <string name="l7_probe_apk">Installed APK digest</string>
@@ -95,7 +95,7 @@
     <string name="l7_probe_search_short">Search</string>
     <string name="l7_probe_report_actions">Report actions</string>
     <string name="l7_probe_table_summary">%1$d items · Supported/granted %2$d · No permission %3$d · Errors %4$d · Unsupported %5$d · Pending/not run %6$d</string>
-    <string name="l7_probe_table_hint">Green check: query passed or permission granted. Gray: no permission or pending. Yellow: error. Red: unsupported. Tap a row for evidence.</string>
+    <string name="l7_probe_table_hint"></string>
     <string name="l7_probe_reason_query">State query available</string>
     <string name="l7_probe_reason_granted">Interface call unverified</string>
     <string name="l7_probe_reason_declared">Not declared by app</string>

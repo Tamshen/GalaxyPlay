@@ -2,11 +2,13 @@
 <resources>
     <string name="galaxy_wireless_not_ready">无线网络或 CarPlay 接收服务尚未就绪，正在结束本次连接；请留意重试提示。</string>
     <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct 自动加入准备未完成。请确认车机本地维护服务可用后重新连接；详细阶段已记录到日志。</string>
-    <string name="galaxy_l7_direct_channel_hint">L7 专用连接固定使用 5 GHz 149 信道，修改使用地区后按对应地区配置连接。</string>
+    <string name="galaxy_l7_direct_channel_hint"></string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct 使用地区</string>
     <string name="galaxy_p2p_region_mainland">中国大陆车载</string>
     <string name="galaxy_p2p_region_other">其他地区（2.4 GHz 保守模式）</string>
-    <string name="galaxy_p2p_region_hint">大陆车载自动优先 149 等高 5 GHz 信道，系统拒绝后可尝试 2.4 GHz；不使用 36–48 室内专用信道。其他地区先限制为 2.4 GHz 1–11，仍须符合当地规则与系统射频许可。修改后下次连接生效。</string>
+    <string name="galaxy_p2p_region_hint"></string>
+    <string name="galaxy_smooth_video">平滑视频（减少画面卡顿）</string>
+    <string name="galaxy_smooth_video_hint">开启后按 iPhone 的帧时间均匀上屏，行驶中更顺；代价是拖动手感多约 0.1 秒延迟。关闭最跟手。修改后重新连接生效。</string>
     <string name="galaxy_p2p_region_channel_invalid">已保存频道不适用于当前车载地区。请选择“自动”或当前地区的其他频道，原设置未被覆盖。</string>
     <string name="galaxy_p2p_region_failure">当前频道或系统建组能力不满足所选车载地区限制。请核对使用地区，选择“自动”或可用频道；若系统无法固定频道，请使用原生热点。</string>
     <string name="galaxy_p2p_configuration_changed">Wi-Fi Direct 的当前配置未确认或已变化。请重新发起连接，应用不会让手机使用旧配置。</string>
@@ -42,12 +44,12 @@
     <string name="l7_hotspot_failed">原生热点操作失败，请在系统设置检查。</string>
     <string name="l7_hotspot_cancelled">已停止等待；已提交的系统操作可能仍会完成，应用不会关闭热点。</string>
     <string name="l7_hotspot_session_active">请先断开 CarPlay，再调整热点配置。</string>
-    <string name="l7_hotspot_settings_hint">Android 设置 → 网络和互联网 → 热点与网络共享。</string>
-    <string name="l7_hotspot_actions_hint">优先沿用原生热点已有配置。需要新名称和密码时，可生成后应用；退出应用不会关闭热点。</string>
+    <string name="l7_hotspot_settings_hint"></string>
+    <string name="l7_hotspot_actions_hint"></string>
     <string name="l7_hotspot_cancel">停止等待</string>
     <string name="l7_hotspot_grant">允许修改系统设置</string>
     <string name="l7_hotspot_not_saved">尚未保存</string>
-    <string name="l7_hotspot_create_hint">自动生成专用热点名称和 16 位随机密码（大小写字母与数字，WPA2）。确认后仅在热点关闭时写入；系统拒绝时，可复制到 Android 原生设置手动填写。</string>
+    <string name="l7_hotspot_create_hint"></string>
     <string name="l7_hotspot_copy_name">复制热点名称</string>
     <string name="l7_hotspot_copy_password">复制热点密码</string>
     <string name="l7_hotspot_copied">已复制</string>
@@ -55,6 +57,6 @@
     <string name="l7_hotspot_settings_missing">无法打开 Android 原生网络设置，此固件可能限制了入口。可继续尝试一键设置原生热点，或在调试与日志中收集环境信息。</string>
     <string name="l7_hotspot_busy">正在处理原生热点，请等待完成或先停止等待。</string>
     <string name="l7_hotspot_wifi_settings">原生 Wi-Fi 设置</string>
-    <string name="l7_hotspot_wifi_hint">打开系统网络设置，在“热点与网络共享”中设置 Android 原生热点。</string>
+    <string name="l7_hotspot_wifi_hint"></string>
     <string name="l7_hotspot_read_independent">读取与设置权限不同，读不到配置不代表热点未开启。可继续一键生成并应用配置，或进入原生 Wi-Fi 设置核对后手动填写；已保存的名称和密码会保留。</string>
 </resources>

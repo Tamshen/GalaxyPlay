@@ -16,5 +16,5 @@
     <string name="l7_task_uploaded">上传完成</string>
     <string name="l7_task_upload_failed">上传失败</string>
     <string name="l7_task_upload_stopped">停止只取消未完成批次，已被服务器接收的日志会保留。</string>
-    <string name="l7_task_overlay_hint">开启后显示悬浮日志；关闭不影响 CarPlay 连接。</string>
+    <string name="l7_task_overlay_hint"></string>
 </resources>

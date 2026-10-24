@@ -62,6 +62,10 @@ class AndroidMediaSink(
     onVideoRecovered: (() -> Unit)? = null,
     private val preferredAvcDecoder: String? = null,
     private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
+    /** 帧节奏（平滑视频）的起始显示延迟；0 表示不排期，解码出来就上屏。 */
+    private val videoPacingDelayMillis: Int = 0,
+    /** 主屏帧率，用于压住排期队列的最大提前量；0 用 30fps 估算。 */
+    private val mainVideoFrameRate: Int = 0,
 ) : MediaSink {
     @Volatile private var mediaAudioChanged = onMediaAudioChanged
 
@@ -73,6 +77,7 @@ class AndroidMediaSink(
     @Volatile private var videoFailure = onVideoFailure
     @Volatile private var mainVideoFailure: Pair<VideoCodec, String>? = null
     @Volatile private var videoSizeChanged = onVideoSizeChanged
+    @Volatile private var surfaceUsesTimestamps = false
     @Volatile private var mainVideoSize = videoWidth to videoHeight
     private val appContext = context?.applicationContext
     private val factoryAudio = platformAdaptation.profile
@@ -153,6 +158,8 @@ class AndroidMediaSink(
         } catch (_: java.util.concurrent.RejectedExecutionException) { recoveryPending.set(false) }
     }
 
+    fun setSurfaceUsesTimestamps(uses: Boolean) { surfaceUsesTimestamps = uses }
+
     fun setSurface(type: Int, surface: Surface) {
         synchronized(videoLifecycleLock) {
             if (closed) return
@@ -232,6 +239,11 @@ class AndroidMediaSink(
 
     override fun onVideoFrame(type: Int, naluBytes: ByteArray) {
         videoDecoder(type)?.submit(naluBytes)
+    }
+
+    /** DiPlay 新版同款入口：带上 iPhone 帧时间与到帧时刻，供帧节奏排期。 */
+    override fun onVideoFrame(type: Int, naluBytes: ByteArray, senderNanos: Long, arrivalNanos: Long) {
+        videoDecoder(type)?.submit(naluBytes, senderNanos, arrivalNanos)
     }
 
     override fun onScreenStreamActive(type: Int, active: Boolean) {
@@ -383,6 +395,9 @@ class AndroidMediaSink(
                 },
                 preferredAvcDecoder = preferredAvcDecoder,
                 performanceOptions = performanceOptions,
+                // 只有主屏做帧节奏；副屏/仪表保持原来的即时上屏。
+                pacingDelayNanos = if (type == 110) videoPacingDelayMillis * 1_000_000L else 0L,
+                surfaceTimestamps = { surfaceUsesTimestamps },
             )
         }
     }
@@ -442,6 +457,8 @@ private class VideoDecoder(
     private val createCodec: (String) -> MediaCodec = MediaCodec::createByCodecName,
     private val preferredAvcDecoder: String? = null,
     private val performanceOptions: MediaPerformanceOptions = MediaPerformanceOptions(),
+    private val pacingDelayNanos: Long = 0L,
+    private val surfaceTimestamps: () -> Boolean = { false },
 ) : Closeable {
     @Volatile private var running = true
     @Volatile private var decoder: MediaCodec? = null
@@ -488,10 +505,10 @@ private class VideoDecoder(
         synchronized(lifecycleLock) { if (running) queue.offer(VideoJob.Config(codec, codecData)) }
     }
 
-    fun submit(nalus: ByteArray) {
+    fun submit(nalus: ByteArray, senderNanos: Long = 0L, arrivalNanos: Long = 0L) {
         synchronized(lifecycleLock) {
             if (!running) return
-            val frame = VideoJob.Frame(nalus)
+            val frame = VideoJob.Frame(nalus, senderNanos = senderNanos, arrivalNanos = arrivalNanos)
             playbackWatchdog.received(frame.receivedNs)
             stats.onReceived(nalus.size)
             queue.offer(frame)
@@ -512,6 +529,11 @@ private class VideoDecoder(
         }
     }
 
+    /**
+     * SurfaceView 由系统合成器按时间戳上屏，可以直接把目标时间交给它；
+     * TextureView 只能由应用自己画，必须由解码器端压住缓冲。
+     */
+
     fun detachSurface(surface: Surface, onDetached: () -> Unit) {
         val completeNow = synchronized(lifecycleLock) {
             if (desiredSurface === surface) desiredSurface = null
@@ -526,6 +548,7 @@ private class VideoDecoder(
 
     override fun close() {
         synchronized(lifecycleLock) { running = false; desiredSurface = null; thread.interrupt() }
+        runCatching { pacingScheduler.shutdownNow() }
     }
 
     private fun run() {
@@ -896,6 +919,11 @@ private class VideoDecoder(
             inputSlot.queued()
             inputProgress.reset()
             inputTiming.record(frame.receivedNs / 1000, inputNs)
+            if (pacingDelay != null && frame.senderNanos > 0L && frame.arrivalNanos > 0L) {
+                // PTS 用本地接收时刻，所以按 PTS 记住这一帧的发送端时间，出队时才能排期。
+                if (pacingMeta.size > 64) pacingMeta.clear()
+                pacingMeta[frame.receivedNs / 1000] = longArrayOf(frame.senderNanos, frame.arrivalNanos)
+            }
             stats.onInput(frame.receivedNs)
             startupWatchdog.input(inputNs)
             referenceChain.onQueued()
@@ -954,6 +982,46 @@ private class VideoDecoder(
         requestKeyFrame()
     }
 
+    // 帧节奏（平滑视频，移植 DiPlay 新版）：用 iPhone 的帧时间 + 自适应显示延迟排期上屏。
+    private val pacer = FramePacer()
+    private val pacingDelay = if (pacingDelayNanos > 0) PacingDelay(pacingDelayNanos) else null
+    private val pacingMeta = HashMap<Long, LongArray>()
+    private val pacingScheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { runnable ->
+        Thread(runnable, "carplay-video-pace").apply { isDaemon = true }
+    }.apply { removeOnCancelPolicy = true }
+    private val heldFrames = java.util.concurrent.atomic.AtomicInteger()
+    /** 最多提前 200ms 排期；实际持有帧数由 MAX_HELD_FRAMES 再兜一层。 */
+    private val maxPaceLeadNs = 200_000_000L
+
+    /** 这一帧的目标上屏时间；0 表示立刻上屏（没有排期信息或已落后）。 */
+    private fun pacingTarget(ptsUs: Long, now: Long): Long {
+        val delay = pacingDelay ?: return 0L
+        val meta = pacingMeta.remove(ptsUs) ?: return 0L
+        if (meta[0] <= 0L || meta[1] <= 0L) return 0L
+        val local = pacer.localTime(meta[0], meta[1])
+        if (local <= 0L) return 0L
+        delay.onFrame((now - local).coerceAtLeast(0L))
+        val target = local + delay.nanos
+        return if (target - now in 1..maxPaceLeadNs) target else 0L
+    }
+
+    /** 到点再交还缓冲；持有数量有上限，避免解码器输出缓冲被排期队列吃干净。 */
+    private fun holdRelease(codec: MediaCodec, index: Int, target: Long) {
+        if (heldFrames.get() >= MAX_HELD_FRAMES) { codec.releaseOutputBuffer(index, true); return }
+        heldFrames.incrementAndGet()
+        runCatching {
+            pacingScheduler.schedule({
+                try {
+                    if (running) codec.releaseOutputBuffer(index, true)
+                } catch (_: Exception) {
+                    // codec 可能已重建或释放。
+                } finally {
+                    heldFrames.decrementAndGet()
+                }
+            }, (target - System.nanoTime()).coerceAtLeast(0L), java.util.concurrent.TimeUnit.NANOSECONDS)
+        }.onFailure { heldFrames.decrementAndGet() }
+    }
+
     private fun drainOutput(codec: MediaCodec) {
         val info = outputInfo
         while (running) {
@@ -968,8 +1036,10 @@ private class VideoDecoder(
                     val expired = VideoFrameBudget.remainingNs(info.presentationTimeUs * 1000, now) == 0L
                     val render = running && !expired && outputSurface != null && outputSurface === desiredSurface
                     val decodeNs = inputTiming.take(info.presentationTimeUs, now)
-                    // 已解码图像可以丢弃，不会破坏 codec 内部参考链；避免补播过期画面。
-                    codec.releaseOutputBuffer(index, render)
+                    val targetNs = if (render) pacingTarget(info.presentationTimeUs, now) else 0L
+                    if (targetNs > now && surfaceTimestamps()) codec.releaseOutputBuffer(index, targetNs)
+                    else if (targetNs > now) holdRelease(codec, index, targetNs)
+                    else codec.releaseOutputBuffer(index, render)
                     if (render) {
                         stats.onSubmitted(info.presentationTimeUs, decodeNs); recoveryGate.onOutput(now)
                     } else stats.onDropped(reason = if (expired) VideoDropReason.OUTPUT_EXPIRED else VideoDropReason.NO_TARGET)
@@ -1039,6 +1109,8 @@ private class VideoDecoder(
         const val MAX_INPUT_SIZE = 8 * 1024 * 1024
         const val INPUT_TIMEOUT_US = 10_000L
         val START_CODE = byteArrayOf(0x00, 0x00, 0x00, 0x01)
+        // 帧节奏：最多同时持有 3 帧解码输出，避免把 codec 输出缓冲吃干净。
+        const val MAX_HELD_FRAMES = 3
     }
 }
 
@@ -1080,7 +1152,6 @@ private class AudioRenderer(
     private var wirelessRealtime = WirelessRealtimeAudioBuffer.applies(wirelessAudio, format)
     private var playoutClock = if (wirelessRealtime) WirelessAudioPlayoutClock(format.sampleRate) else null
     private var streamBuffer: StreamAudioBuffer? = null
-    private var dynamicMusicBuffer = true
     private var pendingPacket: AudioPacket? = null
     private var pendingDueNs = 0L
 
@@ -1102,7 +1173,6 @@ private class AudioRenderer(
     private var playbackStarted = false
     private var prebufferBytes = 0
     private var startThresholdBytes = 0
-    private var trackCapacityBytes = 0
     private val musicJitter = MusicJitterRecovery()
     private val codecInputWait = AudioCodecInputWait()
     private val audioOutputInfo = MediaCodec.BufferInfo()
@@ -1149,11 +1219,10 @@ private class AudioRenderer(
 
     fun configureBuffering(settings: AudioBufferSettings?) {
         check(!started)
-        val selected = settings ?: if (mediaBufferMillis == MediaAudioBuffer.FOLLOW_PHONE)
-            AudioBufferSettings(mediaMillis = mediaBufferMillis) else return
+        // 音乐水位只认 mediaBufferMillis（DiPlay 原版语义）；这里只负责实时通话/导航的协商目标。
+        val selected = settings ?: return
         val channel = mappedSelection().channel
         streamBuffer = StreamAudioBuffer.resolve(selected, channel, format, wirelessAudio)
-        dynamicMusicBuffer = false
         val buffer = streamBuffer
         if (buffer != null) {
             wirelessRealtime = channel != AudioChannel.MEDIA
@@ -1387,7 +1456,7 @@ private class AudioRenderer(
         trackAttributes = attributes
         val plan = if (wirelessRealtime) WirelessRealtimeAudioBuffer.plan(format.sampleRate, format.channels, minBuffer)
             else MediaAudioBuffer.plan(selection.channel == AudioChannel.MEDIA,
-                format.sampleRate, format.channels, minBuffer, mediaBufferMillis, streamBuffer?.targetMillis)
+                format.sampleRate, format.channels, minBuffer, mediaBufferMillis)
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
         var routeLabel: String
@@ -1431,7 +1500,6 @@ private class AudioRenderer(
             false, format.sampleRate, format.channels, useBus = !AudioOutputPolicy.isLegacy(streamOverride))
         diagnosticStage = "track-capacity"
         val capacityBytes = built.bufferSizeInFrames * frameBytes
-        trackCapacityBytes = capacityBytes
         startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes,
             if (wirelessRealtime) frameBytes else PREBUFFER_WRITE_CHUNK_BYTES)
         // 缓冲水位不代表硬件时钟偏差；保持协商采样率，避免调速引起音乐升降调。
@@ -1774,8 +1842,7 @@ private class AudioRenderer(
             }
             val writeStarted = System.nanoTime()
             diagnosticStage = "track-write"
-            val count = track.write(data, offset + written, writeLength,
-                if (mappedChannel == AudioChannel.MEDIA) AudioTrack.WRITE_NON_BLOCKING else AudioTrack.WRITE_BLOCKING)
+            val count = track.write(data, offset + written, writeLength, AudioTrack.WRITE_BLOCKING)
             maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
             if (count < 0) {
                 writeErrorsThisWindow++
@@ -1820,14 +1887,6 @@ private class AudioRenderer(
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
         val wirelessMusic = wirelessAudio && !wirelessRealtime && mappedChannel == AudioChannel.MEDIA
-        if (wirelessMusic && dynamicMusicBuffer) {
-            val threshold = musicJitter.threshold(startThresholdBytes, trackCapacityBytes, bytesPerSecond, frameBytes)
-            if (threshold > startThresholdBytes) {
-                startThresholdBytes = threshold
-                report("Audio: jitter recovery startMs=${threshold * 1000L / bytesPerSecond} " +
-                    "observedGapMs=${musicJitter.gapMillis} capacityMs=${trackCapacityBytes * 1000L / bytesPerSecond}")
-            }
-        }
         if (bufferProgress.shouldRebuffer(!wirelessRealtime && mappedChannel == AudioChannel.MEDIA, playbackStarted,
                 track.underrunCount > underrunsAtPlaybackStart, (queue.isEmpty() && pcmWriter?.hasPending() != true), track.playbackHeadPosition,
                 startThresholdBytes / 2L, recoverOnQueuedBurst = wirelessMusic)) {

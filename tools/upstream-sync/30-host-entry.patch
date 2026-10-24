@@ -143,7 +143,7 @@
      private lateinit var airPlayIdentity: AirPlayIdentity
      private var languagePreferenceAtCreate = AppLocale.SYSTEM
  
-@@ -158,44 +168,47 @@
+@@ -158,44 +168,49 @@
          remoteMfiServer = remoteMfiServer.trim().takeIf { it.isNotEmpty() },
          remoteMfiToken = remoteMfiToken.takeIf { it.isNotEmpty() },
          identification = Iap2IdentificationConfig(
@@ -188,8 +188,8 @@
          manualHotspotBand = manualHotspotBand,
          manualHotspotChannel = manualHotspotChannel,
          manualHotspotSecurity = manualHotspotSecurity,
--        existingWifiSsid = existingWifiSsid,
--        existingWifiPassphrase = existingWifiPassphrase,
+         existingWifiSsid = existingWifiSsid,
+         existingWifiPassphrase = existingWifiPassphrase,
          locationReportingEnabled = locationReportingEnabled,
      )
  
@@ -366,7 +366,7 @@
      private var hideTopBar = true
      private var hideBottomBar = true
      private var safeAreaDrawOutside = true
-@@ -389,15 +368,14 @@
+@@ -389,15 +368,16 @@
      private var microphoneAvailable = false
      private var microphonePermissionResolved = false
      private var wirelessEnabled = false
@@ -379,8 +379,8 @@
      private var wirelessPermissionsReady = false
      private var wirelessHotspotMode = WirelessHotspotMode.WIFI_P2P
      private var manualHotspotSsid = ""
--    private var existingWifiSsid = ""
--    private var existingWifiPassphrase = ""
+     private var existingWifiSsid = ""
+     private var existingWifiPassphrase = ""
      private var manualHotspotPassphrase = ""
      private var manualHotspotBand = ManualHotspotBand.AUTO
      private var manualHotspotChannel = 0
@@ -652,7 +652,7 @@
          hevcEnabled = AirPlayPersistence.loadHevcEnabled(this)
          hevcSoftwareDecoderEnabled =
              Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-@@ -665,35 +562,25 @@
+@@ -665,35 +562,27 @@
          hideTopBar = AirPlayPersistence.loadHideTopBar(this)
          hideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
          safeAreaDrawOutside = AirPlayPersistence.loadSafeAreaDrawOutside(this)
@@ -677,8 +677,8 @@
          remoteMfiToken = AirPlayPersistence.loadRemoteMfiToken(this)
 -        locationReportingEnabled = AirPlayPersistence.loadLocationReportingEnabled(this)
          wirelessHotspotMode = AirPlayPersistence.loadWirelessHotspotMode(this)
--        existingWifiSsid = AirPlayPersistence.loadExistingWifiSsid(this)
--        existingWifiPassphrase = AirPlayPersistence.loadExistingWifiPassphrase(this)
+         existingWifiSsid = AirPlayPersistence.loadExistingWifiSsid(this)
+         existingWifiPassphrase = AirPlayPersistence.loadExistingWifiPassphrase(this)
          manualHotspotSsid = AirPlayPersistence.loadManualHotspotSsid(this)
          manualHotspotPassphrase = AirPlayPersistence.loadManualHotspotPassphrase(this)
          manualHotspotBand = AirPlayPersistence.loadManualHotspotBand(this)
@@ -2747,7 +2747,7 @@
              mfiTarget == MfiTarget.I2C && mfiI2cPath.isBlank() ->
                  getString(R.string.i2c_device_path_is_required)
              mfiTarget == MfiTarget.REMOTE && remoteMfiServer.isBlank() ->
-@@ -3318,12 +2744,6 @@
+@@ -3318,12 +2744,18 @@
      }
  
      private fun validateManualHotspotSettings(): Boolean {
@@ -2757,6 +2757,18 @@
 -            existingWifiErrorView?.visibility = if (error == null) View.GONE else View.VISIBLE
 -            return error == null
 -        }
++        // 与上游 DiPlay 一致：已有 Wi-Fi 也要在连接前校验，空 SSID 必须拦下来而不是落进 require 崩溃。
++        if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI) {
++            val error = com.shilapi.xcertplay.orchestration.ManualHotspotValidation.error(existingWifiSsid, existingWifiPassphrase)
++            // Galaxy 的 Wi-Fi 设置在独立 GalaxySettingsActivity，host 没有 existingWifiErrorView 容器；
++            // 这里用文件里既有的提示通道（Toast + 诊断日志）承担同一职责：报错并阻断连接。
++            if (error != null) {
++                android.widget.Toast.makeText(this, getString(error.messageResource()),
++                    android.widget.Toast.LENGTH_LONG).show()
++                appendLog("Settings not saved; existing Wi-Fi details rejected")
++            }
++            return error == null
++        }
          if (wirelessHotspotMode != WirelessHotspotMode.MANUAL) return true
          val error = when {
              manualHotspotSsid.isBlank() -> getString(R.string.hotspot_ssid_is_required)
@@ -3600,7 +3612,7 @@
          currentSurface?.let(::attachSurface)
          val serviceReused = snapshot.controller.hasActiveAirPlayAttachment()
          appendLog(
-@@ -4142,22 +3502,30 @@
+@@ -4142,22 +3502,37 @@
              },
          )
          updateDebugOverlays()
@@ -3626,6 +3638,13 @@
 +        }
          val controllerGeneration = restartGeneration
 +        L7WiredDiagnostics.event(this, wiredAttempt, "CONTROLLER", "BEGIN")
++        // 上游 DiPlay 在“保存设置并重连”里校验无线参数；Galaxy 的设置页在别处，这里必须在建配置前
++        // 再守一道，否则空 SSID 会直接命中 CarPlayRuntimeConfig 的 require 而不是给出提示。
++        if (wirelessEnabled && wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI &&
++            !validateManualHotspotSettings()) {
++            appendLog("Existing Wi-Fi details incomplete; connection blocked")
++            return
++        }
          val config = createRuntimeConfig()
 -        val effectiveSize = if (isMultiWindowActive() && !AirPlayPersistence.loadAdaptPipResolution(this) &&
 -            maximumDetectedWidthPixels >= size.width && maximumDetectedHeightPixels >= size.height &&

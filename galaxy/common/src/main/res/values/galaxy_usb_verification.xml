@@ -3,10 +3,10 @@
     <string name="usb_verification_method">USB 连接方式</string>
     <string name="usb_verification_standard">标准 USB</string>
     <string name="usb_verification_experimental">USB连接验证测试</string>
-    <string name="usb_verification_hint">实验方式尝试由车机提供 USB 网络。连接时会切换 USB 模式；失败后停止并记录原因，结束时恢复原配置。</string>
+    <string name="usb_verification_hint"></string>
     <string name="usb_verification_stop_first">请先断开当前连接，再更改方式或恢复 USB。</string>
     <string name="usb_verification_restore">恢复 USB 原配置</string>
-    <string name="usb_verification_recovery_hint">实验中断或恢复失败后，先断开连接并拔出 iPhone 数据线，再使用此入口恢复。</string>
+    <string name="usb_verification_recovery_hint"></string>
     <string name="usb_verification_restored">USB 配置已恢复。请重新插入 iPhone 后连接。</string>
     <string name="usb_verification_control_missing">车机控制接口不可用，无法开始USB连接验证测试。请上传日志。</string>
     <string name="usb_verification_environment_missing">未确认可用的 USB 配置或控制器，已停止实验。请上传日志。</string>

@@ -68,6 +68,6 @@
     <string name="l7_audio_test_heard">听到了</string>
     <string name="l7_audio_test_unheard">没听到</string>
     <string name="l7_audio_test_recorded">已记录：%1$s。可换一个路由继续试听。</string>
-    <string name="l7_audio_test_phone_hint">只播放模拟音，不拨号、不录音。真实通话需保存、重新连接后验证。</string>
+    <string name="l7_audio_test_phone_hint"></string>
     <string name="l7_audio_test_unavailable">暂时无法试听“%1$s”。可换个路由再试，详情已记入日志。</string>
 </resources>

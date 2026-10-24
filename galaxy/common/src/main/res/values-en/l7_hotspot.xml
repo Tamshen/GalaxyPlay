@@ -2,11 +2,13 @@
 <resources>
     <string name="galaxy_wireless_not_ready">The wireless network or CarPlay receiver is not ready. Ending this attempt; watch for the retry prompt.</string>
     <string name="galaxy_p2p_auto_join_failed">Wi-Fi Direct auto-join preparation could not be confirmed. Check that the head unit’s local maintenance service is available, then reconnect. Details are recorded in the log.</string>
-    <string name="galaxy_l7_direct_channel_hint">The L7 connection uses fixed 5 GHz channel 149. Changing the region applies the channel settings for that region.</string>
+    <string name="galaxy_l7_direct_channel_hint"></string>
     <string name="galaxy_p2p_region_title">Wi-Fi Direct region of use</string>
     <string name="galaxy_p2p_region_mainland">Mainland China · vehicle use</string>
     <string name="galaxy_p2p_region_other">Other regions · conservative 2.4 GHz</string>
-    <string name="galaxy_p2p_region_hint">For vehicle use in mainland China, Auto prefers upper 5 GHz channels starting with 149, with 2.4 GHz fallback after system rejection. Indoor-only channels 36–48 are excluded. Other regions are restricted to 2.4 GHz channels 1–11; local rules and system radio approval still apply. Changes take effect on the next connection.</string>
+    <string name="galaxy_p2p_region_hint"></string>
+    <string name="galaxy_smooth_video">Smooth video</string>
+    <string name="galaxy_smooth_video_hint">Shows frames at the iPhone frame time for steadier motion while driving, with about 0.1 s more touch delay. Off feels most direct. Applies on the next connection.</string>
     <string name="galaxy_p2p_region_channel_invalid">The saved channel is outside this vehicle region. Choose Auto or an allowed channel. Your saved setting has been preserved.</string>
     <string name="galaxy_p2p_region_failure">The channel or system group-creation capability does not meet the selected vehicle region limits. Check the region and choose Auto or an allowed channel. Use the native hotspot if the system cannot fix a channel.</string>
     <string name="galaxy_p2p_configuration_changed">The current Wi-Fi Direct configuration could not be confirmed or has changed. Start a new connection to use the current configuration.</string>
@@ -42,12 +44,12 @@
     <string name="l7_hotspot_failed">Native hotspot operation failed. Check system settings.</string>
     <string name="l7_hotspot_cancelled">Stopped waiting. A submitted system request may still complete; the app will not turn off the hotspot.</string>
     <string name="l7_hotspot_session_active">Disconnect CarPlay before adjusting hotspot settings.</string>
-    <string name="l7_hotspot_settings_hint">Android Settings → Network &amp; internet → Hotspot &amp; tethering.</string>
-    <string name="l7_hotspot_actions_hint">Existing native hotspot details are reused. Generate and apply new details when needed. Exiting the app keeps the hotspot on.</string>
+    <string name="l7_hotspot_settings_hint"></string>
+    <string name="l7_hotspot_actions_hint"></string>
     <string name="l7_hotspot_cancel">Stop waiting</string>
     <string name="l7_hotspot_grant">Allow system changes</string>
     <string name="l7_hotspot_not_saved">Not saved</string>
-    <string name="l7_hotspot_create_hint">Generate a dedicated hotspot name and a random 16-character WPA2 password with uppercase letters, lowercase letters and digits. Applying changes requires the hotspot to be off. If access is denied, copy the details into Android native settings.</string>
+    <string name="l7_hotspot_create_hint"></string>
     <string name="l7_hotspot_copy_name">Copy hotspot name</string>
     <string name="l7_hotspot_copy_password">Copy hotspot password</string>
     <string name="l7_hotspot_copied">Copied</string>
@@ -55,6 +57,6 @@
     <string name="l7_hotspot_settings_missing">Android native network settings could not be opened. This firmware may restrict access. Try configuring the native hotspot from this app, or collect environment details in Debug &amp; logs.</string>
     <string name="l7_hotspot_busy">A native hotspot operation is in progress. Wait for it to finish or stop waiting first.</string>
     <string name="l7_hotspot_wifi_settings">Android Wi-Fi settings</string>
-    <string name="l7_hotspot_wifi_hint">Open system network settings and find Hotspot &amp; tethering for the Android native hotspot.</string>
+    <string name="l7_hotspot_wifi_hint"></string>
     <string name="l7_hotspot_read_independent">Reading and changing settings use different permissions. Unreadable credentials do not mean the hotspot is off. You can still generate and apply a configuration, or check Android Wi-Fi settings and enter it manually. Saved details are kept.</string>
 </resources>

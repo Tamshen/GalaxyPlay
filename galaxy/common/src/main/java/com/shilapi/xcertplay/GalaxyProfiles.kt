@@ -131,6 +131,20 @@ internal class GalaxyProfiles(private val context: Context,
         requireCurrent(expected)
         select(id)
     }
+    /** 删除用户文件；选中文件是镜像与活动引用来源，最后一份文件是回退来源，两者都不删。 */
+    fun delete(id: String): Boolean = synchronized(lock) {
+        initialize()
+        // 内置模板与未落盘草稿没有对应文件，按不可删除处理。
+        if (id == selectedId() || !file(id).exists()) return@synchronized false
+        val remaining = folder.listFiles().orEmpty().count { it.extension == "json" && it.nameWithoutExtension != id }
+        if (remaining < 1) return@synchronized false
+        AtomicFile(file(id)).delete()
+        // AtomicFile.delete 不抛异常，删除后回读确认；文件仍在时保持原状并报告失败。
+        if (file(id).exists()) return@synchronized false
+        // .previous 只服务被删文件的历史回读，一并清理以免留下参数副本。
+        AtomicFile(File(file(id).path + ".previous")).delete()
+        true
+    }
     fun requireCurrent(expected: GalaxyProfile): GalaxyProfile = synchronized(lock) {
         refresh().also { check(it.id == expected.id && it.revision == expected.revision) { "CONFIG_EDIT_CONFLICT" } }
     }

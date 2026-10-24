@@ -12,8 +12,8 @@
     <string name="marker_up">Up</string>
     <string name="marker_down">Down</string>
     <string name="marker_centre_default">Centre · default</string>
-    <string name="hotspot_mode_manual_desc">Wireless CarPlay uses the hotspot in Android native settings. It is a different service from the hotspot on the vehicle launcher. Enable the native hotspot; select 5 GHz when available.</string>
-    <string name="hotspot_mode_p2p_desc">Alternative setup. Requires the car’s Wi-Fi switch on; a 2.4 GHz connection may stutter.</string>
+    <string name="hotspot_mode_manual_desc"></string>
+    <string name="hotspot_mode_p2p_desc"></string>
     <string name="hotspot_details_off">Native hotspot is off. Enable it in Android native settings.</string>
     <string name="hotspot_details_saved">Details saved. Make sure the Android native hotspot is on with the same name and password.</string>
     <string name="permission_enabled_ready">Permission enabled · ready to use</string>
@@ -73,12 +73,12 @@
     <string name="safe_area_full_screen_at">Safe area: full screen at\u0020</string>
     <string name="safe_area_prefix">Safe area:\u0020</string>
     <string name="settings_android9_compat">The following settings are unavailable and hidden on Android 9 (API 28):\n• Wi-Fi P2P (5 GHz) — LocalOnlyHotspot is used instead.\n• HEVC software decoder — hardware decoding is used instead.</string>
-    <string name="settings_mfi_address_hint">Address must start with http:// or https://. Token is optional and sent as an Authorization bearer token.</string>
+    <string name="settings_mfi_address_hint"></string>
     <string name="app_name">DiPlay</string>
     <string name="language_section_title">Language</string>
     <string name="language_app_language">App language</string>
     <string name="language_system_default">System default</string>
-    <string name="language_hint">Choose a language for DiPlay. System default follows the device language.</string>
+    <string name="language_hint"></string>
     <string name="language_apply">Apply</string>
     <string name="common_cancel">Cancel</string>
     <string name="a_familiar_drive">A familiar drive.</string>
@@ -307,11 +307,11 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. Open car hotspot settings, turn the hotspot on and select 5 GHz if available.\n2. Copy its name and password below exactly.\n3. Leave the car hotspot on when connecting. DiPlay sends the details over Bluetooth; your iPhone joins automatically.</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · Pair your iPhone</string>
-    <string name="s_300_ms_default">300 ms · default</string>
+    <string name="s_300_ms_default">300 ms</string>
     <string name="s_30_fps_lighter_load">30 fps · lighter load</string>
     <string name="s_3_connect">3 · Connect</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. Tap Check and enable below. This enables the cluster map and automatic theme following. An active CarPlay session reconnects once. You can then disconnect the computer.</string>
-    <string name="s_500_ms">500 ms</string>
+    <string name="s_500_ms">500 ms · default</string>
     <string name="s_5_ghz">5 GHz</string>
     <string name="s_60_fps_smoother_motion">60 fps · smoother motion</string>
     <string name="s_60_lightest_load" formatted="false">60% · lightest load</string>
@@ -346,6 +346,7 @@
     <string name="starting">Starting</string>
     <string name="starting_airplay_service">Starting AirPlay service</string>
     <string name="starting_wireless_hotspot">Starting wireless hotspot</string>
+    <string name="starting_existing_wifi">正在连接已有 Wi-Fi</string>
     <string name="startup">Startup</string>
     <string name="still_waiting_for_usage_access_check_that_the_command_ran">Still waiting for Usage Access. Check that the command ran successfully for this car, then try again.</string>
     <string name="tap_a_number_to_test_14_driver_speaker_on_byd">Tap a number to test. 14 = driver speaker on BYD.</string>
@@ -463,15 +464,15 @@
     <string name="l7_steering_status">当前链路</string>
     <string name="l7_steering_session">手机会话</string>
     <string name="l7_steering_chain">状态观察</string>
-    <string name="l7_steering_hint">按方控后查看记录；没有 INPUT 表示应用尚未收到该入口的事件。通道写入成功只代表发送成功，不能证明手机已执行。手机状态观察独立记录，不作为按键确认。</string>
+    <string name="l7_steering_hint"></string>
     <string name="l7_steering_markers">问题锚点</string>
     <string name="l7_steering_mark_failed">标记刚才方控失效</string>
     <string name="l7_steering_mark_ok">标记刚才方控正常</string>
     <string name="l7_steering_logs">查看与导出日志</string>
     <string name="l7_steering_clear">清空本页记录</string>
-    <string name="l7_steering_clear_hint">只清空本次运行的显示记录，已有日志保留。</string>
+    <string name="l7_steering_clear_hint"></string>
     <string name="l7_steering_events">最近输入与处理阶段</string>
-    <string name="l7_steering_events_hint">保留最近 256 条阶段，显示最近 12 组。按 trace 编号和 generation 会话代次关联 STEERING_TRACE 日志；耗时从接收事件开始。等待蓝牙、重复键过滤、其他媒体源控制权、队列与通道结果分别记录。</string>
+    <string name="l7_steering_events_hint"></string>
     <string name="l7_steering_connected">已连接 · 代次 %1$d</string>
     <string name="l7_steering_disconnected">未连接 · 代次 %1$d</string>
     <string name="l7_steering_empty">尚未收到方控或媒体控制事件</string>
@@ -484,12 +485,12 @@
     <string name="l7_usb_retry">重新检查并授权</string>
     <string name="l7_usb_back_settings">返回有线设置</string>
     <string name="l7_usb_previous_title">上次有线连接异常结束</string>
-    <string name="l7_usb_previous_hint">上次有线连接未正常结束，或启动未完成。已保留最近两次连接的阶段与可用退出原因；可在日志页查看、上传或导出诊断，再手动重试。</string>
+    <string name="l7_usb_previous_hint"></string>
     <string name="l7_steering_vehicle">车型与输入采集</string>
     <string name="l7_steering_l7_capture">L7 方控沿用现有实现</string>
     <string name="l7_steering_other_capture">额外输入判断日志默认开启；未知输入仅记录，不映射。厂商回调观察在下次连接时应用。</string>
     <string name="l7_steering_test_key">标记准备测试的按键</string>
-    <string name="l7_steering_test_key_hint">先选按键，再按实物键，最后标记正常或失效；记录默认进入日志，上传由你发起。</string>
+    <string name="l7_steering_test_key_hint"></string>
     <string-array name="l7_steering_test_keys">
         <item>左键</item>
         <item>右键</item>
@@ -514,14 +515,14 @@
     <string name="l7_listen_question">刚才按了哪个方控键？选择后会与这组输入绑定，然后继续监听。标注期间请先不要再按其他键。</string>
     <string name="l7_listen_skip">忽略这组输入</string>
     <string name="l7_listen_no_input">按了方控，但没有收到信号</string>
-    <string name="l7_listen_no_input_hint">记录本次未收到输入，供上传后排查。</string>
+    <string name="l7_listen_no_input_hint"></string>
     <string name="l7_listen_records">2. 已标注的按键</string>
     <string name="l7_listen_saved">收到的信号和标注都会保存到日志；标注不改变方控映射。</string>
     <string name="l7_listen_empty">启用监听并按方控，收到信号后再选择按键。</string>
     <string name="l7_listen_sample">第 %1$d 组输入</string>
     <string name="l7_listen_bound">已绑定 %1$d 条输入记录</string>
     <string name="l7_listen_finish">3. 结束并上传</string>
-    <string name="l7_listen_upload_hint">停止监听后，到日志页手动上传本次记录。</string>
+    <string name="l7_listen_upload_hint"></string>
     <string name="l7_listen_no_input_saved">已记录：本次按键没有收到输入</string>
     <string name="l7_report_expected_media">%1$s\n状态：%2$s · 进度：%3$d 秒\n封面：%4$s</string>
     <string name="l7_report_expected_road">本次测试路名：%1$s\n样例 A：左转 300 米；样例 B：右转 500 米。全程剩余 5 公里、10 分钟。\n请查看 HUD 或仪表是否与当前样例一致。</string>
@@ -534,7 +535,7 @@
     <string name="l7_report_cleanup_question">请查看车机界面：测试信息是否已经清除？</string>
     <string name="l7_report_preparing">正在准备样例，请稍候。</string>
     <string name="l7_report_begin_first">点击开始后，这里会显示本次测试的样例。</string>
-    <string name="l7_report_compare_hint">先查看原车界面，再记录结果；每次更新样例后需重新观察。</string>
+    <string name="l7_report_compare_hint"></string>
     <string name="l7_report_result_ok">已记录：符合预期</string>
     <string name="l7_report_result_bad">已记录：未符合预期</string>
     <string name="l7_report_sample_changed">样例已更新，请核对当前内容后再记录。</string>
@@ -545,7 +546,7 @@
     <string name="l7_voice_system_muted">系统正在静音录音，请结束通话或检查麦克风权限。</string>
     <string name="l7_voice_input_level">当前输入电平 %1$d%%，请说一句话</string>
     <string name="l7_voice_data_received">已收到录音数据</string>
-    <string name="l7_voice_speak_hint">点击开始，对车机说一句话，观察输入电平。</string>
+    <string name="l7_voice_speak_hint"></string>
     <string name="l7_voice_elapsed">已采集 %1$d 秒</string>
     <string name="l7_voice_phone_recording">手机已开启语音输入，请对车机说话。</string>
     <string name="l7_voice_phone_ready">点击发起 Siri，打开后对车机说话，再记录手机是否有响应。</string>
@@ -554,7 +555,7 @@
     <string name="l7_voice_response_saved">已记录：手机有响应</string>
     <string name="l7_voice_no_response_saved">已记录：未响应或识别异常</string>
     <string name="l7_debug_choose">选择要测试的功能</string>
-    <string name="l7_debug_choose_hint">进入后按页面步骤开始、观察并记录结果。测试日志自动保存，最后由你手动上传。</string>
+    <string name="l7_debug_choose_hint"></string>
     <string name="l7_debug_goal_steering">监听方控，收到信号后标注刚才按的键。</string>
     <string name="l7_debug_goal_voice">先检查车机录音，再测试手机 Siri 的响应。</string>
     <string name="l7_debug_goal_media">发送测试曲目，对照原车媒体卡片记录结果。</string>
@@ -564,7 +565,7 @@
     <string name="galaxy_wireless_retry">重新连接</string>
     <string name="wireless_startup_retries_exhausted">自动重试已停止，请检查连接后手动重试。</string>
     <string name="audio_buffer_title">分用途播放缓冲</string>
-    <string name="audio_buffer_hint">分别设置电话、Siri 和导航的播放缓冲。缓冲越大，越能吸收网络抖动，但声音会更晚播放；通话和 Siri 建议保留默认策略。跟随手机协商使用本次连接的缓冲目标，手机未提供有效值时使用默认值。保存后下次连接生效。</string>
+    <string name="audio_buffer_hint"></string>
     <string name="audio_buffer_existing">默认策略</string>
     <string name="audio_buffer_phone">跟随手机协商</string>
     <string name="audio_buffer_phone_title">电话缓冲</string>
@@ -576,17 +577,17 @@
     <string name="audio_buffer_300">300 ms</string>
     <string name="audio_buffer_500">500 ms</string>
     <string name="galaxy_wifi_scan_pause">Direct 连接时暂停后台扫描</string>
-    <string name="galaxy_wifi_scan_pause_hint">连接期间尝试暂停后台搜索网络，减少音画停顿；断开后恢复。系统控制不可用时会在日志记录原因，下一次连接生效。</string>
+    <string name="galaxy_wifi_scan_pause_hint"></string>
     <string name="galaxy_wifi_performance_lock">无线传输性能优化</string>
-    <string name="galaxy_wifi_performance_lock_hint">投屏期间保持 Wi-Fi 高性能与低延迟，断开后释放。下一次连接生效。</string>
+    <string name="galaxy_wifi_performance_lock_hint"></string>
     <string name="media_performance_title">Performance options</string>
     <string name="media_performance_default">Software default</string>
     <string name="media_performance_oem">OEM approach</string>
     <string name="media_performance_music">Music playback strategy</string>
-    <string name="media_performance_music_hint">The OEM approach separates music decoding and playback, with up to 40 ms of additional queued audio.</string>
+    <string name="media_performance_music_hint"></string>
     <string name="media_performance_video_buffer">Video buffer strategy</string>
-    <string name="media_performance_video_buffer_hint">The OEM approach reuses video conversion buffers to reduce repeated memory allocation.</string>
+    <string name="media_performance_video_buffer_hint"></string>
     <string name="media_performance_low_latency">Hardware low latency strategy</string>
-    <string name="media_performance_low_latency_hint">The OEM approach tries Qualcomm low latency parameters and falls back if rejected or decoder recovery occurs.</string>
-    <string name="media_performance_reconnect_hint">Each option defaults to Software default. Confirmed changes are saved separately from profiles and apply on the next connection. If problems occur, select Software default and use Reconnect in the menu. The OEM approach is based on vehicle app implementations; results require testing on your vehicle.</string>
+    <string name="media_performance_low_latency_hint"></string>
+    <string name="media_performance_reconnect_hint"></string>
 </resources>

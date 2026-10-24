@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="galaxy_media_reporting_hint">Enabled by default. Register Galaxy Play with the car media service. Turn off to skip registration. Save and reconnect to apply.</string>
+    <string name="galaxy_media_reporting_hint"></string>
 </resources>

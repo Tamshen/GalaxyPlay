@@ -140,7 +140,14 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
         val catalog = runCatching { repository.catalog() }.getOrElse {
             view.feedback(text(R.string.profile_load_failed), true); return
         }
-        templateDialog = GalaxyConfigurationPicker.show(activity, catalog, current, state.sourceTemplate) { choice ->
+        var reopen = false
+        templateDialog = GalaxyConfigurationPicker.show(activity, catalog, current, state.sourceTemplate,
+            remove = { profile ->
+                // 删除由页面写文件；成功交给确认框关闭后重开列表，失败在确认框内提示。
+                val deleted = !closed && runCatching { repository.delete(profile.id) }.getOrDefault(false)
+                if (deleted) reopen = true
+                deleted
+            }) { choice ->
             if (closed) false else {
                 val result = runCatching {
                     if (choice.copy) {
@@ -159,7 +166,11 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
                 }.onFailure { view.feedback(text(R.string.profile_save_failed), true) }
                 result.isSuccess
             }
-        }.also { dialog -> dialog.setOnDismissListener { if (templateDialog === dialog) templateDialog = null } }
+        }.also { dialog -> dialog.setOnDismissListener {
+            if (templateDialog === dialog) templateDialog = null
+            // 删除成功后按最新文件重新打开选择器；关闭页面时不再重开。
+            if (reopen) { reopen = false; view.post { chooseTemplate() } }
+        } }
     }
     private fun importShared(expected: GalaxyProfile, value: GalaxyConfigurationShare): GalaxyProfile {
         check(!closed && state.original == expected)
@@ -171,6 +182,8 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
     private fun commit() {
         if (closed || saveDialog?.isShowing == true || templateDialog?.isShowing == true || resetDialog?.isShowing == true) return
         val profile = state.draft ?: return
+        // 已有配置点“保存”直接写回，不再弹命名框；只有新建草稿才需要先起名字。
+        if (profile.revision > 0) { commitSaved(profile); return }
         var failure = R.string.profile_save_failed
         saveDialog = GalaxyConfigurationNameField.save(activity,
             GalaxyConfigurationNames.forSave(activity, profile, repository.list().map { it.name }),
@@ -188,6 +201,16 @@ internal class GalaxyConfigurationPage(private val activity: ComponentActivity,
             }
         }.also { dialog -> dialog.setOnDismissListener { if (saveDialog === dialog) saveDialog = null } }
     }
+    /** 已有配置：用现有名称直接保存，不弹任何对话框。 */
+    private fun commitSaved(profile: GalaxyProfile) {
+        val result = runCatching { repository.saveCurrent(profile) }
+        result.onSuccess { state.load(it); bind(); changed() }
+            .onFailure {
+                view.feedback(text(if (it is GalaxyProfileNameConflict) R.string.profile_name_conflict
+                    else R.string.profile_save_failed), true)
+            }
+    }
+
     private fun detach() {
         draft?.let { context ->
             context.onChanged = null

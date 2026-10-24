@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="performance_title">Performance monitor</string>
-    <string name="performance_hint">Manually inspect CPU, memory, UFPS (app UI) and CFPS (CarPlay). Off by default.</string>
+    <string name="performance_hint"></string>
     <string name="performance_state">Monitor status</string>
     <string name="performance_start">Start monitoring</string>
     <string name="performance_stop">Stop monitoring</string>
@@ -11,25 +11,25 @@
     <string name="performance_fallback">Basic monitoring active without overlay permission; results appear here</string>
     <string name="performance_failed">Action incomplete. Check system permissions and retry; this page shows the actual monitor status.</string>
     <string name="performance_overlay">Top-left performance overlay</string>
-    <string name="performance_overlay_hint">Two read-only lines. All touches pass through; projection layout stays unchanged.</string>
-    <string name="performance_permission_hint">Allow to display over other pages. Monitoring remains available here if denied.</string>
+    <string name="performance_overlay_hint"></string>
+    <string name="performance_permission_hint"></string>
     <string name="performance_deep">Sample threads for 15 seconds</string>
-    <string name="performance_deep_hint">Reads this process’s thread CPU counters at additional cost. Start manually when investigating stalls.</string>
+    <string name="performance_deep_hint"></string>
     <string name="performance_details">Monitor details</string>
-    <string name="performance_cpu_hint">App CPU time divided by elapsed time, summed per core. May exceed 100%; this is not whole-device usage.</string>
+    <string name="performance_cpu_hint"></string>
     <string name="performance_memory">Memory</string>
-    <string name="performance_memory_hint">Java and Native heaps are separate. PSS and RSS update about every 10 seconds; do not add these values together.</string>
+    <string name="performance_memory_hint"></string>
     <string name="performance_fps">CFPS · CarPlay frame rate</string>
-    <string name="performance_fps_hint">CFPS counts actual CarPlay video presentations, separately from app UI rendering. No projection is shown explicitly; connected sessions without valid samples wait for video frames. Receive rate is separate.</string>
+    <string name="performance_fps_hint"></string>
     <string name="performance_no_stream">No CarPlay projection</string>
     <string name="performance_cost">Monitoring overhead</string>
     <string name="performance_cost_value">Current query %1$s ms · overlay drawing %2$s ms</string>
     <string name="performance_budget">Monitoring took longer than expected. Hide the overlay or let deep sampling finish.</string>
     <string name="performance_extra">GC and deep thread sampling</string>
-    <string name="performance_measurement_hint">Query and drawing times do not measure the monitor’s full CPU cost. Keep the same workload when comparing off, basic, overlay and deep modes. Stopped values are history; restarting clears them.</string>
+    <string name="performance_measurement_hint"></string>
     <string name="performance_notification">Manually monitoring CPU, memory, UFPS and CFPS. Stop at any time.</string>
     <string name="performance_ufps">UFPS · App UI frame rate</string>
-    <string name="performance_ufps_hint">UFPS counts completed frames of the foreground app main window. It excludes the performance overlay, separate CarPlay video Surface and display refresh rate. Low rates on static pages are normal; it never assumes 60 FPS.</string>
+    <string name="performance_ufps_hint"></string>
     <string name="performance_ui_idle">UI idle (0 FPS)</string>
     <string name="performance_ui_idle_short">Idle</string>
     <string name="performance_ui_background">App in background</string>

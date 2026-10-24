@@ -1,17 +1,17 @@
 <resources>
     <string name="galaxy_carplay_return_default">回到车机</string>
     <string name="galaxy_carplay_return_title">CarPlay 返回入口</string>
-    <string name="galaxy_carplay_return_hint">显示在 CarPlay 中，用于返回车机。名称与图标独立保存，下次连接生效。</string>
+    <string name="galaxy_carplay_return_hint"></string>
     <string name="galaxy_carplay_return_name">入口名称</string>
-    <string name="galaxy_carplay_return_name_hint">填写 1–32 个字符，或恢复默认名称。</string>
+    <string name="galaxy_carplay_return_name_hint"></string>
     <string name="galaxy_carplay_return_name_invalid">请输入 1–32 个字符，不含换行或控制字符。</string>
     <string name="galaxy_carplay_return_save_failed">保存失败，请重试。</string>
     <string name="galaxy_carplay_return_reset_name">默认名称</string>
     <string name="galaxy_carplay_return_preview">CarPlay 返回入口图标预览</string>
     <string name="galaxy_carplay_return_import">选择入口图标</string>
-    <string name="galaxy_carplay_return_crop_hint">选择图片后裁剪为正方形，确认才保存；取消保留原图标。</string>
+    <string name="galaxy_carplay_return_crop_hint"></string>
     <string name="galaxy_carplay_return_icon_default">默认图标</string>
     <string name="galaxy_carplay_return_icon_custom">自定义图标</string>
     <string name="galaxy_carplay_return_reset_icon">恢复默认图标</string>
-    <string name="galaxy_carplay_return_reset_hint">恢复车机返回图标，保留自定义名称与其他设置。下次连接生效。</string>
+    <string name="galaxy_carplay_return_reset_hint"></string>
 </resources>
