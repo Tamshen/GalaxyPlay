@@ -1,6 +1,8 @@
 package com.shilapi.xcertplay.network
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
@@ -25,9 +27,10 @@ class ExistingWifiManager(
     private val onDiagnostic: (String) -> Unit = {},
     private val onNetworkChanged: () -> Unit = {},
 ) : WirelessHotspotManager {
-    private val connectivity = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+    private val appContext = context.applicationContext
+    private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
         ?: throw IllegalStateException("ConnectivityManager is unavailable")
-    private val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
+    private val wifi = appContext.getSystemService(WifiManager::class.java)
         ?: throw IllegalStateException("WifiManager is unavailable")
     private val lock = Any()
     private val invalidated = AtomicBoolean()
@@ -63,6 +66,18 @@ class ExistingWifiManager(
         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
         check(selected == null) { "ExistingWifiManager has already started" }
         val started = System.nanoTime()
+        // 同一局域网模式完全依赖标准 Wi-Fi 射频；若关闭则请求打开。
+        // 普通 App 需要 NETWORK_SETTINGS 权限（manifest 已声明）才能真开起来，否则 setWifiEnabled 静默返回 false。
+        if (!wifi.isWifiEnabled) {
+            @Suppress("DEPRECATION")
+            val accepted = runCatching { wifi.setWifiEnabled(true) }.getOrDefault(false)
+            onDiagnostic("Wi-Fi radio was off; enable request accepted=$accepted")
+            // 无权限时 setWifiEnabled 会静默失败，射频仍关着。此时拉起系统 Wi-Fi 设置页，
+            // 让用户手动点开开关；射频一开，下面的 nudgeAssociation 会自动连回已保存网络。
+            if (!wifi.isWifiEnabled) {
+                openSystemWifiSettings()
+            }
+        }
         while (!closed) {
             // INTERNET/VALIDATED and the default route do not identify the CarPlay LAN.
             val networks = connectivity.allNetworks.filter { network ->
@@ -176,6 +191,37 @@ class ExistingWifiManager(
             return
         }
         onDiagnostic("Existing Wi-Fi not associated yet; asked the system to reconnect ($requested)")
+    }
+
+    /**
+     * 引导用户到系统 Wi-Fi 设置页手动打开射频（本 App 无 NETWORK_SETTINGS 权限时的兜底）。
+     * 注意：这台车机的 ACTION_WIFI_SETTINGS action 被 Flyme 的 connectivitysettings 抢注，
+     * 会打开 TCAM 私有 Wi-Fi 页（不是标准 wlan0）。因此用显式 component 直连
+     * com.android.car.settings 的标准 WLAN 页；失败时再退回 ACTION_WIFI_SETTINGS。
+     */
+    private fun openSystemWifiSettings() {
+        val standard = Intent().apply {
+            component = ComponentName(
+                "com.android.car.settings",
+                "com.android.car.settings.common.CarSettingActivities\$WifiSettingsActivity",
+            )
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            appContext.startActivity(standard)
+            onDiagnostic("Opened standard Wi-Fi settings (CarSettings) for manual enable")
+        } catch (standardError: Exception) {
+            onDiagnostic("Standard Wi-Fi settings unavailable (${standardError.javaClass.simpleName}); falling back")
+            try {
+                appContext.startActivity(
+                    Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                onDiagnostic("Opened fallback Wi-Fi settings")
+            } catch (fallbackError: Exception) {
+                onDiagnostic("Failed to open Wi-Fi settings: ${fallbackError.javaClass.simpleName}")
+            }
+        }
     }
 
     private fun sameLink(properties: LinkProperties): Boolean =

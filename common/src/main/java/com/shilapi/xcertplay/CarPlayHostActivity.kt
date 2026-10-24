@@ -473,9 +473,6 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!L7StartupGuard.enterHost(this)) return
         L7DesktopNavigation.attach(this)
         languagePreferenceAtCreate = AppLocale.preference(this)
-        if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
-            AirPlayPersistence.saveWirelessEnabled(this, false)
-        }
         val restoredVpnAttempt = L7VpnConsent.savedAttempt(savedInstanceState, AirPlayPersistence.loadWirelessEnabled(this))
         if (!AirPlayPersistence.loadWirelessEnabled(this))
             wiredAttempt = L7WiredDiagnostics.beginOrResume(this, restoredVpnAttempt)
@@ -739,13 +736,7 @@ class CarPlayHostActivity : ComponentActivity() {
         setIntent(intent)
         if (!L7Agreement.require(this)) return
         if (!L7StartupGuard.enterHost(this)) return
-        if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED" && wirelessEnabled) {
-            shutdown(false, "switching to USB") {
-                AirPlayPersistence.saveWirelessEnabled(this, false)
-                startActivity(Intent(this, CarPlayHostActivity::class.java))
-            }
-            finish()
-        }
+        // USB 插入（含 MFi 认证芯片 CH341）不改变连接方式：连接通道始终跟随「默认使用无线连接」设置。
     }
 
     override fun onResume() {
